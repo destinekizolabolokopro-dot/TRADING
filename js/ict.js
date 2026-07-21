@@ -294,7 +294,7 @@
 
     var trade = bull ? buildLong(candles, range, pd, crt) : buildShort(candles, range, pd, crt);
     if (!(trade.rr >= CONFIG.minRR)) return null;
-    return { strategy: 'ote', strategyLabel: 'OTE + PD Array + CRT', direction: bull ? 'LONG' : 'SHORT',
+    return { strategy: 'ote', strategyLabel: 'Retracement OTE', direction: bull ? 'LONG' : 'SHORT',
       trade: trade, pd: pd, confluences: conf, confidence: scoreConfidence(conf) };
   }
 
@@ -336,7 +336,7 @@
       trade.rr = (slh - entry) > 0 ? (entry - trade.tp2) / (slh - entry) : 0;
     }
     if (!(trade.rr >= CONFIG.minRR)) return null;
-    return { strategy: 'daily', strategyLabel: 'Previous Daily CRT', direction: bull ? 'LONG' : 'SHORT',
+    return { strategy: 'daily', strategyLabel: 'Previous Daily', direction: bull ? 'LONG' : 'SHORT',
       trade: trade, pd: pdArr, confluences: conf, confidence: scoreConfidence(conf) };
   }
 
@@ -372,10 +372,11 @@
       trend: trend, structure: structure, pdh: opts.pdh, pdl: opts.pdl
     };
 
-    // Deux stratégies ; on retient le meilleur signal (confiance la plus haute).
+    // Stratégies activées (par défaut toutes) ; on retient le meilleur signal.
+    var enabled = opts.strategies || {};
     var cands = [];
-    var s1 = evalOTE(ctx); if (s1) cands.push(s1);
-    var s2 = evalDaily(ctx); if (s2) cands.push(s2);
+    if (enabled.ote !== false) { var s1 = evalOTE(ctx); if (s1) cands.push(s1); }
+    if (enabled.daily !== false) { var s2 = evalDaily(ctx); if (s2) cands.push(s2); }
     cands.sort(function (a, b) { return b.confidence - a.confidence; });
     var best = cands[0] || null;
 

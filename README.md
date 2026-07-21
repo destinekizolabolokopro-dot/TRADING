@@ -16,6 +16,12 @@ fondés sur les concepts **ICT / SMC**, avec graphiques, calculateur de risque e
 - **Confiance proportionnelle** : plus il y a de confluences dans le même sens (OTE, tendance
   EMA 20/50, structure BOS/CHoCH, PD Array, clôture…), plus le pourcentage est élevé.
 - Un signal n'est émis qu'avec **R:R ≥ 1.2**. On retient la meilleure des deux stratégies par paire.
+- **Menu en sous-parties** : Signaux · Historique · Stratégies · Réglages.
+- **Historique & bilan** : chaque signal repéré est archivé ; dès que le prix touche le stop
+  ou l'objectif (TP1), le résultat est noté. Bilan gagnants / perdants, taux de réussite et
+  résultat cumulé (en R). Tout est stocké localement.
+- **Sélecteur de stratégies** : active/désactive chaque stratégie (registre extensible pour
+  en ajouter d'autres facilement).
 - **Graphique chandeliers** intégré (façon TradingView, moteur Canvas maison, hors-ligne) :
   bougies, EMA, niveaux Fibonacci, zone OTE, boxes FVG / Order Blocks, liquidité,
   lignes Entrée / Stop / TP, croix de visée avec lecture OHLC.

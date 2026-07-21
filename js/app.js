@@ -9,22 +9,32 @@
   'use strict';
 
   var STORAGE = 'tradeassist.settings';
+  var HISTORY_KEY = 'tradeassist.history';
   var TICK_MS = 20000;
   var MIN_AGE_CRYPTO = 40000;
   var MIN_AGE_SLOW = 240000;
   var MIN_AGE_DAILY = 1800000; // 30 min — la veille change peu
+
+  // Registre des stratégies (extensible : il suffit d'ajouter une entrée + son eval dans ict.js).
+  var STRATS = [
+    { id: 'ote', name: 'Retracement OTE', sub: 'Zone OTE du Fibonacci + PD Array en discount/premium + CRT.', tag: 'ICT' },
+    { id: 'daily', name: 'Previous Daily', sub: 'Balayage du plus-haut/plus-bas de la veille (PDH/PDL) puis retour.', tag: 'Daily' }
+  ];
 
   var state = {
     symbols: API.DEFAULT_SYMBOLS.slice(),
     timeframe: '15m',
     cache: {},
     daily: {},
+    history: [],
     lastUpdate: null,
     prevSignals: null,
     filters: { dir: 'all', market: 'all', strat: 'all', sort: 'conf' },
+    strategies: { ote: true, daily: true },
     theme: 'light',
     alerts: false,
     risk: { balance: 1000, pct: 1 },
+    view: 'signaux',
     timer: null
   };
 
@@ -39,6 +49,7 @@
         }
         if (s.timeframe) state.timeframe = s.timeframe;
         if (s.filters) state.filters = Object.assign(state.filters, s.filters);
+        if (s.strategies) state.strategies = Object.assign(state.strategies, s.strategies);
         if (s.theme) state.theme = s.theme;
         if (typeof s.alerts === 'boolean') state.alerts = s.alerts;
         if (s.risk) state.risk = Object.assign(state.risk, s.risk);
@@ -49,10 +60,12 @@
     try {
       localStorage.setItem(STORAGE, JSON.stringify({
         symbols: state.symbols, timeframe: state.timeframe, filters: state.filters,
-        theme: state.theme, alerts: state.alerts, risk: state.risk
+        strategies: state.strategies, theme: state.theme, alerts: state.alerts, risk: state.risk
       }));
     } catch (e) { /* ignore */ }
   }
+  function loadHistory() { try { state.history = JSON.parse(localStorage.getItem(HISTORY_KEY)) || []; } catch (e) { state.history = []; } }
+  function saveHistory() { try { localStorage.setItem(HISTORY_KEY, JSON.stringify(state.history.slice(-500))); } catch (e) { /* ignore */ } }
 
   // --- Helpers ----------------------------------------------------------------
   var $ = function (s) { return document.querySelector(s); };
@@ -86,7 +99,9 @@
     if (c && (now - c.ts) < minAge(sym)) return Promise.resolve(c.result);
     return ensureDaily(sym).then(function (daily) {
       return API.fetchCandles(sym, state.timeframe, 200).then(function (candles) {
-        var r = ICT.analyze(sym, state.timeframe, candles, daily || {});
+        var opts = { strategies: state.strategies };
+        if (daily) { opts.pdh = daily.pdh; opts.pdl = daily.pdl; }
+        var r = ICT.analyze(sym, state.timeframe, candles, opts);
         r.label = API.label(sym); r.kind = (API.meta(sym) || {}).kind;
         state.cache[sym] = { ts: Date.now(), result: r };
         return r;
@@ -108,9 +123,90 @@
     var jobs = state.symbols.map(function (sym) { return ensureSymbol(sym).then(function () { renderAll(); }); });
     return Promise.all(jobs).then(function () {
       state.lastUpdate = new Date();
+      updateHistory();
       renderAll();
       checkAlerts();
+      if (state.view === 'historique') renderHistory();
       setStatus('En direct', false);
+    });
+  }
+
+  // --- Historique des trades & bilan -----------------------------------------
+  function updateHistory() {
+    var all = results();
+    // 1) archiver les nouveaux signaux (un seul trade « ouvert » par paire+stratégie+sens)
+    all.forEach(function (r) {
+      if (!r.hasSignal) return;
+      var exists = state.history.some(function (h) {
+        return h.status === 'open' && h.symbol === r.symbol && h.strategy === r.strategy && h.direction === r.trade.direction;
+      });
+      if (exists) return;
+      var t = r.trade;
+      state.history.push({
+        id: Date.now() + '-' + r.symbol, ts: Date.now(), symbol: r.symbol, label: r.label,
+        strategy: r.strategy, strategyLabel: r.strategyLabel, direction: t.direction, timeframe: r.timeframe,
+        precision: r.precision, entry: t.entry, sl: t.sl, tp1: t.tp1, status: 'open', result: null, r: null
+      });
+    });
+    // 2) clôturer les trades ouverts selon le prix courant
+    state.history.forEach(function (h) {
+      if (h.status !== 'open') return;
+      var res = state.cache[h.symbol] && state.cache[h.symbol].result;
+      if (!res || res.price == null) return;
+      var p = res.price, hit = null;
+      if (h.direction === 'LONG') { if (p <= h.sl) hit = 'loss'; else if (p >= h.tp1) hit = 'win'; }
+      else { if (p >= h.sl) hit = 'loss'; else if (p <= h.tp1) hit = 'win'; }
+      if (hit) {
+        h.status = 'closed'; h.result = hit; h.closedTs = Date.now();
+        var risk = Math.abs(h.entry - h.sl), rew = Math.abs(h.tp1 - h.entry);
+        h.r = hit === 'win' ? (risk > 0 ? rew / risk : 0) : -1;
+      }
+    });
+    saveHistory();
+  }
+
+  function computeBilan() {
+    var closed = state.history.filter(function (h) { return h.status === 'closed'; });
+    var wins = closed.filter(function (h) { return h.result === 'win'; }).length;
+    var loss = closed.length - wins;
+    var open = state.history.filter(function (h) { return h.status === 'open'; }).length;
+    var rate = closed.length ? Math.round(wins / closed.length * 100) : null;
+    var rsum = closed.reduce(function (s, h) { return s + (h.r || 0); }, 0);
+    return { total: state.history.length, wins: wins, loss: loss, open: open, rate: rate, rsum: rsum };
+  }
+
+  function renderHistory() {
+    var b = computeBilan();
+    $('#b-total').textContent = b.total;
+    $('#b-win').textContent = b.wins;
+    $('#b-loss').textContent = b.loss;
+    $('#b-open').textContent = b.open;
+    $('#b-rate').textContent = b.rate != null ? b.rate + '%' : '—';
+    var rEl = $('#b-r'); rEl.textContent = (b.rsum >= 0 ? '+' : '') + fmt(b.rsum, 2) + ' R';
+    rEl.className = 'bilan-val ' + (b.rsum > 0 ? 'pos' : (b.rsum < 0 ? 'neg' : ''));
+
+    $('#count-history').textContent = state.history.length;
+    var body = $('#history-body'); body.innerHTML = '';
+    var rows = state.history.slice().reverse();
+    $('#history-empty').style.display = rows.length ? 'none' : '';
+    $('#history-table').style.display = rows.length ? '' : 'none';
+    rows.forEach(function (h) {
+      var tr = document.createElement('tr');
+      function td(txt, cls) { var d = document.createElement('td'); if (cls) d.className = cls; d.textContent = txt; return d; }
+      var d = new Date(h.ts);
+      tr.appendChild(td(d.toLocaleDateString('fr-FR') + ' ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })));
+      tr.appendChild(td(h.label || h.symbol));
+      tr.appendChild(td(h.strategyLabel || h.strategy));
+      var sens = document.createElement('td'); sens.appendChild(el('span', 'mini-badge ' + (h.direction === 'LONG' ? 'badge-long' : 'badge-short'), h.direction === 'LONG' ? 'Achat' : 'Vente')); tr.appendChild(sens);
+      tr.appendChild(td(fmt(h.entry, h.precision), 'num'));
+      tr.appendChild(td(fmt(h.sl, h.precision), 'num'));
+      tr.appendChild(td(fmt(h.tp1, h.precision), 'num'));
+      var rc = document.createElement('td');
+      var lbl = h.status === 'open' ? 'En cours' : (h.result === 'win' ? 'Gagné' : 'Perdu');
+      var cls = h.status === 'open' ? 'res-open' : (h.result === 'win' ? 'res-win' : 'res-loss');
+      rc.appendChild(el('span', 'res ' + cls, lbl + (h.status === 'closed' ? ' · ' + (h.r >= 0 ? '+' : '') + fmt(h.r, 1) + 'R' : '')));
+      tr.appendChild(rc);
+      body.appendChild(tr);
     });
   }
 
@@ -322,8 +418,8 @@
     if (!signals.length) {
       var empty = el('div', 'empty');
       empty.appendChild(el('div', 'empty-icon', '⌕'));
-      empty.appendChild(el('p', null, signalsAll.length ? 'Aucun setup ne correspond aux filtres.' : 'Aucun setup validé pour l’instant.'));
-      empty.appendChild(el('p', 'empty-sub', 'Le moteur attend une confluence complète : PD Array en zone discount/premium + CRT ou clôture, aligné à la tendance.'));
+      empty.appendChild(el('p', null, signalsAll.length ? 'Rien qui corresponde à tes filtres pour l’instant.' : 'Aucun trade à te proposer là, tout de suite.'));
+      empty.appendChild(el('p', 'empty-sub', 'Pas d’inquiétude : je continue de surveiller tes paires et je te montre un trade dès qu’il coche vraiment toutes les cases.'));
       sig.appendChild(empty);
     } else signals.forEach(function (r) { sig.appendChild(signalCard(r)); });
 
@@ -462,22 +558,66 @@
   }
 
   function initSettings() {
-    $('#settings-toggle').addEventListener('click', function () {
-      var p = $('#settings'); p.classList.toggle('open');
-      $('#settings-toggle').classList.toggle('on', p.classList.contains('open'));
-    });
     $('#risk-balance').value = state.risk.balance; $('#risk-pct').value = state.risk.pct;
     $('#risk-save').addEventListener('click', function () {
       var b = parseFloat($('#risk-balance').value), p = parseFloat($('#risk-pct').value);
       if (b > 0) state.risk.balance = b; if (p > 0) state.risk.pct = p;
-      save(); renderAll(); toast('Réglages de risque appliqués.', 'long');
+      save(); renderAll(); toast('C’est noté — la taille des positions est recalculée.', 'long');
+    });
+    $('#clear-history').addEventListener('click', function () {
+      if (!state.history.length) return;
+      state.history = []; saveHistory(); renderHistory();
+      toast('Historique vidé.');
+    });
+  }
+
+  // --- Navigation entre sous-parties -----------------------------------------
+  function switchView(v) {
+    state.view = v;
+    Array.prototype.forEach.call(document.querySelectorAll('.nav-item'), function (b) { b.classList.toggle('active', b.getAttribute('data-view') === v); });
+    Array.prototype.forEach.call(document.querySelectorAll('.view'), function (s) { s.classList.toggle('active', s.id === 'view-' + v); });
+    if (v === 'historique') renderHistory();
+    if (v === 'strategies') renderStrategies();
+  }
+  function initNav() {
+    Array.prototype.forEach.call(document.querySelectorAll('.nav-item'), function (b) {
+      b.addEventListener('click', function () { switchView(b.getAttribute('data-view')); });
+    });
+  }
+
+  // --- Section Stratégies -----------------------------------------------------
+  function renderStrategies() {
+    var box = $('#strategies-list'); box.innerHTML = '';
+    STRATS.forEach(function (s) {
+      var on = state.strategies[s.id] !== false;
+      var card = el('div', 'strat-card' + (on ? ' on' : ''));
+      var info = el('div', 'strat-info');
+      var top = el('div', 'strat-top');
+      top.appendChild(el('h4', null, s.name));
+      top.appendChild(el('span', 'strat-badge strat-' + s.id, s.tag));
+      info.appendChild(top);
+      info.appendChild(el('p', 'strat-sub', s.sub));
+      card.appendChild(info);
+
+      var sw = el('button', 'switch' + (on ? ' on' : ''));
+      sw.setAttribute('role', 'switch'); sw.setAttribute('aria-checked', on ? 'true' : 'false');
+      sw.appendChild(el('span', 'knob'));
+      sw.addEventListener('click', function () {
+        state.strategies[s.id] = state.strategies[s.id] === false;
+        // au moins une stratégie active
+        if (!STRATS.some(function (x) { return state.strategies[x.id] !== false; })) { state.strategies[s.id] = true; toast('Garde au moins une stratégie active.'); }
+        save(); renderStrategies(); refresh(true);
+      });
+      card.appendChild(sw);
+      box.appendChild(card);
     });
   }
 
   function init() {
-    load();
+    load(); loadHistory();
     applyTheme(); updateAlertBtn();
-    buildToolbar(); initSymbols(); initApiKey(); initModals(); initSettings();
+    buildToolbar(); initSymbols(); initApiKey(); initModals(); initSettings(); initNav();
+    renderStrategies();
 
     $('#theme-toggle').addEventListener('click', function () { state.theme = state.theme === 'dark' ? 'light' : 'dark'; save(); applyTheme(); });
     $('#alert-toggle').addEventListener('click', function () {
@@ -485,8 +625,8 @@
       if (state.alerts) {
         beep();
         if (window.Notification && Notification.permission === 'default') Notification.requestPermission();
-        toast('Alertes activées — tu seras prévenu·e à chaque nouveau setup.', 'long');
-      } else toast('Alertes désactivées.');
+        toast('C’est parti — je te préviens dès qu’un nouveau trade se présente.', 'long');
+      } else toast('Très bien, je ne te préviens plus.');
     });
     $('#refresh-btn').addEventListener('click', function () { refresh(true); });
 

@@ -18,6 +18,14 @@ Ces marchés en temps réel nécessitent une clé API GRATUITE :
 3. Dans TRADEassist, colle la clé dans le champ "Clé API forex / or"
    puis clique "Enregistrer". La clé reste sur ton appareil.
 
+LE MENU (4 sous-parties, en haut)
+---------------------------------
+- SIGNAUX    : les trades du moment + les paires sous surveillance.
+- HISTORIQUE : le journal de tous les trades repérés + le bilan
+               (gagnants / perdants / taux de réussite / résultat en R).
+- STRATÉGIES : coche/décoche les stratégies que tu veux suivre.
+- RÉGLAGES   : tes paires, ta clé forex/or, ta gestion du risque.
+
 CE QUE TU PEUX FAIRE
 --------------------
 - STATISTIQUES en haut : nombre de setups, achats/ventes, confiance et R:R moyens.

@@ -77,6 +77,61 @@ body {
 .strat-tag.strat-daily { color: var(--gold); border-color: color-mix(in srgb, var(--gold) 35%, transparent); }
 .signal .strat-tag { margin: 0 0 12px; }
 
+/* --- Menu (sous-parties) --------------------------------------- */
+.mainnav { display: flex; gap: 4px; max-width: 1280px; margin: 14px auto 0; padding: 0 26px; width: 100%; flex-wrap: wrap; }
+.nav-item { background: transparent; border: none; color: var(--text-dim); font-family: var(--sans); font-size: 14px; font-weight: 600; padding: 9px 16px; border-radius: 10px; cursor: pointer; transition: all 0.15s; }
+.nav-item:hover { color: var(--text); background: var(--bg-elev); }
+.nav-item.active { color: var(--accent); background: var(--accent-dim); }
+
+/* --- Vues ------------------------------------------------------ */
+.main { max-width: 1280px; margin: 0 auto; padding: 0 26px; width: 100%; }
+.view { display: none; }
+.view.active { display: block; }
+.view-intro { color: var(--text-dim); font-size: 14px; max-width: 760px; margin: 16px 0 8px; line-height: 1.55; }
+/* dans .main, ces blocs prennent toute la largeur (plus de max-width propre) */
+.view .stats-bar, .view .filters { max-width: none; margin-left: 0; margin-right: 0; padding-left: 0; padding-right: 0; width: 100%; }
+.view .content { max-width: none; padding: 0; }
+
+/* --- Bilan (historique) ---------------------------------------- */
+.bilan { display: grid; grid-template-columns: repeat(6, 1fr); gap: 1px; background: var(--border-soft); border: 1px solid var(--border-soft); border-radius: var(--radius); overflow: hidden; margin: 16px 0; }
+.bilan-card { background: var(--bg-card); padding: 14px 16px; display: flex; flex-direction: column; gap: 3px; }
+.bilan-val { font-family: var(--mono); font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.bilan-card.win .bilan-val { color: var(--accent); }
+.bilan-card.loss .bilan-val { color: var(--danger); }
+.bilan-val.pos { color: var(--accent); } .bilan-val.neg { color: var(--danger); }
+.bilan-lbl { font-size: 11px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.04em; }
+
+.table-wrap { overflow-x: auto; border: 1px solid var(--border-soft); border-radius: var(--radius); background: var(--bg-card); box-shadow: var(--shadow); }
+.history-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.history-table th { text-align: left; color: var(--text-faint); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; padding: 11px 14px; border-bottom: 1px solid var(--border-soft); font-weight: 600; white-space: nowrap; }
+.history-table td { padding: 11px 14px; border-bottom: 1px solid var(--border-soft); color: var(--text); white-space: nowrap; }
+.history-table tr:last-child td { border-bottom: none; }
+.history-table td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.mini-badge { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 5px; }
+.res { font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 6px; font-family: var(--mono); }
+.res-open { color: var(--text-dim); background: var(--bg-elev); }
+.res-win { color: var(--accent); background: var(--accent-dim); }
+.res-loss { color: var(--danger); background: var(--danger-dim); }
+.empty.small { padding: 28px; text-align: center; color: var(--text-faint); font-size: 13px; border: none; background: none; }
+.btn.small { padding: 7px 12px; font-size: 12px; }
+
+/* --- Section Stratégies ---------------------------------------- */
+.strat-list { display: flex; flex-direction: column; gap: 12px; margin-top: 10px; max-width: 760px; }
+.strat-card { display: flex; align-items: center; justify-content: space-between; gap: 16px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow); }
+.strat-card.on { border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
+.strat-info { flex: 1; }
+.strat-top { display: flex; align-items: center; gap: 9px; margin-bottom: 4px; }
+.strat-top h4 { font-size: 15px; font-weight: 700; }
+.strat-badge { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 5px; background: var(--bg-elev); color: var(--text-dim); }
+.strat-badge.strat-ote { color: var(--blue); } .strat-badge.strat-daily { color: var(--gold); }
+.strat-sub { font-size: 13px; color: var(--text-dim); line-height: 1.5; }
+.switch { position: relative; width: 46px; height: 26px; border-radius: 14px; border: none; background: var(--border); cursor: pointer; transition: background 0.18s; flex: none; }
+.switch.on { background: var(--accent); }
+.switch .knob { position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: transform 0.18s; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+.switch.on .knob { transform: translateX(20px); }
+
+@media (max-width: 720px) { .bilan { grid-template-columns: repeat(3, 1fr); } }
+
 /* --- Stats bar -------------------------------------------------- */
 .stats-bar {
   display: grid; grid-template-columns: repeat(6, 1fr); gap: 1px;
