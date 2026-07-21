@@ -125,6 +125,27 @@ body {
 .btn-ghost { background: var(--bg-elev); color: var(--text-dim); border: 1px solid var(--border); }
 .btn-ghost:hover { color: var(--text); border-color: var(--border); }
 
+/* --- Barre clé API --------------------------------------------- */
+.apikey-bar { max-width: 1240px; margin: 0 auto; padding: 0 28px 8px; width: 100%; }
+.apikey-inner {
+  background: var(--bg-elev); border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm); padding: 14px 16px; display: flex; flex-direction: column; gap: 9px;
+}
+.apikey-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+#apikey-input {
+  flex: 1; min-width: 220px; background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); color: var(--text); font-family: var(--mono); font-size: 13px;
+  padding: 9px 12px; outline: none; transition: border-color 0.15s;
+}
+#apikey-input:focus { border-color: var(--accent); }
+.apikey-status { font-size: 12px; font-family: var(--mono); color: var(--text-faint); white-space: nowrap; }
+.apikey-status.ok { color: var(--accent); }
+.apikey-hint { font-size: 12px; color: var(--text-faint); line-height: 1.5; }
+.apikey-hint a { color: var(--blue); text-decoration: none; }
+.apikey-hint a:hover { text-decoration: underline; }
+.card.need-key { border-style: dashed; border-color: #35405a; }
+.watch-reason.key { color: var(--gold); }
+
 /* --- Content --------------------------------------------------- */
 .content { max-width: 1240px; margin: 0 auto; padding: 8px 28px 40px; width: 100%; }
 .section-header {

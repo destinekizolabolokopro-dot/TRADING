@@ -1,24 +1,48 @@
 /*
- * Couche données — API publique Binance
- * --------------------------------------
- * Récupère les bougies (klines) en temps réel, sans clé API ni serveur.
- * Endpoint public, compatible CORS navigateur.
- * Docs : https://binance-docs.github.io/apidocs/spot/en/#kline-candlestick-data
+ * Couche données — multi-fournisseurs
+ * -----------------------------------
+ * - Crypto (BTC/ETH/SOL en USD) : API publique Binance, gratuite, sans clé.
+ * - Forex & Or (GBP/USD, USD/JPY, EUR/JPY, XAU/USD, XAU/EUR) : Twelve Data,
+ *   qui nécessite une clé API gratuite (https://twelvedata.com/pricing → plan gratuit).
+ *   La clé est saisie dans l'interface et conservée localement (localStorage).
+ *
+ * Chaque bougie renvoyée : { time, open, high, low, close, volume }
+ * (triées de la plus ancienne à la plus récente).
  */
 (function (root) {
   'use strict';
 
-  // Plusieurs hôtes en secours si l'un est bloqué géographiquement.
-  var HOSTS = [
-    'https://api.binance.com',
-    'https://api1.binance.com',
-    'https://api.binance.us',
-    'https://data-api.binance.vision'
-  ];
+  var REQUEST_TIMEOUT = 9000;
+  var KEY_STORAGE = 'ictsmc.twelvedata.key';
 
-  var REQUEST_TIMEOUT = 8000; // ms — évite qu'un hôte injoignable bloque l'app
+  // --- Catalogue des paires autorisées (et rien d'autre) ---------------------
+  // provider: 'binance' | 'twelvedata'
+  var SYMBOLS = {
+    BTCUSD: { label: 'BTC/USD', provider: 'binance',    src: 'BTCUSDT', kind: 'crypto' },
+    ETHUSD: { label: 'ETH/USD', provider: 'binance',    src: 'ETHUSDT', kind: 'crypto' },
+    SOLUSD: { label: 'SOL/USD', provider: 'binance',    src: 'SOLUSDT', kind: 'crypto' },
+    GBPUSD: { label: 'GBP/USD', provider: 'twelvedata', src: 'GBP/USD', kind: 'forex' },
+    USDJPY: { label: 'USD/JPY', provider: 'twelvedata', src: 'USD/JPY', kind: 'forex' },
+    EURJPY: { label: 'EUR/JPY', provider: 'twelvedata', src: 'EUR/JPY', kind: 'forex' },
+    XAUUSD: { label: 'XAU/USD', provider: 'twelvedata', src: 'XAU/USD', kind: 'metal' },
+    XAUEUR: { label: 'XAU/EUR', provider: 'twelvedata', src: 'XAU/EUR', kind: 'metal' }
+  };
 
-  // fetch avec délai maximal : rejette si l'hôte ne répond pas à temps.
+  // Ordre d'affichage par défaut (exactement les 8 paires demandées).
+  var DEFAULT_SYMBOLS = ['GBPUSD', 'USDJPY', 'SOLUSD', 'XAUEUR', 'XAUUSD', 'ETHUSD', 'EURJPY', 'BTCUSD'];
+
+  function meta(sym) { return SYMBOLS[sym] || null; }
+  function label(sym) { var m = meta(sym); return m ? m.label : sym; }
+
+  // --- Clé API (Twelve Data) --------------------------------------------------
+  function getApiKey() {
+    try { return localStorage.getItem(KEY_STORAGE) || ''; } catch (e) { return ''; }
+  }
+  function setApiKey(k) {
+    try { localStorage.setItem(KEY_STORAGE, (k || '').trim()); } catch (e) { /* ignore */ }
+  }
+
+  // --- fetch avec délai maximal ----------------------------------------------
   function fetchWithTimeout(url) {
     if (typeof AbortController === 'undefined') return fetch(url);
     var ctrl = new AbortController();
@@ -26,57 +50,84 @@
     return fetch(url, { signal: ctrl.signal }).finally(function () { clearTimeout(t); });
   }
 
-  function parseKlines(raw) {
-    return raw.map(function (k) {
-      return {
-        time: k[0],
-        open: parseFloat(k[1]),
-        high: parseFloat(k[2]),
-        low: parseFloat(k[3]),
-        close: parseFloat(k[4]),
-        volume: parseFloat(k[5])
-      };
-    });
-  }
+  // --- Binance (crypto) -------------------------------------------------------
+  var BINANCE_HOSTS = [
+    'https://api.binance.com',
+    'https://api1.binance.com',
+    'https://data-api.binance.vision',
+    'https://api.binance.us'
+  ];
 
-  // Essaie chaque hôte jusqu'à obtenir une réponse valide.
-  function fetchKlines(symbol, interval, limit) {
-    limit = limit || 200;
-    var path = '/api/v3/klines?symbol=' + symbol + '&interval=' + interval + '&limit=' + limit;
+  function binanceInterval(tf) { return tf; } // 5m/15m/1h/4h identiques
 
+  function fetchBinance(src, interval, limit) {
+    var path = '/api/v3/klines?symbol=' + src + '&interval=' + binanceInterval(interval) + '&limit=' + (limit || 200);
     function tryHost(i) {
-      if (i >= HOSTS.length) {
-        return Promise.reject(new Error('Tous les hôtes Binance sont injoignables'));
-      }
-      return fetchWithTimeout(HOSTS[i] + path)
-        .then(function (r) {
-          if (!r.ok) throw new Error('HTTP ' + r.status);
-          return r.json();
-        })
+      if (i >= BINANCE_HOSTS.length) return Promise.reject(new Error('Binance injoignable'));
+      return fetchWithTimeout(BINANCE_HOSTS[i] + path)
+        .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
         .then(function (data) {
           if (!Array.isArray(data)) throw new Error('Réponse inattendue');
-          return parseKlines(data);
+          return data.map(function (k) {
+            return { time: k[0], open: +k[1], high: +k[2], low: +k[3], close: +k[4], volume: +k[5] };
+          });
         })
-        .catch(function () {
-          return tryHost(i + 1);
-        });
-    }
-    return tryHost(0);
-  }
-
-  // Prix 24h / variation, pour l'affichage (facultatif).
-  function fetchTicker(symbol) {
-    var path = '/api/v3/ticker/24hr?symbol=' + symbol;
-    function tryHost(i) {
-      if (i >= HOSTS.length) return Promise.resolve(null);
-      return fetchWithTimeout(HOSTS[i] + path)
-        .then(function (r) { if (!r.ok) throw 0; return r.json(); })
         .catch(function () { return tryHost(i + 1); });
     }
     return tryHost(0);
   }
 
-  var api = { fetchKlines: fetchKlines, fetchTicker: fetchTicker, HOSTS: HOSTS };
+  // --- Twelve Data (forex & or) ----------------------------------------------
+  var TD_INTERVAL = { '5m': '5min', '15m': '15min', '1h': '1h', '4h': '4h' };
+
+  function fetchTwelveData(src, interval, limit) {
+    var key = getApiKey();
+    if (!key) return Promise.reject(new Error('NO_API_KEY'));
+    var itv = TD_INTERVAL[interval] || '15min';
+    var url = 'https://api.twelvedata.com/time_series?symbol=' + encodeURIComponent(src) +
+      '&interval=' + itv + '&outputsize=' + (limit || 200) + '&format=JSON&apikey=' + encodeURIComponent(key);
+
+    return fetchWithTimeout(url)
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (!data || data.status === 'error' || !Array.isArray(data.values)) {
+          var msg = (data && data.message) ? data.message : 'Données indisponibles';
+          if (/api key|apikey/i.test(msg)) throw new Error('Clé API invalide');
+          if (/limit|run out|credit/i.test(msg)) throw new Error('Limite API atteinte (réessaie plus tard)');
+          throw new Error(msg);
+        }
+        // Twelve Data renvoie du plus récent au plus ancien → on inverse.
+        return data.values.slice().reverse().map(function (v) {
+          return {
+            time: new Date(v.datetime).getTime(),
+            open: +v.open, high: +v.high, low: +v.low, close: +v.close,
+            volume: v.volume != null ? +v.volume : 0
+          };
+        });
+      });
+  }
+
+  // --- Routeur ----------------------------------------------------------------
+  function fetchCandles(sym, interval, limit) {
+    var m = meta(sym);
+    if (!m) return Promise.reject(new Error('Paire non prise en charge'));
+    return m.provider === 'binance'
+      ? fetchBinance(m.src, interval, limit)
+      : fetchTwelveData(m.src, interval, limit);
+  }
+
+  var api = {
+    SYMBOLS: SYMBOLS,
+    DEFAULT_SYMBOLS: DEFAULT_SYMBOLS,
+    meta: meta,
+    label: label,
+    getApiKey: getApiKey,
+    setApiKey: setApiKey,
+    fetchCandles: fetchCandles,
+    // conservés pour compat/diagnostic
+    fetchBinance: fetchBinance,
+    fetchTwelveData: fetchTwelveData
+  };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.API = api;
 })(typeof window !== 'undefined' ? window : this);

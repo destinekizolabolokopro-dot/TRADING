@@ -33,13 +33,29 @@
     <div class="control-group grow">
       <label class="control-label">Watchlist (paires séparées par des virgules)</label>
       <div class="symbols-row">
-        <input id="symbols-input" type="text" spellcheck="false" placeholder="BTCUSDT, ETHUSDT, SOLUSDT…" />
+        <input id="symbols-input" type="text" spellcheck="false" placeholder="GBPUSD, XAUUSD, BTCUSD…" />
         <button id="symbols-apply" class="btn">Appliquer</button>
       </div>
     </div>
     <div class="control-group">
       <label class="control-label">&nbsp;</label>
       <button id="refresh-btn" class="btn btn-ghost">↻ Actualiser</button>
+    </div>
+  </section>
+
+  <section class="apikey-bar">
+    <div class="apikey-inner">
+      <label class="control-label" for="apikey-input">Clé API forex&nbsp;/&nbsp;or (gratuite — Twelve Data)</label>
+      <div class="apikey-row">
+        <input id="apikey-input" type="password" spellcheck="false" placeholder="Colle ta clé API gratuite ici" />
+        <button id="apikey-save" class="btn">Enregistrer</button>
+        <span id="apikey-status" class="apikey-status">○ aucune clé</span>
+      </div>
+      <p class="apikey-hint">
+        La crypto (BTC/ETH/SOL) fonctionne sans clé. Pour le forex et l’or, crée une clé gratuite en 30&nbsp;s sur
+        <a href="https://twelvedata.com/register" target="_blank" rel="noopener">twelvedata.com/register</a>,
+        copie ta clé et colle-la ici. Elle reste sur ton appareil.
+      </p>
     </div>
   </section>
 
@@ -58,7 +74,8 @@
 
   <footer class="footer">
     <p>
-      Données de marché fournies par l’API publique Binance, rafraîchies automatiquement.
+      Données de marché rafraîchies automatiquement : <strong>crypto</strong> via l’API publique Binance (sans clé),
+      <strong>forex &amp; or</strong> via Twelve Data (clé gratuite).
       Le moteur recherche un <strong>PD Array</strong> (Fair Value Gap) en zone <strong>discount/premium</strong>
       confirmé par un <strong>CRT</strong> (prise de liquidité + retour) ou une <strong>clôture au-dessus/en-dessous du PD Array</strong>.
     </p>
