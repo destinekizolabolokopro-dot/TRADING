@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ICT / SMC — Signaux de trading en direct</title>
+  <meta name="description" content="Setups de trading en temps réel fondés sur les concepts ICT/SMC : Fibonacci, PD Arrays en zone discount/premium, CRT et clôtures." />
+  <link rel="stylesheet" href="css/styles.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%230b0e14'/%3E%3Cpath d='M20 62 L38 44 L52 56 L80 30' stroke='%234ade80' stroke-width='7' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">
+        <svg viewBox="0 0 100 100" width="28" height="28"><path d="M18 64 L40 42 L54 54 L82 28" stroke="currentColor" stroke-width="8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+      <div class="brand-text">
+        <h1>ICT&nbsp;/&nbsp;SMC</h1>
+        <p>Signaux Fibonacci · PD Arrays · CRT</p>
+      </div>
+    </div>
+    <div class="status">
+      <span id="status-dot" class="status-dot"></span>
+      <span id="status-label">Connexion…</span>
+    </div>
+  </header>
+
+  <section class="controls">
+    <div class="control-group">
+      <label class="control-label">Unité de temps</label>
+      <div id="tf-buttons" class="tf-buttons"></div>
+    </div>
+    <div class="control-group grow">
+      <label class="control-label">Watchlist (paires séparées par des virgules)</label>
+      <div class="symbols-row">
+        <input id="symbols-input" type="text" spellcheck="false" placeholder="BTCUSDT, ETHUSDT, SOLUSDT…" />
+        <button id="symbols-apply" class="btn">Appliquer</button>
+      </div>
+    </div>
+    <div class="control-group">
+      <label class="control-label">&nbsp;</label>
+      <button id="refresh-btn" class="btn btn-ghost">↻ Actualiser</button>
+    </div>
+  </section>
+
+  <main class="content">
+    <div class="section-header">
+      <h2>Setups validés <span id="count-signals" class="count">0</span></h2>
+      <span id="last-update" class="last-update"></span>
+    </div>
+    <div id="signals" class="grid signals-grid"></div>
+
+    <div class="section-header watch-header">
+      <h2>Sous surveillance <span id="count-watch" class="count muted">0</span></h2>
+    </div>
+    <div id="watchlist" class="grid watch-grid"></div>
+  </main>
+
+  <footer class="footer">
+    <p>
+      Données de marché fournies par l’API publique Binance, rafraîchies automatiquement.
+      Le moteur recherche un <strong>PD Array</strong> (Fair Value Gap) en zone <strong>discount/premium</strong>
+      confirmé par un <strong>CRT</strong> (prise de liquidité + retour) ou une <strong>clôture au-dessus/en-dessous du PD Array</strong>.
+    </p>
+    <p class="disclaimer">⚠ Outil éducatif — ceci n’est pas un conseil financier. Faites toujours votre propre analyse et gérez votre risque.</p>
+  </footer>
+
+  <script src="js/api.js"></script>
+  <script src="js/ict.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
