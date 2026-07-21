@@ -1,42 +1,46 @@
 ====================================================================
-  ICT / SMC — Signaux de trading en direct  —  Guide de démarrage
+  TRADEassist  —  Signaux ICT / SMC en direct  —  Guide de démarrage
 ====================================================================
 
-POUR OUVRIR LE SITE (le plus simple)
-------------------------------------
+POUR OUVRIR (le plus simple)
+----------------------------
 1. Décompresse ce dossier ZIP quelque part (Bureau, Documents…).
 2. Double-clique sur le fichier :  index.html
-3. Le site s'ouvre dans ton navigateur (Chrome, Edge, Firefox…).
+3. Ça s'ouvre dans ton navigateur (Chrome, Edge, Firefox…).
    -> La CRYPTO (BTC/USD, ETH/USD, SOL/USD) s'affiche en DIRECT
       immédiatement, sans rien configurer.
 
 POUR ACTIVER LE FOREX ET L'OR (GBP/USD, USD/JPY, EUR/JPY, XAU/USD, XAU/EUR)
 --------------------------------------------------------------------------
-Le forex et l'or en temps réel nécessitent une clé API GRATUITE :
+Ces marchés en temps réel nécessitent une clé API GRATUITE :
 1. Va sur :  https://twelvedata.com/register
 2. Crée un compte gratuit (30 secondes) et copie ta clé API.
-3. Sur le site, colle la clé dans le champ "Clé API forex / or"
-   puis clique "Enregistrer".
-   -> Les 5 paires forex/or s'activent. La clé reste sur ton appareil.
+3. Dans TRADEassist, colle la clé dans le champ "Clé API forex / or"
+   puis clique "Enregistrer". La clé reste sur ton appareil.
 
-CE QUE FAIT LE SITE
--------------------
-Il cherche automatiquement des trades suivant les concepts ICT/SMC :
-  - Fibonacci : zone DISCOUNT (achat) / PREMIUM (vente), zone OTE 0.62-0.79
-  - PD Array (Fair Value Gap) dans la bonne zone
-  - Déclencheur : CRT (prise de liquidité + retour) OU clôture au-dessus/
-    en-dessous du PD Array
-Un signal n'apparaît que si tout est réuni (avec un Risk:Reward >= 1.2).
-Chaque carte donne : sens (ACHAT/VENTE), entrée, stop, TP1/TP2/TP3, R:R.
+CE QUE TU PEUX FAIRE
+--------------------
+- STATISTIQUES en haut : nombre de setups, achats/ventes, confiance et R:R moyens.
+- FILTRES : direction (achat/vente), marché (crypto/forex/or), tri (confiance/R:R/nom).
+- CLIQUE SUR UNE CARTE -> ouvre le GRAPHIQUE en chandeliers avec tous les
+  niveaux (Fibonacci, zone OTE, FVG, Entrée/Stop/TP, liquidité) + le
+  calculateur de risque et les confluences.
+- BOUTON RISQUE (⚙) : entre ton capital et ton risque % -> la taille de
+  position suggérée s'affiche sur chaque signal.
+- CLOCHE (🔔) : active les alertes (son + notification) à chaque nouveau setup.
+- LUNE/SOLEIL : bascule thème sombre / clair.
+- WATCHLIST : change les paires (seules les 8 prévues sont acceptées).
+- UNITÉ DE TEMPS : 5m / 15m / 1h / 4h.
 
-Le site se met à jour tout seul (crypto ~ toutes les 40 s,
-forex/or ~ toutes les 4 min pour rester dans le quota gratuit).
+COMMENT UN SIGNAL EST TROUVÉ (ICT / SMC)
+----------------------------------------
+  Fibonacci : zone DISCOUNT (achat) / PREMIUM (vente), zone OTE 0.62-0.79
+  + PD Array (Fair Value Gap ou Order Block) dans la bonne zone
+  + Déclencheur : CRT (prise de liquidité + retour) OU clôture sur le PD Array
+  + Contexte : tendance (EMA), structure (BOS/CHoCH)
+Un signal n'apparaît que si tout est réuni (Risk:Reward >= 1.2).
 
-REGLAGES
---------
-- Change l'unité de temps en haut : 5m / 15m / 1h / 4h.
-- Modifie la liste des paires dans le champ "Watchlist" (seules les 8 paires
-  prévues sont acceptées) puis clique "Appliquer".
+Le site se met à jour tout seul (crypto ~40 s, forex/or ~4 min).
 
 --------------------------------------------------------------------
 IMPORTANT : Outil EDUCATIF. Ce n'est PAS un conseil financier.

@@ -1,74 +1,67 @@
-# ICT / SMC — Signaux de trading en direct
+# TRADEassist — Signaux ICT / SMC en direct
 
-Un site **statique** (aucun serveur, aucune clé API) qui affiche en **temps réel** des
-setups de trading crypto fondés sur les concepts **ICT / SMC** :
+Un site **statique** (aucun serveur) qui affiche en **temps réel** des setups de trading
+fondés sur les concepts **ICT / SMC**, avec graphiques, calculateur de risque et alertes.
 
-- **Fibonacci — Premium / Discount** : on trace le dealing range (dernier swing haut ↔ bas),
-  l’*equilibrium* est à 0.5. En dessous = **discount** (on cherche des achats),
-  au-dessus = **premium** (on cherche des ventes). La zone **OTE** (0.62–0.79) est mise en avant.
-- **PD Arrays** : détection des **Fair Value Gaps** (imbalances). Un PD Array situé dans la zone
-  discount/premium devient une zone d’intérêt.
-- **CRT (Candle Range Theory)** : prise de liquidité (*sweep* d’un plus-bas/plus-haut) suivie
-  d’un retour dans le range → déclencheur de retournement.
-- **Clôture sur le PD Array** : une bougie qui **clôture au-dessus** (achat) ou **en-dessous**
-  (vente) du PD Array valide le *reclaim*.
+![TRADEassist](docs/preview.png)
 
-Un signal n’est émis que si la confluence est complète :
+## Fonctionnalités
 
-> **PD Array en zone discount/premium** **+** (**CRT** *ou* **clôture au-dessus/en-dessous du PD Array**),
-> avec un **R:R ≥ 1.2**.
+- **Moteur ICT / SMC**
+  - Fibonacci **premium / discount** (equilibrium 0.5, zone **OTE** 0.62–0.79).
+  - **PD Arrays** : Fair Value Gaps + Order Blocks.
+  - **CRT** (Candle Range Theory) : sweep de liquidité + retour dans le range.
+  - **Clôture** au-dessus / en-dessous du PD Array (reclaim).
+  - Filtres de contexte : **tendance (EMA 20/50)**, **structure de marché (BOS / CHoCH)**,
+    **liquidité** (equal highs / equal lows).
+  - Un signal n'est émis qu'avec confluence complète et **R:R ≥ 1.2**.
+- **Graphique chandeliers** intégré (façon TradingView, moteur Canvas maison, hors-ligne) :
+  bougies, EMA, niveaux Fibonacci, zone OTE, boxes FVG / Order Blocks, liquidité,
+  lignes Entrée / Stop / TP, croix de visée avec lecture OHLC.
+- **Tableau de bord** : statistiques (setups, achat/vente, confiance moyenne, R:R moyen),
+  filtres (direction, marché, tri), watchlist personnalisable.
+- **Calculateur de risque** : capital + risque % → taille de position suggérée sur chaque signal.
+- **Alertes** : son + notification navigateur + toast à chaque nouveau setup.
+- **Thème clair / sombre**, réglages mémorisés localement.
 
-Chaque carte de signal indique : direction (Achat/Vente), zone, position Fibonacci, niveau de
-confiance, **entrée / stop / TP1-TP2-TP3**, ratio **Risk:Reward** et la liste des confluences.
+## Marchés & données
 
-## Données
+- **Crypto** (BTC/USD, ETH/USD, SOL/USD) : API publique **Binance**, gratuite, sans clé.
+- **Forex & Or** (GBP/USD, USD/JPY, EUR/JPY, XAU/USD, XAU/EUR) : **Twelve Data**,
+  qui nécessite une **clé API gratuite** (https://twelvedata.com/register) à coller dans l'interface.
 
-Les bougies proviennent de l’**API publique Binance** (`/api/v3/klines`), gratuite, sans clé,
-compatible navigateur. Plusieurs hôtes de secours sont essayés automatiquement. Rafraîchissement
-toutes les 45 secondes ; unités de temps disponibles : 5m, 15m, 1h, 4h. La watchlist est
-personnalisable et mémorisée localement.
+La crypto se rafraîchit ~ toutes les 40 s ; le forex/or ~ toutes les 4 min (quota gratuit).
 
 ## Utilisation
 
-Comme c’est un site statique, il suffit de le servir :
+Site statique — il suffit de l'ouvrir :
 
 ```bash
-# depuis la racine du projet
-python3 -m http.server 8000
-# puis ouvrir http://localhost:8000
+# option 1 : ouvrir directement
+#   double-clic sur index.html
+
+# option 2 : petit serveur local
+python3 -m http.server 8000   # puis http://localhost:8000
 ```
 
 ### Déploiement (GitHub Pages)
 
-1. *Settings → Pages*
-2. *Source* : la branche du projet, dossier `/root`
-3. Le site est en ligne à l’URL fournie par GitHub.
-
-Aucune étape de build : HTML/CSS/JS pur.
+*Settings → Pages → Deploy from a branch → dossier `/root`.* Aucune étape de build.
 
 ## Structure
 
 ```
-index.html        Tableau de bord
-css/styles.css    Thème sombre épuré
-js/api.js         Récupération des bougies Binance (avec timeout + hôtes de secours)
-js/ict.js         Moteur d’analyse ICT/SMC (testable sous Node)
-js/app.js         Orchestration & rendu
+index.html        Interface
+css/styles.css    Thème (clair + sombre)
+js/api.js         Données multi-fournisseurs (Binance + Twelve Data)
+js/ict.js         Moteur d'analyse ICT/SMC (+ métadonnées graphique) — testable sous Node
+js/chart.js       Graphique chandeliers Canvas
+js/app.js         Orchestration, UI, alertes, modale, calculateur
 ```
 
-Le moteur (`js/ict.js`) est isolé et exporté pour Node, ce qui permet de le tester :
-
-```bash
-node -e "const ICT=require('./js/ict.js'); console.log(typeof ICT.analyze)"
-```
-
-## Réglages
-
-Les paramètres de la stratégie sont regroupés dans `CONFIG` en haut de `js/ict.js`
-(profondeur des swings, bornes OTE, marge de stop, R:R minimal, etc.).
+Les paramètres de stratégie sont regroupés dans `CONFIG` en tête de `js/ict.js`.
 
 ---
 
-⚠️ **Avertissement** — Outil **éducatif**. Ceci n’est **pas** un conseil financier ni une
-incitation à investir. Les marchés comportent un risque de perte. Faites toujours votre propre
-analyse et gérez votre risque.
+⚠️ **Avertissement** — Outil **éducatif**. Ceci n'est **pas** un conseil financier.
+Le trading comporte un risque de perte. Fais toujours ta propre analyse et gère ton risque.

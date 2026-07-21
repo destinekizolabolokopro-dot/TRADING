@@ -1,60 +1,93 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr" data-theme="dark">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ICT / SMC — Signaux de trading en direct</title>
-  <meta name="description" content="Setups de trading en temps réel fondés sur les concepts ICT/SMC : Fibonacci, PD Arrays en zone discount/premium, CRT et clôtures." />
+  <title>TRADEassist — Signaux ICT / SMC en direct</title>
+  <meta name="description" content="TRADEassist : setups de trading en temps réel fondés sur les concepts ICT/SMC — Fibonacci, PD Arrays, CRT, avec graphiques et calculateur de risque." />
   <link rel="stylesheet" href="css/styles.css" />
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%230b0e14'/%3E%3Cpath d='M20 62 L38 44 L52 56 L80 30' stroke='%234ade80' stroke-width='7' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect x='2' y='2' width='44' height='44' rx='12' fill='%230d1b14'/%3E%3Crect x='11' y='30' width='6' height='7' rx='1' fill='%235b6779'/%3E%3Crect x='21' y='24' width='6' height='8' rx='1' fill='%235b6779'/%3E%3Cpath d='M10 37 L20 30 L28 33 L39 15' fill='none' stroke='%234ade80' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='39' cy='15' r='3' fill='%234ade80'/%3E%3C/svg%3E" />
 </head>
 <body>
   <header class="topbar">
     <div class="brand">
       <span class="logo" aria-hidden="true">
-        <svg viewBox="0 0 100 100" width="28" height="28"><path d="M18 64 L40 42 L54 54 L82 28" stroke="currentColor" stroke-width="8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <svg viewBox="0 0 48 48" width="40" height="40">
+          <rect x="2" y="2" width="44" height="44" rx="12" fill="var(--logo-bg)" stroke="var(--accent-dim)"/>
+          <rect x="11" y="30" width="6" height="7" rx="1" fill="var(--text-faint)"/>
+          <rect x="21" y="24" width="6" height="8" rx="1" fill="var(--text-faint)"/>
+          <path d="M10 37 L20 30 L28 33 L39 15" fill="none" stroke="var(--accent)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="39" cy="15" r="3.2" fill="var(--accent)"/>
+        </svg>
       </span>
       <div class="brand-text">
-        <h1>ICT&nbsp;/&nbsp;SMC</h1>
-        <p>Signaux Fibonacci · PD Arrays · CRT</p>
+        <h1>TRADE<span>assist</span></h1>
+        <p>Signaux ICT / SMC · Fibonacci · PD Arrays · CRT</p>
       </div>
     </div>
-    <div class="status">
-      <span id="status-dot" class="status-dot"></span>
-      <span id="status-label">Connexion…</span>
+    <div class="top-actions">
+      <div class="status"><span id="status-dot" class="status-dot"></span><span id="status-label">Connexion…</span></div>
+      <button id="alert-toggle" class="icon-btn" title="Alertes sonores et notifications">🔔</button>
+      <button id="theme-toggle" class="icon-btn" title="Thème clair / sombre">🌙</button>
     </div>
   </header>
 
-  <section class="controls">
-    <div class="control-group">
+  <!-- Bandeau statistiques -->
+  <section class="stats-bar" id="stats-bar">
+    <div class="stat"><span class="stat-val" id="kpi-signals">0</span><span class="stat-lbl">Setups validés</span></div>
+    <div class="stat"><span class="stat-val stat-long" id="kpi-long">0</span><span class="stat-lbl">Achat</span></div>
+    <div class="stat"><span class="stat-val stat-short" id="kpi-short">0</span><span class="stat-lbl">Vente</span></div>
+    <div class="stat"><span class="stat-val" id="kpi-conf">—</span><span class="stat-lbl">Confiance moy.</span></div>
+    <div class="stat"><span class="stat-val" id="kpi-rr">—</span><span class="stat-lbl">R:R moyen</span></div>
+    <div class="stat"><span class="stat-val" id="kpi-markets">0</span><span class="stat-lbl">Paires scannées</span></div>
+  </section>
+
+  <!-- Barre d'outils -->
+  <section class="toolbar">
+    <div class="tool-group">
       <label class="control-label">Unité de temps</label>
       <div id="tf-buttons" class="tf-buttons"></div>
     </div>
-    <div class="control-group grow">
-      <label class="control-label">Watchlist (paires séparées par des virgules)</label>
-      <div class="symbols-row">
-        <input id="symbols-input" type="text" spellcheck="false" placeholder="GBPUSD, XAUUSD, BTCUSD…" />
-        <button id="symbols-apply" class="btn">Appliquer</button>
-      </div>
+    <div class="tool-group">
+      <label class="control-label">Direction</label>
+      <div id="dir-filter" class="seg"></div>
     </div>
-    <div class="control-group">
+    <div class="tool-group">
+      <label class="control-label">Marché</label>
+      <div id="market-filter" class="seg"></div>
+    </div>
+    <div class="tool-group">
+      <label class="control-label">Trier par</label>
+      <div id="sort-filter" class="seg"></div>
+    </div>
+    <div class="tool-group push">
       <label class="control-label">&nbsp;</label>
+      <button id="risk-btn" class="btn btn-ghost">⚙ Risque</button>
       <button id="refresh-btn" class="btn btn-ghost">↻ Actualiser</button>
     </div>
   </section>
 
-  <section class="apikey-bar">
-    <div class="apikey-inner">
-      <label class="control-label" for="apikey-input">Clé API forex&nbsp;/&nbsp;or (gratuite — Twelve Data)</label>
-      <div class="apikey-row">
-        <input id="apikey-input" type="password" spellcheck="false" placeholder="Colle ta clé API gratuite ici" />
-        <button id="apikey-save" class="btn">Enregistrer</button>
-        <span id="apikey-status" class="apikey-status">○ aucune clé</span>
+  <!-- Watchlist + clé API (repliable) -->
+  <section class="config-bar">
+    <div class="config-inner">
+      <div class="config-row">
+        <label class="control-label" for="symbols-input">Watchlist</label>
+        <div class="inline-row">
+          <input id="symbols-input" type="text" spellcheck="false" placeholder="GBPUSD, XAUUSD, BTCUSD…" />
+          <button id="symbols-apply" class="btn">Appliquer</button>
+        </div>
       </div>
-      <p class="apikey-hint">
-        La crypto (BTC/ETH/SOL) fonctionne sans clé. Pour le forex et l’or, crée une clé gratuite en 30&nbsp;s sur
-        <a href="https://twelvedata.com/register" target="_blank" rel="noopener">twelvedata.com/register</a>,
-        copie ta clé et colle-la ici. Elle reste sur ton appareil.
+      <div class="config-row">
+        <label class="control-label" for="apikey-input">Clé API forex / or (gratuite — Twelve Data)</label>
+        <div class="inline-row">
+          <input id="apikey-input" type="password" spellcheck="false" placeholder="Colle ta clé gratuite ici" />
+          <button id="apikey-save" class="btn">Enregistrer</button>
+          <span id="apikey-status" class="apikey-status">○ aucune clé</span>
+        </div>
+      </div>
+      <p class="config-hint">
+        Crypto (BTC/ETH/SOL) sans clé. Forex &amp; or : clé gratuite en 30&nbsp;s sur
+        <a href="https://twelvedata.com/register" target="_blank" rel="noopener">twelvedata.com/register</a>. Elle reste sur ton appareil.
       </p>
     </div>
   </section>
@@ -74,16 +107,57 @@
 
   <footer class="footer">
     <p>
-      Données de marché rafraîchies automatiquement : <strong>crypto</strong> via l’API publique Binance (sans clé),
-      <strong>forex &amp; or</strong> via Twelve Data (clé gratuite).
-      Le moteur recherche un <strong>PD Array</strong> (Fair Value Gap) en zone <strong>discount/premium</strong>
-      confirmé par un <strong>CRT</strong> (prise de liquidité + retour) ou une <strong>clôture au-dessus/en-dessous du PD Array</strong>.
+      Données rafraîchies automatiquement : <strong>crypto</strong> via Binance (sans clé), <strong>forex &amp; or</strong> via Twelve Data (clé gratuite).
+      Le moteur cherche un <strong>PD Array</strong> en zone <strong>discount/premium</strong> confirmé par un <strong>CRT</strong> ou une <strong>clôture</strong> sur le PD Array,
+      filtré par la tendance (EMA) et la structure de marché (BOS/CHoCH).
     </p>
-    <p class="disclaimer">⚠ Outil éducatif — ceci n’est pas un conseil financier. Faites toujours votre propre analyse et gérez votre risque.</p>
+    <p class="disclaimer">⚠ Outil éducatif — ceci n’est pas un conseil financier. Fais toujours ta propre analyse et gère ton risque.</p>
   </footer>
+
+  <!-- Modale détail / graphique -->
+  <div id="modal" class="modal" aria-hidden="true">
+    <div class="modal-backdrop" data-close></div>
+    <div class="modal-card" role="dialog" aria-modal="true">
+      <div class="modal-head">
+        <div class="modal-title">
+          <h3 id="modal-sym">—</h3>
+          <span id="modal-badge" class="badge"></span>
+          <span id="modal-tf" class="tf"></span>
+        </div>
+        <button class="icon-btn" data-close aria-label="Fermer">✕</button>
+      </div>
+      <div class="chart-wrap"><canvas id="modal-chart"></canvas></div>
+      <div id="modal-body" class="modal-body"></div>
+    </div>
+  </div>
+
+  <!-- Modale réglages risque -->
+  <div id="risk-modal" class="modal" aria-hidden="true">
+    <div class="modal-backdrop" data-close-risk></div>
+    <div class="modal-card small" role="dialog" aria-modal="true">
+      <div class="modal-head">
+        <div class="modal-title"><h3>⚙ Calculateur de risque</h3></div>
+        <button class="icon-btn" data-close-risk aria-label="Fermer">✕</button>
+      </div>
+      <div class="risk-form">
+        <label>Capital du compte
+          <div class="inline-row"><span class="prefix">$</span><input id="risk-balance" type="number" min="0" step="100" value="1000" /></div>
+        </label>
+        <label>Risque par trade (%)
+          <div class="inline-row"><input id="risk-pct" type="number" min="0.1" max="100" step="0.1" value="1" /><span class="suffix">%</span></div>
+        </label>
+        <p class="risk-note">La taille de position suggérée sur chaque signal est calculée pour ne perdre que ce montant si le Stop Loss est touché.</p>
+        <button id="risk-save" class="btn">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Zone de toasts -->
+  <div id="toasts" class="toasts"></div>
 
   <script src="js/api.js"></script>
   <script src="js/ict.js"></script>
+  <script src="js/chart.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>
