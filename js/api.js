@@ -78,7 +78,7 @@
   }
 
   // --- Twelve Data (forex & or) ----------------------------------------------
-  var TD_INTERVAL = { '5m': '5min', '15m': '15min', '1h': '1h', '4h': '4h' };
+  var TD_INTERVAL = { '5m': '5min', '15m': '15min', '1h': '1h', '4h': '4h', '1day': '1day' };
 
   function fetchTwelveData(src, interval, limit) {
     var key = getApiKey();
@@ -116,6 +116,21 @@
       : fetchTwelveData(m.src, interval, limit);
   }
 
+  // --- Données journalières (plus-haut / plus-bas de la veille) ---------------
+  // Renvoie { pdh, pdl } = high/low de la bougie journalière PRÉCÉDENTE (veille).
+  function fetchDaily(sym) {
+    var m = meta(sym);
+    if (!m) return Promise.resolve(null);
+    var p;
+    if (m.provider === 'binance') p = fetchBinance(m.src, '1d', 4);
+    else p = fetchTwelveData(m.src, '1day', 4);
+    return p.then(function (candles) {
+      if (!candles || candles.length < 2) return null;
+      var prev = candles[candles.length - 2]; // avant-dernière = veille (la dernière = jour en cours)
+      return { pdh: prev.high, pdl: prev.low };
+    }).catch(function () { return null; });
+  }
+
   var api = {
     SYMBOLS: SYMBOLS,
     DEFAULT_SYMBOLS: DEFAULT_SYMBOLS,
@@ -124,6 +139,7 @@
     getApiKey: getApiKey,
     setApiKey: setApiKey,
     fetchCandles: fetchCandles,
+    fetchDaily: fetchDaily,
     // conservés pour compat/diagnostic
     fetchBinance: fetchBinance,
     fetchTwelveData: fetchTwelveData

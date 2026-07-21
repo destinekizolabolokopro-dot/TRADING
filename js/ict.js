@@ -238,8 +238,112 @@
     });
   }
 
+  // Sweep récent d'un niveau : sur les dernières bougies, le prix a dépassé le
+  // niveau puis a clôturé du bon côté (retour). Renvoie l'extrême balayé.
+  function recentSweepBelow(candles, level, lookback) {
+    var last = candles[candles.length - 1];
+    if (last.close <= level) return null;
+    var lo = Infinity, ok = false;
+    for (var i = Math.max(0, candles.length - lookback); i < candles.length; i++) {
+      if (candles[i].low < level) { ok = true; if (candles[i].low < lo) lo = candles[i].low; }
+    }
+    return ok ? lo : null;
+  }
+  function recentSweepAbove(candles, level, lookback) {
+    var last = candles[candles.length - 1];
+    if (last.close >= level) return null;
+    var hi = -Infinity, ok = false;
+    for (var i = Math.max(0, candles.length - lookback); i < candles.length; i++) {
+      if (candles[i].high > level) { ok = true; if (candles[i].high > hi) hi = candles[i].high; }
+    }
+    return ok ? hi : null;
+  }
+
+  // Confiance = proportion de confluences réunies (plus il y en a, plus c'est élevé).
+  function scoreConfidence(list) { return Math.min(100, 35 + list.length * 12); }
+
+  // --- Stratégie 1 : OTE + PD Array en discount/premium + CRT (obligatoire) ---
+  function evalOTE(ctx) {
+    var candles = ctx.candles, range = ctx.range, pos = ctx.pos, zone = ctx.zone, crt = ctx.crt, trend = ctx.trend, structure = ctx.structure;
+    if (zone !== 'discount' && zone !== 'premium') return null;
+    var bull = zone === 'discount';
+    var wantType = bull ? 'bullish' : 'bearish';
+    function inZone(mid) { return bull ? fibPosition(range, mid) < CONFIG.equilibrium : fibPosition(range, mid) > CONFIG.equilibrium; }
+    // PD Array le plus récent SITUÉ dans la bonne zone (FVG prioritaire, sinon Order Block).
+    var pd = null, isFvg = false;
+    for (var fi = ctx.fvgs.length - 1; fi >= 0 && !pd; fi--) {
+      if (ctx.fvgs[fi].type === wantType && inZone(ctx.fvgs[fi].mid)) { pd = ctx.fvgs[fi]; isFvg = true; }
+    }
+    if (!pd) for (var oi = ctx.obs.length - 1; oi >= 0 && !pd; oi--) {
+      if (ctx.obs[oi].type === wantType && inZone((ctx.obs[oi].top + ctx.obs[oi].bottom) / 2)) pd = ctx.obs[oi];
+    }
+    var pdInZone = !!pd;
+    var crtOk = crt && crt.type === (bull ? 'bullish' : 'bearish');
+    var inOTE = bull ? (pos >= (1 - CONFIG.oteHigh) && pos <= (1 - CONFIG.oteLow)) : (pos >= CONFIG.oteLow && pos <= CONFIG.oteHigh);
+
+    // Règle : PD Array dans la zone + CRT obligatoires.
+    if (!(pdInZone && crtOk)) return null;
+
+    var conf = [];
+    conf.push('PD Array (' + (isFvg ? 'FVG' : 'Order Block') + ') en ' + zone);
+    conf.push('CRT ' + (bull ? 'haussier' : 'baissier') + ' (sweep + retour)');
+    if (inOTE) conf.push('Prix dans la zone OTE (0.62–0.79)');
+    if (closeReclaim(candles, pd)) conf.push('Clôture ' + (bull ? 'au-dessus' : 'en-dessous') + ' du PD Array');
+    if (trend === (bull ? 'haussière' : 'baissière')) conf.push('Tendance ' + trend + ' (EMA ' + CONFIG.emaFast + '/' + CONFIG.emaSlow + ')');
+    if (structure.bias === (bull ? 'haussier' : 'baissier')) conf.push('Structure : ' + structure.label);
+
+    var trade = bull ? buildLong(candles, range, pd, crt) : buildShort(candles, range, pd, crt);
+    if (!(trade.rr >= CONFIG.minRR)) return null;
+    return { strategy: 'ote', strategyLabel: 'OTE + PD Array + CRT', direction: bull ? 'LONG' : 'SHORT',
+      trade: trade, pd: pd, confluences: conf, confidence: scoreConfidence(conf) };
+  }
+
+  // --- Stratégie 2 : Previous Daily CRT --------------------------------------
+  // Balayage du plus-bas (PDL) ou plus-haut (PDH) de la veille + retour.
+  function evalDaily(ctx) {
+    var candles = ctx.candles, pdh = ctx.pdh, pdl = ctx.pdl;
+    if (pdh == null || pdl == null || !(pdh > pdl)) return null;
+    var lookback = 6;
+    var sweepLow = recentSweepBelow(candles, pdl, lookback);
+    var sweepHigh = recentSweepAbove(candles, pdh, lookback);
+    var last = candles[candles.length - 1];
+    var bull = null;
+    if (sweepLow != null && last.close > last.open) bull = true;
+    else if (sweepHigh != null && last.close < last.open) bull = false;
+    if (bull === null) return null;
+
+    var conf = [];
+    conf.push(bull ? 'Balayage du plus-bas de la veille (PDL) + retour' : 'Balayage du plus-haut de la veille (PDH) + retour');
+    conf.push('CRT sur bougie journalière');
+    if (bull && ctx.zone === 'discount') conf.push('Prix en discount');
+    if (!bull && ctx.zone === 'premium') conf.push('Prix en premium');
+    var inOTE = bull ? (ctx.pos >= (1 - CONFIG.oteHigh) && ctx.pos <= (1 - CONFIG.oteLow)) : (ctx.pos >= CONFIG.oteLow && ctx.pos <= CONFIG.oteHigh);
+    if (inOTE) conf.push('Prix dans la zone OTE (0.62–0.79)');
+    var pdArr = bull ? (latestUnfilledFVG(candles, ctx.fvgs, 'bullish') || latestOB(ctx.obs, 'bullish'))
+                     : (latestUnfilledFVG(candles, ctx.fvgs, 'bearish') || latestOB(ctx.obs, 'bearish'));
+    if (pdArr) conf.push('PD Array dans le sens');
+    if (ctx.trend === (bull ? 'haussière' : 'baissière')) conf.push('Tendance ' + ctx.trend);
+    if (ctx.structure.bias === (bull ? 'haussier' : 'baissier')) conf.push('Structure : ' + ctx.structure.label);
+
+    var entry = last.close, trade;
+    if (bull) {
+      var sl = sweepLow * (1 - CONFIG.slBufferPct);
+      trade = { direction: 'LONG', entry: entry, sl: sl, tp1: (pdl + pdh) / 2, tp2: pdh, tp3: pdh + (pdh - pdl) * 0.5 };
+      trade.rr = (entry - sl) > 0 ? (trade.tp2 - entry) / (entry - sl) : 0;
+    } else {
+      var slh = sweepHigh * (1 + CONFIG.slBufferPct);
+      trade = { direction: 'SHORT', entry: entry, sl: slh, tp1: (pdl + pdh) / 2, tp2: pdl, tp3: pdl - (pdh - pdl) * 0.5 };
+      trade.rr = (slh - entry) > 0 ? (entry - trade.tp2) / (slh - entry) : 0;
+    }
+    if (!(trade.rr >= CONFIG.minRR)) return null;
+    return { strategy: 'daily', strategyLabel: 'Previous Daily CRT', direction: bull ? 'LONG' : 'SHORT',
+      trade: trade, pd: pdArr, confluences: conf, confidence: scoreConfidence(conf) };
+  }
+
   // --- Analyse complète -------------------------------------------------------
-  function analyze(symbol, timeframe, candles) {
+  // opts : { pdh, pdl } = plus-haut / plus-bas de la veille (pour la stratégie daily)
+  function analyze(symbol, timeframe, candles, opts) {
+    opts = opts || {};
     var base = { symbol: symbol, timeframe: timeframe, hasSignal: false };
     if (!candles || candles.length < 25) return Object.assign(base, { reason: 'Données insuffisantes' });
 
@@ -263,46 +367,17 @@
     var trend = 'neutre';
     if (emaF[i] != null && emaS[i] != null) trend = emaF[i] > emaS[i] ? 'haussière' : 'baissière';
 
-    var confluences = [];
-    var direction = null, pd = null;
+    var ctx = {
+      candles: candles, range: range, pos: pos, zone: zone, fvgs: fvgs, obs: obs, crt: crt,
+      trend: trend, structure: structure, pdh: opts.pdh, pdl: opts.pdl
+    };
 
-    if (zone === 'discount') {
-      var fvgB = latestUnfilledFVG(candles, fvgs, 'bullish');
-      var obB = latestOB(obs, 'bullish');
-      pd = fvgB || obB;
-      var pdInDiscount = pd && fibPosition(range, (pd.top + pd.bottom) / 2) < CONFIG.equilibrium;
-      var reclaim = closeReclaim(candles, pd);
-      var crtBull = crt && crt.type === 'bullish';
-      var inOTE = pos >= (1 - CONFIG.oteHigh) && pos <= (1 - CONFIG.oteLow);
-
-      if (pdInDiscount) confluences.push('PD Array (' + (pd === fvgB ? 'FVG' : 'Order Block') + ') en discount');
-      if (inOTE) confluences.push('Prix dans la zone OTE (0.62–0.79)');
-      if (crtBull) confluences.push('CRT haussier (sweep + retour)');
-      if (reclaim) confluences.push('Clôture au-dessus du PD Array');
-      if (trend === 'haussière') confluences.push('Tendance haussière (EMA ' + CONFIG.emaFast + '/' + CONFIG.emaSlow + ')');
-      if (structure.bias === 'haussier') confluences.push('Structure : ' + structure.label);
-      confluences.push('Prix en discount (sous l’equilibrium)');
-
-      if (pdInDiscount && (crtBull || reclaim)) direction = 'LONG';
-    } else if (zone === 'premium') {
-      var fvgS = latestUnfilledFVG(candles, fvgs, 'bearish');
-      var obS = latestOB(obs, 'bearish');
-      pd = fvgS || obS;
-      var pdInPremium = pd && fibPosition(range, (pd.top + pd.bottom) / 2) > CONFIG.equilibrium;
-      var reclaimS = closeReclaim(candles, pd);
-      var crtBear = crt && crt.type === 'bearish';
-      var inOTEs = pos >= CONFIG.oteLow && pos <= CONFIG.oteHigh;
-
-      if (pdInPremium) confluences.push('PD Array (' + (pd === fvgS ? 'FVG' : 'Order Block') + ') en premium');
-      if (inOTEs) confluences.push('Prix dans la zone OTE (0.62–0.79)');
-      if (crtBear) confluences.push('CRT baissier (sweep + retour)');
-      if (reclaimS) confluences.push('Clôture en-dessous du PD Array');
-      if (trend === 'baissière') confluences.push('Tendance baissière (EMA ' + CONFIG.emaFast + '/' + CONFIG.emaSlow + ')');
-      if (structure.bias === 'baissier') confluences.push('Structure : ' + structure.label);
-      confluences.push('Prix en premium (au-dessus de l’equilibrium)');
-
-      if (pdInPremium && (crtBear || reclaimS)) direction = 'SHORT';
-    }
+    // Deux stratégies ; on retient le meilleur signal (confiance la plus haute).
+    var cands = [];
+    var s1 = evalOTE(ctx); if (s1) cands.push(s1);
+    var s2 = evalDaily(ctx); if (s2) cands.push(s2);
+    cands.sort(function (a, b) { return b.confidence - a.confidence; });
+    var best = cands[0] || null;
 
     var precision = precisionFor(last.close);
     var chart = {
@@ -314,34 +389,32 @@
         ? { top: range.low + range.size * CONFIG.oteHigh, bottom: range.low + range.size * CONFIG.oteLow }
         : { top: range.low + range.size * (1 - CONFIG.oteLow), bottom: range.low + range.size * (1 - CONFIG.oteHigh) },
       fvgs: fvgs, obs: obs, swings: swings, liquidity: liquidity,
-      emaFast: emaF, emaSlow: emaS,
-      emaFastPeriod: CONFIG.emaFast, emaSlowPeriod: CONFIG.emaSlow
+      emaFast: emaF, emaSlow: emaS, emaFastPeriod: CONFIG.emaFast, emaSlowPeriod: CONFIG.emaSlow,
+      pdh: opts.pdh, pdl: opts.pdl
     };
 
     var result = Object.assign(base, {
-      price: last.close, zone: zone, fibPos: pos, range: range,
-      confluences: confluences, precision: precision,
-      trend: trend, structure: structure.label, structureBias: structure.bias,
-      chart: chart
+      price: last.close, zone: zone, fibPos: pos, range: range, precision: precision,
+      trend: trend, structure: structure.label, structureBias: structure.bias, chart: chart
     });
 
-    if (!direction) {
-      result.reason = zone === 'equilibrium'
-        ? 'Prix à l’equilibrium — pas d’edge'
-        : 'Confluences incomplètes (PD Array + déclencheur requis)';
+    if (!best) {
+      result.reason = (zone === 'discount' || zone === 'premium')
+        ? 'Pas de confluence complète (PD Array + CRT requis, ou balayage daily)'
+        : 'Prix à l’equilibrium — pas d’edge';
       return result;
     }
 
-    var trade = direction === 'LONG' ? buildLong(candles, range, pd, crt) : buildShort(candles, range, pd, crt);
-    if (!(trade.rr >= CONFIG.minRR)) { result.reason = 'R:R insuffisant (' + round(trade.rr, 2) + ')'; return result; }
-
-    var strong = confluences.filter(function (c) { return c.indexOf('en discount') === -1 && c.indexOf('en premium') === -1; }).length;
     result.hasSignal = true;
-    result.trade = trade;
-    result.pd = pd;
-    result.confidence = Math.min(100, 35 + strong * 12);
-    chart.trade = trade;
-    chart.pd = pd;
+    result.trade = best.trade;
+    result.pd = best.pd;
+    result.confluences = best.confluences;
+    result.confidence = best.confidence;
+    result.strategy = best.strategy;
+    result.strategyLabel = best.strategyLabel;
+    result.alternatives = cands.length;
+    chart.trade = best.trade;
+    chart.pd = best.pd;
     return result;
   }
 

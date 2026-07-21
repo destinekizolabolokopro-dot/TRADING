@@ -24,6 +24,7 @@
     obBull: 'rgba(106,168,255,0.14)', obBear: 'rgba(232,195,122,0.14)',
     entry: '#e6ecf5', sl: '#f87171', tp: '#4ade80',
     liq: 'rgba(232,195,122,0.55)', crosshair: 'rgba(255,255,255,0.25)',
+    pdLevel: 'rgba(179,136,255,0.7)',
     bg: 'transparent'
   };
   var PAD = { right: 84, bottom: 22, top: 10, left: 6 };
@@ -201,6 +202,17 @@
       ctx.setLineDash([]);
       ctx.fillStyle = COL.liq; ctx.font = '9px ui-monospace, monospace'; ctx.textAlign = 'left';
       ctx.fillText(lq.type === 'buyside' ? 'BSL' : 'SSL', L.p.left + 4, yy - 5);
+    });
+
+    // plus-haut / plus-bas de la veille (stratégie Previous Daily)
+    [['pdh', a.pdh, 'PDH'], ['pdl', a.pdl, 'PDL']].forEach(function (d) {
+      var price = d[1]; if (price == null) return;
+      var yy = L.y(price); if (yy < L.p.top || yy > L.h - L.p.bottom) return;
+      ctx.strokeStyle = COL.pdLevel; ctx.lineWidth = 1.2; ctx.setLineDash([6, 4]);
+      ctx.beginPath(); ctx.moveTo(L.p.left, yy); ctx.lineTo(L.w - L.p.right, yy); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = COL.pdLevel; ctx.font = '9px ui-monospace, monospace'; ctx.textAlign = 'left';
+      ctx.fillText(d[2], L.p.left + 4, yy - 5);
     });
 
     // niveaux de trade

@@ -32,13 +32,19 @@ CE QUE TU PEUX FAIRE
 - WATCHLIST : change les paires (seules les 8 prévues sont acceptées).
 - UNITÉ DE TEMPS : 5m / 15m / 1h / 4h.
 
-COMMENT UN SIGNAL EST TROUVÉ (ICT / SMC)
-----------------------------------------
-  Fibonacci : zone DISCOUNT (achat) / PREMIUM (vente), zone OTE 0.62-0.79
-  + PD Array (Fair Value Gap ou Order Block) dans la bonne zone
-  + Déclencheur : CRT (prise de liquidité + retour) OU clôture sur le PD Array
-  + Contexte : tendance (EMA), structure (BOS/CHoCH)
-Un signal n'apparaît que si tout est réuni (Risk:Reward >= 1.2).
+LES DEUX STRATÉGIES
+-------------------
+  STRATÉGIE 1 — "OTE + PD Array + CRT" :
+     zone OTE (0.62-0.79) du Fibonacci
+     + PD Array (Fair Value Gap ou Order Block) en zone discount/premium
+     + CRT OBLIGATOIRE (prise de liquidité + retour)
+
+  STRATÉGIE 2 — "Previous Daily CRT" :
+     balayage du plus-haut / plus-bas de la VEILLE (PDH/PDL) + retour.
+
+Plus il y a de confluences dans le même sens, plus la CONFIANCE (%) est élevée.
+Un signal n'apparaît qu'avec un Risk:Reward >= 1.2. Filtre par stratégie en haut.
+Le site est en BLANC par défaut (bouton soleil/lune pour basculer).
 
 Le site se met à jour tout seul (crypto ~40 s, forex/or ~4 min).
 

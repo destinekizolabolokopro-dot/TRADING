@@ -12,15 +12,17 @@
   var TICK_MS = 20000;
   var MIN_AGE_CRYPTO = 40000;
   var MIN_AGE_SLOW = 240000;
+  var MIN_AGE_DAILY = 1800000; // 30 min — la veille change peu
 
   var state = {
     symbols: API.DEFAULT_SYMBOLS.slice(),
     timeframe: '15m',
     cache: {},
+    daily: {},
     lastUpdate: null,
     prevSignals: null,
-    filters: { dir: 'all', market: 'all', sort: 'conf' },
-    theme: 'dark',
+    filters: { dir: 'all', market: 'all', strat: 'all', sort: 'conf' },
+    theme: 'light',
     alerts: false,
     risk: { balance: 1000, pct: 1 },
     timer: null
@@ -69,17 +71,27 @@
   }
 
   // --- Données ----------------------------------------------------------------
+  // Plus-haut/plus-bas de la veille (mis en cache longtemps).
+  function ensureDaily(sym) {
+    var d = state.daily[sym];
+    if (d && (Date.now() - d.ts) < MIN_AGE_DAILY) return Promise.resolve(d.data);
+    return API.fetchDaily(sym).then(function (data) {
+      state.daily[sym] = { ts: Date.now(), data: data }; return data;
+    }).catch(function () { return (d && d.data) || null; });
+  }
+
   function ensureSymbol(sym) {
     var now = Date.now();
     var c = state.cache[sym];
     if (c && (now - c.ts) < minAge(sym)) return Promise.resolve(c.result);
-    return API.fetchCandles(sym, state.timeframe, 200)
-      .then(function (candles) {
-        var r = ICT.analyze(sym, state.timeframe, candles);
+    return ensureDaily(sym).then(function (daily) {
+      return API.fetchCandles(sym, state.timeframe, 200).then(function (candles) {
+        var r = ICT.analyze(sym, state.timeframe, candles, daily || {});
         r.label = API.label(sym); r.kind = (API.meta(sym) || {}).kind;
         state.cache[sym] = { ts: Date.now(), result: r };
         return r;
-      })
+      });
+    })
       .catch(function (err) {
         var m = API.meta(sym);
         var r = { symbol: sym, label: API.label(sym), timeframe: state.timeframe, hasSignal: false, kind: m && m.kind };
@@ -187,6 +199,8 @@
     head.appendChild(el('span', 'badge ' + (t.direction === 'LONG' ? 'badge-long' : 'badge-short'), t.direction === 'LONG' ? 'ACHAT' : 'VENTE'));
     card.appendChild(head);
 
+    if (r.strategyLabel) card.appendChild(el('div', 'strat-tag strat-' + r.strategy, r.strategyLabel));
+
     var meta = el('div', 'meta-row');
     meta.appendChild(el('span', 'pill pill-' + r.zone, zoneLabel(r.zone)));
     meta.appendChild(el('span', 'pill', 'Fib ' + fmt(r.fibPos, 2)));
@@ -273,6 +287,7 @@
     var out = signals.filter(marketMatch);
     if (state.filters.dir === 'long') out = out.filter(function (r) { return r.trade.direction === 'LONG'; });
     else if (state.filters.dir === 'short') out = out.filter(function (r) { return r.trade.direction === 'SHORT'; });
+    if (state.filters.strat !== 'all') out = out.filter(function (r) { return r.strategy === state.filters.strat; });
     if (state.filters.sort === 'rr') out.sort(function (a, b) { return b.trade.rr - a.trade.rr; });
     else if (state.filters.sort === 'sym') out.sort(function (a, b) { return (a.label || '').localeCompare(b.label || ''); });
     else out.sort(function (a, b) { return b.confidence - a.confidence; });
@@ -335,6 +350,9 @@
     var badge = $('#modal-badge');
     if (r.hasSignal) { badge.style.display = ''; badge.className = 'badge ' + (r.trade.direction === 'LONG' ? 'badge-long' : 'badge-short'); badge.textContent = r.trade.direction === 'LONG' ? 'ACHAT' : 'VENTE'; }
     else { badge.style.display = 'none'; }
+    var st = $('#modal-strat');
+    if (r.hasSignal && r.strategyLabel) { st.style.display = ''; st.className = 'strat-tag strat-' + r.strategy; st.textContent = r.strategyLabel; }
+    else { st.style.display = 'none'; }
 
     var body = $('#modal-body'); body.innerHTML = '';
     // contexte
@@ -405,6 +423,7 @@
     });
     seg($('#dir-filter'), [{ v: 'all', t: 'Tous' }, { v: 'long', t: 'Achat' }, { v: 'short', t: 'Vente' }], state.filters.dir, function (v) { state.filters.dir = v; save(); buildToolbar(); renderAll(); });
     seg($('#market-filter'), [{ v: 'all', t: 'Tous' }, { v: 'crypto', t: 'Crypto' }, { v: 'forex', t: 'Forex' }, { v: 'metal', t: 'Or' }], state.filters.market, function (v) { state.filters.market = v; save(); buildToolbar(); renderAll(); });
+    seg($('#strat-filter'), [{ v: 'all', t: 'Toutes' }, { v: 'ote', t: 'OTE' }, { v: 'daily', t: 'Prev. Daily' }], state.filters.strat, function (v) { state.filters.strat = v; save(); buildToolbar(); renderAll(); });
     seg($('#sort-filter'), [{ v: 'conf', t: 'Confiance' }, { v: 'rr', t: 'R:R' }, { v: 'sym', t: 'Nom' }], state.filters.sort, function (v) { state.filters.sort = v; save(); buildToolbar(); renderAll(); });
   }
 
@@ -438,25 +457,27 @@
 
   function initModals() {
     Array.prototype.forEach.call(document.querySelectorAll('[data-close]'), function (x) { x.addEventListener('click', closeDetail); });
-    Array.prototype.forEach.call(document.querySelectorAll('[data-close-risk]'), function (x) { x.addEventListener('click', function () { $('#risk-modal').classList.remove('open'); }); });
-    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { closeDetail(); $('#risk-modal').classList.remove('open'); } });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeDetail(); });
     window.addEventListener('resize', function () { if (openSym) { var r = state.cache[openSym] && state.cache[openSym].result; if (r && r.chart) TAChart.render($('#modal-chart'), r.chart, { precision: r.precision || 2 }); } });
+  }
 
-    $('#risk-btn').addEventListener('click', function () {
-      $('#risk-balance').value = state.risk.balance; $('#risk-pct').value = state.risk.pct;
-      $('#risk-modal').classList.add('open');
+  function initSettings() {
+    $('#settings-toggle').addEventListener('click', function () {
+      var p = $('#settings'); p.classList.toggle('open');
+      $('#settings-toggle').classList.toggle('on', p.classList.contains('open'));
     });
+    $('#risk-balance').value = state.risk.balance; $('#risk-pct').value = state.risk.pct;
     $('#risk-save').addEventListener('click', function () {
       var b = parseFloat($('#risk-balance').value), p = parseFloat($('#risk-pct').value);
       if (b > 0) state.risk.balance = b; if (p > 0) state.risk.pct = p;
-      save(); $('#risk-modal').classList.remove('open'); renderAll();
+      save(); renderAll(); toast('Réglages de risque appliqués.', 'long');
     });
   }
 
   function init() {
     load();
     applyTheme(); updateAlertBtn();
-    buildToolbar(); initSymbols(); initApiKey(); initModals();
+    buildToolbar(); initSymbols(); initApiKey(); initModals(); initSettings();
 
     $('#theme-toggle').addEventListener('click', function () { state.theme = state.theme === 'dark' ? 'light' : 'dark'; save(); applyTheme(); });
     $('#alert-toggle').addEventListener('click', function () {

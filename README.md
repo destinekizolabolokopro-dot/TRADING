@@ -7,14 +7,15 @@ fondés sur les concepts **ICT / SMC**, avec graphiques, calculateur de risque e
 
 ## Fonctionnalités
 
-- **Moteur ICT / SMC**
-  - Fibonacci **premium / discount** (equilibrium 0.5, zone **OTE** 0.62–0.79).
-  - **PD Arrays** : Fair Value Gaps + Order Blocks.
-  - **CRT** (Candle Range Theory) : sweep de liquidité + retour dans le range.
-  - **Clôture** au-dessus / en-dessous du PD Array (reclaim).
-  - Filtres de contexte : **tendance (EMA 20/50)**, **structure de marché (BOS / CHoCH)**,
-    **liquidité** (equal highs / equal lows).
-  - Un signal n'est émis qu'avec confluence complète et **R:R ≥ 1.2**.
+- **Deux stratégies**
+  - **Stratégie 1 — OTE + PD Array + CRT** : zone **OTE** (0.62–0.79) du Fibonacci +
+    **PD Array** (Fair Value Gap ou Order Block) en zone **discount/premium** +
+    **CRT obligatoire** (sweep de liquidité + retour).
+  - **Stratégie 2 — Previous Daily CRT** : balayage du **plus-haut / plus-bas de la veille**
+    (PDH / PDL) suivi d'un retour ; objectif sur la liquidité opposée.
+- **Confiance proportionnelle** : plus il y a de confluences dans le même sens (OTE, tendance
+  EMA 20/50, structure BOS/CHoCH, PD Array, clôture…), plus le pourcentage est élevé.
+- Un signal n'est émis qu'avec **R:R ≥ 1.2**. On retient la meilleure des deux stratégies par paire.
 - **Graphique chandeliers** intégré (façon TradingView, moteur Canvas maison, hors-ligne) :
   bougies, EMA, niveaux Fibonacci, zone OTE, boxes FVG / Order Blocks, liquidité,
   lignes Entrée / Stop / TP, croix de visée avec lecture OHLC.
