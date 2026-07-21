@@ -13,6 +13,10 @@ fondés sur les concepts **ICT / SMC**, avec graphiques, calculateur de risque e
     **CRT obligatoire** (sweep de liquidité + retour).
   - **Stratégie 2 — Previous Daily CRT** : balayage du **plus-haut / plus-bas de la veille**
     (PDH / PDL) suivi d'un retour ; objectif sur la liquidité opposée.
+  - **Stratégie 3 — Scalping (M1)** : tendance déterminée sur **M5** (agrégée depuis le M1),
+    **retour sur une zone clé** (moyenne mobile / Order Block) puis **confirmation sur M1**,
+    stop serré derrière le dernier creux/sommet, **objectif ≥ 2R**, avec filtre de
+    **session** (Londres / New York). Le graphique de ces signaux s'affiche en M1.
 - **Confiance proportionnelle** : plus il y a de confluences dans le même sens (OTE, tendance
   EMA 20/50, structure BOS/CHoCH, PD Array, clôture…), plus le pourcentage est élevé.
 - Un signal n'est émis qu'avec **R:R ≥ 1.2**. On retient la meilleure des deux stratégies par paire.

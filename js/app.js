@@ -18,7 +18,8 @@
   // Registre des stratégies (extensible : il suffit d'ajouter une entrée + son eval dans ict.js).
   var STRATS = [
     { id: 'ote', name: 'Retracement OTE', sub: 'Zone OTE du Fibonacci + PD Array en discount/premium + CRT.', tag: 'ICT' },
-    { id: 'daily', name: 'Previous Daily', sub: 'Balayage du plus-haut/plus-bas de la veille (PDH/PDL) puis retour.', tag: 'Daily' }
+    { id: 'daily', name: 'Previous Daily', sub: 'Balayage du plus-haut/plus-bas de la veille (PDH/PDL) puis retour.', tag: 'Daily' },
+    { id: 'scalp', name: 'Scalping (M1)', sub: 'Tendance sur M5, retour sur une zone clé, confirmation sur M1, objectif ≥ 2R. Idéal pendant Londres / New York.', tag: 'Scalp' }
   ];
 
   var state = {
@@ -26,11 +27,12 @@
     timeframe: '15m',
     cache: {},
     daily: {},
+    m1cache: {},
     history: [],
     lastUpdate: null,
     prevSignals: null,
     filters: { dir: 'all', market: 'all', strat: 'all', sort: 'conf' },
-    strategies: { ote: true, daily: true },
+    strategies: { ote: true, daily: true, scalp: true },
     theme: 'light',
     alerts: false,
     risk: { balance: 1000, pct: 1 },
@@ -93,14 +95,26 @@
     }).catch(function () { return (d && d.data) || null; });
   }
 
+  // Bougies M1 pour le scalping (récupérées seulement si la stratégie est active).
+  function ensureM1(sym) {
+    if (state.strategies.scalp === false) return Promise.resolve(null);
+    var c = state.m1cache[sym];
+    if (c && (Date.now() - c.ts) < minAge(sym)) return Promise.resolve(c.data);
+    return API.fetchCandles(sym, '1m', 400).then(function (d) {
+      state.m1cache[sym] = { ts: Date.now(), data: d }; return d;
+    }).catch(function () { return (c && c.data) || null; });
+  }
+
   function ensureSymbol(sym) {
     var now = Date.now();
     var c = state.cache[sym];
     if (c && (now - c.ts) < minAge(sym)) return Promise.resolve(c.result);
-    return ensureDaily(sym).then(function (daily) {
+    return Promise.all([ensureDaily(sym), ensureM1(sym)]).then(function (arr) {
+      var daily = arr[0], m1 = arr[1];
       return API.fetchCandles(sym, state.timeframe, 200).then(function (candles) {
         var opts = { strategies: state.strategies };
         if (daily) { opts.pdh = daily.pdh; opts.pdl = daily.pdl; }
+        if (m1) opts.m1 = m1;
         var r = ICT.analyze(sym, state.timeframe, candles, opts);
         r.label = API.label(sym); r.kind = (API.meta(sym) || {}).kind;
         state.cache[sym] = { ts: Date.now(), result: r };
@@ -519,7 +533,7 @@
     });
     seg($('#dir-filter'), [{ v: 'all', t: 'Tous' }, { v: 'long', t: 'Achat' }, { v: 'short', t: 'Vente' }], state.filters.dir, function (v) { state.filters.dir = v; save(); buildToolbar(); renderAll(); });
     seg($('#market-filter'), [{ v: 'all', t: 'Tous' }, { v: 'crypto', t: 'Crypto' }, { v: 'forex', t: 'Forex' }, { v: 'metal', t: 'Or' }], state.filters.market, function (v) { state.filters.market = v; save(); buildToolbar(); renderAll(); });
-    seg($('#strat-filter'), [{ v: 'all', t: 'Toutes' }, { v: 'ote', t: 'OTE' }, { v: 'daily', t: 'Prev. Daily' }], state.filters.strat, function (v) { state.filters.strat = v; save(); buildToolbar(); renderAll(); });
+    seg($('#strat-filter'), [{ v: 'all', t: 'Toutes' }, { v: 'ote', t: 'OTE' }, { v: 'daily', t: 'Prev. Daily' }, { v: 'scalp', t: 'Scalp' }], state.filters.strat, function (v) { state.filters.strat = v; save(); buildToolbar(); renderAll(); });
     seg($('#sort-filter'), [{ v: 'conf', t: 'Confiance' }, { v: 'rr', t: 'R:R' }, { v: 'sym', t: 'Nom' }], state.filters.sort, function (v) { state.filters.sort = v; save(); buildToolbar(); renderAll(); });
   }
 

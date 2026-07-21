@@ -340,8 +340,92 @@
       trade: trade, pd: pdArr, confluences: conf, confidence: scoreConfidence(conf) };
   }
 
+  // --- Stratégie 3 : Scalping (multi-timeframe) ------------------------------
+  // Tendance sur M5 (agrégée depuis M1) → retour sur zone clé (MM / OB) sur M1
+  // → confirmation (bougie de retournement / rejet) → SL serré, objectif ≥ 2R.
+  // Filtre de session : Londres / New York.
+  function aggregate(candles, n) {
+    var out = [];
+    for (var i = 0; i < candles.length; i += n) {
+      var slice = candles.slice(i, i + n); if (!slice.length) continue;
+      var hi = -Infinity, lo = Infinity, vol = 0;
+      slice.forEach(function (c) { hi = Math.max(hi, c.high); lo = Math.min(lo, c.low); vol += c.volume || 0; });
+      out.push({ time: slice[0].time, open: slice[0].open, high: hi, low: lo, close: slice[slice.length - 1].close, volume: vol });
+    }
+    return out;
+  }
+  function tradingSession(date) {
+    var h = (date || new Date()).getUTCHours();
+    var london = h >= 7 && h < 16, ny = h >= 12 && h < 21;
+    return { active: london || ny, overlap: h >= 12 && h < 16, name: (london && ny) ? 'Londres + New York' : (london ? 'Londres' : (ny ? 'New York' : 'hors session')) };
+  }
+  function basicChart(c, trade) {
+    var closes = c.map(function (x) { return x.close; });
+    return {
+      candles: c, view: { from: Math.max(0, c.length - CONFIG.viewBars), to: c.length - 1 },
+      fvgs: findFVGs(c), obs: findOrderBlocks(c), swings: findSwings(c, CONFIG.swingLookback),
+      emaFast: ema(closes, CONFIG.emaFast), emaSlow: ema(closes, CONFIG.emaSlow),
+      emaFastPeriod: CONFIG.emaFast, emaSlowPeriod: CONFIG.emaSlow, liquidity: [], trade: trade
+    };
+  }
+  function evalScalping(ctx) {
+    var m1 = ctx.m1;
+    if (!m1 || m1.length < 70) return null;
+    // 1) Tendance sur M5 (agrégée)
+    var m5 = aggregate(m1, 5);
+    if (m5.length < CONFIG.emaSlow + 2) return null;
+    var c5 = m5.map(function (c) { return c.close; });
+    var ef = ema(c5, CONFIG.emaFast), es = ema(c5, CONFIG.emaSlow);
+    var j = m5.length - 1;
+    if (ef[j] == null || es[j] == null) return null;
+    var up = ef[j] > es[j];
+    var trend = up ? 'haussière' : 'baissière';
+
+    // 2) Zone clé sur M1 : retour sur la moyenne mobile (EMA 50) ou un Order Block
+    var c1 = m1.map(function (c) { return c.close; });
+    var e50 = ema(c1, 50);
+    var i = m1.length - 1, last = m1[i], prev = m1[i - 1];
+    if (e50[i] == null) return null;
+    function touched(c) { return c.low <= e50[i] * 1.0012 && c.high >= e50[i] * 0.9988; }
+    var pullback = touched(last) || touched(prev);
+    var obs1 = findOrderBlocks(m1);
+    var ob = up ? latestOB(obs1, 'bullish') : latestOB(obs1, 'bearish');
+
+    // 3) Confirmation sur M1 (bougie de retournement / cassure)
+    var confirmLong = up && last.close > last.open && (last.close > prev.high || (last.close - last.low) > (last.high - last.close));
+    var confirmShort = !up && last.close < last.open && (last.close < prev.low || (last.high - last.close) > (last.close - last.low));
+    var dirLong = confirmLong, dirShort = confirmShort;
+    if (!dirLong && !dirShort) return null;
+    if (!pullback && !ob) return null; // il faut un retour sur une zone clé
+
+    var conf = ['Tendance ' + trend + ' (M5)'];
+    if (pullback) conf.push('Retour sur la moyenne mobile (M1)');
+    if (ob) conf.push('Order Block M1 dans le sens');
+    conf.push('Confirmation M1 (' + (dirLong ? 'bougie haussière' : 'bougie baissière') + ')');
+    var sess = tradingSession();
+    if (sess.overlap) conf.push('Chevauchement Londres/New York (volatilité max)');
+    else if (sess.active) conf.push('Session ' + sess.name + ' active');
+
+    // 4) Trade : SL derrière le dernier creux/sommet M1, objectif 2R
+    var lookback = 6, entry = last.close, trade, k;
+    if (dirLong) {
+      var lo = Infinity; for (k = Math.max(0, m1.length - lookback); k < m1.length; k++) lo = Math.min(lo, m1[k].low);
+      var sl = lo * (1 - CONFIG.slBufferPct), risk = entry - sl;
+      trade = { direction: 'LONG', entry: entry, sl: sl, tp1: entry + risk, tp2: entry + 2 * risk, tp3: entry + 3 * risk };
+      trade.rr = risk > 0 ? (trade.tp2 - entry) / risk : 0;
+    } else {
+      var hi = -Infinity; for (k = Math.max(0, m1.length - lookback); k < m1.length; k++) hi = Math.max(hi, m1[k].high);
+      var slh = hi * (1 + CONFIG.slBufferPct), risk2 = slh - entry;
+      trade = { direction: 'SHORT', entry: entry, sl: slh, tp1: entry - risk2, tp2: entry - 2 * risk2, tp3: entry - 3 * risk2 };
+      trade.rr = risk2 > 0 ? (entry - trade.tp2) / risk2 : 0;
+    }
+    if (!(trade.rr >= CONFIG.minRR)) return null;
+    return { strategy: 'scalp', strategyLabel: 'Scalping (M1)', direction: dirLong ? 'LONG' : 'SHORT',
+      trade: trade, pd: ob, confluences: conf, confidence: scoreConfidence(conf), trend: trend, m1: m1 };
+  }
+
   // --- Analyse complète -------------------------------------------------------
-  // opts : { pdh, pdl } = plus-haut / plus-bas de la veille (pour la stratégie daily)
+  // opts : { pdh, pdl } (daily) · { m1 } (scalping) · { strategies } (activées)
   function analyze(symbol, timeframe, candles, opts) {
     opts = opts || {};
     var base = { symbol: symbol, timeframe: timeframe, hasSignal: false };
@@ -349,11 +433,15 @@
 
     var swings = findSwings(candles, CONFIG.swingLookback);
     var range = dealingRange(candles, swings);
-    if (!range) return Object.assign(base, { reason: 'Aucun dealing range clair' });
+    // Le range du timeframe courant sert à OTE/Daily ; le scalping n'en dépend pas.
+    var scalpOnly = opts.strategies && opts.strategies.ote === false && opts.strategies.daily === false;
+    if (!range && !scalpOnly && !(opts.strategies && opts.strategies.scalp)) {
+      return Object.assign(base, { reason: 'Aucun dealing range clair' });
+    }
 
     var last = candles[candles.length - 1];
-    var pos = fibPosition(range, last.close);
-    var zone = zoneOf(pos);
+    var pos = range ? fibPosition(range, last.close) : null;
+    var zone = range ? zoneOf(pos) : 'inconnu';
     var fvgs = findFVGs(candles);
     var obs = findOrderBlocks(candles);
     var crt = detectCRT(candles);
@@ -369,40 +457,51 @@
 
     var ctx = {
       candles: candles, range: range, pos: pos, zone: zone, fvgs: fvgs, obs: obs, crt: crt,
-      trend: trend, structure: structure, pdh: opts.pdh, pdl: opts.pdl
+      trend: trend, structure: structure, pdh: opts.pdh, pdl: opts.pdl, m1: opts.m1
     };
 
     // Stratégies activées (par défaut toutes) ; on retient le meilleur signal.
     var enabled = opts.strategies || {};
     var cands = [];
-    if (enabled.ote !== false) { var s1 = evalOTE(ctx); if (s1) cands.push(s1); }
-    if (enabled.daily !== false) { var s2 = evalDaily(ctx); if (s2) cands.push(s2); }
+    if (enabled.ote !== false && range) { var s1 = evalOTE(ctx); if (s1) cands.push(s1); }
+    if (enabled.daily !== false && range) { var s2 = evalDaily(ctx); if (s2) cands.push(s2); }
+    if (enabled.scalp !== false) { var s3 = evalScalping(ctx); if (s3) cands.push(s3); }
     cands.sort(function (a, b) { return b.confidence - a.confidence; });
     var best = cands[0] || null;
 
     var precision = precisionFor(last.close);
-    var chart = {
-      candles: candles,
-      view: { from: Math.max(0, candles.length - CONFIG.viewBars), to: candles.length - 1 },
-      range: range,
-      fib: fibLevels(range),
-      ote: zone === 'premium'
-        ? { top: range.low + range.size * CONFIG.oteHigh, bottom: range.low + range.size * CONFIG.oteLow }
-        : { top: range.low + range.size * (1 - CONFIG.oteLow), bottom: range.low + range.size * (1 - CONFIG.oteHigh) },
-      fvgs: fvgs, obs: obs, swings: swings, liquidity: liquidity,
-      emaFast: emaF, emaSlow: emaS, emaFastPeriod: CONFIG.emaFast, emaSlowPeriod: CONFIG.emaSlow,
-      pdh: opts.pdh, pdl: opts.pdl
-    };
+    // Graphique : M1 pour un setup de scalping, sinon le timeframe courant.
+    var chart;
+    if (best && best.strategy === 'scalp') {
+      chart = basicChart(best.m1, best.trade);
+    } else if (!range) {
+      chart = basicChart(candles, best ? best.trade : null);
+    } else {
+      chart = {
+        candles: candles,
+        view: { from: Math.max(0, candles.length - CONFIG.viewBars), to: candles.length - 1 },
+        range: range, fib: fibLevels(range),
+        ote: zone === 'premium'
+          ? { top: range.low + range.size * CONFIG.oteHigh, bottom: range.low + range.size * CONFIG.oteLow }
+          : { top: range.low + range.size * (1 - CONFIG.oteLow), bottom: range.low + range.size * (1 - CONFIG.oteHigh) },
+        fvgs: fvgs, obs: obs, swings: swings, liquidity: liquidity,
+        emaFast: emaF, emaSlow: emaS, emaFastPeriod: CONFIG.emaFast, emaSlowPeriod: CONFIG.emaSlow,
+        pdh: opts.pdh, pdl: opts.pdl
+      };
+      if (best) { chart.trade = best.trade; chart.pd = best.pd; }
+    }
 
     var result = Object.assign(base, {
       price: last.close, zone: zone, fibPos: pos, range: range, precision: precision,
-      trend: trend, structure: structure.label, structureBias: structure.bias, chart: chart
+      trend: (best && best.trend) ? best.trend : trend,
+      structure: structure.label, structureBias: structure.bias, chart: chart
     });
 
     if (!best) {
-      result.reason = (zone === 'discount' || zone === 'premium')
-        ? 'Pas de confluence complète (PD Array + CRT requis, ou balayage daily)'
-        : 'Prix à l’equilibrium — pas d’edge';
+      result.reason = !range ? 'Aucun dealing range clair'
+        : ((zone === 'discount' || zone === 'premium')
+          ? 'Pas de confluence complète (PD Array + CRT requis, ou balayage daily)'
+          : 'Prix à l’equilibrium — pas d’edge');
       return result;
     }
 
@@ -414,8 +513,6 @@
     result.strategy = best.strategy;
     result.strategyLabel = best.strategyLabel;
     result.alternatives = cands.length;
-    chart.trade = best.trade;
-    chart.pd = best.pd;
     return result;
   }
 

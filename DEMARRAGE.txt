@@ -50,6 +50,11 @@ LES DEUX STRATÉGIES
   STRATÉGIE 2 — "Previous Daily CRT" :
      balayage du plus-haut / plus-bas de la VEILLE (PDH/PDL) + retour.
 
+  STRATÉGIE 3 — "Scalping (M1)" :
+     tendance sur M5 -> retour sur une zone clé (moyenne mobile / Order Block)
+     -> confirmation sur M1 -> stop serré, objectif >= 2R.
+     Meilleurs moments : sessions de Londres et de New York.
+
 Plus il y a de confluences dans le même sens, plus la CONFIANCE (%) est élevée.
 Un signal n'apparaît qu'avec un Risk:Reward >= 1.2. Filtre par stratégie en haut.
 Le site est en BLANC par défaut (bouton soleil/lune pour basculer).

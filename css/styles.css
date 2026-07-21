@@ -75,6 +75,8 @@ body {
 .strat-tag { display: inline-block; font-size: 10.5px; font-weight: 600; padding: 3px 9px; border-radius: 6px; background: var(--bg-elev); border: 1px solid var(--border-soft); color: var(--text-dim); }
 .strat-tag.strat-ote { color: var(--blue); border-color: color-mix(in srgb, var(--blue) 35%, transparent); }
 .strat-tag.strat-daily { color: var(--gold); border-color: color-mix(in srgb, var(--gold) 35%, transparent); }
+.strat-tag.strat-scalp { color: #9b6dff; border-color: color-mix(in srgb, #9b6dff 35%, transparent); }
+.strat-badge.strat-scalp { color: #9b6dff; }
 .signal .strat-tag { margin: 0 0 12px; }
 
 /* --- Menu (sous-parties) --------------------------------------- */
