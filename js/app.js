@@ -295,6 +295,29 @@
     return (r.price - base) / base * 100;
   }
 
+  // Ligne d'un niveau (Entrée / SL / TP) avec distance en % et montant en $.
+  function levelRow(label, val, cls, kind, t, p, ps) {
+    var row = el('div', 'level ' + cls);
+    row.appendChild(el('span', 'level-lbl', label));
+    var right = el('div', 'level-right');
+    right.appendChild(el('span', 'level-val', fmt(val, p)));
+    if (kind !== 'entry' && t.entry) {
+      var pct = (val - t.entry) / t.entry * 100;
+      var amt = ps ? ps.units * Math.abs(val - t.entry) : null;
+      var sign = kind === 'sl' ? '−' : '+';
+      var txt = sign + fmt(Math.abs(pct), 2) + '%' + (amt != null ? ' · ' + sign + fmt(amt, 2) + ' $' : '');
+      right.appendChild(el('span', 'level-sub ' + (kind === 'sl' ? 'neg' : 'pos'), txt));
+    }
+    row.appendChild(right);
+    return row;
+  }
+  function planCell(label, val, cls) {
+    var b = el('div', 'plan-cell');
+    b.appendChild(el('span', 'pc-l', label));
+    b.appendChild(el('span', 'pc-v ' + (cls || ''), val));
+    return b;
+  }
+
   // --- Cartes -----------------------------------------------------------------
   function signalCard(r) {
     var t = r.trade, p = r.precision;
@@ -321,22 +344,26 @@
     var bar = el('div', 'conf-bar'); var fill = el('div', 'conf-fill ' + (t.direction === 'LONG' ? 'long' : 'short')); fill.style.width = r.confidence + '%'; bar.appendChild(fill);
     card.appendChild(bar);
 
+    var ps = positionSize(t);
     var levels = el('div', 'levels');
-    function lv(l, v, c) { var row = el('div', 'level ' + (c || '')); row.appendChild(el('span', 'level-lbl', l)); row.appendChild(el('span', 'level-val', fmt(v, p))); return row; }
-    levels.appendChild(lv('Entrée', t.entry, 'lvl-entry'));
-    levels.appendChild(lv('Stop Loss', t.sl, 'lvl-sl'));
-    levels.appendChild(lv('TP1 · equilibrium', t.tp1, 'lvl-tp'));
-    levels.appendChild(lv('TP2 · liquidité', t.tp2, 'lvl-tp'));
+    levels.appendChild(levelRow('Entrée', t.entry, 'lvl-entry', 'entry', t, p, ps));
+    levels.appendChild(levelRow('Stop Loss', t.sl, 'lvl-sl', 'sl', t, p, ps));
+    levels.appendChild(levelRow('TP1 · equilibrium', t.tp1, 'lvl-tp', 'tp', t, p, ps));
+    levels.appendChild(levelRow('TP2 · liquidité', t.tp2, 'lvl-tp', 'tp', t, p, ps));
+    levels.appendChild(levelRow('TP3 · extension', t.tp3, 'lvl-tp', 'tp', t, p, ps));
     var rr = el('div', 'level lvl-rr'); rr.appendChild(el('span', 'level-lbl', 'Risk : Reward')); rr.appendChild(el('span', 'level-val', '1 : ' + fmt(t.rr, 2)));
     levels.appendChild(rr);
     card.appendChild(levels);
 
-    var ps = positionSize(t);
     if (ps) {
-      var pr = el('div', 'possize');
-      pr.appendChild(el('span', 'possize-lbl', 'Taille suggérée'));
-      pr.appendChild(el('span', 'possize-val', '≈ ' + fmt(ps.units, ps.units > 100 ? 2 : 4) + ' u. · risque ' + fmt(ps.riskAmount, 2) + ' $'));
-      card.appendChild(pr);
+      var reward2 = ps.units * Math.abs(t.tp2 - t.entry);
+      var plan = el('div', 'plan-summary');
+      var r1 = el('div', 'plan-row');
+      r1.appendChild(planCell('Risque', '−' + fmt(ps.riskAmount, 2) + ' $', 'neg'));
+      r1.appendChild(planCell('Gain visé · TP2', '+' + fmt(reward2, 2) + ' $', 'pos'));
+      plan.appendChild(r1);
+      plan.appendChild(el('div', 'plan-size', 'Taille ≈ ' + fmt(ps.units, ps.units > 100 ? 2 : 4) + ' unités · valeur ≈ ' + fmt(ps.notional, 0) + ' $'));
+      card.appendChild(plan);
     }
 
     var foot = el('div', 'card-foot');
@@ -477,15 +504,26 @@
 
     if (r.hasSignal) {
       var t = r.trade;
+      var psd = positionSize(t);
       var tbl = el('div', 'detail-levels');
-      function row(l, v, c) { var d = el('div', 'dl-row ' + (c || '')); d.appendChild(el('span', null, l)); d.appendChild(el('span', 'dl-v', fmt(v, p))); return d; }
+      function row(l, v, c, kind) {
+        var d = el('div', 'dl-row ' + (c || ''));
+        d.appendChild(el('span', null, l));
+        var rt = el('div', 'dl-right');
+        rt.appendChild(el('span', 'dl-v', fmt(v, p)));
+        if (kind && t.entry) {
+          var pct = (v - t.entry) / t.entry * 100, amt = psd ? psd.units * Math.abs(v - t.entry) : null, sign = kind === 'sl' ? '−' : '+';
+          rt.appendChild(el('span', 'dl-sub ' + (kind === 'sl' ? 'neg' : 'pos'), sign + fmt(Math.abs(pct), 2) + '%' + (amt != null ? ' · ' + sign + fmt(amt, 2) + ' $' : '')));
+        }
+        d.appendChild(rt); return d;
+      }
       tbl.appendChild(row('Entrée', t.entry, 'e'));
-      tbl.appendChild(row('Stop Loss', t.sl, 'sl'));
-      tbl.appendChild(row('TP1 · equilibrium', t.tp1, 'tp'));
-      tbl.appendChild(row('TP2 · liquidité', t.tp2, 'tp'));
-      tbl.appendChild(row('TP3 · extension', t.tp3, 'tp'));
-      tbl.appendChild(row('Risk : Reward', null, 'rr'));
-      tbl.lastChild.lastChild.textContent = '1 : ' + fmt(t.rr, 2);
+      tbl.appendChild(row('Stop Loss', t.sl, 'sl', 'sl'));
+      tbl.appendChild(row('TP1 · equilibrium', t.tp1, 'tp', 'tp'));
+      tbl.appendChild(row('TP2 · liquidité', t.tp2, 'tp', 'tp'));
+      tbl.appendChild(row('TP3 · extension', t.tp3, 'tp', 'tp'));
+      var rrRow = el('div', 'dl-row rr'); rrRow.appendChild(el('span', null, 'Risk : Reward')); var rrRt = el('div', 'dl-right'); rrRt.appendChild(el('span', 'dl-v', '1 : ' + fmt(t.rr, 2))); rrRow.appendChild(rrRt);
+      tbl.appendChild(rrRow);
       body.appendChild(tbl);
 
       var ps = positionSize(t);

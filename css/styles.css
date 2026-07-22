@@ -236,6 +236,24 @@ body {
 .lvl-tp .level-val { color: var(--accent); }
 .lvl-rr { background: var(--bg-card); }
 .lvl-rr .level-val { color: var(--blue); font-weight: 700; }
+.level-right { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
+.level-sub { font-family: var(--mono); font-size: 10.5px; font-variant-numeric: tabular-nums; }
+.level-sub.pos { color: var(--accent); } .level-sub.neg { color: var(--danger); }
+
+/* récap plan de trade */
+.plan-summary { background: var(--bg-elev); border: 1px solid var(--border-soft); border-radius: var(--radius-sm); padding: 10px 12px; margin-bottom: 12px; }
+.plan-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.plan-cell { display: flex; flex-direction: column; gap: 2px; }
+.pc-l { font-size: 10px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.04em; }
+.pc-v { font-family: var(--mono); font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.pc-v.pos { color: var(--accent); } .pc-v.neg { color: var(--danger); }
+.plan-size { font-size: 11px; color: var(--text-faint); margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border-soft); }
+
+/* modale : sous-info niveaux */
+.dl-right { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
+.dl-sub { font-family: var(--mono); font-size: 10.5px; font-variant-numeric: tabular-nums; }
+.dl-sub.pos { color: var(--accent); } .dl-sub.neg { color: var(--danger); }
+.dl-row.rr .dl-v { color: var(--blue); }
 
 .possize { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: var(--bg-elev); border: 1px dashed var(--border); border-radius: var(--radius-sm); padding: 8px 12px; margin-bottom: 12px; }
 .possize-lbl { font-size: 11px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.04em; }
