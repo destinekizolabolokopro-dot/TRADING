@@ -20,7 +20,8 @@
     { id: 'ote', name: 'Retracement OTE', sub: 'Zone OTE du Fibonacci + PD Array en discount/premium + CRT.', tag: 'ICT' },
     { id: 'daily', name: 'Previous Daily', sub: 'Balayage du plus-haut/plus-bas de la veille (PDH/PDL) puis retour.', tag: 'Daily' },
     { id: 'scalp', name: 'Scalping (M1)', sub: 'Tendance sur M5, retour sur une zone clé, confirmation sur M1, objectif ≥ 2R. Ne se déclenche QUE pendant les sessions de Londres et de New York.', tag: 'Scalp' },
-    { id: 'smc', name: 'Smart Money (SMC)', sub: 'Tendance sur unité supérieure → retour sur une zone d’offre/demande → confirmation BOS/CHoCH ou rejet → objectif sur la prochaine liquidité (ratio > 1:2).', tag: 'SMC' }
+    { id: 'smc', name: 'Smart Money (SMC)', sub: 'Tendance sur unité supérieure → retour sur une zone d’offre/demande → confirmation BOS/CHoCH ou rejet → objectif sur la prochaine liquidité (ratio > 1:2).', tag: 'SMC' },
+    { id: 'sr', name: 'Support & Résistance', sub: 'Zones testées plusieurs fois sur H4/Daily → retour sur la zone → confirmation (rejet, engloutissement, BOS/CHoCH) → stop derrière la zone, objectif sur la prochaine zone (ratio > 1:2).', tag: 'S/R' }
   ];
 
   var state = {
@@ -33,7 +34,8 @@
     lastUpdate: null,
     prevSignals: null,
     filters: { dir: 'all', market: 'all', strat: 'all', sort: 'conf' },
-    strategies: { ote: true, daily: true, scalp: true, smc: true },
+    histFilter: 'all',
+    strategies: { ote: true, daily: true, scalp: true, smc: true, sr: true },
     theme: 'light',
     alerts: false,
     risk: { balance: 1000, pct: 1 },
@@ -52,6 +54,7 @@
         }
         if (s.timeframe) state.timeframe = s.timeframe;
         if (s.filters) state.filters = Object.assign(state.filters, s.filters);
+        if (s.histFilter) state.histFilter = s.histFilter;
         if (s.strategies) state.strategies = Object.assign(state.strategies, s.strategies);
         if (s.theme) state.theme = s.theme;
         if (typeof s.alerts === 'boolean') state.alerts = s.alerts;
@@ -62,7 +65,7 @@
   function save() {
     try {
       localStorage.setItem(STORAGE, JSON.stringify({
-        symbols: state.symbols, timeframe: state.timeframe, filters: state.filters,
+        symbols: state.symbols, timeframe: state.timeframe, filters: state.filters, histFilter: state.histFilter,
         strategies: state.strategies, theme: state.theme, alerts: state.alerts, risk: state.risk
       }));
     } catch (e) { /* ignore */ }
@@ -180,18 +183,70 @@
     saveHistory();
   }
 
-  function computeBilan() {
-    var closed = state.history.filter(function (h) { return h.status === 'closed'; });
+  function computeBilan(list) {
+    list = list || state.history;
+    var closed = list.filter(function (h) { return h.status === 'closed'; });
     var wins = closed.filter(function (h) { return h.result === 'win'; }).length;
     var loss = closed.length - wins;
-    var open = state.history.filter(function (h) { return h.status === 'open'; }).length;
+    var open = list.filter(function (h) { return h.status === 'open'; }).length;
     var rate = closed.length ? Math.round(wins / closed.length * 100) : null;
     var rsum = closed.reduce(function (s, h) { return s + (h.r || 0); }, 0);
-    return { total: state.history.length, wins: wins, loss: loss, open: open, rate: rate, rsum: rsum };
+    return { total: list.length, wins: wins, loss: loss, open: open, rate: rate, rsum: rsum };
+  }
+
+  // Regroupe les trades clôturés par clé et calcule le taux de réussite + R.
+  function groupStats(closed, keyFn) {
+    var m = {};
+    closed.forEach(function (h) {
+      var k = keyFn(h); if (!k) return;
+      if (!m[k]) m[k] = { n: 0, wins: 0, r: 0, label: k };
+      m[k].n++; if (h.result === 'win') m[k].wins++; m[k].r += (h.r || 0);
+    });
+    return Object.keys(m).map(function (k) { var g = m[k]; g.rate = Math.round(g.wins / g.n * 100); return g; });
+  }
+
+  // « Apprentissage » : conclusions tirées des trades clôturés.
+  function renderInsights() {
+    var box = $('#insights'); box.innerHTML = '';
+    var closed = state.history.filter(function (h) { return h.status === 'closed'; });
+    function card(kind, txt) { var c = el('div', 'insight ' + kind); c.appendChild(el('span', 'insight-ic', kind === 'good' ? '✓' : (kind === 'bad' ? '⚠' : '•'))); c.appendChild(el('p', null, txt)); return c; }
+
+    if (closed.length < 5) {
+      box.appendChild(card('neutral', 'Encore ' + (5 - closed.length) + ' trade(s) clôturé(s) à attendre avant de tirer des conclusions fiables. Laisse tourner : chaque trade repéré s’ajoute et se solde tout seul.'));
+      return;
+    }
+    var wins = closed.filter(function (h) { return h.result === 'win'; }).length;
+    var rate = Math.round(wins / closed.length * 100);
+    var rsum = closed.reduce(function (s, h) { return s + (h.r || 0); }, 0);
+    box.appendChild(card(rate >= 50 ? 'good' : 'neutral', 'Sur ' + closed.length + ' trades clôturés : ' + rate + '% de réussite, ' + (rsum >= 0 ? '+' : '') + fmt(rsum, 1) + 'R cumulés.'));
+
+    var byStrat = groupStats(closed, function (h) { return h.strategyLabel || h.strategy; }).filter(function (g) { return g.n >= 3; }).sort(function (a, b) { return b.rate - a.rate; });
+    if (byStrat.length) {
+      var best = byStrat[0];
+      box.appendChild(card('good', 'Ton point fort : « ' + best.label + ' » — ' + best.rate + '% de réussite (' + best.n + ' trades, ' + (best.r >= 0 ? '+' : '') + fmt(best.r, 1) + 'R).'));
+      var worst = byStrat[byStrat.length - 1];
+      if (byStrat.length > 1 && worst.rate < 50) box.appendChild(card('bad', 'À améliorer : « ' + worst.label + ' » — ' + worst.rate + '% (' + worst.n + ' trades). Envisage de la désactiver ou d’attendre plus de confluences avant d’entrer.'));
+    }
+
+    var byDir = groupStats(closed, function (h) { return h.direction; });
+    var lg = byDir.filter(function (g) { return g.label === 'LONG'; })[0], sh = byDir.filter(function (g) { return g.label === 'SHORT'; })[0];
+    if (lg && sh && lg.n >= 3 && sh.n >= 3 && Math.abs(lg.rate - sh.rate) >= 20) {
+      var better = lg.rate > sh.rate ? lg : sh;
+      box.appendChild(card('neutral', 'Tu réussis mieux ' + (better === lg ? 'à l’achat' : 'à la vente') + ' (' + better.rate + '%) qu’' + (better === lg ? 'à la vente' : 'à l’achat') + ' — privilégie ce sens quand c’est possible.'));
+    }
+
+    var byPair = groupStats(closed, function (h) { return h.label || h.symbol; }).filter(function (g) { return g.n >= 3; }).sort(function (a, b) { return b.rate - a.rate; });
+    if (byPair.length) {
+      box.appendChild(card('good', 'Meilleure paire : ' + byPair[0].label + ' (' + byPair[0].rate + '%).'));
+      var wp = byPair[byPair.length - 1];
+      if (byPair.length > 1 && wp.rate < 40) box.appendChild(card('bad', 'Paire la plus difficile : ' + wp.label + ' (' + wp.rate + '%). Sois plus sélectif dessus.'));
+    }
+    box.appendChild(card('neutral', 'Rappel : garde le même risque après une perte, et n’entre que sur les configurations qui cochent toutes les cases. La discipline compte plus que le nombre de trades.'));
   }
 
   function renderHistory() {
-    var b = computeBilan();
+    var list = state.histFilter === 'all' ? state.history : state.history.filter(function (h) { return h.strategy === state.histFilter; });
+    var b = computeBilan(list);
     $('#b-total').textContent = b.total;
     $('#b-win').textContent = b.wins;
     $('#b-loss').textContent = b.loss;
@@ -200,9 +255,11 @@
     var rEl = $('#b-r'); rEl.textContent = (b.rsum >= 0 ? '+' : '') + fmt(b.rsum, 2) + ' R';
     rEl.className = 'bilan-val ' + (b.rsum > 0 ? 'pos' : (b.rsum < 0 ? 'neg' : ''));
 
-    $('#count-history').textContent = state.history.length;
+    renderInsights();
+
+    $('#count-history').textContent = list.length;
     var body = $('#history-body'); body.innerHTML = '';
-    var rows = state.history.slice().reverse();
+    var rows = list.slice().reverse();
     $('#history-empty').style.display = rows.length ? 'none' : '';
     $('#history-table').style.display = rows.length ? '' : 'none';
     rows.forEach(function (h) {
@@ -567,12 +624,12 @@
     });
   }
   function buildToolbar() {
-    seg($('#tf-buttons'), [{ v: '5m', t: '5m' }, { v: '15m', t: '15m' }, { v: '1h', t: '1h' }, { v: '4h', t: '4h' }], state.timeframe, function (v) {
+    seg($('#tf-buttons'), [{ v: '1m', t: '1m' }, { v: '5m', t: '5m' }, { v: '15m', t: '15m' }, { v: '30m', t: '30m' }, { v: '1h', t: '1h' }, { v: '4h', t: '4h' }, { v: '1d', t: '1j' }], state.timeframe, function (v) {
       if (v === state.timeframe) return; state.timeframe = v; save(); buildToolbar(); refresh(true);
     });
     seg($('#dir-filter'), [{ v: 'all', t: 'Tous' }, { v: 'long', t: 'Achat' }, { v: 'short', t: 'Vente' }], state.filters.dir, function (v) { state.filters.dir = v; save(); buildToolbar(); renderAll(); });
     seg($('#market-filter'), [{ v: 'all', t: 'Tous' }, { v: 'crypto', t: 'Crypto' }, { v: 'forex', t: 'Forex' }, { v: 'metal', t: 'Or' }], state.filters.market, function (v) { state.filters.market = v; save(); buildToolbar(); renderAll(); });
-    seg($('#strat-filter'), [{ v: 'all', t: 'Toutes' }, { v: 'ote', t: 'OTE' }, { v: 'daily', t: 'Prev. Daily' }, { v: 'scalp', t: 'Scalp' }, { v: 'smc', t: 'SMC' }], state.filters.strat, function (v) { state.filters.strat = v; save(); buildToolbar(); renderAll(); });
+    seg($('#strat-filter'), [{ v: 'all', t: 'Toutes' }, { v: 'ote', t: 'OTE' }, { v: 'daily', t: 'Prev. Daily' }, { v: 'scalp', t: 'Scalp' }, { v: 'smc', t: 'SMC' }, { v: 'sr', t: 'S/R' }], state.filters.strat, function (v) { state.filters.strat = v; save(); buildToolbar(); renderAll(); });
     seg($('#sort-filter'), [{ v: 'conf', t: 'Confiance' }, { v: 'rr', t: 'R:R' }, { v: 'sym', t: 'Nom' }], state.filters.sort, function (v) { state.filters.sort = v; save(); buildToolbar(); renderAll(); });
   }
 
@@ -638,6 +695,11 @@
     });
   }
 
+  function buildHistFilter() {
+    var opts = [{ v: 'all', t: 'Toutes' }].concat(STRATS.map(function (s) { return { v: s.id, t: s.tag }; }));
+    seg($('#hist-filter'), opts, state.histFilter, function (v) { state.histFilter = v; save(); buildHistFilter(); renderHistory(); });
+  }
+
   // --- Section Stratégies -----------------------------------------------------
   function renderStrategies() {
     var box = $('#strategies-list'); box.innerHTML = '';
@@ -669,7 +731,7 @@
   function init() {
     load(); loadHistory();
     applyTheme(); updateAlertBtn();
-    buildToolbar(); initSymbols(); initApiKey(); initModals(); initSettings(); initNav();
+    buildToolbar(); initSymbols(); initApiKey(); initModals(); initSettings(); initNav(); buildHistFilter();
     renderStrategies();
 
     $('#theme-toggle').addEventListener('click', function () { state.theme = state.theme === 'dark' ? 'light' : 'dark'; save(); applyTheme(); });

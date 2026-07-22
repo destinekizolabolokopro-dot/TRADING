@@ -76,7 +76,12 @@
 
     <!-- SOUS-PARTIE : HISTORIQUE -->
     <section class="view" id="view-historique">
-      <p class="view-intro">Chaque trade repéré est archivé ici. Dès que le prix touche l’objectif ou le stop, on note le résultat — pour que tu voies noir sur blanc ce que ça aurait donné.</p>
+      <p class="view-intro">Chaque trade repéré est archivé ici. Dès que le prix touche l’objectif ou le stop, on note le résultat — et TRADEassist en tire des conclusions pour t’aider à progresser.</p>
+
+      <div class="hist-controls">
+        <label class="control-label">Voir la stratégie</label>
+        <div id="hist-filter" class="seg"></div>
+      </div>
 
       <div class="bilan" id="bilan">
         <div class="bilan-card"><span class="bilan-val" id="b-total">0</span><span class="bilan-lbl">Trades</span></div>
@@ -86,6 +91,9 @@
         <div class="bilan-card"><span class="bilan-val" id="b-rate">—</span><span class="bilan-lbl">Taux de réussite</span></div>
         <div class="bilan-card"><span class="bilan-val" id="b-r">—</span><span class="bilan-lbl">Résultat cumulé (R)</span></div>
       </div>
+
+      <div class="section-header"><h2>Analyse &amp; conclusions</h2></div>
+      <div id="insights" class="insights"></div>
 
       <div class="section-header">
         <h2>Journal des trades <span id="count-history" class="count muted">0</span></h2>

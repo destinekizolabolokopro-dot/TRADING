@@ -22,7 +22,9 @@ LE MENU (4 sous-parties, en haut)
 ---------------------------------
 - SIGNAUX    : les trades du moment + les paires sous surveillance.
 - HISTORIQUE : le journal de tous les trades repérés + le bilan
-               (gagnants / perdants / taux de réussite / résultat en R).
+               (gagnants / perdants / taux de réussite / résultat en R),
+               un filtre par stratégie, et une ANALYSE qui tire des
+               conclusions de tes trades (points forts / à améliorer).
 - STRATÉGIES : coche/décoche les stratégies que tu veux suivre.
 - RÉGLAGES   : tes paires, ta clé forex/or, ta gestion du risque.
 
@@ -49,6 +51,11 @@ LES DEUX STRATÉGIES
 
   STRATÉGIE 2 — "Previous Daily CRT" :
      balayage du plus-haut / plus-bas de la VEILLE (PDH/PDL) + retour.
+
+  STRATÉGIE 5 — "Support & Résistance" :
+     zones testées plusieurs fois sur H4/Daily -> retour sur la zone
+     -> confirmation (rejet, engloutissement, BOS/CHoCH)
+     -> stop derrière la zone, objectif sur la prochaine zone (ratio > 1:2).
 
   STRATÉGIE 4 — "Smart Money (SMC)" :
      tendance sur unité supérieure -> retour sur une zone d'offre/demande

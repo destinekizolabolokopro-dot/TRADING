@@ -13,6 +13,9 @@ fondés sur les concepts **ICT / SMC**, avec graphiques, calculateur de risque e
     **CRT obligatoire** (sweep de liquidité + retour).
   - **Stratégie 2 — Previous Daily CRT** : balayage du **plus-haut / plus-bas de la veille**
     (PDH / PDL) suivi d'un retour ; objectif sur la liquidité opposée.
+  - **Stratégie 5 — Support & Résistance** : zones testées **plusieurs fois** (rectangles, pas
+    des lignes) sur **H4/Daily** → retour sur la zone → confirmation (rejet longue mèche,
+    engloutissement, BOS/CHoCH) → stop derrière la zone, objectif sur la prochaine zone (ratio > 1:2).
   - **Stratégie 4 — Smart Money (SMC)** : approche Price Action / SMC (pensée forex, appliquée
     aussi à la crypto). **Tendance sur unité supérieure** (agrégée) → **retour sur une zone
     d'offre/demande** (Order Block / FVG) → **confirmation BOS/CHoCH ou rejet** → **objectif sur
@@ -30,6 +33,9 @@ fondés sur les concepts **ICT / SMC**, avec graphiques, calculateur de risque e
   résultat cumulé (en R). Tout est stocké localement.
 - **Sélecteur de stratégies** : active/désactive chaque stratégie (registre extensible pour
   en ajouter d'autres facilement).
+- **Apprentissage** : l'historique tire automatiquement des **conclusions** des trades clôturés
+  — meilleure/pire stratégie, biais achat/vente, meilleure paire, taux de réussite et R cumulé.
+- **Filtre par stratégie dans l'historique** et **timeframes** au choix (1m à 1j).
 - **Graphique chandeliers** intégré (façon TradingView, moteur Canvas maison, hors-ligne) :
   bougies, EMA, niveaux Fibonacci, zone OTE, boxes FVG / Order Blocks, liquidité,
   lignes Entrée / Stop / TP, croix de visée avec lecture OHLC.

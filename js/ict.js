@@ -29,6 +29,7 @@
     emaSlow: 50,
     ignoreSession: false, // true uniquement pour la démo (affiche le scalp hors session)
     eqTolerance: 0.0012, // 0.12 % pour considérer deux extrêmes « égaux »
+    srTolerance: 0.005,  // 0.5 % pour regrouper des extrêmes en une zone S/R
     viewBars: 90         // fenêtre conseillée pour le graphique
   };
 
@@ -495,6 +496,85 @@
       trade: trade, pd: zone, confluences: conf, confidence: scoreConfidence(conf) };
   }
 
+  // --- Stratégie 5 : Support & Résistance (zones H4/Daily) -------------------
+  // Zones où le prix a réagi PLUSIEURS fois (rectangle, pas une ligne) sur une
+  // grande unité de temps. On attend le RETOUR sur la zone + une confirmation
+  // (rejet longue mèche / engloutissement / BOS-CHoCH), stop derrière la zone,
+  // objectif sur la prochaine zone clé. Ratio visé > 1:2.
+  function findSRZones(swings, tol) {
+    function cluster(points) {
+      var zones = [];
+      points.forEach(function (pt) {
+        var placed = false;
+        for (var i = 0; i < zones.length; i++) {
+          var z = zones[i];
+          if (Math.abs(pt.price - z.mid) / z.mid <= tol) {
+            z.prices.push(pt.price); z.lastIdx = Math.max(z.lastIdx, pt.index);
+            z.mid = z.prices.reduce(function (a, b) { return a + b; }, 0) / z.prices.length; placed = true; break;
+          }
+        }
+        if (!placed) zones.push({ prices: [pt.price], lastIdx: pt.index, mid: pt.price });
+      });
+      return zones.filter(function (z) { return z.prices.length >= 2; }).map(function (z) {
+        return { top: Math.max.apply(null, z.prices), bottom: Math.min.apply(null, z.prices), mid: z.mid, touches: z.prices.length, lastIdx: z.lastIdx };
+      });
+    }
+    return { resistance: cluster(swings.highs), support: cluster(swings.lows) };
+  }
+  function evalSR(ctx) {
+    var candles = ctx.candles;
+    var htf = aggregate(candles, 4), trend = ctx.trend;
+    if (htf.length >= CONFIG.emaSlow + 2) {
+      var hc = htf.map(function (c) { return c.close; });
+      var ef = ema(hc, CONFIG.emaFast), es = ema(hc, CONFIG.emaSlow), j = htf.length - 1;
+      if (ef[j] != null && es[j] != null) trend = ef[j] > es[j] ? 'haussière' : 'baissière';
+    }
+    if (trend !== 'haussière' && trend !== 'baissière') return null;
+    var bull = trend === 'haussière';
+    // Zones tracées sur le timeframe courant (choisi H4/Daily) — pas l'agrégation.
+    var zones = findSRZones(ctx.swings, CONFIG.srTolerance);
+    var last = candles[candles.length - 1], prev = candles[candles.length - 2], entry = last.close;
+
+    var pool = bull ? zones.support : zones.resistance;
+    var zone = null;
+    pool.forEach(function (z) {
+      var touched = bull ? (last.low <= z.top * 1.002 && entry >= z.bottom * 0.99 && entry <= z.top * 1.02)
+                         : (last.high >= z.bottom * 0.998 && entry <= z.top * 1.01 && entry >= z.bottom * 0.98);
+      if (touched && (!zone || z.touches > zone.touches)) zone = z;
+    });
+    if (!zone) return null;
+
+    var bosOk = ctx.structure && ((bull && ctx.structure.bias === 'haussier') || (!bull && ctx.structure.bias === 'baissier'));
+    var rejection = bull ? (last.close > last.open && (last.close - last.low) > (last.high - last.close)) : (last.close < last.open && (last.high - last.close) > (last.close - last.low));
+    var engulf = bull ? (last.close > last.open && last.close > prev.high) : (last.close < last.open && last.close < prev.low);
+    if (!bosOk && !rejection && !engulf) return null;
+
+    var conf = ['Tendance ' + trend + ' (H4/Daily)'];
+    conf.push('Zone ' + (bull ? 'de support' : 'de résistance') + ' testée ' + zone.touches + ' fois');
+    if (bosOk) conf.push('Structure : ' + ctx.structure.label);
+    if (rejection) conf.push('Rejet avec longue mèche');
+    if (engulf) conf.push('Bougie d’engloutissement');
+    conf.push('Objectif sur la prochaine zone clé');
+
+    var trade;
+    if (bull) {
+      var sl = zone.bottom * (1 - CONFIG.slBufferPct), risk = entry - sl, tgt = null;
+      zones.resistance.forEach(function (z) { if (z.bottom > entry && (tgt == null || z.bottom < tgt)) tgt = z.bottom; });
+      if (tgt == null || tgt < entry + 1.5 * risk) tgt = entry + 2 * risk;
+      trade = { direction: 'LONG', entry: entry, sl: sl, tp1: entry + (tgt - entry) * 0.5, tp2: tgt, tp3: tgt + (tgt - entry) * 0.5 };
+      trade.rr = risk > 0 ? (tgt - entry) / risk : 0;
+    } else {
+      var slh = zone.top * (1 + CONFIG.slBufferPct), risk2 = slh - entry, tgt2 = null;
+      zones.support.forEach(function (z) { if (z.top < entry && (tgt2 == null || z.top > tgt2)) tgt2 = z.top; });
+      if (tgt2 == null || tgt2 > entry - 1.5 * risk2) tgt2 = entry - 2 * risk2;
+      trade = { direction: 'SHORT', entry: entry, sl: slh, tp1: entry - (entry - tgt2) * 0.5, tp2: tgt2, tp3: tgt2 - (entry - tgt2) * 0.5 };
+      trade.rr = risk2 > 0 ? (entry - tgt2) / risk2 : 0;
+    }
+    if (!(trade.rr >= CONFIG.minRR)) return null;
+    return { strategy: 'sr', strategyLabel: 'Support & Résistance', direction: bull ? 'LONG' : 'SHORT',
+      trade: trade, pd: { type: bull ? 'bullish' : 'bearish', top: zone.top, bottom: zone.bottom, index: zone.lastIdx }, confluences: conf, confidence: scoreConfidence(conf) };
+  }
+
   // --- Analyse complète -------------------------------------------------------
   // opts : { pdh, pdl } (daily) · { m1 } (scalping) · { strategies } (activées)
   function analyze(symbol, timeframe, candles, opts) {
@@ -506,7 +586,7 @@
     var range = dealingRange(candles, swings);
     // Le range du timeframe courant sert à OTE/Daily ; scalping et SMC n'en dépendent pas.
     var st = opts.strategies || {};
-    var canRunWithoutRange = (st.scalp !== false) || (st.smc !== false);
+    var canRunWithoutRange = (st.scalp !== false) || (st.smc !== false) || (st.sr !== false);
     if (!range && !canRunWithoutRange) {
       return Object.assign(base, { reason: 'Aucun dealing range clair' });
     }
@@ -540,6 +620,7 @@
     if (enabled.daily !== false && range) { var s2 = evalDaily(ctx); if (s2) cands.push(s2); }
     if (enabled.scalp !== false) { var s3 = evalScalping(ctx); if (s3) cands.push(s3); }
     if (enabled.smc !== false) { var s4 = evalSMC(ctx); if (s4) cands.push(s4); }
+    if (enabled.sr !== false) { var s5 = evalSR(ctx); if (s5) cands.push(s5); }
     cands.sort(function (a, b) { return b.confidence - a.confidence; });
     var best = cands[0] || null;
 
@@ -594,6 +675,7 @@
     CONFIG: CONFIG, ema: ema, findSwings: findSwings, dealingRange: dealingRange,
     fibPosition: fibPosition, zoneOf: zoneOf, findFVGs: findFVGs, findOrderBlocks: findOrderBlocks,
     findLiquidity: findLiquidity, marketStructure: marketStructure, detectCRT: detectCRT,
+    aggregate: aggregate, findSRZones: findSRZones,
     analyze: analyze, precisionFor: precisionFor, round: round
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

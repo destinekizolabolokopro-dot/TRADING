@@ -79,6 +79,8 @@ body {
 .strat-badge.strat-scalp { color: #9b6dff; }
 .strat-tag.strat-smc { color: #14b8a6; border-color: color-mix(in srgb, #14b8a6 35%, transparent); }
 .strat-badge.strat-smc { color: #14b8a6; }
+.strat-tag.strat-sr { color: #e0699a; border-color: color-mix(in srgb, #e0699a 35%, transparent); }
+.strat-badge.strat-sr { color: #e0699a; }
 .signal .strat-tag { margin: 0 0 12px; }
 
 /* --- Menu (sous-parties) --------------------------------------- */
@@ -133,6 +135,16 @@ body {
 .switch.on { background: var(--accent); }
 .switch .knob { position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: transform 0.18s; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
 .switch.on .knob { transform: translateX(20px); }
+
+/* filtre historique + conclusions */
+.hist-controls { display: flex; flex-direction: column; gap: 7px; margin: 14px 0 4px; }
+.insights { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
+.insight { display: flex; align-items: flex-start; gap: 10px; background: var(--bg-card); border: 1px solid var(--border-soft); border-left-width: 3px; border-radius: var(--radius-sm); padding: 11px 14px; box-shadow: var(--shadow); }
+.insight p { font-size: 13px; color: var(--text); line-height: 1.5; }
+.insight-ic { font-weight: 700; font-size: 13px; line-height: 1.5; flex: none; }
+.insight.good { border-left-color: var(--accent); } .insight.good .insight-ic { color: var(--accent); }
+.insight.bad { border-left-color: var(--danger); } .insight.bad .insight-ic { color: var(--danger); }
+.insight.neutral { border-left-color: var(--text-faint); } .insight.neutral .insight-ic { color: var(--text-dim); }
 
 @media (max-width: 720px) { .bilan { grid-template-columns: repeat(3, 1fr); } }
 
