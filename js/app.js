@@ -10,6 +10,9 @@
 
   var STORAGE = 'tradeassist.settings';
   var HISTORY_KEY = 'tradeassist.history';
+  var AUTO_KEY = 'tradeassist.autohistory';
+  var AUTO_MIN_CONF = 55;   // confiance minimale pour que le bot prenne un trade
+  var AUTO_EXPLORE = 4;     // nb de trades par stratégie avant de juger (phase de test)
   var TICK_MS = 20000;
   var MIN_AGE_CRYPTO = 40000;
   var MIN_AGE_SLOW = 240000;
@@ -31,6 +34,8 @@
     daily: {},
     m1cache: {},
     history: [],
+    autoHistory: [],
+    autoEnabled: true,
     lastUpdate: null,
     prevSignals: null,
     filters: { dir: 'all', market: 'all', strat: 'all', sort: 'conf' },
@@ -58,6 +63,7 @@
         if (s.strategies) state.strategies = Object.assign(state.strategies, s.strategies);
         if (s.theme) state.theme = s.theme;
         if (typeof s.alerts === 'boolean') state.alerts = s.alerts;
+        if (typeof s.autoEnabled === 'boolean') state.autoEnabled = s.autoEnabled;
         if (s.risk) state.risk = Object.assign(state.risk, s.risk);
       }
     } catch (e) { /* ignore */ }
@@ -66,12 +72,14 @@
     try {
       localStorage.setItem(STORAGE, JSON.stringify({
         symbols: state.symbols, timeframe: state.timeframe, filters: state.filters, histFilter: state.histFilter,
-        strategies: state.strategies, theme: state.theme, alerts: state.alerts, risk: state.risk
+        strategies: state.strategies, theme: state.theme, alerts: state.alerts, autoEnabled: state.autoEnabled, risk: state.risk
       }));
     } catch (e) { /* ignore */ }
   }
   function loadHistory() { try { state.history = JSON.parse(localStorage.getItem(HISTORY_KEY)) || []; } catch (e) { state.history = []; } }
   function saveHistory() { try { localStorage.setItem(HISTORY_KEY, JSON.stringify(state.history.slice(-500))); } catch (e) { /* ignore */ } }
+  function loadAutoHistory() { try { state.autoHistory = JSON.parse(localStorage.getItem(AUTO_KEY)) || []; } catch (e) { state.autoHistory = []; } }
+  function saveAutoHistory() { try { localStorage.setItem(AUTO_KEY, JSON.stringify(state.autoHistory.slice(-500))); } catch (e) { /* ignore */ } }
 
   // --- Helpers ----------------------------------------------------------------
   var $ = function (s) { return document.querySelector(s); };
@@ -79,6 +87,19 @@
   function fmt(v, p) { if (v == null || isNaN(v)) return '—'; return Number(v).toLocaleString('fr-FR', { minimumFractionDigits: p, maximumFractionDigits: p }); }
   function minAge(sym) { var m = API.meta(sym); return (m && m.kind === 'crypto') ? MIN_AGE_CRYPTO : MIN_AGE_SLOW; }
   function zoneLabel(z) { return z === 'discount' ? 'Discount' : (z === 'premium' ? 'Premium' : 'Equilibrium'); }
+
+  // % de réussite estimé : mélange la confiance du setup avec le taux de réussite
+  // réel de la stratégie (une fois assez de trades clôturés dans l'historique).
+  function stratHistRate(strategy) {
+    var closed = state.history.filter(function (h) { return h.status === 'closed' && h.strategy === strategy; });
+    if (closed.length < 5) return null;
+    return Math.round(closed.filter(function (h) { return h.result === 'win'; }).length / closed.length * 100);
+  }
+  function estSuccess(r) {
+    var wr = stratHistRate(r.strategy);
+    if (wr == null) return { pct: r.confidence, live: false };
+    return { pct: Math.round(r.confidence * 0.5 + wr * 0.5), live: true };
+  }
 
   function positionSize(trade) {
     if (!trade) return null;
@@ -142,9 +163,13 @@
     return Promise.all(jobs).then(function () {
       state.lastUpdate = new Date();
       updateHistory();
+      updateAutoHistory();
+      if (state.autoEnabled) runAutoBot();
+      saveAutoHistory();
       renderAll();
       checkAlerts();
       if (state.view === 'historique') renderHistory();
+      if (state.view === 'auto') renderAuto();
       setStatus('En direct', false);
     });
   }
@@ -205,44 +230,48 @@
     return Object.keys(m).map(function (k) { var g = m[k]; g.rate = Math.round(g.wins / g.n * 100); return g; });
   }
 
-  // « Apprentissage » : conclusions tirées des trades clôturés.
-  function renderInsights() {
-    var box = $('#insights'); box.innerHTML = '';
-    var closed = state.history.filter(function (h) { return h.status === 'closed'; });
-    function card(kind, txt) { var c = el('div', 'insight ' + kind); c.appendChild(el('span', 'insight-ic', kind === 'good' ? '✓' : (kind === 'bad' ? '⚠' : '•'))); c.appendChild(el('p', null, txt)); return c; }
-
+  // Construit la liste des conclusions [{kind,txt}] à partir d'un historique.
+  function buildConclusions(hist, isBot) {
+    var who = isBot ? 'Le bot' : 'Tu';
+    var out = [];
+    var closed = hist.filter(function (h) { return h.status === 'closed'; });
     if (closed.length < 5) {
-      box.appendChild(card('neutral', 'Encore ' + (5 - closed.length) + ' trade(s) clôturé(s) à attendre avant de tirer des conclusions fiables. Laisse tourner : chaque trade repéré s’ajoute et se solde tout seul.'));
-      return;
+      out.push({ kind: 'neutral', txt: 'Encore ' + (5 - closed.length) + ' trade(s) clôturé(s) avant des conclusions fiables. ' + (isBot ? 'Le bot continue de tester chaque stratégie.' : 'Laisse tourner : chaque trade se solde tout seul.') });
+      return out;
     }
     var wins = closed.filter(function (h) { return h.result === 'win'; }).length;
     var rate = Math.round(wins / closed.length * 100);
     var rsum = closed.reduce(function (s, h) { return s + (h.r || 0); }, 0);
-    box.appendChild(card(rate >= 50 ? 'good' : 'neutral', 'Sur ' + closed.length + ' trades clôturés : ' + rate + '% de réussite, ' + (rsum >= 0 ? '+' : '') + fmt(rsum, 1) + 'R cumulés.'));
+    out.push({ kind: rate >= 50 ? 'good' : 'neutral', txt: 'Sur ' + closed.length + ' trades clôturés : ' + rate + '% de réussite, ' + (rsum >= 0 ? '+' : '') + fmt(rsum, 1) + 'R cumulés.' });
 
     var byStrat = groupStats(closed, function (h) { return h.strategyLabel || h.strategy; }).filter(function (g) { return g.n >= 3; }).sort(function (a, b) { return b.rate - a.rate; });
     if (byStrat.length) {
       var best = byStrat[0];
-      box.appendChild(card('good', 'Ton point fort : « ' + best.label + ' » — ' + best.rate + '% de réussite (' + best.n + ' trades, ' + (best.r >= 0 ? '+' : '') + fmt(best.r, 1) + 'R).'));
+      out.push({ kind: 'good', txt: (isBot ? 'Sa stratégie la plus rentable' : 'Ton point fort') + ' : « ' + best.label + ' » — ' + best.rate + '% (' + best.n + ' trades, ' + (best.r >= 0 ? '+' : '') + fmt(best.r, 1) + 'R).' });
       var worst = byStrat[byStrat.length - 1];
-      if (byStrat.length > 1 && worst.rate < 50) box.appendChild(card('bad', 'À améliorer : « ' + worst.label + ' » — ' + worst.rate + '% (' + worst.n + ' trades). Envisage de la désactiver ou d’attendre plus de confluences avant d’entrer.'));
+      if (byStrat.length > 1 && worst.rate < 50) out.push({ kind: 'bad', txt: (isBot ? 'Il a mis de côté' : 'À améliorer') + ' : « ' + worst.label + ' » — ' + worst.rate + '% (' + worst.n + ' trades)' + (isBot ? ' (écartée automatiquement).' : '. Envisage de la désactiver ou d’attendre plus de confluences.') });
     }
-
     var byDir = groupStats(closed, function (h) { return h.direction; });
     var lg = byDir.filter(function (g) { return g.label === 'LONG'; })[0], sh = byDir.filter(function (g) { return g.label === 'SHORT'; })[0];
     if (lg && sh && lg.n >= 3 && sh.n >= 3 && Math.abs(lg.rate - sh.rate) >= 20) {
       var better = lg.rate > sh.rate ? lg : sh;
-      box.appendChild(card('neutral', 'Tu réussis mieux ' + (better === lg ? 'à l’achat' : 'à la vente') + ' (' + better.rate + '%) qu’' + (better === lg ? 'à la vente' : 'à l’achat') + ' — privilégie ce sens quand c’est possible.'));
+      out.push({ kind: 'neutral', txt: who + ' réussi' + (isBot ? 't' : 's') + ' mieux ' + (better === lg ? 'à l’achat' : 'à la vente') + ' (' + better.rate + '%) qu’' + (better === lg ? 'à la vente' : 'à l’achat') + '.' });
     }
-
     var byPair = groupStats(closed, function (h) { return h.label || h.symbol; }).filter(function (g) { return g.n >= 3; }).sort(function (a, b) { return b.rate - a.rate; });
-    if (byPair.length) {
-      box.appendChild(card('good', 'Meilleure paire : ' + byPair[0].label + ' (' + byPair[0].rate + '%).'));
-      var wp = byPair[byPair.length - 1];
-      if (byPair.length > 1 && wp.rate < 40) box.appendChild(card('bad', 'Paire la plus difficile : ' + wp.label + ' (' + wp.rate + '%). Sois plus sélectif dessus.'));
-    }
-    box.appendChild(card('neutral', 'Rappel : garde le même risque après une perte, et n’entre que sur les configurations qui cochent toutes les cases. La discipline compte plus que le nombre de trades.'));
+    if (byPair.length) out.push({ kind: 'good', txt: 'Meilleure paire : ' + byPair[0].label + ' (' + byPair[0].rate + '%).' });
+    if (isBot) out.push({ kind: 'neutral', txt: 'Plus le bot accumule de trades, plus il devient sélectif — il garde ce qui marche et abandonne le reste, sans que tu aies à intervenir.' });
+    else out.push({ kind: 'neutral', txt: 'Rappel : garde le même risque après une perte, et n’entre que sur les configurations complètes. La discipline compte plus que le nombre de trades.' });
+    return out;
   }
+  function paintInsights(boxId, arr) {
+    var box = $(boxId); box.innerHTML = '';
+    arr.forEach(function (i) {
+      var c = el('div', 'insight ' + i.kind);
+      c.appendChild(el('span', 'insight-ic', i.kind === 'good' ? '✓' : (i.kind === 'bad' ? '⚠' : '•')));
+      c.appendChild(el('p', null, i.txt)); box.appendChild(c);
+    });
+  }
+  function renderInsights() { paintInsights('#insights', buildConclusions(state.history, false)); }
 
   function renderHistory() {
     var list = state.histFilter === 'all' ? state.history : state.history.filter(function (h) { return h.strategy === state.histFilter; });
@@ -262,24 +291,103 @@
     var rows = list.slice().reverse();
     $('#history-empty').style.display = rows.length ? 'none' : '';
     $('#history-table').style.display = rows.length ? '' : 'none';
-    rows.forEach(function (h) {
-      var tr = document.createElement('tr');
-      function td(txt, cls) { var d = document.createElement('td'); if (cls) d.className = cls; d.textContent = txt; return d; }
-      var d = new Date(h.ts);
-      tr.appendChild(td(d.toLocaleDateString('fr-FR') + ' ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })));
-      tr.appendChild(td(h.label || h.symbol));
-      tr.appendChild(td(h.strategyLabel || h.strategy));
-      var sens = document.createElement('td'); sens.appendChild(el('span', 'mini-badge ' + (h.direction === 'LONG' ? 'badge-long' : 'badge-short'), h.direction === 'LONG' ? 'Achat' : 'Vente')); tr.appendChild(sens);
-      tr.appendChild(td(fmt(h.entry, h.precision), 'num'));
-      tr.appendChild(td(fmt(h.sl, h.precision), 'num'));
-      tr.appendChild(td(fmt(h.tp1, h.precision), 'num'));
-      var rc = document.createElement('td');
-      var lbl = h.status === 'open' ? 'En cours' : (h.result === 'win' ? 'Gagné' : 'Perdu');
-      var cls = h.status === 'open' ? 'res-open' : (h.result === 'win' ? 'res-win' : 'res-loss');
-      rc.appendChild(el('span', 'res ' + cls, lbl + (h.status === 'closed' ? ' · ' + (h.r >= 0 ? '+' : '') + fmt(h.r, 1) + 'R' : '')));
-      tr.appendChild(rc);
-      body.appendChild(tr);
+    rows.forEach(function (h) { body.appendChild(historyRow(h)); });
+  }
+
+  function historyRow(h) {
+    var tr = document.createElement('tr');
+    function td(txt, cls) { var d = document.createElement('td'); if (cls) d.className = cls; d.textContent = txt; return d; }
+    var d = new Date(h.ts);
+    tr.appendChild(td(d.toLocaleDateString('fr-FR') + ' ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })));
+    tr.appendChild(td(h.label || h.symbol));
+    tr.appendChild(td(h.strategyLabel || h.strategy));
+    var sens = document.createElement('td'); sens.appendChild(el('span', 'mini-badge ' + (h.direction === 'LONG' ? 'badge-long' : 'badge-short'), h.direction === 'LONG' ? 'Achat' : 'Vente')); tr.appendChild(sens);
+    tr.appendChild(td(fmt(h.entry, h.precision), 'num'));
+    tr.appendChild(td(fmt(h.sl, h.precision), 'num'));
+    tr.appendChild(td(fmt(h.tp1, h.precision), 'num'));
+    var rc = document.createElement('td');
+    var lbl = h.status === 'open' ? 'En cours' : (h.result === 'win' ? 'Gagné' : 'Perdu');
+    var cls = h.status === 'open' ? 'res-open' : (h.result === 'win' ? 'res-win' : 'res-loss');
+    rc.appendChild(el('span', 'res ' + cls, lbl + (h.status === 'closed' ? ' · ' + (h.r >= 0 ? '+' : '') + fmt(h.r, 1) + 'R' : '')));
+    tr.appendChild(rc);
+    return tr;
+  }
+
+  // === Bot Auto : trade seul, apprend seul ==================================
+  // Statistiques de réussite du bot par stratégie (sur ses trades clôturés).
+  function autoStratStats() {
+    var m = {};
+    state.autoHistory.forEach(function (h) {
+      if (h.status !== 'closed') return;
+      if (!m[h.strategy]) m[h.strategy] = { n: 0, wins: 0 };
+      m[h.strategy].n++; if (h.result === 'win') m[h.strategy].wins++;
     });
+    return m;
+  }
+  // Décision du bot pour une stratégie : test (peu de données), confiance, ou évite.
+  function autoWeight(strategy, stats) {
+    var s = stats[strategy];
+    if (!s || s.n < AUTO_EXPLORE) return { phase: 'test', rate: s ? Math.round(s.wins / s.n * 100) : null, n: s ? s.n : 0 };
+    var rate = Math.round(s.wins / s.n * 100);
+    return { phase: rate >= 50 ? 'confiance' : 'évite', rate: rate, n: s.n };
+  }
+  // Le bot prend position tout seul (1 trade ouvert max par paire).
+  function runAutoBot() {
+    var stats = autoStratStats();
+    results().forEach(function (r) {
+      if (!r.hasSignal || r.confidence < AUTO_MIN_CONF) return;
+      if (state.autoHistory.some(function (h) { return h.status === 'open' && h.symbol === r.symbol; })) return;
+      var w = autoWeight(r.strategy, stats);
+      if (w.phase === 'évite') return; // il a appris à éviter cette stratégie
+      var t = r.trade;
+      state.autoHistory.push({
+        id: Date.now() + '-' + r.symbol, ts: Date.now(), symbol: r.symbol, label: r.label,
+        strategy: r.strategy, strategyLabel: r.strategyLabel, direction: t.direction, timeframe: r.timeframe,
+        precision: r.precision, entry: t.entry, sl: t.sl, tp1: t.tp1, status: 'open', result: null, r: null, phase: w.phase
+      });
+    });
+  }
+  function updateAutoHistory() {
+    state.autoHistory.forEach(function (h) {
+      if (h.status !== 'open') return;
+      var res = state.cache[h.symbol] && state.cache[h.symbol].result;
+      if (!res || res.price == null) return;
+      var p = res.price, hit = null;
+      if (h.direction === 'LONG') { if (p <= h.sl) hit = 'loss'; else if (p >= h.tp1) hit = 'win'; }
+      else { if (p >= h.sl) hit = 'loss'; else if (p <= h.tp1) hit = 'win'; }
+      if (hit) { h.status = 'closed'; h.result = hit; h.closedTs = Date.now(); var risk = Math.abs(h.entry - h.sl), rew = Math.abs(h.tp1 - h.entry); h.r = hit === 'win' ? (risk > 0 ? rew / risk : 0) : -1; }
+    });
+  }
+
+  function renderAuto() {
+    var stEl = $('#auto-state'); if (stEl) { stEl.textContent = state.autoEnabled ? 'actif' : 'en pause'; stEl.className = 'auto-state ' + (state.autoEnabled ? 'on' : 'off'); }
+    var tg = $('#auto-toggle'); if (tg) tg.textContent = state.autoEnabled ? 'Mettre en pause' : 'Réactiver le bot';
+
+    var b = computeBilan(state.autoHistory);
+    $('#a-total').textContent = b.total; $('#a-win').textContent = b.wins; $('#a-loss').textContent = b.loss; $('#a-open').textContent = b.open;
+    $('#a-rate').textContent = b.rate != null ? b.rate + '%' : '—';
+    var rEl = $('#a-r'); rEl.textContent = (b.rsum >= 0 ? '+' : '') + fmt(b.rsum, 2) + ' R'; rEl.className = 'bilan-val ' + (b.rsum > 0 ? 'pos' : (b.rsum < 0 ? 'neg' : ''));
+
+    var stats = autoStratStats(); var brain = $('#auto-brain'); brain.innerHTML = '';
+    STRATS.forEach(function (s) {
+      var w = autoWeight(s.id, stats);
+      var row = el('div', 'brain-row');
+      var left = el('div', 'brain-left'); left.appendChild(el('span', 'brain-name', s.name)); left.appendChild(el('span', 'strat-badge strat-' + s.id, s.tag)); row.appendChild(left);
+      var right = el('div', 'brain-right');
+      right.appendChild(el('span', 'brain-rate', w.rate != null ? w.rate + '% · ' + w.n + ' trades' : 'jamais testée'));
+      var cls = w.phase === 'confiance' ? 'good' : (w.phase === 'évite' ? 'bad' : 'test');
+      var lbl = w.phase === 'confiance' ? 'Utilisée ✓' : (w.phase === 'évite' ? 'Écartée' : 'En test');
+      right.appendChild(el('span', 'brain-status ' + cls, lbl));
+      row.appendChild(right); brain.appendChild(row);
+    });
+
+    paintInsights('#auto-insights', buildConclusions(state.autoHistory, true));
+
+    $('#count-auto').textContent = state.autoHistory.length;
+    var body = $('#auto-body'); body.innerHTML = '';
+    var rows = state.autoHistory.slice().reverse();
+    $('#auto-empty').style.display = rows.length ? 'none' : ''; $('#auto-table').style.display = rows.length ? '' : 'none';
+    rows.forEach(function (h) { body.appendChild(historyRow(h)); });
   }
 
   function results() { return state.symbols.map(function (s) { return state.cache[s] && state.cache[s].result; }).filter(Boolean); }
@@ -393,9 +501,10 @@
     if (r.strategyLabel) card.appendChild(el('div', 'strat-tag strat-' + r.strategy, r.strategyLabel));
 
     var meta = el('div', 'meta-row');
-    meta.appendChild(el('span', 'pill pill-' + r.zone, zoneLabel(r.zone)));
-    meta.appendChild(el('span', 'pill', 'Fib ' + fmt(r.fibPos, 2)));
+    if (r.zone) meta.appendChild(el('span', 'pill pill-' + r.zone, zoneLabel(r.zone)));
     meta.appendChild(el('span', 'pill pill-conf', 'Confiance ' + r.confidence + '%'));
+    var es = estSuccess(r);
+    meta.appendChild(el('span', 'pill pill-succ', 'Réussite ' + (es.live ? '' : '~') + es.pct + '%'));
     card.appendChild(meta);
 
     // barre de confiance
@@ -558,6 +667,7 @@
     ctx.appendChild(box('Tendance', r.trend || '—'));
     ctx.appendChild(box('Structure', r.structure || '—'));
     ctx.appendChild(box('Prix', fmt(r.price, p)));
+    if (r.hasSignal) { var es2 = estSuccess(r); ctx.appendChild(box('Réussite estimée', (es2.live ? '' : '~') + es2.pct + '%')); }
     body.appendChild(ctx);
 
     if (r.hasSignal) {
@@ -679,6 +789,14 @@
       state.history = []; saveHistory(); renderHistory();
       toast('Historique vidé.');
     });
+    $('#auto-toggle').addEventListener('click', function () {
+      state.autoEnabled = !state.autoEnabled; save(); renderAuto();
+      toast(state.autoEnabled ? 'Le bot est réactivé — il reprend la main.' : 'Le bot est en pause.', state.autoEnabled ? 'long' : '');
+    });
+    $('#clear-auto').addEventListener('click', function () {
+      state.autoHistory = []; saveAutoHistory(); renderAuto();
+      toast('Bot réinitialisé — il repart de zéro et réapprend.');
+    });
   }
 
   // --- Navigation entre sous-parties -----------------------------------------
@@ -688,6 +806,7 @@
     Array.prototype.forEach.call(document.querySelectorAll('.view'), function (s) { s.classList.toggle('active', s.id === 'view-' + v); });
     if (v === 'historique') renderHistory();
     if (v === 'strategies') renderStrategies();
+    if (v === 'auto') renderAuto();
   }
   function initNav() {
     Array.prototype.forEach.call(document.querySelectorAll('.nav-item'), function (b) {
@@ -729,7 +848,7 @@
   }
 
   function init() {
-    load(); loadHistory();
+    load(); loadHistory(); loadAutoHistory();
     applyTheme(); updateAlertBtn();
     buildToolbar(); initSymbols(); initApiKey(); initModals(); initSettings(); initNav(); buildHistFilter();
     renderStrategies();

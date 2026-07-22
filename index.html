@@ -37,6 +37,7 @@
     <button class="nav-item active" data-view="signaux">📡 Signaux</button>
     <button class="nav-item" data-view="historique">📈 Historique</button>
     <button class="nav-item" data-view="strategies">🎯 Stratégies</button>
+    <button class="nav-item nav-auto" data-view="auto">🤖 Auto</button>
     <button class="nav-item" data-view="reglages">⚙ Réglages</button>
   </nav>
 
@@ -112,6 +113,44 @@
     <section class="view" id="view-strategies">
       <p class="view-intro">Choisis les stratégies que tu veux suivre. Décoche celles qui ne t’intéressent pas — seuls les trades des stratégies actives s’affichent. D’autres viendront s’ajouter ici.</p>
       <div id="strategies-list" class="strat-list"></div>
+    </section>
+
+    <!-- SOUS-PARTIE : AUTO (le bot autonome) -->
+    <section class="view" id="view-auto">
+      <div class="auto-head">
+        <div>
+          <h2 class="auto-title">🤖 Bot Auto <span id="auto-state" class="auto-state">actif</span></h2>
+          <p class="view-intro">Ce bot trade <strong>tout seul</strong>. Il pioche dans toutes tes stratégies, teste chacune, garde celles qui gagnent et écarte celles qui perdent. Il apprend au fil des trades — plus il en fait, plus il devient sélectif. Objectif : de meilleurs résultats sur la durée, sans que tu aies à intervenir.</p>
+        </div>
+        <button id="auto-toggle" class="btn">Mettre en pause</button>
+      </div>
+
+      <div class="bilan" id="auto-bilan">
+        <div class="bilan-card"><span class="bilan-val" id="a-total">0</span><span class="bilan-lbl">Trades</span></div>
+        <div class="bilan-card win"><span class="bilan-val" id="a-win">0</span><span class="bilan-lbl">Gagnants</span></div>
+        <div class="bilan-card loss"><span class="bilan-val" id="a-loss">0</span><span class="bilan-lbl">Perdants</span></div>
+        <div class="bilan-card"><span class="bilan-val" id="a-open">0</span><span class="bilan-lbl">En cours</span></div>
+        <div class="bilan-card"><span class="bilan-val" id="a-rate">—</span><span class="bilan-lbl">Taux de réussite</span></div>
+        <div class="bilan-card"><span class="bilan-val" id="a-r">—</span><span class="bilan-lbl">Résultat cumulé (R)</span></div>
+      </div>
+
+      <div class="section-header"><h2>Ce que le bot a appris</h2></div>
+      <div id="auto-brain" class="brain-list"></div>
+
+      <div class="section-header"><h2>Conclusions du bot</h2></div>
+      <div id="auto-insights" class="insights"></div>
+
+      <div class="section-header">
+        <h2>Ses trades <span id="count-auto" class="count muted">0</span></h2>
+        <button id="clear-auto" class="btn btn-ghost small">Réinitialiser le bot</button>
+      </div>
+      <div class="table-wrap">
+        <table class="history-table" id="auto-table">
+          <thead><tr><th>Date</th><th>Paire</th><th>Stratégie</th><th>Sens</th><th>Entrée</th><th>Stop</th><th>TP1</th><th>Résultat</th></tr></thead>
+          <tbody id="auto-body"></tbody>
+        </table>
+        <div id="auto-empty" class="empty small">Le bot n’a pas encore pris de trade. Dès qu’une configuration valable apparaît, il s’en occupe tout seul.</div>
+      </div>
     </section>
 
     <!-- SOUS-PARTIE : RÉGLAGES -->

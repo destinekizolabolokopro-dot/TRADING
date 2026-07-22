@@ -26,7 +26,13 @@ LE MENU (4 sous-parties, en haut)
                un filtre par stratégie, et une ANALYSE qui tire des
                conclusions de tes trades (points forts / à améliorer).
 - STRATÉGIES : coche/décoche les stratégies que tu veux suivre.
+- AUTO (🤖)  : un bot qui trade TOUT SEUL. Il teste toutes les stratégies,
+               garde celles qui gagnent, écarte celles qui perdent, et
+               affiche son propre historique + ce qu'il a appris.
 - RÉGLAGES   : tes paires, ta clé forex/or, ta gestion du risque.
+
+Chaque signal affiche aussi un % de RÉUSSITE ESTIMÉ (confiance du setup
+combinée au taux de réussite réel de la stratégie).
 
 CE QUE TU PEUX FAIRE
 --------------------

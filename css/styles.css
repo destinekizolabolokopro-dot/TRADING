@@ -146,7 +146,25 @@ body {
 .insight.bad { border-left-color: var(--danger); } .insight.bad .insight-ic { color: var(--danger); }
 .insight.neutral { border-left-color: var(--text-faint); } .insight.neutral .insight-ic { color: var(--text-dim); }
 
-@media (max-width: 720px) { .bilan { grid-template-columns: repeat(3, 1fr); } }
+/* Bot Auto */
+.nav-item.nav-auto.active { color: #7c5cff; background: color-mix(in srgb, #7c5cff 14%, transparent); }
+.auto-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-top: 6px; }
+.auto-title { font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+.auto-state { font-size: 11px; font-weight: 700; padding: 2px 10px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.04em; }
+.auto-state.on { background: var(--accent-dim); color: var(--accent); }
+.auto-state.off { background: var(--border-soft); color: var(--text-dim); }
+.brain-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
+.brain-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; background: var(--bg-card); border: 1px solid var(--border-soft); border-radius: var(--radius-sm); padding: 11px 14px; box-shadow: var(--shadow); }
+.brain-left { display: flex; align-items: center; gap: 9px; }
+.brain-name { font-size: 14px; font-weight: 600; }
+.brain-right { display: flex; align-items: center; gap: 12px; }
+.brain-rate { font-family: var(--mono); font-size: 12px; color: var(--text-dim); }
+.brain-status { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 6px; }
+.brain-status.good { color: var(--accent); background: var(--accent-dim); }
+.brain-status.bad { color: var(--danger); background: var(--danger-dim); }
+.brain-status.test { color: var(--text-dim); background: var(--bg-elev); }
+
+@media (max-width: 720px) { .bilan { grid-template-columns: repeat(3, 1fr); } .auto-head { flex-direction: column; } }
 
 /* --- Stats bar -------------------------------------------------- */
 .stats-bar {
@@ -237,6 +255,7 @@ body {
 .pill-discount { color: var(--accent); border-color: var(--accent-dim); }
 .pill-premium { color: var(--gold); border-color: color-mix(in srgb, var(--gold) 30%, transparent); }
 .pill-conf { color: var(--blue); border-color: color-mix(in srgb, var(--blue) 30%, transparent); }
+.pill-succ { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 35%, transparent); font-weight: 600; }
 
 .conf-bar { height: 4px; background: var(--bg-elev); border-radius: 3px; overflow: hidden; margin-bottom: 14px; }
 .conf-fill { height: 100%; border-radius: 3px; }

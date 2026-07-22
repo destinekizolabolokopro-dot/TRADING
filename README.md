@@ -36,6 +36,13 @@ fondés sur les concepts **ICT / SMC**, avec graphiques, calculateur de risque e
 - **Apprentissage** : l'historique tire automatiquement des **conclusions** des trades clôturés
   — meilleure/pire stratégie, biais achat/vente, meilleure paire, taux de réussite et R cumulé.
 - **Filtre par stratégie dans l'historique** et **timeframes** au choix (1m à 1j).
+- **% de réussite estimé** sur chaque signal : mélange la confiance du setup et le taux de
+  réussite réel de la stratégie (une fois assez de trades clôturés).
+- **Bot Auto** (section dédiée 🤖) : un bot qui **trade seul** en piochant dans toutes les
+  stratégies. Il teste chacune, **garde celles qui gagnent, écarte celles qui perdent**
+  (au-delà de 4 trades, une stratégie sous 50 % est mise de côté). Il possède son propre
+  historique, son bilan, son panneau « Ce que le bot a appris » (statut par stratégie) et ses
+  conclusions. Objectif : de meilleurs résultats sur la durée, sans intervention.
 - **Graphique chandeliers** intégré (façon TradingView, moteur Canvas maison, hors-ligne) :
   bougies, EMA, niveaux Fibonacci, zone OTE, boxes FVG / Order Blocks, liquidité,
   lignes Entrée / Stop / TP, croix de visée avec lecture OHLC.
