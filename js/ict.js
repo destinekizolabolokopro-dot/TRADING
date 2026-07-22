@@ -427,6 +427,74 @@
       trade: trade, pd: ob, confluences: conf, confidence: scoreConfidence(conf), trend: trend, m1: m1 };
   }
 
+  // --- Stratégie 4 : Smart Money (SMC) ---------------------------------------
+  // Tendance sur unité supérieure (agrégée) → retour sur une zone d'offre/demande
+  // (Order Block / FVG) → confirmation BOS/CHoCH ou rejet → objectif sur la
+  // prochaine liquidité (swing opposé / equal highs-lows). Ratio visé > 1:2.
+  function nearestSwingAbove(swings, price) { for (var i = swings.highs.length - 1; i >= 0; i--) if (swings.highs[i].price > price) return swings.highs[i].price; return null; }
+  function nearestSwingBelow(swings, price) { for (var i = swings.lows.length - 1; i >= 0; i--) if (swings.lows[i].price < price) return swings.lows[i].price; return null; }
+
+  function evalSMC(ctx) {
+    var candles = ctx.candles;
+
+    // Tendance sur unité supérieure : agrégation ×4 du timeframe courant.
+    var htf = aggregate(candles, 4), trend = ctx.trend;
+    if (htf.length >= CONFIG.emaSlow + 2) {
+      var hc = htf.map(function (c) { return c.close; });
+      var ef = ema(hc, CONFIG.emaFast), es = ema(hc, CONFIG.emaSlow), j = htf.length - 1;
+      if (ef[j] != null && es[j] != null) trend = ef[j] > es[j] ? 'haussière' : 'baissière';
+    }
+    if (trend !== 'haussière' && trend !== 'baissière') return null;
+    var bull = trend === 'haussière';
+    var last = candles[candles.length - 1];
+
+    // Zone d'offre/demande : Order Block prioritaire, sinon FVG, dans le sens.
+    var ob = bull ? latestOB(ctx.obs, 'bullish') : latestOB(ctx.obs, 'bearish');
+    var fvg = latestUnfilledFVG(candles, ctx.fvgs, bull ? 'bullish' : 'bearish');
+    var zone = ob || fvg;
+    if (!zone) return null;
+    var isFvg = zone === fvg && !ob;
+    var zTop = zone.top, zBot = zone.bottom;
+
+    // Le prix est revenu SUR la zone (il l'a touchée récemment).
+    var returned = bull ? (last.low <= zTop * 1.002 && last.close >= zBot * 0.995)
+                        : (last.high >= zBot * 0.998 && last.close <= zTop * 1.005);
+    if (!returned) return null;
+
+    // Confirmation : BOS/CHoCH dans le sens OU rejet (bougie de retournement).
+    var bosOk = ctx.structure && ((bull && ctx.structure.bias === 'haussier') || (!bull && ctx.structure.bias === 'baissier'));
+    var rejection = bull ? (last.close > last.open && (last.close - last.low) > (last.high - last.close))
+                         : (last.close < last.open && (last.high - last.close) > (last.close - last.low));
+    if (!bosOk && !rejection) return null;
+
+    var conf = ['Tendance ' + trend + ' (unité supérieure)'];
+    conf.push('Retour sur une zone d’offre/demande (' + (isFvg ? 'FVG' : 'Order Block') + ')');
+    if (bosOk) conf.push('Structure : ' + ctx.structure.label);
+    if (rejection) conf.push('Rejet de la zone (bougie de retournement)');
+    var inOTE = bull ? (ctx.pos >= (1 - CONFIG.oteHigh) && ctx.pos <= (1 - CONFIG.oteLow)) : (ctx.pos >= CONFIG.oteLow && ctx.pos <= CONFIG.oteHigh);
+    if (inOTE) conf.push('Prix dans la zone OTE (0.62–0.79)');
+    conf.push('Objectif sur la prochaine liquidité');
+
+    // Objectif = prochaine liquidité (swing opposé) ; sinon projection à ~2.5R.
+    var entry = last.close, trade;
+    if (bull) {
+      var sl = zBot * (1 - CONFIG.slBufferPct), risk = entry - sl;
+      var target = nearestSwingAbove(ctx.swings, entry);
+      if (target == null || target < entry + 1.5 * risk) target = entry + 2.5 * risk;
+      trade = { direction: 'LONG', entry: entry, sl: sl, tp1: entry + (target - entry) * 0.5, tp2: target, tp3: target + (target - entry) * 0.5 };
+      trade.rr = risk > 0 ? (target - entry) / risk : 0;
+    } else {
+      var slh = zTop * (1 + CONFIG.slBufferPct), risk2 = slh - entry;
+      var target2 = nearestSwingBelow(ctx.swings, entry);
+      if (target2 == null || target2 > entry - 1.5 * risk2) target2 = entry - 2.5 * risk2;
+      trade = { direction: 'SHORT', entry: entry, sl: slh, tp1: entry - (entry - target2) * 0.5, tp2: target2, tp3: target2 - (entry - target2) * 0.5 };
+      trade.rr = risk2 > 0 ? (entry - target2) / risk2 : 0;
+    }
+    if (!(trade.rr >= CONFIG.minRR)) return null;
+    return { strategy: 'smc', strategyLabel: 'Smart Money (SMC)', direction: bull ? 'LONG' : 'SHORT',
+      trade: trade, pd: zone, confluences: conf, confidence: scoreConfidence(conf) };
+  }
+
   // --- Analyse complète -------------------------------------------------------
   // opts : { pdh, pdl } (daily) · { m1 } (scalping) · { strategies } (activées)
   function analyze(symbol, timeframe, candles, opts) {
@@ -436,9 +504,10 @@
 
     var swings = findSwings(candles, CONFIG.swingLookback);
     var range = dealingRange(candles, swings);
-    // Le range du timeframe courant sert à OTE/Daily ; le scalping n'en dépend pas.
-    var scalpOnly = opts.strategies && opts.strategies.ote === false && opts.strategies.daily === false;
-    if (!range && !scalpOnly && !(opts.strategies && opts.strategies.scalp)) {
+    // Le range du timeframe courant sert à OTE/Daily ; scalping et SMC n'en dépendent pas.
+    var st = opts.strategies || {};
+    var canRunWithoutRange = (st.scalp !== false) || (st.smc !== false);
+    if (!range && !canRunWithoutRange) {
       return Object.assign(base, { reason: 'Aucun dealing range clair' });
     }
 
@@ -460,7 +529,8 @@
 
     var ctx = {
       candles: candles, range: range, pos: pos, zone: zone, fvgs: fvgs, obs: obs, crt: crt,
-      trend: trend, structure: structure, pdh: opts.pdh, pdl: opts.pdl, m1: opts.m1
+      trend: trend, structure: structure, swings: swings, liquidity: liquidity,
+      pdh: opts.pdh, pdl: opts.pdl, m1: opts.m1
     };
 
     // Stratégies activées (par défaut toutes) ; on retient le meilleur signal.
@@ -469,6 +539,7 @@
     if (enabled.ote !== false && range) { var s1 = evalOTE(ctx); if (s1) cands.push(s1); }
     if (enabled.daily !== false && range) { var s2 = evalDaily(ctx); if (s2) cands.push(s2); }
     if (enabled.scalp !== false) { var s3 = evalScalping(ctx); if (s3) cands.push(s3); }
+    if (enabled.smc !== false) { var s4 = evalSMC(ctx); if (s4) cands.push(s4); }
     cands.sort(function (a, b) { return b.confidence - a.confidence; });
     var best = cands[0] || null;
 

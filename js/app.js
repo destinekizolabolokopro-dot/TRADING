@@ -19,7 +19,8 @@
   var STRATS = [
     { id: 'ote', name: 'Retracement OTE', sub: 'Zone OTE du Fibonacci + PD Array en discount/premium + CRT.', tag: 'ICT' },
     { id: 'daily', name: 'Previous Daily', sub: 'Balayage du plus-haut/plus-bas de la veille (PDH/PDL) puis retour.', tag: 'Daily' },
-    { id: 'scalp', name: 'Scalping (M1)', sub: 'Tendance sur M5, retour sur une zone clé, confirmation sur M1, objectif ≥ 2R. Ne se déclenche QUE pendant les sessions de Londres et de New York.', tag: 'Scalp' }
+    { id: 'scalp', name: 'Scalping (M1)', sub: 'Tendance sur M5, retour sur une zone clé, confirmation sur M1, objectif ≥ 2R. Ne se déclenche QUE pendant les sessions de Londres et de New York.', tag: 'Scalp' },
+    { id: 'smc', name: 'Smart Money (SMC)', sub: 'Tendance sur unité supérieure → retour sur une zone d’offre/demande → confirmation BOS/CHoCH ou rejet → objectif sur la prochaine liquidité (ratio > 1:2).', tag: 'SMC' }
   ];
 
   var state = {
@@ -32,7 +33,7 @@
     lastUpdate: null,
     prevSignals: null,
     filters: { dir: 'all', market: 'all', strat: 'all', sort: 'conf' },
-    strategies: { ote: true, daily: true, scalp: true },
+    strategies: { ote: true, daily: true, scalp: true, smc: true },
     theme: 'light',
     alerts: false,
     risk: { balance: 1000, pct: 1 },
@@ -571,7 +572,7 @@
     });
     seg($('#dir-filter'), [{ v: 'all', t: 'Tous' }, { v: 'long', t: 'Achat' }, { v: 'short', t: 'Vente' }], state.filters.dir, function (v) { state.filters.dir = v; save(); buildToolbar(); renderAll(); });
     seg($('#market-filter'), [{ v: 'all', t: 'Tous' }, { v: 'crypto', t: 'Crypto' }, { v: 'forex', t: 'Forex' }, { v: 'metal', t: 'Or' }], state.filters.market, function (v) { state.filters.market = v; save(); buildToolbar(); renderAll(); });
-    seg($('#strat-filter'), [{ v: 'all', t: 'Toutes' }, { v: 'ote', t: 'OTE' }, { v: 'daily', t: 'Prev. Daily' }, { v: 'scalp', t: 'Scalp' }], state.filters.strat, function (v) { state.filters.strat = v; save(); buildToolbar(); renderAll(); });
+    seg($('#strat-filter'), [{ v: 'all', t: 'Toutes' }, { v: 'ote', t: 'OTE' }, { v: 'daily', t: 'Prev. Daily' }, { v: 'scalp', t: 'Scalp' }, { v: 'smc', t: 'SMC' }], state.filters.strat, function (v) { state.filters.strat = v; save(); buildToolbar(); renderAll(); });
     seg($('#sort-filter'), [{ v: 'conf', t: 'Confiance' }, { v: 'rr', t: 'R:R' }, { v: 'sym', t: 'Nom' }], state.filters.sort, function (v) { state.filters.sort = v; save(); buildToolbar(); renderAll(); });
   }
 

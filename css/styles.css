@@ -77,6 +77,8 @@ body {
 .strat-tag.strat-daily { color: var(--gold); border-color: color-mix(in srgb, var(--gold) 35%, transparent); }
 .strat-tag.strat-scalp { color: #9b6dff; border-color: color-mix(in srgb, #9b6dff 35%, transparent); }
 .strat-badge.strat-scalp { color: #9b6dff; }
+.strat-tag.strat-smc { color: #14b8a6; border-color: color-mix(in srgb, #14b8a6 35%, transparent); }
+.strat-badge.strat-smc { color: #14b8a6; }
 .signal .strat-tag { margin: 0 0 12px; }
 
 /* --- Menu (sous-parties) --------------------------------------- */

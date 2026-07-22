@@ -13,6 +13,10 @@ fondés sur les concepts **ICT / SMC**, avec graphiques, calculateur de risque e
     **CRT obligatoire** (sweep de liquidité + retour).
   - **Stratégie 2 — Previous Daily CRT** : balayage du **plus-haut / plus-bas de la veille**
     (PDH / PDL) suivi d'un retour ; objectif sur la liquidité opposée.
+  - **Stratégie 4 — Smart Money (SMC)** : approche Price Action / SMC (pensée forex, appliquée
+    aussi à la crypto). **Tendance sur unité supérieure** (agrégée) → **retour sur une zone
+    d'offre/demande** (Order Block / FVG) → **confirmation BOS/CHoCH ou rejet** → **objectif sur
+    la prochaine liquidité** (swing opposé / equal highs-lows), ratio visé > 1:2.
   - **Stratégie 3 — Scalping (M1)** : tendance déterminée sur **M5** (agrégée depuis le M1),
     **retour sur une zone clé** (moyenne mobile / Order Block) puis **confirmation sur M1**,
     stop serré derrière le dernier creux/sommet, **objectif ≥ 2R**, avec filtre de

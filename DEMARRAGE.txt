@@ -50,6 +50,11 @@ LES DEUX STRATÉGIES
   STRATÉGIE 2 — "Previous Daily CRT" :
      balayage du plus-haut / plus-bas de la VEILLE (PDH/PDL) + retour.
 
+  STRATÉGIE 4 — "Smart Money (SMC)" :
+     tendance sur unité supérieure -> retour sur une zone d'offre/demande
+     (Order Block / FVG) -> confirmation BOS/CHoCH ou rejet
+     -> objectif sur la prochaine liquidité (ratio > 1:2).
+
   STRATÉGIE 3 — "Scalping (M1)" :
      tendance sur M5 -> retour sur une zone clé (moyenne mobile / Order Block)
      -> confirmation sur M1 -> stop serré, objectif >= 2R.
