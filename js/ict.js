@@ -27,6 +27,7 @@
     minRR: 1.2,
     emaFast: 20,
     emaSlow: 50,
+    ignoreSession: false, // true uniquement pour la démo (affiche le scalp hors session)
     eqTolerance: 0.0012, // 0.12 % pour considérer deux extrêmes « égaux »
     viewBars: 90         // fenêtre conseillée pour le graphique
   };
@@ -371,6 +372,9 @@
   function evalScalping(ctx) {
     var m1 = ctx.m1;
     if (!m1 || m1.length < 70) return null;
+    // Le scalping ne se déclenche QUE pendant les sessions de Londres / New York.
+    var sess = tradingSession();
+    if (!sess.active && !CONFIG.ignoreSession) return null;
     // 1) Tendance sur M5 (agrégée)
     var m5 = aggregate(m1, 5);
     if (m5.length < CONFIG.emaSlow + 2) return null;
@@ -402,9 +406,8 @@
     if (pullback) conf.push('Retour sur la moyenne mobile (M1)');
     if (ob) conf.push('Order Block M1 dans le sens');
     conf.push('Confirmation M1 (' + (dirLong ? 'bougie haussière' : 'bougie baissière') + ')');
-    var sess = tradingSession();
     if (sess.overlap) conf.push('Chevauchement Londres/New York (volatilité max)');
-    else if (sess.active) conf.push('Session ' + sess.name + ' active');
+    else conf.push('Session ' + sess.name + ' active');
 
     // 4) Trade : SL derrière le dernier creux/sommet M1, objectif 2R
     var lookback = 6, entry = last.close, trade, k;

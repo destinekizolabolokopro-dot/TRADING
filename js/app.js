@@ -19,7 +19,7 @@
   var STRATS = [
     { id: 'ote', name: 'Retracement OTE', sub: 'Zone OTE du Fibonacci + PD Array en discount/premium + CRT.', tag: 'ICT' },
     { id: 'daily', name: 'Previous Daily', sub: 'Balayage du plus-haut/plus-bas de la veille (PDH/PDL) puis retour.', tag: 'Daily' },
-    { id: 'scalp', name: 'Scalping (M1)', sub: 'Tendance sur M5, retour sur une zone clé, confirmation sur M1, objectif ≥ 2R. Idéal pendant Londres / New York.', tag: 'Scalp' }
+    { id: 'scalp', name: 'Scalping (M1)', sub: 'Tendance sur M5, retour sur une zone clé, confirmation sur M1, objectif ≥ 2R. Ne se déclenche QUE pendant les sessions de Londres et de New York.', tag: 'Scalp' }
   ];
 
   var state = {
