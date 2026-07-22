@@ -35,7 +35,11 @@ fondés sur les concepts **ICT / SMC**, avec graphiques, calculateur de risque e
   en ajouter d'autres facilement).
 - **Apprentissage** : l'historique tire automatiquement des **conclusions** des trades clôturés
   — meilleure/pire stratégie, biais achat/vente, meilleure paire, taux de réussite et R cumulé.
-- **Filtre par stratégie dans l'historique** et **timeframes** au choix (1m à 1j).
+- **10 stratégies** au total, dont 5 à indicateurs : **RSI Reversal**, **MACD Cross**,
+  **EMA Pullback**, **Bollinger Reversal**, **Cassure (Breakout)** — objectif 2R.
+- **Filtre par stratégie dans l'historique** et **unités de temps** S1 / D1 / H4 / H1 / M15 / M1.
+- Le **Bot Auto** a son propre **sélecteur d'unité de temps** (il peut travailler sur un TF
+  différent de l'affichage).
 - **% de réussite estimé** sur chaque signal : mélange la confiance du setup et le taux de
   réussite réel de la stratégie (une fois assez de trades clôturés).
 - **Bot Auto** (section dédiée 🤖) : un bot qui **trade seul** en piochant dans toutes les

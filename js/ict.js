@@ -575,6 +575,98 @@
       trade: trade, pd: { type: bull ? 'bullish' : 'bearish', top: zone.top, bottom: zone.bottom, index: zone.lastIdx }, confluences: conf, confidence: scoreConfidence(conf) };
   }
 
+  // === Indicateurs techniques ===============================================
+  function rsi(closes, period) {
+    var out = new Array(closes.length).fill(null);
+    if (closes.length < period + 1) return out;
+    var gain = 0, loss = 0, i;
+    for (i = 1; i <= period; i++) { var d = closes[i] - closes[i - 1]; if (d >= 0) gain += d; else loss -= d; }
+    gain /= period; loss /= period;
+    out[period] = loss === 0 ? 100 : 100 - 100 / (1 + gain / loss);
+    for (i = period + 1; i < closes.length; i++) {
+      var d2 = closes[i] - closes[i - 1], g = d2 > 0 ? d2 : 0, l = d2 < 0 ? -d2 : 0;
+      gain = (gain * (period - 1) + g) / period; loss = (loss * (period - 1) + l) / period;
+      out[i] = loss === 0 ? 100 : 100 - 100 / (1 + gain / loss);
+    }
+    return out;
+  }
+  function macd(closes, f, s, sig) {
+    var ef = ema(closes, f), es = ema(closes, s);
+    var line = closes.map(function (_, i) { return (ef[i] != null && es[i] != null) ? ef[i] - es[i] : null; });
+    var sigArr = ema(line.map(function (v) { return v == null ? 0 : v; }), sig);
+    return { line: line, signal: sigArr };
+  }
+  function bollinger(closes, period, mult) {
+    var out = new Array(closes.length).fill(null);
+    for (var i = period - 1; i < closes.length; i++) {
+      var slice = closes.slice(i - period + 1, i + 1);
+      var mean = slice.reduce(function (a, b) { return a + b; }, 0) / period;
+      var variance = slice.reduce(function (a, b) { return a + (b - mean) * (b - mean); }, 0) / period;
+      var sd = Math.sqrt(variance);
+      out[i] = { mid: mean, upper: mean + mult * sd, lower: mean - mult * sd };
+    }
+    return out;
+  }
+  function recentLow(candles, n) { var lo = Infinity; for (var i = Math.max(0, candles.length - n); i < candles.length; i++) lo = Math.min(lo, candles[i].low); return lo; }
+  function recentHigh(candles, n) { var hi = -Infinity; for (var i = Math.max(0, candles.length - n); i < candles.length; i++) hi = Math.max(hi, candles[i].high); return hi; }
+  function buildTrade2R(bull, entry, slPrice) {
+    if (bull) { var risk = entry - slPrice; return { direction: 'LONG', entry: entry, sl: slPrice, tp1: entry + risk, tp2: entry + 2 * risk, tp3: entry + 3 * risk, rr: risk > 0 ? 2 : 0 }; }
+    var r2 = slPrice - entry; return { direction: 'SHORT', entry: entry, sl: slPrice, tp1: entry - r2, tp2: entry - 2 * r2, tp3: entry - 3 * r2, rr: r2 > 0 ? 2 : 0 };
+  }
+
+  // === Stratégies à indicateurs =============================================
+  function indiSignal(ctx, id, label, bull, bear, conf) {
+    if (!bull && !bear) return null;
+    var b = bull, last = ctx.candles[ctx.candles.length - 1], entry = last.close;
+    if (b && ctx.trend === 'haussière') conf.push('Aligné à la tendance');
+    if (!b && ctx.trend === 'baissière') conf.push('Aligné à la tendance');
+    conf.push('Objectif 2R, stop derrière le dernier extrême');
+    var sl = b ? recentLow(ctx.candles, 6) * (1 - CONFIG.slBufferPct) : recentHigh(ctx.candles, 6) * (1 + CONFIG.slBufferPct);
+    var trade = buildTrade2R(b, entry, sl);
+    if (!(trade.rr >= CONFIG.minRR)) return null;
+    return { strategy: id, strategyLabel: label, direction: b ? 'LONG' : 'SHORT', trade: trade, pd: null, confluences: conf, confidence: scoreConfidence(conf) };
+  }
+  function evalRSI(ctx) {
+    var c = ctx.candles; if (c.length < 40) return null;
+    var cl = c.map(function (x) { return x.close; }), r = rsi(cl, 14), i = cl.length - 1;
+    if (r[i] == null || r[i - 1] == null) return null;
+    var bull = r[i - 1] < 30 && r[i] >= 30, bear = r[i - 1] > 70 && r[i] <= 70;
+    return indiSignal(ctx, 'rsi', 'RSI Reversal', bull, bear, [bull ? 'RSI sort de survente (<30)' : (bear ? 'RSI sort de surachat (>70)' : '')]);
+  }
+  function evalMACD(ctx) {
+    var c = ctx.candles; if (c.length < 45) return null;
+    var cl = c.map(function (x) { return x.close; }), m = macd(cl, 12, 26, 9), i = cl.length - 1;
+    if (m.line[i] == null || m.signal[i] == null || m.line[i - 1] == null) return null;
+    var bull = m.line[i - 1] <= m.signal[i - 1] && m.line[i] > m.signal[i] && m.line[i] < 0;
+    var bear = m.line[i - 1] >= m.signal[i - 1] && m.line[i] < m.signal[i] && m.line[i] > 0;
+    return indiSignal(ctx, 'macd', 'MACD Cross', bull, bear, [bull ? 'Croisement MACD haussier' : (bear ? 'Croisement MACD baissier' : '')]);
+  }
+  function evalEMAX(ctx) {
+    var c = ctx.candles; if (c.length < 55) return null;
+    var cl = c.map(function (x) { return x.close; }), ef = ema(cl, CONFIG.emaFast), es = ema(cl, CONFIG.emaSlow), i = cl.length - 1;
+    if (ef[i] == null || es[i] == null) return null;
+    var up = ef[i] > es[i], last = c[i];
+    var bull = up && last.low <= ef[i] * 1.001 && last.close > last.open && last.close > ef[i];
+    var bear = !up && last.high >= ef[i] * 0.999 && last.close < last.open && last.close < ef[i];
+    return indiSignal(ctx, 'ema', 'EMA Pullback', bull, bear, [bull ? 'Repli sur EMA ' + CONFIG.emaFast + ' en tendance haussière' : (bear ? 'Repli sur EMA ' + CONFIG.emaFast + ' en tendance baissière' : '')]);
+  }
+  function evalBoll(ctx) {
+    var c = ctx.candles; if (c.length < 30) return null;
+    var cl = c.map(function (x) { return x.close; }), bb = bollinger(cl, 20, 2), i = cl.length - 1;
+    if (!bb[i] || !bb[i - 1]) return null;
+    var bull = cl[i - 1] < bb[i - 1].lower && cl[i] > bb[i].lower;
+    var bear = cl[i - 1] > bb[i - 1].upper && cl[i] < bb[i].upper;
+    return indiSignal(ctx, 'boll', 'Bollinger Reversal', bull, bear, [bull ? 'Retour au-dessus de la bande basse' : (bear ? 'Retour sous la bande haute' : '')]);
+  }
+  function evalBreakout(ctx) {
+    var c = ctx.candles; if (c.length < 30) return null;
+    var i = c.length - 1, last = c[i];
+    var hh = recentHigh(c.slice(0, -1), 20), ll = recentLow(c.slice(0, -1), 20);
+    var bull = last.close > hh && last.close > last.open;
+    var bear = last.close < ll && last.close < last.open;
+    return indiSignal(ctx, 'breakout', 'Cassure (Breakout)', bull, bear, [bull ? 'Cassure du plus-haut des 20 dernières bougies' : (bear ? 'Cassure du plus-bas des 20 dernières bougies' : '')]);
+  }
+
   // --- Analyse complète -------------------------------------------------------
   // opts : { pdh, pdl } (daily) · { m1 } (scalping) · { strategies } (activées)
   function analyze(symbol, timeframe, candles, opts) {
@@ -586,7 +678,8 @@
     var range = dealingRange(candles, swings);
     // Le range du timeframe courant sert à OTE/Daily ; scalping et SMC n'en dépendent pas.
     var st = opts.strategies || {};
-    var canRunWithoutRange = (st.scalp !== false) || (st.smc !== false) || (st.sr !== false);
+    var rangeFree = ['scalp', 'smc', 'sr', 'rsi', 'macd', 'ema', 'boll', 'breakout'];
+    var canRunWithoutRange = rangeFree.some(function (k) { return st[k] !== false; });
     if (!range && !canRunWithoutRange) {
       return Object.assign(base, { reason: 'Aucun dealing range clair' });
     }
@@ -621,6 +714,11 @@
     if (enabled.scalp !== false) { var s3 = evalScalping(ctx); if (s3) cands.push(s3); }
     if (enabled.smc !== false) { var s4 = evalSMC(ctx); if (s4) cands.push(s4); }
     if (enabled.sr !== false) { var s5 = evalSR(ctx); if (s5) cands.push(s5); }
+    if (enabled.rsi !== false) { var s6 = evalRSI(ctx); if (s6) cands.push(s6); }
+    if (enabled.macd !== false) { var s7 = evalMACD(ctx); if (s7) cands.push(s7); }
+    if (enabled.ema !== false) { var s8 = evalEMAX(ctx); if (s8) cands.push(s8); }
+    if (enabled.boll !== false) { var s9 = evalBoll(ctx); if (s9) cands.push(s9); }
+    if (enabled.breakout !== false) { var s10 = evalBreakout(ctx); if (s10) cands.push(s10); }
     cands.sort(function (a, b) { return b.confidence - a.confidence; });
     var best = cands[0] || null;
 

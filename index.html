@@ -34,11 +34,11 @@
 
   <!-- MENU -->
   <nav class="mainnav" id="mainnav">
-    <button class="nav-item active" data-view="signaux">📡 Signaux</button>
-    <button class="nav-item" data-view="historique">📈 Historique</button>
-    <button class="nav-item" data-view="strategies">🎯 Stratégies</button>
-    <button class="nav-item nav-auto" data-view="auto">🤖 Auto</button>
-    <button class="nav-item" data-view="reglages">⚙ Réglages</button>
+    <button class="nav-item active" data-view="signaux">Signaux</button>
+    <button class="nav-item" data-view="historique">Historique</button>
+    <button class="nav-item" data-view="strategies">Stratégies</button>
+    <button class="nav-item nav-auto" data-view="auto">Bot Auto</button>
+    <button class="nav-item" data-view="reglages">Réglages</button>
   </nav>
 
   <main class="main">
@@ -119,10 +119,13 @@
     <section class="view" id="view-auto">
       <div class="auto-head">
         <div>
-          <h2 class="auto-title">🤖 Bot Auto <span id="auto-state" class="auto-state">actif</span></h2>
+          <h2 class="auto-title">Bot Auto <span id="auto-state" class="auto-state">actif</span></h2>
           <p class="view-intro">Ce bot trade <strong>tout seul</strong>. Il pioche dans toutes tes stratégies, teste chacune, garde celles qui gagnent et écarte celles qui perdent. Il apprend au fil des trades — plus il en fait, plus il devient sélectif. Objectif : de meilleurs résultats sur la durée, sans que tu aies à intervenir.</p>
         </div>
-        <button id="auto-toggle" class="btn">Mettre en pause</button>
+        <div class="auto-actions">
+          <div class="auto-tf-wrap"><label class="control-label">Unité de temps du bot</label><div id="auto-tf" class="seg"></div></div>
+          <button id="auto-toggle" class="btn">Mettre en pause</button>
+        </div>
       </div>
 
       <div class="bilan" id="auto-bilan">
@@ -168,7 +171,7 @@
           </div>
         </div>
         <div class="setting-section">
-          <h4>🔑 Forex &amp; or (clé gratuite)</h4>
+          <h4>Forex &amp; or (clé gratuite)</h4>
           <label class="control-label" for="apikey-input">Clé API Twelve Data</label>
           <div class="inline-row">
             <input id="apikey-input" type="password" spellcheck="false" placeholder="Colle ta clé gratuite ici" />
@@ -178,7 +181,7 @@
           <p class="config-hint">La crypto marche sans rien. Pour le forex et l’or, prends une clé gratuite en 30&nbsp;s sur <a href="https://twelvedata.com/register" target="_blank" rel="noopener">twelvedata.com</a>.</p>
         </div>
         <div class="setting-section">
-          <h4>🛡 Gestion du risque</h4>
+          <h4>Gestion du risque</h4>
           <label class="control-label" for="risk-balance">Capital du compte</label>
           <div class="inline-row"><span class="prefix">$</span><input id="risk-balance" type="number" min="0" step="100" value="1000" /></div>
           <label class="control-label" for="risk-pct">Risque par trade (%)</label>

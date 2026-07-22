@@ -18,13 +18,24 @@
   var MIN_AGE_SLOW = 240000;
   var MIN_AGE_DAILY = 1800000; // 30 min — la veille change peu
 
+  // Unités de temps (ordre demandé) : S1 D1 H4 H1 M15 M1.
+  var TF_OPTIONS = [
+    { v: '1w', t: 'S1' }, { v: '1d', t: 'D1' }, { v: '4h', t: 'H4' },
+    { v: '1h', t: 'H1' }, { v: '15m', t: 'M15' }, { v: '1m', t: 'M1' }
+  ];
+
   // Registre des stratégies (extensible : il suffit d'ajouter une entrée + son eval dans ict.js).
   var STRATS = [
     { id: 'ote', name: 'Retracement OTE', sub: 'Zone OTE du Fibonacci + PD Array en discount/premium + CRT.', tag: 'ICT' },
     { id: 'daily', name: 'Previous Daily', sub: 'Balayage du plus-haut/plus-bas de la veille (PDH/PDL) puis retour.', tag: 'Daily' },
     { id: 'scalp', name: 'Scalping (M1)', sub: 'Tendance sur M5, retour sur une zone clé, confirmation sur M1, objectif ≥ 2R. Ne se déclenche QUE pendant les sessions de Londres et de New York.', tag: 'Scalp' },
     { id: 'smc', name: 'Smart Money (SMC)', sub: 'Tendance sur unité supérieure → retour sur une zone d’offre/demande → confirmation BOS/CHoCH ou rejet → objectif sur la prochaine liquidité (ratio > 1:2).', tag: 'SMC' },
-    { id: 'sr', name: 'Support & Résistance', sub: 'Zones testées plusieurs fois sur H4/Daily → retour sur la zone → confirmation (rejet, engloutissement, BOS/CHoCH) → stop derrière la zone, objectif sur la prochaine zone (ratio > 1:2).', tag: 'S/R' }
+    { id: 'sr', name: 'Support & Résistance', sub: 'Zones testées plusieurs fois sur H4/Daily → retour sur la zone → confirmation (rejet, engloutissement, BOS/CHoCH) → stop derrière la zone, objectif sur la prochaine zone (ratio > 1:2).', tag: 'S/R' },
+    { id: 'rsi', name: 'RSI Reversal', sub: 'Sortie de survente (RSI < 30) ou de surachat (RSI > 70), stop derrière le dernier extrême, objectif 2R.', tag: 'RSI' },
+    { id: 'macd', name: 'MACD Cross', sub: 'Croisement de la MACD (12/26/9) sous/au-dessus de zéro, objectif 2R.', tag: 'MACD' },
+    { id: 'ema', name: 'EMA Pullback', sub: 'Repli sur l’EMA 20 dans le sens de la tendance (EMA 20/50), objectif 2R.', tag: 'EMA' },
+    { id: 'boll', name: 'Bollinger Reversal', sub: 'Retour du prix à l’intérieur des bandes de Bollinger (20, 2), objectif 2R.', tag: 'BOLL' },
+    { id: 'breakout', name: 'Cassure (Breakout)', sub: 'Cassure du plus-haut / plus-bas des 20 dernières bougies avec élan, objectif 2R.', tag: 'CASS' }
   ];
 
   var state = {
@@ -40,7 +51,9 @@
     prevSignals: null,
     filters: { dir: 'all', market: 'all', strat: 'all', sort: 'conf' },
     histFilter: 'all',
-    strategies: { ote: true, daily: true, scalp: true, smc: true, sr: true },
+    strategies: { ote: true, daily: true, scalp: true, smc: true, sr: true, rsi: true, macd: true, ema: true, boll: true, breakout: true },
+    autoCache: {},
+    autoTf: '15m',
     theme: 'light',
     alerts: false,
     risk: { balance: 1000, pct: 1 },
@@ -64,6 +77,7 @@
         if (s.theme) state.theme = s.theme;
         if (typeof s.alerts === 'boolean') state.alerts = s.alerts;
         if (typeof s.autoEnabled === 'boolean') state.autoEnabled = s.autoEnabled;
+        if (s.autoTf) state.autoTf = s.autoTf;
         if (s.risk) state.risk = Object.assign(state.risk, s.risk);
       }
     } catch (e) { /* ignore */ }
@@ -72,7 +86,7 @@
     try {
       localStorage.setItem(STORAGE, JSON.stringify({
         symbols: state.symbols, timeframe: state.timeframe, filters: state.filters, histFilter: state.histFilter,
-        strategies: state.strategies, theme: state.theme, alerts: state.alerts, autoEnabled: state.autoEnabled, risk: state.risk
+        strategies: state.strategies, theme: state.theme, alerts: state.alerts, autoEnabled: state.autoEnabled, autoTf: state.autoTf, risk: state.risk
       }));
     } catch (e) { /* ignore */ }
   }
@@ -163,14 +177,16 @@
     return Promise.all(jobs).then(function () {
       state.lastUpdate = new Date();
       updateHistory();
-      updateAutoHistory();
-      if (state.autoEnabled) runAutoBot();
-      saveAutoHistory();
-      renderAll();
-      checkAlerts();
-      if (state.view === 'historique') renderHistory();
-      if (state.view === 'auto') renderAuto();
-      setStatus('En direct', false);
+      return Promise.all(state.symbols.map(ensureAutoResult)).then(function (autoRes) {
+        updateAutoHistory();
+        if (state.autoEnabled) runAutoBot(autoRes);
+        saveAutoHistory();
+        renderAll();
+        checkAlerts();
+        if (state.view === 'historique') renderHistory();
+        if (state.view === 'auto') renderAuto();
+        setStatus('En direct', false);
+      });
     });
   }
 
@@ -331,11 +347,27 @@
     var rate = Math.round(s.wins / s.n * 100);
     return { phase: rate >= 50 ? 'confiance' : 'évite', rate: rate, n: s.n };
   }
+  // Résultat d'analyse au timeframe du bot (réutilise le cache principal si même TF).
+  function ensureAutoResult(sym) {
+    if (state.autoTf === state.timeframe) return Promise.resolve(state.cache[sym] && state.cache[sym].result);
+    var c = state.autoCache[sym];
+    if (c && (Date.now() - c.ts) < minAge(sym)) return Promise.resolve(c.result);
+    return ensureDaily(sym).then(function (daily) {
+      return API.fetchCandles(sym, state.autoTf, 200).then(function (candles) {
+        var opts = { strategies: state.strategies };
+        if (daily) { opts.pdh = daily.pdh; opts.pdl = daily.pdl; }
+        var r = ICT.analyze(sym, state.autoTf, candles, opts);
+        r.label = API.label(sym); r.kind = (API.meta(sym) || {}).kind;
+        state.autoCache[sym] = { ts: Date.now(), result: r }; return r;
+      }).catch(function () { return null; });
+    }).catch(function () { return null; });
+  }
+
   // Le bot prend position tout seul (1 trade ouvert max par paire).
-  function runAutoBot() {
+  function runAutoBot(list) {
     var stats = autoStratStats();
-    results().forEach(function (r) {
-      if (!r.hasSignal || r.confidence < AUTO_MIN_CONF) return;
+    list.forEach(function (r) {
+      if (!r || !r.hasSignal || r.confidence < AUTO_MIN_CONF) return;
       if (state.autoHistory.some(function (h) { return h.status === 'open' && h.symbol === r.symbol; })) return;
       var w = autoWeight(r.strategy, stats);
       if (w.phase === 'évite') return; // il a appris à éviter cette stratégie
@@ -733,13 +765,21 @@
       container.appendChild(b);
     });
   }
+  // Menu déroulant (pour les listes longues comme les stratégies).
+  function selectCtrl(container, options, current, onPick) {
+    container.innerHTML = '';
+    var s = document.createElement('select'); s.className = 'select-ctrl';
+    options.forEach(function (o) { var op = document.createElement('option'); op.value = o.v; op.textContent = o.t; if (o.v === current) op.selected = true; s.appendChild(op); });
+    s.addEventListener('change', function () { onPick(s.value); });
+    container.appendChild(s);
+  }
   function buildToolbar() {
-    seg($('#tf-buttons'), [{ v: '1m', t: '1m' }, { v: '5m', t: '5m' }, { v: '15m', t: '15m' }, { v: '30m', t: '30m' }, { v: '1h', t: '1h' }, { v: '4h', t: '4h' }, { v: '1d', t: '1j' }], state.timeframe, function (v) {
+    seg($('#tf-buttons'), TF_OPTIONS, state.timeframe, function (v) {
       if (v === state.timeframe) return; state.timeframe = v; save(); buildToolbar(); refresh(true);
     });
     seg($('#dir-filter'), [{ v: 'all', t: 'Tous' }, { v: 'long', t: 'Achat' }, { v: 'short', t: 'Vente' }], state.filters.dir, function (v) { state.filters.dir = v; save(); buildToolbar(); renderAll(); });
     seg($('#market-filter'), [{ v: 'all', t: 'Tous' }, { v: 'crypto', t: 'Crypto' }, { v: 'forex', t: 'Forex' }, { v: 'metal', t: 'Or' }], state.filters.market, function (v) { state.filters.market = v; save(); buildToolbar(); renderAll(); });
-    seg($('#strat-filter'), [{ v: 'all', t: 'Toutes' }, { v: 'ote', t: 'OTE' }, { v: 'daily', t: 'Prev. Daily' }, { v: 'scalp', t: 'Scalp' }, { v: 'smc', t: 'SMC' }, { v: 'sr', t: 'S/R' }], state.filters.strat, function (v) { state.filters.strat = v; save(); buildToolbar(); renderAll(); });
+    selectCtrl($('#strat-filter'), [{ v: 'all', t: 'Toutes les stratégies' }].concat(STRATS.map(function (s) { return { v: s.id, t: s.name }; })), state.filters.strat, function (v) { state.filters.strat = v; save(); renderAll(); });
     seg($('#sort-filter'), [{ v: 'conf', t: 'Confiance' }, { v: 'rr', t: 'R:R' }, { v: 'sym', t: 'Nom' }], state.filters.sort, function (v) { state.filters.sort = v; save(); buildToolbar(); renderAll(); });
   }
 
@@ -815,8 +855,15 @@
   }
 
   function buildHistFilter() {
-    var opts = [{ v: 'all', t: 'Toutes' }].concat(STRATS.map(function (s) { return { v: s.id, t: s.tag }; }));
-    seg($('#hist-filter'), opts, state.histFilter, function (v) { state.histFilter = v; save(); buildHistFilter(); renderHistory(); });
+    var opts = [{ v: 'all', t: 'Toutes les stratégies' }].concat(STRATS.map(function (s) { return { v: s.id, t: s.name }; }));
+    selectCtrl($('#hist-filter'), opts, state.histFilter, function (v) { state.histFilter = v; save(); renderHistory(); });
+  }
+  function buildAutoTf() {
+    seg($('#auto-tf'), TF_OPTIONS, state.autoTf, function (v) {
+      if (v === state.autoTf) return; state.autoTf = v; state.autoCache = {}; save(); buildAutoTf();
+      toast('Le bot passe en ' + (TF_OPTIONS.filter(function (o) { return o.v === v; })[0] || { t: v }).t + '.');
+      refresh(false);
+    });
   }
 
   // --- Section Stratégies -----------------------------------------------------
@@ -850,7 +897,7 @@
   function init() {
     load(); loadHistory(); loadAutoHistory();
     applyTheme(); updateAlertBtn();
-    buildToolbar(); initSymbols(); initApiKey(); initModals(); initSettings(); initNav(); buildHistFilter();
+    buildToolbar(); initSymbols(); initApiKey(); initModals(); initSettings(); initNav(); buildHistFilter(); buildAutoTf();
     renderStrategies();
 
     $('#theme-toggle').addEventListener('click', function () { state.theme = state.theme === 'dark' ? 'light' : 'dark'; save(); applyTheme(); });
