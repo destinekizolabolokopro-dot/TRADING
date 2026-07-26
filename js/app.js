@@ -24,18 +24,13 @@
     { v: '1h', t: 'H1' }, { v: '15m', t: 'M15' }, { v: '1m', t: 'M1' }
   ];
 
-  // Registre des stratégies (extensible : il suffit d'ajouter une entrée + son eval dans ict.js).
+  // Registre des setups SMC/ICT (détecteurs de patterns multi-timeframe).
   var STRATS = [
-    { id: 'ote', name: 'Retracement OTE', sub: 'Zone OTE du Fibonacci + PD Array en discount/premium + CRT.', tag: 'ICT' },
-    { id: 'daily', name: 'Previous Daily', sub: 'Balayage du plus-haut/plus-bas de la veille (PDH/PDL) puis retour.', tag: 'Daily' },
-    { id: 'scalp', name: 'Scalping (M1)', sub: 'Tendance sur M5, retour sur une zone clé, confirmation sur M1, objectif ≥ 2R. Ne se déclenche QUE pendant les sessions de Londres et de New York.', tag: 'Scalp' },
-    { id: 'smc', name: 'Smart Money (SMC)', sub: 'Tendance sur unité supérieure → retour sur une zone d’offre/demande → confirmation BOS/CHoCH ou rejet → objectif sur la prochaine liquidité (ratio > 1:2).', tag: 'SMC' },
-    { id: 'sr', name: 'Support & Résistance', sub: 'Zones testées plusieurs fois sur H4/Daily → retour sur la zone → confirmation (rejet, engloutissement, BOS/CHoCH) → stop derrière la zone, objectif sur la prochaine zone (ratio > 1:2).', tag: 'S/R' },
-    { id: 'rsi', name: 'RSI Reversal', sub: 'Sortie de survente (RSI < 30) ou de surachat (RSI > 70), stop derrière le dernier extrême, objectif 2R.', tag: 'RSI' },
-    { id: 'macd', name: 'MACD Cross', sub: 'Croisement de la MACD (12/26/9) sous/au-dessus de zéro, objectif 2R.', tag: 'MACD' },
-    { id: 'ema', name: 'EMA Pullback', sub: 'Repli sur l’EMA 20 dans le sens de la tendance (EMA 20/50), objectif 2R.', tag: 'EMA' },
-    { id: 'boll', name: 'Bollinger Reversal', sub: 'Retour du prix à l’intérieur des bandes de Bollinger (20, 2), objectif 2R.', tag: 'BOLL' },
-    { id: 'breakout', name: 'Cassure (Breakout)', sub: 'Cassure du plus-haut / plus-bas des 20 dernières bougies avec élan, objectif 2R.', tag: 'CASS' }
+    { id: 'foundation', name: 'Foundation', sub: 'Swing haute probabilité : Weekly + Daily alignés → prix en Discount/Premium Daily → FVG HTF (BISI/SIBI) → cassure de structure + Breaker Block H4. RR ≥ 1:3.', tag: 'W1' },
+    { id: 'strike', name: 'Strike', sub: 'Court & impulsif : tendance Daily claire → FVG Daily dans le sens → cassure de structure + Breaker Block M15 au retest. RR ≥ 1:2.', tag: 'D1' },
+    { id: 'meek', name: 'Meek Seven', sub: 'Intraday : Daily + H4 + H1 alignés → Discount/Premium H1 → FVG H4/H1 → cassure + Breaker Block M15. RR ≥ 1:2.', tag: 'H1' },
+    { id: 'asia', name: 'Asia Sweep', sub: 'Biais H4/H1 → sweep de l’Asia High/Low (02h–06h) → FVG HTF → cassure + Breaker Block M5. Sessions Londres/New York uniquement. RR ≥ 1:2.', tag: 'ASIA' },
+    { id: 'shield', name: 'Shield', sub: 'Swing filtré : FVG Weekly + Breaker Block H4 alignés à la tendance Weekly. Pas de trade sans BB H4 valide. RR ≥ 1:2.', tag: 'W1' }
   ];
 
   var state = {
@@ -49,9 +44,10 @@
     autoEnabled: true,
     lastUpdate: null,
     prevSignals: null,
-    filters: { dir: 'all', market: 'all', strat: 'all', sort: 'conf' },
+    filters: { dir: 'all', market: 'all', strat: 'all', sort: 'conf', tf: 'all' },
     histFilter: 'all',
-    strategies: { ote: true, daily: true, scalp: true, smc: true, sr: true, rsi: true, macd: true, ema: true, boll: true, breakout: true },
+    strategies: { foundation: true, strike: true, meek: true, asia: true, shield: true },
+    frames: {},
     autoCache: {},
     autoTf: '15m',
     theme: 'light',
@@ -101,6 +97,11 @@
   function fmt(v, p) { if (v == null || isNaN(v)) return '—'; return Number(v).toLocaleString('fr-FR', { minimumFractionDigits: p, maximumFractionDigits: p }); }
   function minAge(sym) { var m = API.meta(sym); return (m && m.kind === 'crypto') ? MIN_AGE_CRYPTO : MIN_AGE_SLOW; }
   function zoneLabel(z) { return z === 'discount' ? 'Discount' : (z === 'premium' ? 'Premium' : 'Equilibrium'); }
+  // R cumulé → aussi en % de gains (selon le risque par trade réglé).
+  function gainStr(rsum) {
+    var pct = rsum * (state.risk.pct || 1);
+    return (rsum >= 0 ? '+' : '') + fmt(rsum, 2) + ' R · ' + (pct >= 0 ? '+' : '') + fmt(pct, 1) + '%';
+  }
 
   // % de réussite estimé : mélange la confiance du setup avec le taux de réussite
   // réel de la stratégie (une fois assez de trades clôturés dans l'historique).
@@ -124,87 +125,102 @@
     return { units: units, riskAmount: riskAmount, notional: units * trade.entry };
   }
 
-  // --- Données ----------------------------------------------------------------
-  // Plus-haut/plus-bas de la veille (mis en cache longtemps).
-  function ensureDaily(sym) {
-    var d = state.daily[sym];
-    if (d && (Date.now() - d.ts) < MIN_AGE_DAILY) return Promise.resolve(d.data);
-    return API.fetchDaily(sym).then(function (data) {
-      state.daily[sym] = { ts: Date.now(), data: data }; return data;
-    }).catch(function () { return (d && d.data) || null; });
+  // --- Données multi-timeframe -----------------------------------------------
+  // On surveille en continu D1 · H1 · M15 (+ M1 si un setup de scalp est actif) ;
+  // W1, H4 et M5 sont agrégés à partir de ces bases pour limiter les appels API.
+  var FRAME_TTL = { '1d': 1800000, '1h': 600000, '15m': 150000, '1m': 60000 };
+  function fetchFrame(sym, tf, n) {
+    var key = sym + ':' + tf, c = state.frames[key];
+    if (c && (Date.now() - c.ts) < (FRAME_TTL[tf] || 120000)) return Promise.resolve(c.data);
+    return API.fetchCandles(sym, tf, n).then(function (d) {
+      state.frames[key] = { ts: Date.now(), data: d }; return d;
+    });
   }
+  function tfLabel(v) { var m = { '1w': 'S1', '1d': 'D1', '4h': 'H4', '1h': 'H1', '15m': 'M15', '5m': 'M5', '1m': 'M1' }; return m[v] || v; }
 
-  // Bougies M1 pour le scalping (récupérées seulement si la stratégie est active).
-  function ensureM1(sym) {
-    if (state.strategies.scalp === false) return Promise.resolve(null);
-    var c = state.m1cache[sym];
-    if (c && (Date.now() - c.ts) < minAge(sym)) return Promise.resolve(c.data);
-    return API.fetchCandles(sym, '1m', 400).then(function (d) {
-      state.m1cache[sym] = { ts: Date.now(), data: d }; return d;
-    }).catch(function () { return (c && c.data) || null; });
+  function ensureFrames(sym) {
+    var needLTF = state.strategies.asia !== false; // M1 → M5 seulement pour le scalp Asia
+    return Promise.all([
+      fetchFrame(sym, '1d', 260), fetchFrame(sym, '1h', 400), fetchFrame(sym, '15m', 300),
+      needLTF ? fetchFrame(sym, '1m', 400).catch(function () { return null; }) : Promise.resolve(null)
+    ]).then(function (a) {
+      var d1 = a[0], h1 = a[1], m15 = a[2], m1 = a[3];
+      return {
+        d1: d1, h1: h1, m15: m15, m1: m1,
+        w1: d1 ? ICT.aggregate(d1, 5) : null,
+        h4: h1 ? ICT.aggregate(h1, 4) : null,
+        m5: m1 ? ICT.aggregate(m1, 5) : null
+      };
+    });
   }
 
   function ensureSymbol(sym) {
-    var now = Date.now();
-    var c = state.cache[sym];
-    if (c && (now - c.ts) < minAge(sym)) return Promise.resolve(c.result);
-    return Promise.all([ensureDaily(sym), ensureM1(sym)]).then(function (arr) {
-      var daily = arr[0], m1 = arr[1];
-      return API.fetchCandles(sym, state.timeframe, 200).then(function (candles) {
-        var opts = { strategies: state.strategies };
-        if (daily) { opts.pdh = daily.pdh; opts.pdl = daily.pdl; }
-        if (m1) opts.m1 = m1;
-        var r = ICT.analyze(sym, state.timeframe, candles, opts);
-        r.label = API.label(sym); r.kind = (API.meta(sym) || {}).kind;
-        state.cache[sym] = { ts: Date.now(), result: r };
-        return r;
+    return ensureFrames(sym).then(function (F) {
+      var setups = ICT.analyzeSetups(sym, F, { strategies: state.strategies });
+      var price = F.m15 ? F.m15[F.m15.length - 1].close : (F.h1 ? F.h1[F.h1.length - 1].close : (F.d1 ? F.d1[F.d1.length - 1].close : null));
+      var conf = ICT.confluence(F, setups, botLearnFactor);
+      var precision = ICT.precisionFor(price || 1);
+      var r = {
+        symbol: sym, label: API.label(sym), kind: (API.meta(sym) || {}).kind,
+        price: price, precision: precision, timeframe: 'Multi-TF',
+        signals: setups, hasSignal: setups.length > 0, confluence: conf,
+        trend: conf ? (conf.direction === 'LONG' ? 'haussière' : 'baissière') : null
+      };
+      r.chart = setups[0] ? setups[0].chart : (F.h1 ? ICT.buildSetupChart(F.h1, {}) : null);
+      if (setups[0]) { r.trade = setups[0].trade; r.strategy = setups[0].strategy; r.strategyLabel = setups[0].strategyLabel; r.confidence = setups[0].confidence; r.confluences = setups[0].confluences; }
+      state.cache[sym] = { ts: Date.now(), result: r };
+      return r;
+    }).catch(function (err) {
+      var m = API.meta(sym);
+      var r = { symbol: sym, label: API.label(sym), timeframe: 'Multi-TF', hasSignal: false, signals: [], kind: m && m.kind };
+      if (err && err.message === 'NO_API_KEY') { r.needKey = true; r.reason = 'Ajoute ta clé API gratuite (plus haut) pour activer le forex/or.'; }
+      else r.error = (err && err.message) || 'Erreur réseau';
+      state.cache[sym] = { ts: Date.now(), result: r };
+      return r;
+    });
+  }
+  // Aplatit tous les signaux (tous timeframes, toutes paires) en cartes.
+  function allSignals() {
+    var out = [];
+    results().forEach(function (r) {
+      (r.signals || []).forEach(function (s) {
+        out.push(Object.assign({}, s, { symbol: r.symbol, label: r.label, kind: r.kind, price: r.price, precision: r.precision, timeframe: tfLabel(s.execTf) }));
       });
-    })
-      .catch(function (err) {
-        var m = API.meta(sym);
-        var r = { symbol: sym, label: API.label(sym), timeframe: state.timeframe, hasSignal: false, kind: m && m.kind };
-        if (err && err.message === 'NO_API_KEY') { r.needKey = true; r.reason = 'Ajoute ta clé API gratuite (plus haut) pour activer le forex/or.'; }
-        else r.error = (err && err.message) || 'Erreur réseau';
-        state.cache[sym] = { ts: Date.now(), result: r };
-        return r;
-      });
+    });
+    return out;
   }
 
   function refresh(force) {
-    if (force) state.cache = {};
+    if (force) { state.cache = {}; state.frames = {}; }
     setStatus('Analyse en cours…', true);
     var jobs = state.symbols.map(function (sym) { return ensureSymbol(sym).then(function () { renderAll(); }); });
     return Promise.all(jobs).then(function () {
       state.lastUpdate = new Date();
       updateHistory();
-      return Promise.all(state.symbols.map(ensureAutoResult)).then(function (autoRes) {
-        updateAutoHistory();
-        if (state.autoEnabled) runAutoBot(autoRes);
-        saveAutoHistory();
-        renderAll();
-        checkAlerts();
-        if (state.view === 'historique') renderHistory();
-        if (state.view === 'auto') renderAuto();
-        setStatus('En direct', false);
-      });
+      updateAutoHistory();
+      if (state.autoEnabled) runAutoBot(results());
+      saveAutoHistory();
+      renderAll();
+      checkAlerts();
+      if (state.view === 'historique') renderHistory();
+      if (state.view === 'auto') renderAuto();
+      setStatus('En direct', false);
     });
   }
 
   // --- Historique des trades & bilan -----------------------------------------
   function updateHistory() {
-    var all = results();
-    // 1) archiver les nouveaux signaux (un seul trade « ouvert » par paire+stratégie+sens)
-    all.forEach(function (r) {
-      if (!r.hasSignal) return;
+    // 1) archiver chaque nouveau signal (un « ouvert » par paire+setup+sens)
+    allSignals().forEach(function (s) {
       var exists = state.history.some(function (h) {
-        return h.status === 'open' && h.symbol === r.symbol && h.strategy === r.strategy && h.direction === r.trade.direction;
+        return h.status === 'open' && h.symbol === s.symbol && h.strategy === s.strategy && h.direction === s.direction;
       });
       if (exists) return;
-      var t = r.trade;
+      var t = s.trade;
       state.history.push({
-        id: Date.now() + '-' + r.symbol, ts: Date.now(), symbol: r.symbol, label: r.label,
-        strategy: r.strategy, strategyLabel: r.strategyLabel, direction: t.direction, timeframe: r.timeframe,
-        precision: r.precision, entry: t.entry, sl: t.sl, tp1: t.tp1, status: 'open', result: null, r: null
+        id: Date.now() + '-' + s.symbol + '-' + s.strategy, ts: Date.now(), symbol: s.symbol, label: s.label,
+        strategy: s.strategy, strategyLabel: s.strategyLabel, direction: s.direction, timeframe: s.timeframe,
+        precision: s.precision, entry: t.entry, sl: t.sl, tp1: t.tp1, status: 'open', result: null, r: null
       });
     });
     // 2) clôturer les trades ouverts selon le prix courant
@@ -297,7 +313,7 @@
     $('#b-loss').textContent = b.loss;
     $('#b-open').textContent = b.open;
     $('#b-rate').textContent = b.rate != null ? b.rate + '%' : '—';
-    var rEl = $('#b-r'); rEl.textContent = (b.rsum >= 0 ? '+' : '') + fmt(b.rsum, 2) + ' R';
+    var rEl = $('#b-r'); rEl.textContent = gainStr(b.rsum);
     rEl.className = 'bilan-val ' + (b.rsum > 0 ? 'pos' : (b.rsum < 0 ? 'neg' : ''));
 
     renderInsights();
@@ -340,42 +356,41 @@
     });
     return m;
   }
-  // Décision du bot pour une stratégie : test (peu de données), confiance, ou évite.
+  // Décision du bot pour un setup : test (peu de données), confiance, ou évite.
   function autoWeight(strategy, stats) {
     var s = stats[strategy];
     if (!s || s.n < AUTO_EXPLORE) return { phase: 'test', rate: s ? Math.round(s.wins / s.n * 100) : null, n: s ? s.n : 0 };
     var rate = Math.round(s.wins / s.n * 100);
     return { phase: rate >= 50 ? 'confiance' : 'évite', rate: rate, n: s.n };
   }
-  // Résultat d'analyse au timeframe du bot (réutilise le cache principal si même TF).
-  function ensureAutoResult(sym) {
-    if (state.autoTf === state.timeframe) return Promise.resolve(state.cache[sym] && state.cache[sym].result);
-    var c = state.autoCache[sym];
-    if (c && (Date.now() - c.ts) < minAge(sym)) return Promise.resolve(c.result);
-    return ensureDaily(sym).then(function (daily) {
-      return API.fetchCandles(sym, state.autoTf, 200).then(function (candles) {
-        var opts = { strategies: state.strategies };
-        if (daily) { opts.pdh = daily.pdh; opts.pdl = daily.pdl; }
-        var r = ICT.analyze(sym, state.autoTf, candles, opts);
-        r.label = API.label(sym); r.kind = (API.meta(sym) || {}).kind;
-        state.autoCache[sym] = { ts: Date.now(), result: r }; return r;
-      }).catch(function () { return null; });
-    }).catch(function () { return null; });
+  // Apprentissage : facteur de poids par setup (s:) selon le taux de réussite réel du bot.
+  // < 1 = le bot fait moins confiance (il « laisse tomber » ce qui perd), > 1 = il renforce.
+  function botLearnFactor(key) {
+    if (key.slice(0, 2) === 's:') {
+      var s = autoStratStats()[key.slice(2)];
+      if (!s || s.n < AUTO_EXPLORE) return 1;
+      return Math.max(0.35, Math.min(1.5, (s.wins / s.n) / 0.5));
+    }
+    return 1;
   }
 
-  // Le bot prend position tout seul (1 trade ouvert max par paire).
+  // Le bot raisonne par CONFLUENCE : une seule conclusion par paire, puis il prend
+  // le setup exécutable aligné à cette conclusion (1 trade ouvert max par paire).
   function runAutoBot(list) {
-    var stats = autoStratStats();
     list.forEach(function (r) {
-      if (!r || !r.hasSignal || r.confidence < AUTO_MIN_CONF) return;
+      if (!r || !r.confluence || r.confluence.pct < AUTO_MIN_CONF) return;
       if (state.autoHistory.some(function (h) { return h.status === 'open' && h.symbol === r.symbol; })) return;
-      var w = autoWeight(r.strategy, stats);
-      if (w.phase === 'évite') return; // il a appris à éviter cette stratégie
-      var t = r.trade;
+      var dir = r.confluence.direction;
+      var aligned = (r.signals || []).filter(function (s) { return s.strategy !== 'asia' && s.direction === dir; });
+      aligned.sort(function (a, b) { return b.confidence - a.confidence; });
+      var lead = aligned[0]; if (!lead) return; // besoin d'un setup exécutable dans le sens de la conclusion
+      var w = autoWeight(lead.strategy, autoStratStats());
+      if (w.phase === 'évite') return;
+      var t = lead.trade;
       state.autoHistory.push({
         id: Date.now() + '-' + r.symbol, ts: Date.now(), symbol: r.symbol, label: r.label,
-        strategy: r.strategy, strategyLabel: r.strategyLabel, direction: t.direction, timeframe: r.timeframe,
-        precision: r.precision, entry: t.entry, sl: t.sl, tp1: t.tp1, status: 'open', result: null, r: null, phase: w.phase
+        strategy: lead.strategy, strategyLabel: 'Confluence · ' + lead.strategyLabel, direction: dir, timeframe: tfLabel(lead.execTf),
+        precision: r.precision, entry: t.entry, sl: t.sl, tp1: t.tp1, status: 'open', result: null, r: null, phase: w.phase, pct: r.confluence.pct
       });
     });
   }
@@ -398,9 +413,24 @@
     var b = computeBilan(state.autoHistory);
     $('#a-total').textContent = b.total; $('#a-win').textContent = b.wins; $('#a-loss').textContent = b.loss; $('#a-open').textContent = b.open;
     $('#a-rate').textContent = b.rate != null ? b.rate + '%' : '—';
-    var rEl = $('#a-r'); rEl.textContent = (b.rsum >= 0 ? '+' : '') + fmt(b.rsum, 2) + ' R'; rEl.className = 'bilan-val ' + (b.rsum > 0 ? 'pos' : (b.rsum < 0 ? 'neg' : ''));
+    var rEl = $('#a-r'); rEl.textContent = gainStr(b.rsum); rEl.className = 'bilan-val ' + (b.rsum > 0 ? 'pos' : (b.rsum < 0 ? 'neg' : ''));
 
     var stats = autoStratStats(); var brain = $('#auto-brain'); brain.innerHTML = '';
+    // Conclusions de confluence du bot, paire par paire (la « décision unique »).
+    var verdicts = results().filter(function (r) { return r && r.confluence; });
+    if (verdicts.length) {
+      brain.appendChild(el('div', 'brain-title', 'Sa lecture du marché maintenant (confluence HTF)'));
+      verdicts.sort(function (a, b) { return b.confluence.pct - a.confluence.pct; }).forEach(function (r) {
+        var cf = r.confluence, row = el('div', 'brain-row verdict');
+        var left = el('div', 'brain-left'); left.appendChild(el('span', 'brain-name', r.label));
+        left.appendChild(el('span', 'mini-badge ' + (cf.direction === 'LONG' ? 'badge-long' : 'badge-short'), cf.direction === 'LONG' ? 'Achat' : 'Vente'));
+        row.appendChild(left);
+        var right = el('div', 'brain-right'); right.appendChild(el('span', 'brain-rate', 'Réussite ~' + cf.pct + '%'));
+        var bar = el('div', 'mini-bar'); var f = el('div', 'mini-fill ' + (cf.direction === 'LONG' ? 'long' : 'short')); f.style.width = cf.pct + '%'; bar.appendChild(f);
+        right.appendChild(bar); row.appendChild(right); brain.appendChild(row);
+      });
+      brain.appendChild(el('div', 'brain-title', 'Ce que le bot a appris par setup'));
+    }
     STRATS.forEach(function (s) {
       var w = autoWeight(s.id, stats);
       var row = el('div', 'brain-row');
@@ -520,7 +550,7 @@
   function signalCard(r) {
     var t = r.trade, p = r.precision;
     var card = el('article', 'card signal ' + (t.direction === 'LONG' ? 'is-long' : 'is-short'));
-    card.addEventListener('click', function () { openDetail(r.symbol); });
+    card.addEventListener('click', function () { openDetail(r.symbol, r.strategy); });
 
     var head = el('div', 'card-head');
     var left = el('div', 'card-head-left');
@@ -624,6 +654,7 @@
     if (state.filters.dir === 'long') out = out.filter(function (r) { return r.trade.direction === 'LONG'; });
     else if (state.filters.dir === 'short') out = out.filter(function (r) { return r.trade.direction === 'SHORT'; });
     if (state.filters.strat !== 'all') out = out.filter(function (r) { return r.strategy === state.filters.strat; });
+    if (state.filters.tf && state.filters.tf !== 'all') out = out.filter(function (r) { return r.execTf === state.filters.tf; });
     if (state.filters.sort === 'rr') out.sort(function (a, b) { return b.trade.rr - a.trade.rr; });
     else if (state.filters.sort === 'sym') out.sort(function (a, b) { return (a.label || '').localeCompare(b.label || ''); });
     else out.sort(function (a, b) { return b.confidence - a.confidence; });
@@ -646,7 +677,7 @@
 
   function renderAll() {
     var all = results();
-    var signalsAll = all.filter(function (r) { return r.hasSignal; });
+    var signalsAll = allSignals();
     var signals = applyFilters(signalsAll);
     var watching = all.filter(function (r) { return !r.hasSignal; }).filter(marketMatch);
 
@@ -675,11 +706,16 @@
   }
 
   // --- Modale détail ----------------------------------------------------------
-  var openSym = null;
-  function openDetail(sym) {
-    var r = state.cache[sym] && state.cache[sym].result;
-    if (!r || !r.chart) return;
-    openSym = sym;
+  var openSym = null, openView = null;
+  function openDetail(sym, strat) {
+    var res = state.cache[sym] && state.cache[sym].result;
+    if (!res) return;
+    var sig = strat ? (res.signals || []).filter(function (s) { return s.strategy === strat; })[0] : null;
+    var r;
+    if (sig) r = Object.assign({}, res, { hasSignal: true, trade: sig.trade, strategy: sig.strategy, strategyLabel: sig.strategyLabel, confidence: sig.confidence, confluences: sig.confluences, chart: sig.chart, timeframe: tfLabel(sig.execTf) });
+    else r = Object.assign({}, res, { hasSignal: false });
+    if (!r.chart) return;
+    openSym = sym; openView = r;
     var p = r.precision || 2;
     $('#modal-sym').textContent = r.label || sym;
     $('#modal-tf').textContent = r.timeframe;
@@ -754,7 +790,7 @@
       TAChart.render($('#modal-chart'), r.chart, { precision: p });
     });
   }
-  function closeDetail() { openSym = null; var m = $('#modal'); m.classList.remove('open'); m.setAttribute('aria-hidden', 'true'); }
+  function closeDetail() { openSym = null; openView = null; var m = $('#modal'); m.classList.remove('open'); m.setAttribute('aria-hidden', 'true'); }
 
   // --- Contrôles --------------------------------------------------------------
   function seg(container, options, current, onPick) {
@@ -774,8 +810,9 @@
     container.appendChild(s);
   }
   function buildToolbar() {
-    seg($('#tf-buttons'), TF_OPTIONS, state.timeframe, function (v) {
-      if (v === state.timeframe) return; state.timeframe = v; save(); buildToolbar(); refresh(true);
+    // On surveille toutes les TF en continu ; ces boutons filtrent l'affichage par TF d'exécution.
+    seg($('#tf-buttons'), [{ v: 'all', t: 'Toutes TF' }, { v: '4h', t: 'H4' }, { v: '15m', t: 'M15' }, { v: '5m', t: 'M5' }], state.filters.tf, function (v) {
+      state.filters.tf = v; save(); buildToolbar(); renderAll();
     });
     seg($('#dir-filter'), [{ v: 'all', t: 'Tous' }, { v: 'long', t: 'Achat' }, { v: 'short', t: 'Vente' }], state.filters.dir, function (v) { state.filters.dir = v; save(); buildToolbar(); renderAll(); });
     seg($('#market-filter'), [{ v: 'all', t: 'Tous' }, { v: 'crypto', t: 'Crypto' }, { v: 'forex', t: 'Forex' }, { v: 'metal', t: 'Or' }], state.filters.market, function (v) { state.filters.market = v; save(); buildToolbar(); renderAll(); });
@@ -814,7 +851,7 @@
   function initModals() {
     Array.prototype.forEach.call(document.querySelectorAll('[data-close]'), function (x) { x.addEventListener('click', closeDetail); });
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeDetail(); });
-    window.addEventListener('resize', function () { if (openSym) { var r = state.cache[openSym] && state.cache[openSym].result; if (r && r.chart) TAChart.render($('#modal-chart'), r.chart, { precision: r.precision || 2 }); } });
+    window.addEventListener('resize', function () { if (openView && openView.chart) TAChart.render($('#modal-chart'), openView.chart, { precision: openView.precision || 2 }); });
   }
 
   function initSettings() {
@@ -859,11 +896,8 @@
     selectCtrl($('#hist-filter'), opts, state.histFilter, function (v) { state.histFilter = v; save(); renderHistory(); });
   }
   function buildAutoTf() {
-    seg($('#auto-tf'), TF_OPTIONS, state.autoTf, function (v) {
-      if (v === state.autoTf) return; state.autoTf = v; state.autoCache = {}; save(); buildAutoTf();
-      toast('Le bot passe en ' + (TF_OPTIONS.filter(function (o) { return o.v === v; })[0] || { t: v }).t + '.');
-      refresh(false);
-    });
+    // Le bot raisonne par confluence sur les grandes unités de temps (pas de TF unique).
+    var e = $('#auto-tf'); if (e) e.innerHTML = '<span class="tf-info">Raisonnement HTF · H1 · H4 · D1 · W1</span>';
   }
 
   // --- Section Stratégies -----------------------------------------------------

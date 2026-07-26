@@ -164,16 +164,11 @@ button { font-family: inherit; }
 
 .strat-tag { display: inline-block; font-size: 10.5px; font-weight: 600; padding: 3px 10px; border-radius: 7px; background: var(--bg-elev); border: 1px solid var(--border-soft); color: var(--text-dim); }
 .signal .strat-tag { margin: 2px 0 13px; }
-.strat-tag.strat-ote, .strat-badge.strat-ote { color: var(--blue); } .strat-tag.strat-ote { border-color: color-mix(in srgb, var(--blue) 35%, transparent); }
-.strat-tag.strat-daily, .strat-badge.strat-daily { color: var(--gold); } .strat-tag.strat-daily { border-color: color-mix(in srgb, var(--gold) 35%, transparent); }
-.strat-tag.strat-scalp, .strat-badge.strat-scalp { color: #9b6dff; } .strat-tag.strat-scalp { border-color: color-mix(in srgb, #9b6dff 35%, transparent); }
-.strat-tag.strat-smc, .strat-badge.strat-smc { color: #12b8a6; } .strat-tag.strat-smc { border-color: color-mix(in srgb, #12b8a6 35%, transparent); }
-.strat-tag.strat-sr, .strat-badge.strat-sr { color: #e0699a; } .strat-tag.strat-sr { border-color: color-mix(in srgb, #e0699a 35%, transparent); }
-.strat-tag.strat-rsi, .strat-badge.strat-rsi { color: #e08b3a; } .strat-tag.strat-rsi { border-color: color-mix(in srgb, #e08b3a 35%, transparent); }
-.strat-tag.strat-macd, .strat-badge.strat-macd { color: #3aa0e0; } .strat-tag.strat-macd { border-color: color-mix(in srgb, #3aa0e0 35%, transparent); }
-.strat-tag.strat-ema, .strat-badge.strat-ema { color: #8a5cf0; } .strat-tag.strat-ema { border-color: color-mix(in srgb, #8a5cf0 35%, transparent); }
-.strat-tag.strat-boll, .strat-badge.strat-boll { color: #d64f8f; } .strat-tag.strat-boll { border-color: color-mix(in srgb, #d64f8f 35%, transparent); }
-.strat-tag.strat-breakout, .strat-badge.strat-breakout { color: #2fae8f; } .strat-tag.strat-breakout { border-color: color-mix(in srgb, #2fae8f 35%, transparent); }
+.strat-tag.strat-foundation, .strat-badge.strat-foundation { color: var(--gold); } .strat-tag.strat-foundation { border-color: color-mix(in srgb, var(--gold) 38%, transparent); }
+.strat-tag.strat-strike, .strat-badge.strat-strike { color: #e0699a; } .strat-tag.strat-strike { border-color: color-mix(in srgb, #e0699a 38%, transparent); }
+.strat-tag.strat-meek, .strat-badge.strat-meek { color: var(--blue); } .strat-tag.strat-meek { border-color: color-mix(in srgb, var(--blue) 38%, transparent); }
+.strat-tag.strat-asia, .strat-badge.strat-asia { color: #9b6dff; } .strat-tag.strat-asia { border-color: color-mix(in srgb, #9b6dff 38%, transparent); }
+.strat-tag.strat-shield, .strat-badge.strat-shield { color: #12b8a6; } .strat-tag.strat-shield { border-color: color-mix(in srgb, #12b8a6 38%, transparent); }
 
 .conf-bar { height: 3px; background: var(--border-soft); border-radius: 3px; overflow: hidden; margin-bottom: 15px; }
 .conf-fill { height: 100%; border-radius: 3px; }
@@ -377,3 +372,26 @@ button { font-family: inherit; }
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
 }
+
+/* --- Confluence du bot / nouveaux composants ------------------- */
+.brain-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); margin: 16px 0 4px; }
+.brain-title:first-child { margin-top: 0; }
+.brain-row.verdict { background: linear-gradient(180deg, var(--bg-card), color-mix(in srgb, var(--bg-card) 92%, var(--accent))); }
+.mini-badge { font-size: 10px; font-weight: 700; padding: 2px 9px; border-radius: 6px; letter-spacing: 0.02em; }
+.mini-badge.badge-long { background: var(--accent-dim); color: var(--accent); }
+.mini-badge.badge-short { background: var(--danger-dim); color: var(--danger); }
+.mini-bar { width: 90px; height: 5px; border-radius: 5px; background: var(--border-soft); overflow: hidden; }
+.mini-fill { height: 100%; border-radius: 5px; transition: width 0.5s cubic-bezier(0.2,0.7,0.2,1); }
+.mini-fill.long { background: var(--accent); } .mini-fill.short { background: var(--danger); }
+.tf-info { font-family: var(--mono); font-size: 11.5px; color: var(--text-dim); background: var(--bg-elev); border: 1px solid var(--border-soft); border-radius: 100px; padding: 6px 14px; display: inline-block; }
+
+/* Apparition douce des cartes + graphique (esthétique « terminal ») */
+@keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.card { animation: rise 0.4s cubic-bezier(0.2,0.7,0.2,1) both; }
+.signals-grid .card:nth-child(2) { animation-delay: 0.03s; }
+.signals-grid .card:nth-child(3) { animation-delay: 0.06s; }
+.signals-grid .card:nth-child(4) { animation-delay: 0.09s; }
+.signals-grid .card:nth-child(n+5) { animation-delay: 0.12s; }
+.card.signal { transition: transform 0.2s cubic-bezier(0.2,0.7,0.2,1), border-color 0.2s, box-shadow 0.2s; }
+.card.signal:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); }
+#modal-chart { animation: rise 0.35s cubic-bezier(0.2,0.7,0.2,1) both; }

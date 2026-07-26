@@ -667,6 +667,232 @@
     return indiSignal(ctx, 'breakout', 'Cassure (Breakout)', bull, bear, [bull ? 'Cassure du plus-haut des 20 dernières bougies' : (bear ? 'Cassure du plus-bas des 20 dernières bougies' : '')]);
   }
 
+  // ============================================================================
+  //  SETUPS SMC/ICT MULTI-TIMEFRAME + moteur de CONFLUENCE du bot
+  //  Frames : { w1, d1, h4, h1, m15, m5, m1 }
+  // ============================================================================
+  var TFW = { '1w': 5, '1d': 4, '4h': 3, '1h': 2, '15m': 1, '5m': 0.6, '1m': 0.4 };
+
+  // Biais/tendance « claire » : structure (HH/HL vs LL/LH) prioritaire, EMA en secours.
+  function biasOf(candles) {
+    if (!candles || candles.length < 20) return 'neutre';
+    var sw = findSwings(candles, CONFIG.swingLookback);
+    var ms = marketStructure(candles, sw);
+    if (ms.bias === 'haussier') return 'haussier';
+    if (ms.bias === 'baissier') return 'baissier';
+    var cl = candles.map(function (c) { return c.close; });
+    var ef = ema(cl, CONFIG.emaFast), es = ema(cl, CONFIG.emaSlow), i = cl.length - 1;
+    if (ef[i] != null && es[i] != null) return ef[i] > es[i] ? 'haussier' : 'baissier';
+    return 'neutre';
+  }
+  // Zone Premium (>50%) / Discount (<50%) via le dealing range (Fibonacci).
+  function pdZone(candles) {
+    var sw = findSwings(candles, CONFIG.swingLookback);
+    var range = dealingRange(candles, sw);
+    if (!range) return { zone: 'inconnu', pos: null, range: null };
+    var pos = fibPosition(range, candles[candles.length - 1].close);
+    return { zone: zoneOf(pos), pos: pos, range: range };
+  }
+  function fvgDir(candles, bull) { return latestUnfilledFVG(candles, findFVGs(candles), bull ? 'bullish' : 'bearish'); }
+  // Breaker Block d'exécution : dernier Order Block (sinon FVG) dans le sens + swing de protection.
+  function breakerZone(candles, bull) {
+    var obs = findOrderBlocks(candles);
+    var ob = bull ? latestOB(obs, 'bullish') : latestOB(obs, 'bearish');
+    if (ob) return { top: ob.top, bottom: ob.bottom, swing: bull ? ob.bottom : ob.top };
+    var fvg = fvgDir(candles, bull);
+    if (fvg) return { top: fvg.top, bottom: fvg.bottom, swing: bull ? fvg.bottom : fvg.top };
+    return null;
+  }
+  // Cassure de structure (BOS/CHoCH/MSS) dans le sens voulu.
+  function structureBreak(candles, bull) {
+    var ms = marketStructure(candles, findSwings(candles, CONFIG.swingLookback));
+    return bull ? ms.bias === 'haussier' : ms.bias === 'baissier';
+  }
+  function nextSwing(candles, bull, price) {
+    var sw = findSwings(candles, CONFIG.swingLookback);
+    return bull ? nearestSwingAbove(sw, price) : nearestSwingBelow(sw, price);
+  }
+  // Range de la session asiatique (02h–06h UTC) sur le jour courant.
+  function asiaRange(candles) {
+    var hi = -Infinity, lo = Infinity, n = 0, day = new Date().getUTCDate();
+    for (var i = 0; i < candles.length; i++) {
+      var d = new Date(candles[i].time), h = d.getUTCHours();
+      if (d.getUTCDate() === day && h >= 2 && h < 6) { hi = Math.max(hi, candles[i].high); lo = Math.min(lo, candles[i].low); n++; }
+    }
+    return n ? { high: hi, low: lo } : null;
+  }
+  // Construit le plan (SL derrière le breaker, TP = prochain swing sinon RR mini).
+  function buildSetup(bull, exec, breaker, minRR, tpSwing) {
+    var entry = exec[exec.length - 1].close, t;
+    if (bull) {
+      var sl = breaker.swing * (1 - CONFIG.slBufferPct), risk = entry - sl;
+      if (!(risk > 0)) return null;
+      var tp = (tpSwing != null && tpSwing > entry + minRR * risk) ? tpSwing : entry + minRR * risk;
+      t = { direction: 'LONG', entry: entry, sl: sl, tp1: entry + risk, tp2: tp, tp3: tp + (tp - entry) * 0.5, rr: (tp - entry) / risk };
+    } else {
+      var slh = breaker.swing * (1 + CONFIG.slBufferPct), r2 = slh - entry;
+      if (!(r2 > 0)) return null;
+      var tp2 = (tpSwing != null && tpSwing < entry - minRR * r2) ? tpSwing : entry - minRR * r2;
+      t = { direction: 'SHORT', entry: entry, sl: slh, tp1: entry - r2, tp2: tp2, tp3: tp2 - (entry - tp2) * 0.5, rr: (entry - tp2) / r2 };
+    }
+    return (t.rr >= minRR - 0.05) ? t : null;
+  }
+  function mkSetup(id, label, bull, trade, breaker, conf, exec, tf) {
+    return { strategy: id, strategyLabel: label, direction: bull ? 'LONG' : 'SHORT', trade: trade,
+      pd: breaker ? { type: bull ? 'bullish' : 'bearish', top: breaker.top, bottom: breaker.bottom } : null,
+      confluences: conf, confidence: scoreConfidence(conf), execTf: tf, execCandles: exec };
+  }
+
+  // FOUNDATION — Swing : W1 + D1 alignés → Discount/Premium Daily → FVG HTF → BOS + BB H4 (RR ≥ 1:3).
+  function evalFoundation(F) {
+    if (!F.w1 || !F.d1 || !F.h4) return null;
+    var bw = biasOf(F.w1), bd = biasOf(F.d1);
+    if (bw === 'neutre' || bw !== bd) return null;
+    var bull = bw === 'haussier', pd = pdZone(F.d1);
+    if (bull ? pd.zone !== 'discount' : pd.zone !== 'premium') return null;
+    if (!(fvgDir(F.d1, bull) || fvgDir(F.h4, bull))) return null;
+    if (!structureBreak(F.h4, bull)) return null;
+    var bk = breakerZone(F.h4, bull); if (!bk) return null;
+    var t = buildSetup(bull, F.h4, bk, 3, nextSwing(F.d1, bull, F.h4[F.h4.length - 1].close)); if (!t) return null;
+    return mkSetup('foundation', 'Foundation', bull, t, bk,
+      ['Weekly ' + bw + ' + Daily ' + bd + ' alignés', 'Prix en ' + pd.zone + ' Daily (Fibonacci)',
+       'FVG HTF ' + (bull ? 'BISI (achat)' : 'SIBI (vente)'), 'Cassure de structure H4', 'Breaker Block H4 ' + bw, 'RR ≥ 1:3'], F.h4, '4h');
+  }
+  // STRIKE — Daily clair → FVG Daily → BOS + BB M15 (RR ≥ 1:2, court & impulsif).
+  function evalStrike(F) {
+    if (!F.d1 || !F.m15) return null;
+    var bd = biasOf(F.d1); if (bd === 'neutre') return null;
+    var bull = bd === 'haussier';
+    if (!fvgDir(F.d1, bull)) return null;
+    if (!structureBreak(F.m15, bull)) return null;
+    var bk = breakerZone(F.m15, bull); if (!bk) return null;
+    var t = buildSetup(bull, F.m15, bk, 2, nextSwing(F.m15, bull, F.m15[F.m15.length - 1].close)); if (!t) return null;
+    return mkSetup('strike', 'Strike', bull, t, bk,
+      ['Tendance Daily ' + bd + ' (claire)', 'FVG Daily ' + (bull ? 'BISI' : 'SIBI'),
+       'Cassure de structure M15', 'Breaker Block M15 (retest)', 'Court & impulsif · RR ≥ 1:2'], F.m15, '15m');
+  }
+  // MEEK SEVEN — D1 + H4 + H1 alignés → Discount/Premium H1 → FVG H4/H1 → BOS + BB M15 (RR ≥ 1:2).
+  function evalMeek(F) {
+    if (!F.d1 || !F.h4 || !F.h1 || !F.m15) return null;
+    var bd = biasOf(F.d1), b4 = biasOf(F.h4), b1 = biasOf(F.h1);
+    if (bd === 'neutre' || b4 !== bd || b1 !== bd) return null;
+    var bull = bd === 'haussier', pd = pdZone(F.h1);
+    if (bull ? pd.zone !== 'discount' : pd.zone !== 'premium') return null;
+    if (!(fvgDir(F.h1, bull) || fvgDir(F.h4, bull))) return null;
+    if (!structureBreak(F.m15, bull)) return null;
+    var bk = breakerZone(F.m15, bull); if (!bk) return null;
+    var t = buildSetup(bull, F.m15, bk, 2, nextSwing(F.h1, bull, F.m15[F.m15.length - 1].close)); if (!t) return null;
+    return mkSetup('meek', 'Meek Seven', bull, t, bk,
+      ['Daily + H4 + H1 ' + bd + ' alignés', 'Prix en ' + pd.zone + ' H1 (Fibonacci)',
+       'FVG H4/H1 ' + (bull ? 'BISI' : 'SIBI'), 'Cassure de structure M15', 'Breaker Block M15', 'RR ≥ 1:2'], F.m15, '15m');
+  }
+  // ASIA — biais H4+H1 → sweep Asia High/Low (02h–06h) → FVG HTF → BOS + BB M5 (sessions, RR ≥ 1:2).
+  function evalAsia(F) {
+    if (!F.h4 || !F.h1 || !F.m5) return null;
+    var sess = tradingSession();
+    if (!sess.active && !CONFIG.ignoreSession) return null;
+    var b4 = biasOf(F.h4), b1 = biasOf(F.h1);
+    if (b4 === 'neutre' || b4 !== b1) return null;
+    var bull = b4 === 'haussier', asia = asiaRange(F.m5); if (!asia) return null;
+    var swept = bull ? recentSweepBelow(F.m5, asia.low, 18) : recentSweepAbove(F.m5, asia.high, 18);
+    if (swept == null) return null;
+    if (!(fvgDir(F.h4, bull) || fvgDir(F.h1, bull))) return null;
+    if (!structureBreak(F.m5, bull)) return null;
+    var bk = breakerZone(F.m5, bull); if (!bk) return null;
+    bk.swing = bull ? Math.min(bk.swing, swept) : Math.max(bk.swing, swept);
+    var t = buildSetup(bull, F.m5, bk, 2, null); if (!t) return null;
+    return mkSetup('asia', 'Asia Sweep', bull, t, bk,
+      ['Biais H4 + H1 ' + b4, 'Sweep de l’Asia ' + (bull ? 'Low' : 'High') + ' (02h–06h)',
+       'FVG HTF ' + (bull ? 'BISI' : 'SIBI'), 'Cassure de structure M5', 'Breaker Block M5', 'Session ' + sess.name, 'RR ≥ 1:2'], F.m5, '5m');
+  }
+  // SHIELD — FVG Weekly + BB H4 alignés à la tendance Weekly (RR ≥ 1:2).
+  function evalShield(F) {
+    if (!F.w1 || !F.h4) return null;
+    var bw = biasOf(F.w1); if (bw === 'neutre') return null;
+    var bull = bw === 'haussier';
+    if (!fvgDir(F.w1, bull)) return null;
+    if (!structureBreak(F.h4, bull)) return null;
+    var bk = breakerZone(F.h4, bull); if (!bk) return null;
+    var t = buildSetup(bull, F.h4, bk, 2, nextSwing(F.w1, bull, F.h4[F.h4.length - 1].close)); if (!t) return null;
+    return mkSetup('shield', 'Shield', bull, t, bk,
+      ['Tendance Weekly ' + bw, 'FVG Weekly ' + (bull ? 'BISI' : 'SIBI') + ' (retour du prix)',
+       'PD Array : FVG W1 + BB H4 alignés', 'Breaker Block H4 validé', 'RR ≥ 1:2'], F.h4, '4h');
+  }
+
+  var SETUP_EVALS = [
+    { id: 'foundation', fn: evalFoundation }, { id: 'strike', fn: evalStrike },
+    { id: 'meek', fn: evalMeek }, { id: 'asia', fn: evalAsia }, { id: 'shield', fn: evalShield }
+  ];
+  function analyzeSetups(symbol, frames, opts) {
+    opts = opts || {};
+    var en = opts.strategies || {}, out = [];
+    SETUP_EVALS.forEach(function (s) {
+      if (en[s.id] === false) return;
+      var r = null; try { r = s.fn(frames); } catch (e) { r = null; }
+      if (r) { r.symbol = symbol; r.chart = buildSetupChart(r.execCandles, r); out.push(r); }
+    });
+    out.sort(function (a, b) { return b.confidence - a.confidence; });
+    return out;
+  }
+  function buildSetupChart(candles, sig) {
+    var cl = candles.map(function (c) { return c.close; });
+    var sw = findSwings(candles, CONFIG.swingLookback), range = dealingRange(candles, sw);
+    var meta = { candles: candles, view: { from: Math.max(0, candles.length - CONFIG.viewBars), to: candles.length - 1 },
+      fvgs: findFVGs(candles), obs: findOrderBlocks(candles), swings: sw, liquidity: findLiquidity(sw),
+      emaFast: ema(cl, CONFIG.emaFast), emaSlow: ema(cl, CONFIG.emaSlow), emaFastPeriod: CONFIG.emaFast, emaSlowPeriod: CONFIG.emaSlow,
+      trade: sig.trade, pd: sig.pd };
+    if (range) {
+      meta.range = range; meta.fib = fibLevels(range);
+      var pos = fibPosition(range, candles[candles.length - 1].close);
+      meta.ote = zoneOf(pos) === 'premium'
+        ? { top: range.low + range.size * CONFIG.oteHigh, bottom: range.low + range.size * CONFIG.oteLow }
+        : { top: range.low + range.size * (1 - CONFIG.oteLow), bottom: range.low + range.size * (1 - CONFIG.oteHigh) };
+    }
+    return meta;
+  }
+
+  // Votes de concepts ICT/SMC + indicateurs sur un jeu de bougies (+1 achat / -1 vente).
+  function conceptVotes(candles) {
+    if (!candles || candles.length < 25) return [];
+    var sw = findSwings(candles, CONFIG.swingLookback), cl = candles.map(function (c) { return c.close; });
+    var last = candles[candles.length - 1], i = cl.length - 1, v = [];
+    function vote(name, d) { if (d) v.push({ name: name, dir: d }); }
+    vote('Structure (BOS/CHoCH)', (function () { var m = marketStructure(candles, sw); return m.bias === 'haussier' ? 1 : (m.bias === 'baissier' ? -1 : 0); })());
+    var ef = ema(cl, CONFIG.emaFast), es = ema(cl, CONFIG.emaSlow);
+    if (ef[i] != null && es[i] != null) vote('EMA 20/50', ef[i] > es[i] ? 1 : -1);
+    var range = dealingRange(candles, sw);
+    if (range) { var pos = fibPosition(range, last.close); vote('Premium/Discount (OTE)', pos < 0.5 ? 1 : (pos > 0.5 ? -1 : 0)); }
+    var fvgs = findFVGs(candles), fb = latestUnfilledFVG(candles, fvgs, 'bullish'), fs = latestUnfilledFVG(candles, fvgs, 'bearish');
+    if (fb && !fs) vote('FVG (déséquilibre)', 1); else if (fs && !fb) vote('FVG (déséquilibre)', -1);
+    var obs = findOrderBlocks(candles), ob = latestOB(obs, 'bullish'), os = latestOB(obs, 'bearish');
+    if (ob && (!os || ob.index > os.index)) vote('Order Block', 1); else if (os && (!ob || os.index > ob.index)) vote('Order Block', -1);
+    var crt = detectCRT(candles); if (crt) vote('Liquidité (sweep/CISD)', crt.type === 'bullish' ? 1 : -1);
+    var r = rsi(cl, 14); if (r[i] != null) vote('RSI', r[i] < 30 ? 1 : (r[i] > 70 ? -1 : 0));
+    var bb = bollinger(cl, 20, 2); if (bb[i]) vote('Bollinger', cl[i] < bb[i].lower ? 1 : (cl[i] > bb[i].upper ? -1 : 0));
+    return v;
+  }
+  // Moteur de raisonnement du bot : combine tous les concepts sur toutes les HTF (pondéré par TF,
+  // plus la TF est haute plus elle pèse et domine) + les setups, en UNE conclusion par paire.
+  function confluence(frames, setups, learn) {
+    learn = learn || function () { return 1; };
+    var TFS = [['1w', frames.w1], ['1d', frames.d1], ['4h', frames.h4], ['1h', frames.h1]];
+    var score = 0, totalW = 0, details = [];
+    TFS.forEach(function (p) {
+      var tf = p[0], candles = p[1], w = TFW[tf] || 1; if (!candles) return;
+      var votes = conceptVotes(candles), sub = 0;
+      votes.forEach(function (vv) { var ww = w * learn('c:' + vv.name); sub += vv.dir * ww; score += vv.dir * ww; totalW += ww; });
+      if (votes.length) details.push({ tf: tf, bias: sub > 0 ? 'haussier' : (sub < 0 ? 'baissier' : 'neutre'), n: votes.length });
+    });
+    (setups || []).forEach(function (s) {
+      if (s.strategy === 'asia') return; // scalp : hors du raisonnement HTF du bot
+      var ww = ((TFW[s.execTf] || 1) + 2) * learn('s:' + s.strategy), dir = s.direction === 'LONG' ? 1 : -1;
+      score += dir * ww; totalW += ww;
+    });
+    if (totalW <= 0 || score === 0) return null;
+    var bull = score > 0, ratio = Math.abs(score) / totalW;
+    return { direction: bull ? 'LONG' : 'SHORT', pct: Math.max(50, Math.min(95, Math.round(48 + ratio * 40))), ratio: ratio, details: details };
+  }
+
   // --- Analyse complète -------------------------------------------------------
   // opts : { pdh, pdl } (daily) · { m1 } (scalping) · { strategies } (activées)
   function analyze(symbol, timeframe, candles, opts) {
@@ -776,7 +1002,9 @@
     fibPosition: fibPosition, zoneOf: zoneOf, findFVGs: findFVGs, findOrderBlocks: findOrderBlocks,
     findLiquidity: findLiquidity, marketStructure: marketStructure, detectCRT: detectCRT,
     aggregate: aggregate, findSRZones: findSRZones,
-    analyze: analyze, precisionFor: precisionFor, round: round
+    analyze: analyze, analyzeSetups: analyzeSetups, confluence: confluence,
+    conceptVotes: conceptVotes, buildSetupChart: buildSetupChart, asiaRange: asiaRange,
+    biasOf: biasOf, precisionFor: precisionFor, round: round
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.ICT = api;

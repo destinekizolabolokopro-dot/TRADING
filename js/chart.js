@@ -25,7 +25,9 @@
     entry: '#e6ecf5', sl: '#f87171', tp: '#4ade80',
     liq: 'rgba(232,195,122,0.55)', crosshair: 'rgba(255,255,255,0.25)',
     pdLevel: 'rgba(179,136,255,0.7)',
-    bg: 'transparent'
+    riskZone: 'rgba(239,83,80,0.10)', profitZone: 'rgba(38,166,154,0.10)',
+    breaker: 'rgba(179,136,255,0.16)', breakerEdge: 'rgba(179,136,255,0.55)',
+    last: '#e8c37a', bg: 'transparent'
   };
   var PAD = { right: 84, bottom: 22, top: 10, left: 6 };
 
@@ -160,6 +162,24 @@
 
     drawGridAxis(ctx, L, precision);
 
+    // Zones Risque (entrée→SL) et Gain (entrée→TP2) — lecture immédiate façon TradingView.
+    if (a.trade) {
+      var xe = a.pd ? Math.max(L.p.left, L.x((a.obs && a.obs.length ? a.obs[a.obs.length - 1].index : L.to - 10))) : L.p.left;
+      var xR = L.w - L.p.right;
+      var yEntry = L.y(a.trade.entry), ySL = L.y(a.trade.sl), yTP = L.y(a.trade.tp2);
+      ctx.fillStyle = COL.riskZone; ctx.fillRect(xe, Math.min(yEntry, ySL), xR - xe, Math.abs(ySL - yEntry));
+      ctx.fillStyle = COL.profitZone; ctx.fillRect(xe, Math.min(yEntry, yTP), xR - xe, Math.abs(yTP - yEntry));
+    }
+    // Breaker Block (zone d'exécution du setup).
+    if (a.pd) {
+      var yT = L.y(a.pd.top), yB = L.y(a.pd.bottom);
+      ctx.fillStyle = COL.breaker; ctx.fillRect(L.p.left, Math.min(yT, yB), (L.w - L.p.right) - L.p.left, Math.abs(yB - yT));
+      ctx.strokeStyle = COL.breakerEdge; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+      ctx.strokeRect(L.p.left, Math.min(yT, yB), (L.w - L.p.right) - L.p.left, Math.abs(yB - yT)); ctx.setLineDash([]);
+      ctx.fillStyle = COL.breakerEdge; ctx.font = '9px ui-monospace, monospace'; ctx.textAlign = 'left';
+      ctx.fillText('Breaker Block', L.p.left + 5, Math.min(yT, yB) + 9);
+    }
+
     // zone OTE
     if (a.ote) drawZoneBox(ctx, L, a.ote.top, a.ote.bottom, (a.trade && a.trade.direction === 'SHORT') ? COL.oteShort : COL.ote, a.range ? Math.min(a.range.highIndex, a.range.lowIndex) : null);
 
@@ -192,6 +212,14 @@
 
     drawCandles(ctx, L);
     if (a.swings) drawSwings(ctx, L, a.swings);
+
+    // Ligne du dernier prix (marché en direct).
+    var lastC = L.candles[L.candles.length - 1];
+    if (lastC) {
+      var yl = L.y(lastC.close);
+      ctx.strokeStyle = COL.last; ctx.lineWidth = 1; ctx.setLineDash([2, 2]);
+      ctx.beginPath(); ctx.moveTo(L.p.left, yl); ctx.lineTo(L.w - L.p.right, yl); ctx.stroke(); ctx.setLineDash([]);
+    }
 
     // liquidité
     (a.liquidity || []).forEach(function (lq) {
