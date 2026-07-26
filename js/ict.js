@@ -713,7 +713,9 @@
     if (enabled.daily !== false && range) { var s2 = evalDaily(ctx); if (s2) cands.push(s2); }
     if (enabled.scalp !== false) { var s3 = evalScalping(ctx); if (s3) cands.push(s3); }
     if (enabled.smc !== false) { var s4 = evalSMC(ctx); if (s4) cands.push(s4); }
-    if (enabled.sr !== false) { var s5 = evalSR(ctx); if (s5) cands.push(s5); }
+    // Support & Résistance : uniquement en grande unité de temps (H1 et plus).
+    var TF_RANK = { '1m': 1, '5m': 2, '15m': 3, '30m': 4, '1h': 5, '4h': 6, '1d': 7, '1w': 8 };
+    if (enabled.sr !== false && (TF_RANK[timeframe] || 0) >= TF_RANK['1h']) { var s5 = evalSR(ctx); if (s5) cands.push(s5); }
     if (enabled.rsi !== false) { var s6 = evalRSI(ctx); if (s6) cands.push(s6); }
     if (enabled.macd !== false) { var s7 = evalMACD(ctx); if (s7) cands.push(s7); }
     if (enabled.ema !== false) { var s8 = evalEMAX(ctx); if (s8) cands.push(s8); }
