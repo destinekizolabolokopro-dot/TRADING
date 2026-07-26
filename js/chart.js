@@ -72,7 +72,7 @@
   }
 
   function drawGridAxis(ctx, L, precision) {
-    ctx.font = '10px ui-monospace, Menlo, monospace';
+    ctx.font = "10px 'Inter var', Inter, ui-sans-serif, sans-serif";
     ctx.textBaseline = 'middle';
     var ticks = 5;
     for (var t = 0; t <= ticks; t++) {
@@ -93,7 +93,7 @@
     ctx.setLineDash([]);
     // étiquette prix à droite
     var txt = fmt(price, precision);
-    ctx.font = '10px ui-monospace, Menlo, monospace';
+    ctx.font = "10px 'Inter var', Inter, ui-sans-serif, sans-serif";
     var tw = ctx.measureText(txt).width + 8;
     ctx.fillStyle = color;
     ctx.fillRect(L.w - L.p.right, yy - 7, tw, 14);
@@ -101,7 +101,7 @@
     ctx.fillText(txt, L.w - L.p.right + 4, yy);
     // libellé à gauche
     if (label) {
-      ctx.font = '10px ui-monospace, Menlo, monospace';
+      ctx.font = "10px 'Inter var', Inter, ui-sans-serif, sans-serif";
       ctx.fillStyle = color; ctx.textAlign = 'left';
       ctx.fillText(label, L.p.left + 4, yy - 8);
     }
@@ -141,7 +141,7 @@
   }
 
   function drawSwings(ctx, L, swings) {
-    ctx.font = '9px ui-monospace, monospace'; ctx.textAlign = 'center';
+    ctx.font = "9px 'Inter var', Inter, ui-sans-serif, sans-serif"; ctx.textAlign = 'center';
     function mark(pt, isHigh) {
       if (pt.index < L.from || pt.index > L.to) return;
       var xx = L.x(pt.index), yy = L.y(pt.price);
@@ -176,7 +176,7 @@
       ctx.fillStyle = COL.breaker; ctx.fillRect(L.p.left, Math.min(yT, yB), (L.w - L.p.right) - L.p.left, Math.abs(yB - yT));
       ctx.strokeStyle = COL.breakerEdge; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
       ctx.strokeRect(L.p.left, Math.min(yT, yB), (L.w - L.p.right) - L.p.left, Math.abs(yB - yT)); ctx.setLineDash([]);
-      ctx.fillStyle = COL.breakerEdge; ctx.font = '9px ui-monospace, monospace'; ctx.textAlign = 'left';
+      ctx.fillStyle = COL.breakerEdge; ctx.font = "9px 'Inter var', Inter, ui-sans-serif, sans-serif"; ctx.textAlign = 'left';
       ctx.fillText('Breaker Block', L.p.left + 5, Math.min(yT, yB) + 9);
     }
 
@@ -202,7 +202,7 @@
       ctx.lineWidth = 1; ctx.setLineDash(f.f === 0.5 ? [] : [2, 3]);
       ctx.beginPath(); ctx.moveTo(L.p.left, yy); ctx.lineTo(L.w - L.p.right, yy); ctx.stroke();
       ctx.setLineDash([]);
-      ctx.fillStyle = COL.text; ctx.font = '9px ui-monospace, monospace'; ctx.textAlign = 'right';
+      ctx.fillStyle = COL.text; ctx.font = "9px 'Inter var', Inter, ui-sans-serif, sans-serif"; ctx.textAlign = 'right';
       ctx.fillText(f.label, L.w - L.p.right - 4, yy - 5);
     });
 
@@ -228,7 +228,7 @@
       ctx.strokeStyle = COL.liq; ctx.lineWidth = 1; ctx.setLineDash([1, 4]);
       ctx.beginPath(); ctx.moveTo(L.p.left, yy); ctx.lineTo(L.w - L.p.right, yy); ctx.stroke();
       ctx.setLineDash([]);
-      ctx.fillStyle = COL.liq; ctx.font = '9px ui-monospace, monospace'; ctx.textAlign = 'left';
+      ctx.fillStyle = COL.liq; ctx.font = "9px 'Inter var', Inter, ui-sans-serif, sans-serif"; ctx.textAlign = 'left';
       ctx.fillText(lq.type === 'buyside' ? 'BSL' : 'SSL', L.p.left + 4, yy - 5);
     });
 
@@ -239,7 +239,7 @@
       ctx.strokeStyle = COL.pdLevel; ctx.lineWidth = 1.2; ctx.setLineDash([6, 4]);
       ctx.beginPath(); ctx.moveTo(L.p.left, yy); ctx.lineTo(L.w - L.p.right, yy); ctx.stroke();
       ctx.setLineDash([]);
-      ctx.fillStyle = COL.pdLevel; ctx.font = '9px ui-monospace, monospace'; ctx.textAlign = 'left';
+      ctx.fillStyle = COL.pdLevel; ctx.font = "9px 'Inter var', Inter, ui-sans-serif, sans-serif"; ctx.textAlign = 'left';
       ctx.fillText(d[2], L.p.left + 4, yy - 5);
     });
 
@@ -271,14 +271,14 @@
     // prix au curseur
     var price = L.lo + (L.hi - L.lo) * (1 - (my - L.p.top) / L.plotH);
     ctx.fillStyle = '#2a3446'; ctx.fillRect(L.w - L.p.right, my - 7, L.p.right, 14);
-    ctx.fillStyle = '#e6ecf5'; ctx.font = '10px ui-monospace, monospace'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#e6ecf5'; ctx.font = "10px 'Inter var', Inter, ui-sans-serif, sans-serif"; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
     ctx.fillText(fmt(price, precision), L.w - L.p.right + 4, my);
     // OHLC
     var c = L.candles[idx - L.from];
     if (c) {
       var up = c.close >= c.open;
       var s = 'O ' + fmt(c.open, precision) + '  H ' + fmt(c.high, precision) + '  B ' + fmt(c.low, precision) + '  C ' + fmt(c.close, precision);
-      ctx.font = '10px ui-monospace, monospace'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+      ctx.font = "10px 'Inter var', Inter, ui-sans-serif, sans-serif"; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
       ctx.fillStyle = 'rgba(10,14,20,0.85)';
       var tw = ctx.measureText(s).width + 12;
       ctx.fillRect(L.p.left + 2, L.p.top + 2, tw, 16);
