@@ -48,6 +48,7 @@
     histFilter: 'all',
     strategies: { foundation: true, strike: true, meek: true, asia: true, shield: true },
     frames: {},
+    dxy: null,
     autoCache: {},
     autoTf: '15m',
     theme: 'light',
@@ -168,8 +169,8 @@
       var precision = ICT.precisionFor(price || 1);
       var r = {
         symbol: sym, label: API.label(sym), kind: (API.meta(sym) || {}).kind,
-        price: price, precision: precision, timeframe: 'Multi-TF',
-        signals: setups, hasSignal: setups.length > 0, confluence: conf,
+        price: price, precision: precision, timeframe: 'Multi-TF', frames: F,
+        signals: setups, hasSignal: setups.length > 0, confluence: conf, confluenceBase: conf,
         trend: conf ? (conf.direction === 'LONG' ? 'haussière' : 'baissière') : null
       };
       r.chart = setups[0] ? setups[0].chart : (F.h1 ? ICT.buildSetupChart(F.h1, {}) : null);
@@ -196,12 +197,58 @@
     return out;
   }
 
+  // === DXY / Force du dollar (filtre PRIORITAIRE du bot) =====================
+  // Le DXY passe en premier : il fixe le biais USD, puis la confluence de chaque
+  // paire doit s'y conformer. USD fort → USDxxx haussières, xxxUSD baissières.
+  // On mesure la force du dollar sur les paires USD déjà analysées (proxy DXY fiable).
+  function computeDxy() {
+    var score = 0, tot = 0;
+    function contrib(sym, invert) {
+      var res = state.cache[sym] && state.cache[sym].result;
+      if (!res || !res.frames) return;
+      [['d1', 3], ['h4', 2], ['h1', 1]].forEach(function (p) {
+        var bl = ICT.biasOf(res.frames[p[0]]); if (bl === 'neutre') return;
+        var dir = bl === 'haussier' ? 1 : -1; if (invert) dir = -dir;
+        score += dir * p[1]; tot += p[1];
+      });
+    }
+    contrib('USDJPY', false); // USD/JPY monte → USD fort
+    contrib('GBPUSD', true);  // GBP/USD monte → USD faible
+    contrib('XAUUSD', true);  // or monte → USD faible
+    if (tot === 0) return null;
+    return { direction: score > 0 ? 'LONG' : 'SHORT', pct: Math.max(52, Math.min(92, Math.round(50 + Math.abs(score) / tot * 40))) };
+  }
+  // Sens attendu d'une paire selon le DXY (USD fort = DXY LONG).
+  function usdImplied(sym, dxyDir) {
+    var strong = dxyDir === 'LONG';
+    if (sym.slice(0, 3) === 'USD') return strong ? 'LONG' : 'SHORT';   // USDxxx
+    if (sym.slice(-3) === 'USD') return strong ? 'SHORT' : 'LONG';     // xxxUSD (dont XAUUSD, BTCUSD…)
+    if (sym.slice(0, 3) === 'XAU') return strong ? 'SHORT' : 'LONG';   // or (XAUEUR) : faible quand USD fort
+    return null; // paire sans USD (ex. EUR/JPY) : le DXY ne s'applique pas
+  }
+  // Applique le DXY à la confluence : il MÈNE le sens, le % dit l'accord des setups.
+  function applyDxy(r, dxy) {
+    var base = r.confluenceBase;
+    if (!dxy) return base;
+    var imp = usdImplied(r.symbol, dxy.direction);
+    if (!imp) return base;
+    var agree = base && base.direction === imp;
+    var pct = base
+      ? (agree ? Math.min(96, Math.round(base.pct * 0.5 + dxy.pct * 0.5) + 6) : Math.max(48, Math.round(dxy.pct * 0.45)))
+      : Math.round(dxy.pct * 0.6);
+    return { direction: imp, pct: pct, ratio: base ? base.ratio : 0, details: base ? base.details : [],
+      dxy: { direction: dxy.direction, pct: dxy.pct, agree: !!agree } };
+  }
+
   function refresh(force) {
     if (force) { state.cache = {}; state.frames = {}; }
     setStatus('Analyse en cours…', true);
     var jobs = state.symbols.map(function (sym) { return ensureSymbol(sym).then(function () { renderAll(); }); });
     return Promise.all(jobs).then(function () {
       state.lastUpdate = new Date();
+      // Le DXY passe en premier, puis on ajuste la conclusion de chaque paire.
+      state.dxy = computeDxy();
+      results().forEach(function (r) { r.confluence = applyDxy(r, state.dxy); r.trend = r.confluence ? (r.confluence.direction === 'LONG' ? 'haussière' : 'baissière') : null; });
       updateHistory();
       updateAutoHistory();
       if (state.autoEnabled) runAutoBot(results());
@@ -422,14 +469,25 @@
     var rEl = $('#a-r'); rEl.textContent = gainStr(b.rsum); rEl.className = 'bilan-val ' + (b.rsum > 0 ? 'pos' : (b.rsum < 0 ? 'neg' : ''));
 
     var stats = autoStratStats(); var brain = $('#auto-brain'); brain.innerHTML = '';
+    // DXY / Force du dollar — le filtre PRIORITAIRE que le bot regarde en premier.
+    if (state.dxy) {
+      var up = state.dxy.direction === 'LONG';
+      var dxrow = el('div', 'dxy-banner ' + (up ? 'up' : 'down'));
+      dxrow.appendChild(el('span', 'dxy-ic', up ? '$↑' : '$↓'));
+      var dxt = el('div', 'dxy-txt');
+      dxt.appendChild(el('span', 'dxy-h', 'DXY / Dollar : ' + (up ? 'HAUSSIER — USD fort' : 'BAISSIER — USD faible') + ' (' + state.dxy.pct + '%)'));
+      dxt.appendChild(el('span', 'dxy-s', up ? 'Priorité : USD/xxx haussières · xxx/USD + or baissiers.' : 'Priorité : USD/xxx baissières · xxx/USD + or haussiers.'));
+      dxrow.appendChild(dxt); brain.appendChild(dxrow);
+    }
     // Conclusions de confluence du bot, paire par paire (la « décision unique »).
     var verdicts = results().filter(function (r) { return r && r.confluence; });
     if (verdicts.length) {
-      brain.appendChild(el('div', 'brain-title', 'Sa lecture du marché maintenant (confluence HTF)'));
+      brain.appendChild(el('div', 'brain-title', 'Sa lecture du marché maintenant (DXY + confluence HTF)'));
       verdicts.sort(function (a, b) { return b.confluence.pct - a.confluence.pct; }).forEach(function (r) {
         var cf = r.confluence, row = el('div', 'brain-row verdict');
         var left = el('div', 'brain-left'); left.appendChild(el('span', 'brain-name', r.label));
         left.appendChild(el('span', 'mini-badge ' + (cf.direction === 'LONG' ? 'badge-long' : 'badge-short'), cf.direction === 'LONG' ? 'Achat' : 'Vente'));
+        if (cf.dxy) left.appendChild(el('span', 'dxy-tag ' + (cf.dxy.agree ? 'ok' : 'warn'), cf.dxy.agree ? 'DXY ✓' : 'DXY ≠ setups'));
         row.appendChild(left);
         var right = el('div', 'brain-right'); right.appendChild(el('span', 'brain-rate', 'Réussite ~' + cf.pct + '%'));
         var bar = el('div', 'mini-bar'); var f = el('div', 'mini-fill ' + (cf.direction === 'LONG' ? 'long' : 'short')); f.style.width = cf.pct + '%'; bar.appendChild(f);

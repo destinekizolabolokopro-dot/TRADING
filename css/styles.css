@@ -403,6 +403,19 @@ button { font-family: inherit; }
 .mini-fill.long { background: var(--accent); } .mini-fill.short { background: var(--danger); }
 .tf-info { font-family: var(--mono); font-size: 11.5px; color: var(--text-dim); background: var(--bg-elev); border: 1px solid var(--border-soft); border-radius: 100px; padding: 6px 14px; display: inline-block; }
 
+/* DXY / force du dollar — filtre prioritaire du bot */
+.dxy-banner { display: flex; align-items: center; gap: 14px; padding: 15px 18px; border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: 14px; }
+.dxy-banner.up { background: linear-gradient(90deg, var(--accent-dim), transparent); border-color: color-mix(in srgb, var(--accent) 34%, var(--border)); }
+.dxy-banner.down { background: linear-gradient(90deg, var(--danger-dim), transparent); border-color: color-mix(in srgb, var(--danger) 30%, var(--border)); }
+.dxy-ic { font-weight: 800; font-size: 18px; width: 40px; height: 40px; display: grid; place-items: center; border-radius: 12px; background: var(--bg-elev); flex: none; }
+.dxy-banner.up .dxy-ic { color: var(--accent); } .dxy-banner.down .dxy-ic { color: var(--danger); }
+.dxy-txt { display: flex; flex-direction: column; gap: 3px; }
+.dxy-h { font-size: 14px; font-weight: 700; letter-spacing: -0.01em; }
+.dxy-s { font-size: 12.5px; color: var(--text-dim); }
+.dxy-tag { font-size: 9.5px; font-weight: 700; padding: 2px 7px; border-radius: 5px; letter-spacing: 0.02em; }
+.dxy-tag.ok { color: var(--accent); background: var(--accent-dim); }
+.dxy-tag.warn { color: var(--gold); background: color-mix(in srgb, var(--gold) 16%, transparent); }
+
 /* Apparition douce des cartes + graphique (esthétique « terminal ») */
 @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 .card { animation: rise 0.4s cubic-bezier(0.2,0.7,0.2,1) both; }
