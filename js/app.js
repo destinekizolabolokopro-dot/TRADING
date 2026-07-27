@@ -86,6 +86,12 @@
       }));
     } catch (e) { /* ignore */ }
   }
+  // Vérifie que le navigateur autorise vraiment la sauvegarde (bloquée en navigation
+  // privée, ou pour certains fichiers locaux). Si non, on prévient l'utilisateur.
+  function storageWorks() {
+    try { var k = '__ta_test__'; localStorage.setItem(k, '1'); localStorage.removeItem(k); return true; }
+    catch (e) { return false; }
+  }
   function loadHistory() { try { state.history = JSON.parse(localStorage.getItem(HISTORY_KEY)) || []; } catch (e) { state.history = []; } }
   function saveHistory() { try { localStorage.setItem(HISTORY_KEY, JSON.stringify(state.history.slice(-500))); } catch (e) { /* ignore */ } }
   function loadAutoHistory() { try { state.autoHistory = JSON.parse(localStorage.getItem(AUTO_KEY)) || []; } catch (e) { state.autoHistory = []; } }
@@ -930,6 +936,8 @@
 
   function init() {
     load(); loadHistory(); loadAutoHistory();
+    if (storageWorks()) { save(); }
+    else { setTimeout(function () { toast('⚠ Ton navigateur empêche la sauvegarde (navigation privée ?). Ton historique ne sera pas gardé après fermeture. Ouvre le fichier normalement, sans mode privé.'); }, 1200); }
     applyTheme(); updateAlertBtn();
     buildToolbar(); initSymbols(); initApiKey(); initModals(); initSettings(); initNav(); buildHistFilter(); buildAutoTf();
     renderStrategies();
