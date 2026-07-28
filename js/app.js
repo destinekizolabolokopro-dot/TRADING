@@ -13,6 +13,7 @@
   var AUTO_KEY = 'tradeassist.autohistory';
   var AUTO_MIN_CONF = 55;   // confiance minimale pour que le bot prenne un trade
   var AUTO_EXPLORE = 4;     // nb de trades par stratégie avant de juger (phase de test)
+  var REENTRY_MS = 3600000; // délai avant de rouvrir le même setup après une clôture (anti-spam)
   var TICK_MS = 20000;
   var MIN_AGE_CRYPTO = 40000;
   var MIN_AGE_SLOW = 240000;
@@ -261,6 +262,27 @@
     });
   }
 
+  // Un trade est GAGNÉ quand le prix atteint le vrai objectif (TP2 = 2–3R), PERDU au SL.
+  // (Avant : on clôturait au TP1 ≈ 1R, trop proche de l'entrée → résultats en pile ou face.)
+  function closeAgainst(h, price) {
+    var target = h.tp2 != null ? h.tp2 : h.tp1;
+    var hit = null;
+    if (h.direction === 'LONG') { if (price <= h.sl) hit = 'loss'; else if (price >= target) hit = 'win'; }
+    else { if (price >= h.sl) hit = 'loss'; else if (price <= target) hit = 'win'; }
+    if (hit) {
+      h.status = 'closed'; h.result = hit; h.closedTs = Date.now();
+      var risk = Math.abs(h.entry - h.sl), rew = Math.abs(target - h.entry);
+      h.r = hit === 'win' ? (risk > 0 ? rew / risk : 0) : -1;
+    }
+  }
+  // Anti-spam : on ne rouvre pas le même setup (paire+sens) juste après l'avoir clôturé.
+  function onCooldown(list, sym, strat, dir) {
+    return list.some(function (h) {
+      return h.status === 'closed' && h.symbol === sym && h.strategy === strat && h.direction === dir &&
+        h.closedTs && (Date.now() - h.closedTs) < REENTRY_MS;
+    });
+  }
+
   // --- Historique des trades & bilan -----------------------------------------
   function updateHistory() {
     // 1) archiver chaque nouveau signal (un « ouvert » par paire+setup+sens)
@@ -268,27 +290,19 @@
       var exists = state.history.some(function (h) {
         return h.status === 'open' && h.symbol === s.symbol && h.strategy === s.strategy && h.direction === s.direction;
       });
-      if (exists) return;
+      if (exists || onCooldown(state.history, s.symbol, s.strategy, s.direction)) return;
       var t = s.trade;
       state.history.push({
         id: Date.now() + '-' + s.symbol + '-' + s.strategy, ts: Date.now(), symbol: s.symbol, label: s.label,
         strategy: s.strategy, strategyLabel: s.strategyLabel, direction: s.direction, timeframe: s.timeframe,
-        precision: s.precision, entry: t.entry, sl: t.sl, tp1: t.tp1, status: 'open', result: null, r: null
+        precision: s.precision, entry: t.entry, sl: t.sl, tp1: t.tp1, tp2: t.tp2, status: 'open', result: null, r: null
       });
     });
     // 2) clôturer les trades ouverts selon le prix courant
     state.history.forEach(function (h) {
       if (h.status !== 'open') return;
       var res = state.cache[h.symbol] && state.cache[h.symbol].result;
-      if (!res || res.price == null) return;
-      var p = res.price, hit = null;
-      if (h.direction === 'LONG') { if (p <= h.sl) hit = 'loss'; else if (p >= h.tp1) hit = 'win'; }
-      else { if (p >= h.sl) hit = 'loss'; else if (p <= h.tp1) hit = 'win'; }
-      if (hit) {
-        h.status = 'closed'; h.result = hit; h.closedTs = Date.now();
-        var risk = Math.abs(h.entry - h.sl), rew = Math.abs(h.tp1 - h.entry);
-        h.r = hit === 'win' ? (risk > 0 ? rew / risk : 0) : -1;
-      }
+      if (res && res.price != null) closeAgainst(h, res.price);
     });
     saveHistory();
   }
@@ -389,7 +403,7 @@
     var sens = document.createElement('td'); sens.appendChild(el('span', 'mini-badge ' + (h.direction === 'LONG' ? 'badge-long' : 'badge-short'), h.direction === 'LONG' ? 'Achat' : 'Vente')); tr.appendChild(sens);
     tr.appendChild(td(fmt(h.entry, h.precision), 'num'));
     tr.appendChild(td(fmt(h.sl, h.precision), 'num'));
-    tr.appendChild(td(fmt(h.tp1, h.precision), 'num'));
+    tr.appendChild(td(fmt(h.tp2 != null ? h.tp2 : h.tp1, h.precision), 'num'));
     var rc = document.createElement('td');
     var lbl = h.status === 'open' ? 'En cours' : (h.result === 'win' ? 'Gagné' : 'Perdu');
     var cls = h.status === 'open' ? 'res-open' : (h.result === 'win' ? 'res-win' : 'res-loss');
@@ -437,13 +451,14 @@
       var aligned = (r.signals || []).filter(function (s) { return s.strategy !== 'asia' && s.direction === dir; });
       aligned.sort(function (a, b) { return b.confidence - a.confidence; });
       var lead = aligned[0]; if (!lead) return; // besoin d'un setup exécutable dans le sens de la conclusion
+      if (onCooldown(state.autoHistory, r.symbol, lead.strategy, dir)) return; // anti-spam après une clôture
       var w = autoWeight(lead.strategy, autoStratStats());
       if (w.phase === 'évite') return;
       var t = lead.trade;
       state.autoHistory.push({
         id: Date.now() + '-' + r.symbol, ts: Date.now(), symbol: r.symbol, label: r.label,
         strategy: lead.strategy, strategyLabel: 'Confluence · ' + lead.strategyLabel, direction: dir, timeframe: tfLabel(lead.execTf),
-        precision: r.precision, entry: t.entry, sl: t.sl, tp1: t.tp1, status: 'open', result: null, r: null, phase: w.phase, pct: r.confluence.pct
+        precision: r.precision, entry: t.entry, sl: t.sl, tp1: t.tp1, tp2: t.tp2, status: 'open', result: null, r: null, phase: w.phase, pct: r.confluence.pct
       });
     });
   }
@@ -451,11 +466,7 @@
     state.autoHistory.forEach(function (h) {
       if (h.status !== 'open') return;
       var res = state.cache[h.symbol] && state.cache[h.symbol].result;
-      if (!res || res.price == null) return;
-      var p = res.price, hit = null;
-      if (h.direction === 'LONG') { if (p <= h.sl) hit = 'loss'; else if (p >= h.tp1) hit = 'win'; }
-      else { if (p >= h.sl) hit = 'loss'; else if (p <= h.tp1) hit = 'win'; }
-      if (hit) { h.status = 'closed'; h.result = hit; h.closedTs = Date.now(); var risk = Math.abs(h.entry - h.sl), rew = Math.abs(h.tp1 - h.entry); h.r = hit === 'win' ? (risk > 0 ? rew / risk : 0) : -1; }
+      if (res && res.price != null) closeAgainst(h, res.price);
     });
   }
 

@@ -346,10 +346,13 @@
   // Tendance sur M5 (agrégée depuis M1) → retour sur zone clé (MM / OB) sur M1
   // → confirmation (bougie de retournement / rejet) → SL serré, objectif ≥ 2R.
   // Filtre de session : Londres / New York.
+  // Agrégation alignée à DROITE : on jette le reliquat le plus ancien pour que
+  // CHAQUE bougie agrégée (surtout la plus récente) soit complète — sinon le biais
+  // HTF est faussé par une dernière bougie « H4/W1 » partielle.
   function aggregate(candles, n) {
-    var out = [];
-    for (var i = 0; i < candles.length; i += n) {
-      var slice = candles.slice(i, i + n); if (!slice.length) continue;
+    var out = [], start = candles.length % n;
+    for (var i = start; i + n <= candles.length; i += n) {
+      var slice = candles.slice(i, i + n);
       var hi = -Infinity, lo = Infinity, vol = 0;
       slice.forEach(function (c) { hi = Math.max(hi, c.high); lo = Math.min(lo, c.low); vol += c.volume || 0; });
       out.push({ time: slice[0].time, open: slice[0].open, high: hi, low: lo, close: slice[slice.length - 1].close, volume: vol });
