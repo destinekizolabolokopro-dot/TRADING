@@ -17,23 +17,52 @@
 'use strict';
 
 const PAIRS = [
-  { sym: 'BTC', kraken: 'XBTUSD', label: 'BTC/USD' },
-  { sym: 'ETH', kraken: 'ETHUSD', label: 'ETH/USD' },
-  { sym: 'SOL', kraken: 'SOLUSD', label: 'SOL/USD' },
+  { sym: 'BTC', label: 'BTC/USD', source: 'kraken', kraken: 'XBTUSD' },
+  { sym: 'ETH', label: 'ETH/USD', source: 'kraken', kraken: 'ETHUSD' },
+  { sym: 'SOL', label: 'SOL/USD', source: 'kraken', kraken: 'SOLUSD' },
+  { sym: 'DXY', label: 'DXY · Dollar Index', source: 'yahoo', yahoo: 'DX-Y.NYB' },
 ];
-const TFS = [{ i: 1440, name: 'D1' }, { i: 240, name: 'H4' }];
+// Kraken n'a pas le DXY → on le prend chez Yahoo (gratuit, sans clé).
+// H4 côté Yahoo : on récupère du H1 puis on agrège 4 bougies.
+const TFS = [
+  { name: 'D1', kraken: 1440, yahoo: { interval: '1d', range: '6mo' } },
+  { name: 'H4', kraken: 240, yahoo: { interval: '1h', range: '1mo', agg: 4 } },
+];
 const WEBHOOK = process.env.DISCORD_WEBHOOK_ZONES || '';
 const DRY = process.argv.includes('--dry');
 const OTE_LOW = 0.62, OTE_HIGH = 0.79, EQ_TOL = 0.0015;
 
+// Agrégation alignée à droite : chaque bougie agrégée est complète.
+function aggregate(c, n) {
+  const out = [], start = c.length % n;
+  for (let i = start; i + n <= c.length; i += n) {
+    const s = c.slice(i, i + n);
+    out.push({ t: s[0].t, o: s[0].o, h: Math.max(...s.map((x) => x.h)), l: Math.min(...s.map((x) => x.l)), c: s[s.length - 1].c });
+  }
+  return out;
+}
+
 // --- Données : on ENLÈVE la dernière bougie (celle en cours) → clôturées seules
-async function closedCandles(pair, interval) {
+async function krakenClosed(pair, interval) {
   const url = `https://api.kraken.com/0/public/OHLC?pair=${pair}&interval=${interval}`;
   const j = await (await fetch(url)).json();
   if (j.error && j.error.length) throw new Error(pair + ': ' + j.error.join(','));
   const key = Object.keys(j.result).find((k) => k !== 'last');
-  const c = j.result[key].map((r) => ({ t: r[0], o: +r[1], h: +r[2], l: +r[3], c: +r[4], v: +r[6] }));
-  return c.slice(0, -1); // <-- règle « clôture » : on retire la bougie non terminée
+  const c = j.result[key].map((r) => ({ t: r[0], o: +r[1], h: +r[2], l: +r[3], c: +r[4] }));
+  return c.slice(0, -1); // règle « clôture » : on retire la bougie non terminée
+}
+async function yahooClosed(sym, y) {
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=${y.interval}&range=${y.range}`;
+  const j = await (await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } })).json();
+  const r = j.chart.result[0], ts = r.timestamp, q = r.indicators.quote[0];
+  let c = ts.map((t, i) => ({ t, o: q.open[i], h: q.high[i], l: q.low[i], c: q.close[i] }))
+    .filter((x) => x.o != null && x.h != null && x.l != null && x.c != null);
+  c = c.slice(0, -1); // on retire la bougie en cours
+  if (y.agg) c = aggregate(c, y.agg);
+  return c;
+}
+function getClosed(pair, tf) {
+  return pair.source === 'yahoo' ? yahooClosed(pair.yahoo, tf.yahoo) : krakenClosed(pair.kraken, tf.kraken);
 }
 
 // --- Swings (fractales 2 côtés) ---------------------------------------------
@@ -126,6 +155,25 @@ function structure(c, s) {
   return { label: 'range', bias: 'neutre' };
 }
 
+// --- MSS : Market Structure Shift (cassure AVEC displacement + FVG) ----------
+// Règle ICT : après un balayage de liquidité, une impulsion casse le dernier
+// swing opposé et laisse un FVG → l'entrée se fait au retour dans ce FVG.
+function mss(c, s) {
+  const n = c.length, last = c[n - 1];
+  const bodies = c.slice(-14).map((x) => Math.abs(x.c - x.o));
+  const avgBody = bodies.reduce((a, b) => a + b, 0) / bodies.length;
+  // FVG laissé par les 3 dernières bougies clôturées (displacement récent)
+  const a = c[n - 3], b = c[n - 2], d = c[n - 1];
+  const bigUp = b.c > b.o && Math.abs(b.c - b.o) > 1.5 * avgBody;
+  const bigDn = b.c < b.o && Math.abs(b.c - b.o) > 1.5 * avgBody;
+  const lastHi = s.hi[s.hi.length - 1], lastLo = s.lo[s.lo.length - 1];
+  if (bigUp && a.h < d.l && lastHi && b.c > lastHi.p) // casse un sommet à la hausse + FVG
+    return { dir: 'haussier', fvgBottom: a.h, fvgTop: d.l, sl: lastLo ? lastLo.p : a.l };
+  if (bigDn && a.l > d.h && lastLo && b.c < lastLo.p) // casse un creux à la baisse + FVG
+    return { dir: 'baissier', fvgBottom: d.h, fvgTop: a.l, sl: lastHi ? lastHi.p : a.h };
+  return null;
+}
+
 // --- CYCLE : Accumulation → Manipulation → Expansion → Distribution ----------
 function cycle(c, s) {
   const n = c.length, look = Math.min(12, n - 2);
@@ -163,7 +211,7 @@ function analyse(c) {
   return {
     price: c[c.length - 1].c,
     fvg: lastFVG(c), ob: lastOB(c), breaker: lastBreaker(c),
-    ote: ote(c, s), liq: liquidity(s), struct: structure(c, s), cyc: cycle(c, s),
+    ote: ote(c, s), liq: liquidity(s), struct: structure(c, s), cyc: cycle(c, s), mss: mss(c, s),
   };
 }
 
@@ -177,6 +225,7 @@ function embedFor(pair, tfBlocks) {
     const a = b.a, lines = [];
     lines.push(`${PHASE_ICON[a.cyc.phase]} **Cycle : ${a.cyc.phase}** — ${a.cyc.note}`);
     lines.push(`📐 Structure : ${a.struct.label}`);
+    if (a.mss) lines.push(`🔀 **MSS ${a.mss.dir}** — entrée au retour dans le FVG ${fmt(a.mss.fvgBottom)} – ${fmt(a.mss.fvgTop)} · stop ${fmt(a.mss.sl)}`);
     if (a.fvg) lines.push(`▫️ FVG ${a.fvg.type} : ${fmt(a.fvg.bottom)} – ${fmt(a.fvg.top)}`);
     if (a.ob) lines.push(`🧱 Order Block ${a.ob.type} : ${fmt(a.ob.bottom)} – ${fmt(a.ob.top)}`);
     if (a.breaker) lines.push(`⚡ Breaker ${a.breaker.type} : ${fmt(a.breaker.bottom)} – ${fmt(a.breaker.top)}`);
@@ -192,7 +241,7 @@ async function main() {
   for (const p of PAIRS) {
     const blocks = [];
     for (const tf of TFS) {
-      try { blocks.push({ tf: tf.name, a: analyse(await closedCandles(p.kraken, tf.i)) }); }
+      try { blocks.push({ tf: tf.name, a: analyse(await getClosed(p, tf)) }); }
       catch (e) { console.error('Erreur', p.sym, tf.name, e.message); }
     }
     if (blocks.length) embeds.push(embedFor(p, blocks));
