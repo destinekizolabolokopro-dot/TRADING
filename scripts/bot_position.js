@@ -52,7 +52,7 @@ function buildTrade(pair, d1, h4) {
   // Premium/discount D1
   const zoneName = d1.range ? (entry < d1.range.eq ? 'discount' : 'premium') : '—';
   const zoneOk = (dir === 'LONG' && zoneName === 'discount') || (dir === 'SHORT' && zoneName === 'premium');
-  return { pair, dir, via, entry, sl, tp, rr: +rr.toFixed(1), zoneName, zoneOk };
+  return { pair, dir, via, entry, sl, tp, rr: +rr.toFixed(1), zoneName, zoneOk, zoneLow: zone[0], zoneHigh: zone[1], viaMSS: via === 'MSS H4' };
 }
 
 async function main() {
@@ -80,23 +80,24 @@ async function main() {
     const t = x.t;
     if (t.skip) { embeds.push({ title: `⏸️ ${t.pair.label}`, color: 0x8a8a8a, description: `On attend — ${t.skip}` }); continue; }
     // contexte DXY (inverse pour cryptos)
-    let dxyNote = 'DXY indisponible';
+    let dxyNote = 'DXY indisponible', dxyFav = false;
     if (dxy) {
-      const fav = (t.dir === 'LONG' && dxy.bias === 'baissier') || (t.dir === 'SHORT' && dxy.bias === 'haussier');
-      dxyNote = `DXY ${dxy.bias} (${C.fmt(dxy.price)}) → ${fav ? '✅ favorable' : dxy.bias === 'neutre' ? '➖ neutre' : '⚠️ à contre-courant'}`;
+      dxyFav = (t.dir === 'LONG' && dxy.bias === 'baissier') || (t.dir === 'SHORT' && dxy.bias === 'haussier');
+      dxyNote = `DXY ${dxy.bias} (${C.fmt(dxy.price)}) → ${dxyFav ? '✅ favorable' : dxy.bias === 'neutre' ? '➖ neutre' : '⚠️ à contre-courant'}`;
     }
+    // Barre de progression du setup (0 → 100 = validé, à prendre)
+    const price = x.price, inZone = price >= Math.min(t.zoneLow, t.zoneHigh) && price <= Math.max(t.zoneLow, t.zoneHigh);
+    let val = 50 + (t.zoneOk ? 15 : 0) + (t.viaMSS ? 15 : 5) + (dxyFav ? 10 : 0) + (inZone ? 15 : 0);
+    val = Math.min(100, val);
     const long = t.dir === 'LONG';
     const flag = learn.phase === 'évite' ? '\n🧠 *Le bot ÉVITE ce type de setup (taux ' + learn.rate + '% sur ' + learn.n + ' trades) — signal donné à titre indicatif.*' : '';
+    const real = learn.n >= L.MIN_SAMPLE;
+    const rate = real ? learn.rate : C.estRate(val);
     embeds.push({
       title: `${long ? '🟢' : '🔴'} ${t.pair.label} — ${t.dir}`,
       color: long ? 0x1f9d5f : 0xd1435b,
-      description: `Timing via **${t.via}** · zone D1 **${t.zoneName}** ${t.zoneOk ? '✓' : '⚠️'}\n${dxyNote}${flag}`,
-      fields: [
-        { name: 'Entrée', value: '`' + C.fmt(t.entry) + '`', inline: true },
-        { name: 'Stop', value: '`' + C.fmt(t.sl) + '`', inline: true },
-        { name: 'Objectif', value: '`' + C.fmt(t.tp) + '`', inline: true },
-        { name: 'Ratio', value: `**${t.rr} R**`, inline: true },
-      ],
+      description: `Timing via **${t.via}** · zone D1 **${t.zoneName}** ${t.zoneOk ? '✓' : '⚠️'}${inZone ? ' · prix DANS la zone' : ' · en attente du retour en zone'}\n${dxyNote}${flag}`,
+      fields: C.tradeFields(t, val, rate, real),
     });
     // mémoriser le trade (si pas déjà ouvert et si le bot ne l'évite pas)
     if (learn.phase !== 'évite' && !L.alreadyOpen(hist, t.pair.sym, 'position', t.dir)) {

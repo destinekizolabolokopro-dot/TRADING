@@ -169,8 +169,39 @@ async function postDiscord(webhook, payload, dry) {
 }
 function nowUTC() { return new Date().toLocaleString('fr-FR', { timeZone: 'UTC', dateStyle: 'medium', timeStyle: 'short' }) + ' UTC'; }
 
+// --- Métriques d'un trade (barre, réussite, gains) ---------------------------
+// Barre de progression : 0 % = setup naissant, 100 % = validé, à prendre maintenant.
+function bar(pct, len) {
+  len = len || 12; const f = Math.max(0, Math.min(len, Math.round((pct / 100) * len)));
+  return '█'.repeat(f) + '░'.repeat(len - f) + '  ' + Math.round(pct) + '%';
+}
+function money(n) { return Math.round(n).toLocaleString('fr-FR') + ' €'; }
+// Gain/perte potentiels si on risque `riskPct` % d'un compte (défaut 1 % de 10 000 €).
+function potential(rr, account, riskPct) {
+  account = account || 10000; riskPct = riskPct == null ? 1 : riskPct;
+  const risk = account * riskPct / 100;
+  return { risk, gain: risk * rr };
+}
+// Champs Discord communs aux trades (Position & Auto), pour un rendu identique.
+function tradeFields(t, validationPct, successRate, successReal, account) {
+  account = account || 10000;
+  const p = potential(t.rr, account);
+  return [
+    { name: '📈 Progression du setup', value: bar(validationPct) + (validationPct >= 100 ? '  ✅ à prendre' : ''), inline: false },
+    { name: 'Entrée', value: '`' + fmt(t.entry) + '`', inline: true },
+    { name: 'Stop', value: '`' + fmt(t.sl) + '`', inline: true },
+    { name: 'Objectif', value: '`' + fmt(t.tp) + '`', inline: true },
+    { name: 'Ratio', value: '**' + t.rr + ' R**', inline: true },
+    { name: 'Réussite ' + (successReal ? '(historique)' : '(estimée)'), value: successRate + ' %', inline: true },
+    { name: 'Sur ' + money(account) + ' (risque 1 %)', value: '✅ +' + money(p.gain) + '  /  ❌ −' + money(p.risk), inline: true },
+  ];
+}
+// Estimation prudente d'un % de réussite à partir de la maturité du setup.
+function estRate(validationPct) { return Math.max(30, Math.min(85, Math.round(validationPct * 0.8))); }
+
 module.exports = {
   TF, CRYPTO, DXY, OTE_LOW, OTE_HIGH,
   getClosed, aggregate, swings, lastFVG, lastOB, lastBreaker, ote, liquidity, structure, mss, cycle, dealingRange, analyse,
   fmt, PHASE_ICON, postDiscord, nowUTC,
+  bar, money, potential, tradeFields, estRate,
 };

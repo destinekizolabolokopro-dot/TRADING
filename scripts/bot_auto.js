@@ -74,16 +74,13 @@ async function main() {
     if (!t || t.rr < MIN_RR) continue;
     const long = r.s.dir === 'LONG';
     const flag = learn.phase === 'évite' ? `\n🧠 *Le bot ÉVITE ce profil (taux ${learn.rate}% sur ${learn.n}) — indicatif.*` : '';
+    const real = learn.n >= L.MIN_SAMPLE;
+    const rate = real ? learn.rate : C.estRate(r.s.pct);
     embeds.push({
-      title: `${long ? '🟢' : '🔴'} ${r.p.label} — ${r.s.dir} · confluence ${r.s.pct}%`,
+      title: `${long ? '🟢' : '🔴'} ${r.p.label} — ${r.s.dir}`,
       color: long ? 0x1f9d5f : 0xd1435b,
       description: `Pourquoi : ${r.s.why.join(' · ')}${flag}`,
-      fields: [
-        { name: 'Entrée', value: '`' + C.fmt(t.entry) + '`', inline: true },
-        { name: 'Stop', value: '`' + C.fmt(t.sl) + '`', inline: true },
-        { name: 'Objectif', value: '`' + C.fmt(t.tp) + '`', inline: true },
-        { name: 'Ratio', value: `**${t.rr} R**`, inline: true },
-      ],
+      fields: C.tradeFields(t, r.s.pct, rate, real),
     });
     if (learn.phase !== 'évite' && !L.alreadyOpen(hist, r.p.sym, 'auto', r.s.dir)) {
       hist.push({ ts: Date.now(), symbol: r.p.sym, setup: 'auto', direction: r.s.dir, entry: t.entry, sl: t.sl, tp: t.tp, status: 'open', result: null, r: null });
