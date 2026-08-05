@@ -40,14 +40,17 @@ async function main() {
     const day = d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
     (byDay[day] = byDay[day] || []).push(e);
   }
-  const embeds = Object.keys(byDay).slice(0, 10).map((day) => {
-    const lines = byDay[day].slice(0, 12).map((e) => {
+  // Un champ par jour (name/value), puis on les répartit dans des embeds (max 5 champs chacun)
+  const dayFields = Object.keys(byDay).slice(0, 10).map((day) => {
+    const lines = byDay[day].slice(0, 10).map((e) => {
       const h = new Date(e.date).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' });
       const extra = (e.forecast != null || e.previous != null) ? ` — prév. ${fmtVal(e.forecast, e.unit)} / préc. ${fmtVal(e.previous, e.unit)}` : '';
       return `\`${h}\` ${FLAG[e.country] || e.country} ${IMP[e.importance] || ''} **${e.title}**${extra}`;
     });
-    return { name: '📅 ' + day.charAt(0).toUpperCase() + day.slice(1), value: lines.join('\n').slice(0, 1024), inline: false };
+    return { name: '📅 ' + day.charAt(0).toUpperCase() + day.slice(1), value: lines.join('\n').slice(0, 1024) || '—', inline: false };
   });
+  const embeds = [];
+  for (let i = 0; i < dayFields.length; i += 5) embeds.push({ color: 0x6d5ae0, fields: dayFields.slice(i, i + 5) });
 
   const content = `📰 **Calendrier économique — ${DAYS} prochains jours** · ${C.nowUTC()}\nHeures en **UTC** · 🔴 haute / 🟠 moyenne importance · devises majeures`;
   await C.postDiscord(WEBHOOK, { username: 'News Éco', content, embeds: embeds.length ? embeds : undefined }, DRY);
