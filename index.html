@@ -165,7 +165,7 @@
     <div class="brand"><span class="mark"><i></i></span>TRADEassist</div>
     <div class="status">
       <span class="live"><span class="pulse"></span>Marché ouvert</span>
-      <span class="clock" id="clock">--:--:-- UTC</span>
+      <span class="clock" id="clock">--:--:--</span>
     </div>
   </div>
 </header>
@@ -313,7 +313,8 @@ function hero(){
 
 function clock(){
   const d = new Date();
-  $('#clock').textContent = d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',second:'2-digit',timeZone:'UTC'})+' UTC';
+  const t = d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',second:'2-digit',timeZone:'Europe/Paris'});
+  $('#clock').textContent = t + ' Paris';
 }
 
 $('#tabs').addEventListener('click', e=>{
