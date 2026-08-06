@@ -17,6 +17,8 @@
     --long:#37c46b; --long-dim:#16351f;
     --short:#f0555b; --short-dim:#38171a;
     --wait:#e0a63f; --wait-dim:#332711;
+    /* Dégradé premium réservé au HERO (sphère + CTA), pas au dashboard */
+    --grad:linear-gradient(135deg,#9a7bff 0%,#6d5aed 45%,#22c9e0 100%);
     --sans:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
     --display:'Space Grotesk',var(--sans);
     --mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
@@ -48,23 +50,48 @@
   @media (max-width:600px){.clock{display:none}}
 
   /* ---------- Hero ---------- */
-  .hero{position:relative;padding:52px 0 30px;overflow:hidden}
+  .hero{position:relative;padding:48px 0 34px;overflow:hidden}
+  .hero::before{content:'';position:absolute;top:-60px;right:-40px;width:560px;height:560px;
+    background:radial-gradient(circle,rgba(109,90,237,.20),rgba(34,201,224,.06) 45%,transparent 68%);
+    pointer-events:none;z-index:0}
+  .hero-grid{position:relative;z-index:1;display:grid;grid-template-columns:1.05fr .95fr;gap:28px;align-items:center}
   .hero-eyebrow{font-size:.74rem;letter-spacing:.18em;text-transform:uppercase;color:var(--faint);margin-bottom:14px}
   .hero h1{font-family:var(--display);font-weight:600;font-size:clamp(1.9rem,5vw,3rem);
     line-height:1.06;letter-spacing:-.03em;margin:0 0 14px;max-width:16ch;text-wrap:balance}
   .hero h1 em{font-style:normal;color:var(--muted)}
-  .hero-sub{color:var(--muted);max-width:52ch;margin:0 0 26px;font-size:1.02rem}
+  .hero-sub{color:var(--muted);max-width:48ch;margin:0 0 22px;font-size:1.02rem}
+  .cta-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:28px}
+  .btn{font:inherit;font-weight:600;font-size:.9rem;padding:12px 20px;border-radius:11px;
+    border:1px solid var(--border);cursor:pointer;background:var(--surface-2);color:var(--ink);transition:.18s}
+  .btn:hover{border-color:var(--border-strong);transform:translateY(-2px)}
+  .btn-primary{background:var(--grad);border:0;color:#0a0a12;font-weight:700}
+  .btn-primary:hover{filter:brightness(1.08)}
   .hero-stats{display:flex;flex-wrap:wrap;gap:12px}
-  .stat{background:var(--surface);border:1px solid var(--border);border-radius:13px;padding:13px 16px;min-width:132px}
+  .stat{background:var(--surface);border:1px solid var(--border);border-radius:13px;padding:13px 16px;min-width:126px}
   .stat .k{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--faint);margin-bottom:5px}
   .stat .v{font-family:var(--display);font-weight:600;font-size:1.32rem;display:flex;align-items:center;gap:8px}
-  .float{position:absolute;border:1px solid var(--border);border-radius:12px;background:var(--surface);
-    opacity:.5;pointer-events:none}
-  .f1{width:120px;height:74px;top:40px;right:6%;animation:floaty 9s ease-in-out infinite}
-  .f2{width:80px;height:52px;top:150px;right:20%;animation:floaty 11s ease-in-out infinite reverse}
-  .f3{width:52px;height:52px;top:70px;right:32%;border-radius:50%;animation:floaty 13s ease-in-out infinite}
-  @keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-16px)}}
-  @media (max-width:820px){.float{display:none}}
+
+  /* Sphère « marché » + anneaux + chips flottants */
+  .hero-visual{position:relative;height:400px;display:grid;place-items:center}
+  .ring{position:absolute;border:1px solid var(--border);border-radius:50%;opacity:.6}
+  .ring.r1{width:180px;height:180px}
+  .ring.r2{width:290px;height:290px;opacity:.4}
+  .ring.r3{width:400px;height:400px;opacity:.22}
+  .orb{width:148px;height:148px;border-radius:50%;
+    background:radial-gradient(circle at 34% 28%,#b9a3ff,#6d5aed 46%,#22c9e0 100%);
+    box-shadow:0 0 90px 12px rgba(124,92,255,.30),inset 0 0 46px rgba(255,255,255,.18);
+    animation:breathe 5.5s ease-in-out infinite}
+  @keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.055)}}
+  .chip-f{position:absolute;display:inline-flex;align-items:center;gap:8px;
+    background:rgba(20,20,23,.88);border:1px solid var(--border);border-radius:99px;
+    padding:8px 13px;font-size:.82rem;white-space:nowrap;backdrop-filter:blur(6px)}
+  .chip-f .d{width:8px;height:8px;border-radius:50%}
+  .chip-f.c1{top:20%;left:-2%;animation:floaty 8s ease-in-out infinite}
+  .chip-f.c2{top:48%;left:6%;animation:floaty 10s ease-in-out infinite reverse}
+  .chip-f.c3{top:72%;left:34%;animation:floaty 9s ease-in-out infinite}
+  .chip-f.c4{top:30%;right:2%;animation:floaty 11s ease-in-out infinite reverse}
+  @keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-15px)}}
+  @media (max-width:860px){.hero-grid{grid-template-columns:1fr}.hero-visual{display:none}}
 
   /* ---------- Filtres ---------- */
   .toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;
@@ -145,14 +172,29 @@
 
 <div class="wrap">
   <section class="hero">
-    <div class="float f1"></div><div class="float f2"></div><div class="float f3"></div>
-    <div class="hero-eyebrow">Signaux ICT / SMC · lecture top-down</div>
-    <h1>Le marché, lu d'un<br>coup d'œil. <em>Puis décidé.</em></h1>
-    <p class="hero-sub">La complexité — DXY, structure, zones institutionnelles — est calculée en coulisses. À l'écran, il ne reste que la décision.</p>
-    <div class="hero-stats">
-      <div class="stat"><div class="k">Biais dominant</div><div class="v" id="s-bias">—</div></div>
-      <div class="stat"><div class="k">DXY (dollar)</div><div class="v mono" id="s-dxy">—</div></div>
-      <div class="stat"><div class="k">Paires en signal</div><div class="v mono" id="s-count">—</div></div>
+    <div class="hero-grid">
+      <div class="hero-left">
+        <div class="hero-eyebrow">Signaux ICT / SMC · lecture top-down</div>
+        <h1>Le marché, lu d'un coup d'œil. <em>Puis décidé.</em></h1>
+        <p class="hero-sub">La complexité — DXY, structure, zones institutionnelles — est calculée en coulisses. À l'écran, il ne reste que la décision.</p>
+        <div class="cta-row">
+          <button class="btn btn-primary" id="cta-signals">Voir les signaux</button>
+          <button class="btn" id="cta-how">Comment ça marche</button>
+        </div>
+        <div class="hero-stats">
+          <div class="stat"><div class="k">Biais dominant</div><div class="v" id="s-bias">—</div></div>
+          <div class="stat"><div class="k">DXY (dollar)</div><div class="v mono" id="s-dxy">—</div></div>
+          <div class="stat"><div class="k">Paires en signal</div><div class="v mono" id="s-count">—</div></div>
+        </div>
+      </div>
+      <div class="hero-visual" aria-hidden="true">
+        <span class="ring r1"></span><span class="ring r2"></span><span class="ring r3"></span>
+        <div class="orb"></div>
+        <span class="chip-f c1"><span class="d" style="background:var(--long)"></span>BTC ▲ Long</span>
+        <span class="chip-f c2"><span class="d" style="background:var(--wait)"></span>MSS détecté</span>
+        <span class="chip-f c3"><span class="d" style="background:var(--short)"></span>DXY ▼ baissier</span>
+        <span class="chip-f c4"><span class="d" style="background:var(--long)"></span>FVG H4 frais</span>
+      </div>
     </div>
   </section>
 
@@ -278,6 +320,8 @@ $('#tabs').addEventListener('click', e=>{
   const b = e.target.closest('.tab'); if(!b) return;
   $('#tabs .on').classList.remove('on'); b.classList.add('on'); render(b.dataset.f);
 });
+
+$('#cta-signals').addEventListener('click', ()=> $('#grid').scrollIntoView({behavior:'smooth',block:'start'}));
 
 hero(); render(); clock(); setInterval(clock,1000);
 </script>
