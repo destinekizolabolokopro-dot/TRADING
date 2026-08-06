@@ -101,7 +101,9 @@
     padding:7px 14px;border-radius:8px;cursor:pointer;transition:.16s}
   .tab:hover{color:var(--ink)}
   .tab.on{background:var(--surface-3);color:var(--ink)}
-  .count{font-size:.82rem;color:var(--faint)}
+  .count{font-size:.82rem;color:var(--faint);display:flex;align-items:center;gap:10px}
+  .srcbadge{font-size:.76rem;font-weight:600}
+  .srcbadge.on{color:var(--long)} .srcbadge.off{color:var(--faint)}
 
   /* ---------- Grille de cartes ---------- */
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;padding-bottom:40px}
@@ -205,7 +207,7 @@
       <button class="tab" data-f="crypto">Crypto</button>
       <button class="tab" data-f="forex">Forex / Or</button>
     </div>
-    <div class="count" id="count"></div>
+    <div class="count"><span class="srcbadge off" id="src">● …</span> <span id="count"></span></div>
   </div>
 
   <main class="grid" id="grid"></main>
@@ -215,10 +217,11 @@
   Données mock (démo visuelle) · vraies données branchées ensuite · <b>pédagogique, pas un conseil financier</b> · risque max 1 % par trade.
 </footer>
 
+<script src="js/live.js"></script>
 <script>
-/* ---------- Données mock (remplacées par de vraies données ensuite) ---------- */
+/* ---------- Données mock (repli si le direct échoue) ---------- */
 const CYCLE_COLOR = { Accumulation:'#5b8', Manipulation:'var(--wait)', Expansion:'var(--long)', Distribution:'var(--short)', Transition:'var(--faint)' };
-const PAIRS = [
+const MOCK = [
   { sym:'BTC/USD', name:'Bitcoin', cls:'crypto', price:64054, chg:+1.2, dir:'LONG', conf:78, cycle:'Expansion',
     entry:63120, sl:61980, tp:66850, rr:3.3, win:71, prog:82,
     note:'Discount + FVG H4 sous le prix, DXY baissier (favorable).' },
@@ -244,6 +247,7 @@ const PAIRS = [
     entry:100.05, sl:100.62, tp:98.60, rr:2.5, win:59, prog:55,
     note:'Impulsion baissière — contexte favorable au risque (crypto / or).' },
 ];
+let PAIRS = MOCK;
 
 const $ = (s,el=document)=>el.querySelector(s);
 const fmt = n => n==null?'—':(Math.abs(n)>=1000?Math.round(n):+n.toFixed(Math.abs(n)>=10?2:4)).toLocaleString('fr-FR');
@@ -317,14 +321,32 @@ function clock(){
   $('#clock').textContent = t + ' Paris';
 }
 
+let currentFilter='all';
 $('#tabs').addEventListener('click', e=>{
   const b = e.target.closest('.tab'); if(!b) return;
-  $('#tabs .on').classList.remove('on'); b.classList.add('on'); render(b.dataset.f);
+  $('#tabs .on').classList.remove('on'); b.classList.add('on');
+  currentFilter=b.dataset.f; render(currentFilter);
 });
 
 $('#cta-signals').addEventListener('click', ()=> $('#grid').scrollIntoView({behavior:'smooth',block:'start'}));
 
-hero(); render(); clock(); setInterval(clock,1000);
+function setSource(live){
+  const s=$('#src'); if(!s) return;
+  s.textContent = live ? '● En direct' : '● Démo';
+  s.className = 'srcbadge ' + (live?'on':'off');
+}
+
+async function boot(){
+  clock(); setInterval(clock,1000);
+  hero(); render();               // 1) affichage immédiat (mock) pour ne jamais avoir d'écran vide
+  setSource(false);
+  if(!window.LIVE) return;
+  try{
+    const data = await LIVE.load(); // 2) puis on remplace par les vraies données
+    if(data && data.length){ PAIRS = data; hero(); render(currentFilter); setSource(true); }
+  }catch(e){ /* on garde le mock */ }
+}
+boot();
 </script>
 </body>
 </html>
