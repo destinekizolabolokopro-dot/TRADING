@@ -184,5 +184,35 @@
     });
   }
 
-  root.LIVE = { load: load };
+  // Contexte multi-unités (H1 / H4 / D1) pour le Bot IA — alignement top-down.
+  function mtf() {
+    var pairs = [{ sym: 'BTC/USD', src: 'BTCUSDT' }, { sym: 'ETH/USD', src: 'ETHUSDT' }, { sym: 'SOL/USD', src: 'SOLUSDT' }];
+    var tfs = [{ n: 'D1', i: '1d' }, { n: 'H4', i: '4h' }, { n: 'H1', i: '1h' }];
+    var jobs = [];
+    pairs.forEach(function (p) {
+      tfs.forEach(function (tf) {
+        jobs.push(binance(p.src, tf.i, 150).then(function (c) { return { p: p, tf: tf, c: c }; }, function () { return { p: p, tf: tf, c: null }; }));
+      });
+    });
+    return Promise.all(jobs).then(function (res) {
+      var byPair = {};
+      res.forEach(function (r) {
+        if (!byPair[r.p.sym]) byPair[r.p.sym] = { paire: r.p.sym, unites: {} };
+        if (!r.c || r.c.length < 30) return;
+        var c = r.c, s = swings(c), st = structure(c, s), rr = rng(s), price = c[c.length - 1].c, f = lastFVG(c), ot = ote(c, s), ob = lastOB(c);
+        var round = function (x) { return x == null ? null : +(x.toFixed(x >= 100 ? 2 : 4)); };
+        byPair[r.p.sym].unites[r.tf.n] = {
+          prix: round(price), structure: st.label, biais: st.bias, cycle: cyclePhase(c),
+          zone: rr ? (price < rr.eq ? 'discount' : 'premium') : '—',
+          fvg: f ? { type: f.type, bas: round(f.bottom), haut: round(f.top) } : null,
+          ote: ot ? { type: ot.type, bas: round(ot.bottom), haut: round(ot.top) } : null,
+          ob: ob ? { type: ob.type, bas: round(ob.bottom), haut: round(ob.top) } : null,
+          range: rr ? { haut: round(rr.hi), bas: round(rr.lo) } : null
+        };
+      });
+      return pairs.map(function (p) { return byPair[p.sym]; }).filter(Boolean);
+    });
+  }
+
+  root.LIVE = { load: load, mtf: mtf };
 })(typeof window !== 'undefined' ? window : this);

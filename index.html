@@ -208,7 +208,7 @@
     <div class="status">
       <span class="live"><span class="pulse"></span>Marché ouvert</span>
       <span class="clock" id="clock">--:--:--</span>
-      <button class="ai-btn" id="ai-open">🤖 Analyse IA</button>
+      <button class="ai-btn" id="ai-open">🤖 Bot IA</button>
     </div>
   </div>
 </header>
@@ -261,8 +261,8 @@
 <div class="overlay" id="ai-overlay">
   <div class="modal">
     <button class="modal-close" id="ai-close" aria-label="Fermer">×</button>
-    <h2>🤖 Analyse IA du marché</h2>
-    <p class="sub">Claude lit l'état du marché et propose ses meilleures idées de trade, raisonnées. Ta clé reste sur ton ordinateur.</p>
+    <h2>🤖 Bot IA (Claude)</h2>
+    <p class="sub">Un 2ᵉ bot propulsé par Claude : il raisonne sur H1/H4/D1, base ses trades sur l'ICT/SMC (+ toute technique intelligente) et envoie ses meilleures idées. Ta clé reste sur ton ordinateur.</p>
     <div class="field">
       <label>Clé API Anthropic (console.anthropic.com)</label>
       <input type="password" id="ai-key" placeholder="sk-ant-..." autocomplete="off">
@@ -497,9 +497,11 @@ $('#ai-run').addEventListener('click', async ()=>{
   AI.setKey($('#ai-key').value); AI.setModel($('#ai-model').value);
   const st=$('#ai-status'), out=$('#ai-out');
   out.classList.remove('show'); out.innerHTML='';
-  st.textContent='⏳ Claude analyse le marché…';
+  st.textContent='⏳ Le Bot IA récupère les données H1/H4/D1 et analyse…';
   try{
-    const r = await AI.analyze(PAIRS);
+    let mtf=null;
+    try{ if(window.LIVE&&LIVE.mtf) mtf=await LIVE.mtf(); }catch(e){}
+    const r = await AI.analyze(PAIRS, mtf);
     st.textContent = '✅ Analyse terminée · modèle ' + r.model + (r.usage&&r.usage.output_tokens?(' · '+r.usage.output_tokens+' tokens'):'');
     if(!r.parsed){ out.innerHTML='<div class="ai-summary">'+(r.raw||'Réponse vide.').slice(0,1200)+'</div>'; out.classList.add('show'); return; }
     let html='';
@@ -510,7 +512,7 @@ $('#ai-run').addEventListener('click', async ()=>{
       const long=(i.sens||'').toUpperCase()==='LONG';
       html+='<div class="ai-idea '+(long?'long':'short')+'">'+
         '<div class="ihead"><span class="isym">'+(i.paire||'—')+'</span>'+
-        '<span class="ilvl">'+(long?'▲ LONG':'▼ SHORT')+' · '+(i.confiance!=null?i.confiance+'%':'')+'</span></div>'+
+        '<span class="ilvl">'+(long?'▲ LONG':'▼ SHORT')+(i.tf?' · '+i.tf:'')+' · '+(i.confiance!=null?i.confiance+'%':'')+'</span></div>'+
         '<div class="inums"><span>Entrée '+fmtN(i.entree)+'</span><span class="lo">Stop '+fmtN(i.stop)+'</span>'+
         '<span class="tp">Objectif '+fmtN(i.objectif)+'</span><span>RR '+(i.rr!=null?i.rr:'—')+'</span></div>'+
         '<div class="why">💡 '+(i.pourquoi||'')+'</div></div>';

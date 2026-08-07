@@ -20,29 +20,40 @@
   function setModel(m) { try { localStorage.setItem(MODEL_STORE, m); } catch (e) {} }
 
   var SYSTEM =
-    "Tu es un analyste de trading ICT/SMC, prudent et honnête. Tu écris en français. " +
-    "Tu n'es PAS un conseiller financier : tes idées sont pédagogiques, jamais des garanties. " +
-    "Tu ne retiens que les setups à haute probabilité avec un ratio risque/rendement >= 2. " +
-    "Tu croises le contexte DXY (un DXY baissier favorise crypto/or, un DXY haussier les défavorise). " +
-    "Si aucun setup n'est convaincant, tu le dis clairement plutôt que de forcer un trade. " +
-    "Rappelle une règle de gestion : risque max 1 % du compte par trade.";
+    "Tu es un BOT DE TRADING autonome, propulsé par Claude (Anthropic), intégré à un site ICT/SMC. Tu écris en français. " +
+    "Tu opères UNIQUEMENT sur les unités de temps H1, H4 et D1 — jamais en dessous de H1. " +
+    "Tu raisonnes en TOP-DOWN : le biais vient du D1, tu affines en H4, tu synchronises l'entrée en H1. " +
+    "Tu bases tes décisions PRINCIPALEMENT sur les concepts ICT/SMC (structure & BOS/CHoCH, MSS, FVG, order blocks, " +
+    "breaker, OTE 62-79%, liquidité/equal highs-lows, premium/discount, cycles Accumulation-Manipulation-Expansion-Distribution), " +
+    "MAIS tu es LIBRE d'employer toute autre technique intelligente et pertinente (momentum, confluence multi-unités, " +
+    "corrélations, contexte DXY) si elle augmente la probabilité de gagner. " +
+    "Le DXY est inversé pour crypto/or : DXY baissier = favorable, DXY haussier = défavorable. " +
+    "Ton objectif est d'être RENTABLE et réaliste : tu ne prends que des trades à ratio risque/rendement >= 2, " +
+    "avec un point d'entrée précis, un stop logique (au-delà d'un balayage/structure) et un objectif atteignable. " +
+    "Sois HONNÊTE : si aucun setup n'est net, renvoie une liste vide plutôt que de forcer un trade. " +
+    "Tu n'es pas un conseiller financier ; règle de gestion : risque max 1 % du compte par trade.";
 
-  function buildUser(pairs) {
+  function buildUser(pairs, mtf) {
     var snap = pairs.map(function (p) {
       return {
         paire: p.sym, prix: p.price, sens_calcule: p.dir, cycle: p.cycle,
         confluence_pct: p.conf, entree: p.entry, stop: p.sl, objectif: p.tp, rr: p.rr, note: p.note
       };
     });
-    return "Voici l'état actuel du marché (données réelles, analyse ICT/SMC déjà calculée par le site). " +
-      "Donne TES meilleures idées de trade (0 à 3), classées de la plus forte à la plus faible. " +
+    var txt = "Tu es le Bot IA du site. Analyse le marché et envoie TES meilleures idées de trade (0 à 3), " +
+      "sur H1/H4/D1 uniquement, classées de la plus forte à la plus faible. " +
       "Réponds UNIQUEMENT avec un objet JSON valide, sans texte autour, de la forme :\n" +
-      '{"marche":"résumé global du marché en 1-2 phrases","idees":[{"paire":"BTC/USD","sens":"LONG|SHORT",' +
-      '"entree":00,"stop":00,"objectif":00,"rr":0.0,"confiance":0,"pourquoi":"explication courte en français"}]}\n' +
-      "Si rien ne vaut le coup, renvoie \"idees\": []. Données :\n" + JSON.stringify(snap, null, 2);
+      '{"marche":"résumé global en 1-2 phrases","idees":[{"paire":"BTC/USD","sens":"LONG|SHORT","tf":"H1|H4|D1",' +
+      '"entree":00,"stop":00,"objectif":00,"rr":0.0,"confiance":0,"pourquoi":"explication ICT/SMC courte en français"}]}\n' +
+      "Si rien ne vaut le coup, renvoie \"idees\": [].";
+    if (mtf && mtf.length) {
+      txt += "\n\nDONNÉES MULTI-UNITÉS (D1 → H4 → H1) pour l'alignement top-down :\n" + JSON.stringify(mtf, null, 2);
+    }
+    txt += "\n\nRÉSUMÉ par paire (toutes paires, dont DXY/forex) :\n" + JSON.stringify(snap, null, 2);
+    return txt;
   }
 
-  function analyze(pairs) {
+  function analyze(pairs, mtf) {
     var key = getKey();
     if (!key) return Promise.reject(new Error('Aucune clé API. Colle ta clé Anthropic dans les réglages.'));
     var model = getModel();
@@ -51,7 +62,7 @@
       max_tokens: 2000,
       output_config: { effort: 'low' }, // rapide & économique pour une analyse structurée
       system: SYSTEM,
-      messages: [{ role: 'user', content: buildUser(pairs) }]
+      messages: [{ role: 'user', content: buildUser(pairs, mtf) }]
     };
     return fetch(ENDPOINT, {
       method: 'POST',
