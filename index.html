@@ -162,6 +162,42 @@
   .note{margin-top:15px;font-size:.82rem;color:var(--muted);display:flex;gap:8px;line-height:1.5}
 
   footer{border-top:1px solid var(--border);padding:26px 0 40px;color:var(--faint);font-size:.8rem;text-align:center}
+
+  /* Bouton IA + modale */
+  .ai-btn{font:inherit;font-weight:600;font-size:.82rem;padding:7px 14px;border-radius:10px;
+    border:0;cursor:pointer;background:var(--grad);color:#0a0a12;display:inline-flex;align-items:center;gap:6px}
+  .ai-btn:hover{filter:brightness(1.08)}
+  .overlay{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);
+    display:none;align-items:flex-start;justify-content:center;padding:40px 16px;overflow:auto}
+  .overlay.open{display:flex}
+  .modal{width:100%;max-width:640px;background:var(--surface);border:1px solid var(--border);
+    border-radius:18px;padding:24px}
+  .modal h2{font-family:var(--display);font-weight:600;margin:0 0 4px;font-size:1.3rem;display:flex;align-items:center;gap:9px}
+  .modal .sub{color:var(--muted);font-size:.9rem;margin:0 0 18px}
+  .field{margin-bottom:14px}
+  .field label{display:block;font-size:.76rem;text-transform:uppercase;letter-spacing:.06em;color:var(--faint);margin-bottom:6px}
+  .field input,.field select{width:100%;background:var(--surface-2);border:1px solid var(--border);
+    border-radius:10px;padding:11px 13px;color:var(--ink);font:inherit;font-size:.92rem}
+  .field input:focus,.field select:focus{outline:2px solid var(--border-strong);outline-offset:0}
+  .modal-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
+  .ai-run{background:var(--grad);color:#0a0a12;border:0}
+  .ai-out{margin-top:18px;display:none}
+  .ai-out.show{display:block}
+  .ai-summary{background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:14px;font-size:.92rem}
+  .ai-idea{background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:12px;border-left:3px solid var(--long)}
+  .ai-idea.short{border-left-color:var(--short)}
+  .ai-idea .ihead{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px}
+  .ai-idea .isym{font-family:var(--display);font-weight:600;font-size:1.05rem}
+  .ai-idea .ilvl{font-size:.78rem;font-weight:700;padding:4px 10px;border-radius:999px}
+  .ai-idea.long .ilvl{background:var(--long-dim);color:var(--long)}
+  .ai-idea.short .ilvl{background:var(--short-dim);color:var(--short)}
+  .ai-idea .inums{display:flex;flex-wrap:wrap;gap:8px 16px;font-family:var(--mono);font-size:.86rem;margin-bottom:8px}
+  .ai-idea .inums .lo{color:var(--short)} .ai-idea .inums .tp{color:var(--long)}
+  .ai-idea .why{font-size:.9rem;color:var(--muted);line-height:1.5}
+  .ai-note{font-size:.78rem;color:var(--faint);margin-top:12px}
+  .ai-status{font-size:.86rem;color:var(--muted);margin-top:8px;min-height:1.2em}
+  .modal-close{position:absolute;top:16px;right:18px;background:transparent;border:0;color:var(--muted);font-size:1.4rem;cursor:pointer}
+  .modal{position:relative}
   @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -172,6 +208,7 @@
     <div class="status">
       <span class="live"><span class="pulse"></span>Marché ouvert</span>
       <span class="clock" id="clock">--:--:--</span>
+      <button class="ai-btn" id="ai-open">🤖 Analyse IA</button>
     </div>
   </div>
 </header>
@@ -220,6 +257,35 @@
 <footer class="wrap">
   Données mock (démo visuelle) · vraies données branchées ensuite · <b>pédagogique, pas un conseil financier</b> · risque max 1 % par trade.
 </footer>
+
+<div class="overlay" id="ai-overlay">
+  <div class="modal">
+    <button class="modal-close" id="ai-close" aria-label="Fermer">×</button>
+    <h2>🤖 Analyse IA du marché</h2>
+    <p class="sub">Claude lit l'état du marché et propose ses meilleures idées de trade, raisonnées. Ta clé reste sur ton ordinateur.</p>
+    <div class="field">
+      <label>Clé API Anthropic (console.anthropic.com)</label>
+      <input type="password" id="ai-key" placeholder="sk-ant-..." autocomplete="off">
+    </div>
+    <div class="field">
+      <label>Modèle (le moins cher = Haiku)</label>
+      <select id="ai-model">
+        <option value="claude-opus-5">Opus 5 — le plus intelligent (le plus cher)</option>
+        <option value="claude-sonnet-5">Sonnet 5 — équilibré</option>
+        <option value="claude-haiku-4-5">Haiku 4.5 — rapide &amp; économique</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn ai-run" id="ai-run">Analyser le marché</button>
+      <button class="btn" id="ai-save">Enregistrer la clé</button>
+    </div>
+    <div class="ai-status" id="ai-status"></div>
+    <div class="ai-out" id="ai-out"></div>
+    <p class="ai-note">⚠️ Idées pédagogiques générées par une IA — pas un conseil financier, aucune garantie. Chaque analyse consomme des tokens (payants) sur ta clé.</p>
+  </div>
+</div>
+
+<script src="js/ai.js"></script>
 
 <script src="js/live.js"></script>
 <script>
@@ -409,6 +475,49 @@ async function boot(){
   }catch(e){ /* on garde le mock */ }
 }
 boot();
+
+/* ---------- Analyse IA (Claude) ---------- */
+const aiOverlay=$('#ai-overlay');
+function openAI(){
+  if(window.AI){ $('#ai-key').value=AI.getKey(); $('#ai-model').value=AI.getModel(); }
+  aiOverlay.classList.add('open');
+}
+function closeAI(){ aiOverlay.classList.remove('open'); }
+$('#ai-open').addEventListener('click', openAI);
+$('#ai-close').addEventListener('click', closeAI);
+aiOverlay.addEventListener('click', e=>{ if(e.target===aiOverlay) closeAI(); });
+$('#ai-save').addEventListener('click', ()=>{
+  if(!window.AI) return;
+  AI.setKey($('#ai-key').value); AI.setModel($('#ai-model').value);
+  $('#ai-status').textContent='✅ Clé et modèle enregistrés (en local).';
+});
+function fmtN(n){ return n==null?'—':(Math.abs(n)>=1000?Math.round(n):+(+n).toFixed(Math.abs(n)>=10?2:4)).toLocaleString('fr-FR'); }
+$('#ai-run').addEventListener('click', async ()=>{
+  if(!window.AI){ $('#ai-status').textContent='Module IA indisponible.'; return; }
+  AI.setKey($('#ai-key').value); AI.setModel($('#ai-model').value);
+  const st=$('#ai-status'), out=$('#ai-out');
+  out.classList.remove('show'); out.innerHTML='';
+  st.textContent='⏳ Claude analyse le marché…';
+  try{
+    const r = await AI.analyze(PAIRS);
+    st.textContent = '✅ Analyse terminée · modèle ' + r.model + (r.usage&&r.usage.output_tokens?(' · '+r.usage.output_tokens+' tokens'):'');
+    if(!r.parsed){ out.innerHTML='<div class="ai-summary">'+(r.raw||'Réponse vide.').slice(0,1200)+'</div>'; out.classList.add('show'); return; }
+    let html='';
+    if(r.parsed.marche) html+='<div class="ai-summary">🧭 '+r.parsed.marche+'</div>';
+    const idees=r.parsed.idees||[];
+    if(!idees.length) html+='<div class="ai-summary">Aucune idée à haute probabilité pour l’instant — Claude préfère attendre.</div>';
+    idees.forEach(i=>{
+      const long=(i.sens||'').toUpperCase()==='LONG';
+      html+='<div class="ai-idea '+(long?'long':'short')+'">'+
+        '<div class="ihead"><span class="isym">'+(i.paire||'—')+'</span>'+
+        '<span class="ilvl">'+(long?'▲ LONG':'▼ SHORT')+' · '+(i.confiance!=null?i.confiance+'%':'')+'</span></div>'+
+        '<div class="inums"><span>Entrée '+fmtN(i.entree)+'</span><span class="lo">Stop '+fmtN(i.stop)+'</span>'+
+        '<span class="tp">Objectif '+fmtN(i.objectif)+'</span><span>RR '+(i.rr!=null?i.rr:'—')+'</span></div>'+
+        '<div class="why">💡 '+(i.pourquoi||'')+'</div></div>';
+    });
+    out.innerHTML=html; out.classList.add('show');
+  }catch(e){ st.textContent='❌ '+e.message; }
+});
 </script>
 </body>
 </html>
