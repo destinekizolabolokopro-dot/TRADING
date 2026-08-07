@@ -1,16 +1,17 @@
 #!/usr/bin/env node
 'use strict';
 /**
- * Bot 2 — SCALP (H1 · M30 · M15)
- * Mêmes détections que le Radar Zones mais sur les petites unités, pour le
- * scalping. Ne notifie une unité que si quelque chose d'exploitable est présent
- * (MSS, FVG frais, ou OTE avec prix dedans) — sinon on ne spamme pas.
+ * Bot 2 — SIGNAUX INTRADAY (H1 · H4 · D1)
+ * Mêmes détections que le Radar Zones, mais ne notifie une unité que si quelque
+ * chose d'EXPLOITABLE est présent (MSS, FVG frais, OTE avec prix dedans,
+ * manipulation/expansion) — sinon on ne spamme pas. Aucune unité sous H1 :
+ * toute prise de position reste en HTF.
  *   DISCORD_WEBHOOK_SCALP="…" node scripts/bot_scalp.js      (--dry pour tester)
  */
 const C = require('./lib/ict_core');
 
 const PAIRS = [...C.CRYPTO, C.DXY];
-const TFS = [C.TF.H1, C.TF.M30, C.TF.M15];
+const TFS = [C.TF.D1, C.TF.H4, C.TF.H1];
 const WEBHOOK = process.env.DISCORD_WEBHOOK_SCALP || '';
 const DRY = process.argv.includes('--dry');
 
@@ -37,8 +38,8 @@ async function main() {
     if (fields.length) embeds.push({ title: `⚡ ${p.label}`, color: 0xe0791f, fields });
   }
   const content = embeds.length
-    ? `⚡ **Scalp — H1/M30/M15** · ${C.nowUTC()}\nOpportunités court terme sur bougies clôturées · *pédagogique*`
-    : `⚡ **Scalp** · ${C.nowUTC()} — rien d'exploitable pour l'instant, on patiente.`;
-  await C.postDiscord(WEBHOOK, { username: 'Scalp', content, embeds }, DRY);
+    ? `⚡ **Signaux intraday — H1/H4/D1** · ${C.nowUTC()}\nOpportunités HTF sur bougies clôturées · *pédagogique*`
+    : `⚡ **Signaux intraday** · ${C.nowUTC()} — rien d'exploitable pour l'instant, on patiente.`;
+  await C.postDiscord(WEBHOOK, { username: 'Signaux H1/H4/D1', content, embeds }, DRY);
 }
 main().catch((e) => { console.error('❌', e.message); process.exit(1); });

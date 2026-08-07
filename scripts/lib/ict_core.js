@@ -7,13 +7,13 @@
 
 const OTE_LOW = 0.62, OTE_HIGH = 0.79, EQ_TOL = 0.0015;
 
-// --- Unités de temps ---------------------------------------------------------
+// --- Unités de temps -------------------------------------------------------
+// Règle du projet : on ne descend JAMAIS sous H1. Toute prise de position est
+// en HTF (H1 / H4 / D1). Aucune unité < H1 n'est définie ici volontairement.
 const TF = {
   D1: { name: 'D1', kraken: 1440, yahoo: { interval: '1d', range: '6mo' } },
   H4: { name: 'H4', kraken: 240, yahoo: { interval: '1h', range: '1mo', agg: 4 } },
   H1: { name: 'H1', kraken: 60, yahoo: { interval: '1h', range: '1mo' } },
-  M30: { name: 'M30', kraken: 30, yahoo: { interval: '30m', range: '5d' } },
-  M15: { name: 'M15', kraken: 15, yahoo: { interval: '15m', range: '5d' } },
 };
 
 // --- Instruments -------------------------------------------------------------
