@@ -214,6 +214,7 @@
   .rc{font-family:var(--sans);font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:999px}
   .rc.win{background:var(--long-dim);color:var(--long)} .rc.loss{background:var(--short-dim);color:var(--short)} .rc.open{background:var(--surface-3);color:var(--muted)}
   .hd-long{color:var(--long)} .hd-short{color:var(--short)}
+  .htable td.motif{font-family:var(--sans);color:var(--muted);max-width:240px;white-space:normal;line-height:1.35;font-size:.78rem}
   .htable-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
   .hist-empty{color:var(--muted);font-size:.9rem;padding:14px 0}
   @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
@@ -554,7 +555,7 @@ $('#ai-run').addEventListener('click', async ()=>{
     // Sécurité : on n'affiche que les trades >= 1 RR, meilleurs ratios d'abord
     let idees=(r.parsed.idees||[]).filter(i=> i.rr==null || +i.rr>=1);
     idees.sort((a,b)=> (+b.rr||0)-(+a.rr||0));
-    if(window.History){ History.record(idees.map(i=>({sym:i.paire,dir:(i.sens||'').toUpperCase(),entry:+i.entree,sl:+i.stop,tp:+i.objectif,rr:+i.rr})),'Bot IA'); History.evaluate(priceMap()); }
+    if(window.History){ History.record(idees.map(i=>({sym:i.paire,dir:(i.sens||'').toUpperCase(),entry:+i.entree,sl:+i.stop,tp:+i.objectif,rr:+i.rr,note:i.pourquoi||''})),'Bot IA'); History.evaluate(priceMap()); }
     if(!idees.length) html+='<div class="ai-summary">Aucune idée ≥ 1 RR pour l’instant — le Bot IA préfère attendre.</div>';
     idees.forEach(i=>{
       const long=(i.sens||'').toUpperCase()==='LONG';
@@ -586,18 +587,21 @@ function renderHist(){
   const rows=History.load().slice().sort((a,b)=>b.ts-a.ts);
   const wrap=$('#hist-table');
   if(!rows.length){ wrap.innerHTML='<div class="hist-empty">Aucun trade enregistré pour l’instant. Ils s’ajouteront dès qu’un bot proposera un trade (données en direct).</div>'; return; }
-  let h='<table class="htable"><thead><tr><th>Envoyé par</th><th>Paire</th><th>Sens</th><th>Entrée</th><th>SL</th><th>TP</th><th>RR</th><th>Résultat</th><th>Date</th></tr></thead><tbody>';
+  const esc=s=>(s||'').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  let h='<table class="htable"><thead><tr><th>Envoyé par</th><th>Paire</th><th>Sens</th><th>Entrée</th><th>SL</th><th>TP</th><th>RR</th><th>Résultat</th><th>Motif</th><th>Date</th></tr></thead><tbody>';
   rows.forEach(t=>{
     const long=t.direction==='LONG';
     const src=(t.source||'').indexOf('IA')>=0?'ia':'regles';
     const rc=t.status==='open'?'open':t.result;
     const rlbl=t.status==='open'?'En cours':(t.result==='win'?('Gagné +'+t.rr+'R'):'Perdu −1R');
+    const motif=t.motif||'—';
     h+='<tr>'+
       '<td><span class="src '+src+'">'+(t.source||'—')+'</span></td>'+
       '<td>'+t.symbol+'</td>'+
       '<td class="'+(long?'hd-long':'hd-short')+'">'+(long?'▲ LONG':'▼ SHORT')+'</td>'+
       '<td>'+fmtN(t.entry)+'</td><td>'+fmtN(t.sl)+'</td><td>'+fmtN(t.tp)+'</td><td>'+t.rr+'</td>'+
       '<td><span class="rc '+rc+'">'+rlbl+'</span></td>'+
+      '<td class="motif" title="'+esc(motif)+'">'+esc(motif)+'</td>'+
       '<td>'+frDate(t.ts)+'</td></tr>';
   });
   h+='</tbody></table>';
