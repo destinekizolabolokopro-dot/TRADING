@@ -36,12 +36,15 @@ function score(a, dxyBias) {
 
 function trade(a, dir) {
   const long = dir === 'LONG';
-  let entry = a.price;
-  if (a.fvg && a.fvg.type === a.struct.bias) entry = (a.fvg.bottom + a.fvg.top) / 2;
-  else if (a.ob && a.ob.type === a.struct.bias) entry = (a.ob.bottom + a.ob.top) / 2;
-  else if (a.ote && a.ote.inside) entry = (a.ote.bottom + a.ote.top) / 2;
-  const sl = long ? (a.range ? a.range.lo * 0.998 : entry * 0.97) : (a.range ? a.range.hi * 1.002 : entry * 1.03);
-  const tp = long ? (a.range ? a.range.hi : entry * 1.06) : (a.range ? a.range.lo : entry * 0.94);
+  // POI aligné (FVG puis OB) → stop SERRÉ juste au-delà, cible sur la liquidité (extrême de range).
+  let poi = null;
+  if (a.fvg && a.fvg.type === a.struct.bias) poi = [a.fvg.bottom, a.fvg.top];
+  else if (a.ob && a.ob.type === a.struct.bias) poi = [a.ob.bottom, a.ob.top];
+  if (!poi || !a.range) return null; // pas de POI aligné → pas de trade
+  const entry = (poi[0] + poi[1]) / 2;
+  const span = Math.abs(poi[1] - poi[0]) || a.price * 0.0015;
+  const sl = long ? poi[0] - span * 0.6 : poi[1] + span * 0.6;
+  const tp = long ? a.range.hi : a.range.lo;
   const risk = Math.abs(entry - sl), rew = Math.abs(tp - entry);
   const ok = long ? (sl < entry && tp > entry) : (sl > entry && tp < entry);
   if (!ok || risk <= 0) return null;

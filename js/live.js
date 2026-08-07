@@ -92,28 +92,54 @@
     if (dir === 'WAIT' || !r) return base;
 
     var zoneName = price < r.eq ? 'discount' : 'premium';
-    var entry, sl, tp;
-    if (f && ((dir === 'LONG' && f.type === 'haussier') || (dir === 'SHORT' && f.type === 'baissier'))) entry = (f.bottom + f.top) / 2;
-    else entry = r.eq;
-    if (dir === 'LONG') { sl = r.lo * 0.997; tp = r.hi; } else { sl = r.hi * 1.003; tp = r.lo; }
+
+    // GARDE-FOU ICT 1 : on n'achète pas en premium, on ne vend pas en discount.
+    var zoneOk = (dir === 'LONG' && zoneName === 'discount') || (dir === 'SHORT' && zoneName === 'premium');
+    if (!zoneOk) {
+      base.prog = 46;
+      base.note = 'Biais ' + st.bias + ' mais prix en ' + zoneName + ' — mauvaise zone pour ' + dir + ', on attend un retour en ' + (dir === 'LONG' ? 'discount' : 'premium') + '.';
+      return base;
+    }
+
+    // GARDE-FOU ICT 2 : il faut un POI aligné (FVG puis OB) dans le sens du biais.
+    var poi = null, poiType = null;
+    if (f && f.type === st.bias) { poi = [f.bottom, f.top]; poiType = 'FVG'; }
+    else if (ob && ob.type === st.bias) { poi = [ob.bottom, ob.top]; poiType = 'Order Block'; }
+    if (!poi) {
+      base.prog = 50;
+      base.note = 'Biais ' + st.bias + ' en ' + zoneName + ', mais pas de FVG/OB aligné — on attend la formation d\'une zone.';
+      return base;
+    }
+
+    // Entrée au milieu du POI, STOP serré juste au-delà, CIBLE sur la liquidité (extrême de range).
+    var entry = (poi[0] + poi[1]) / 2;
+    var span = Math.abs(poi[1] - poi[0]) || price * 0.0015;
+    var sl = dir === 'LONG' ? poi[0] - span * 0.6 : poi[1] + span * 0.6;
+    var tp = dir === 'LONG' ? r.hi : r.lo;
     var ok = dir === 'LONG' ? (sl < entry && tp > entry) : (sl > entry && tp < entry);
     var risk = Math.abs(entry - sl), rew = Math.abs(tp - entry);
-    if (!ok || risk <= 0) return base;
+    if (!ok || risk <= 0) { base.prog = 48; base.note = 'Géométrie invalide — on attend.'; return base; }
     var rr = +(rew / risk).toFixed(1);
-    // Ratio minimum demandé : 1 RR. En dessous, pas de trade → on attend.
-    if (rr < 1) { base.prog = 45; base.note = 'Biais ' + st.bias + ', mais point d\'entrée sous 1R — on attend un retour en ' + (dir === 'LONG' ? 'discount' : 'premium') + '.'; return base; }
+    if (rr < 1) { base.prog = 48; base.note = 'Setup aligné mais RR < 1 (cible trop proche) — on attend un meilleur point.'; return base; }
 
-    var conf = 45;
-    if ((dir === 'LONG' && zoneName === 'discount') || (dir === 'SHORT' && zoneName === 'premium')) conf += 15;
-    if (f && f.type === st.bias) conf += 12;
-    if (st.label.indexOf('BOS') >= 0) conf += 10;
+    // Confluence renforcée
+    var conf = 48;
+    conf += 12;                                   // zone correcte (déjà validée)
+    if (poiType === 'FVG') conf += 12; else conf += 8;
+    if (st.label.indexOf('BOS') >= 0) conf += 12; // cassure de structure confirmée
+    var oteIn = ot && price >= Math.min(ot.bottom, ot.top) && price <= Math.max(ot.bottom, ot.top);
+    if (oteIn) conf += 6;                          // prix dans l'OTE (62-79%)
+    if (cyc === 'Expansion' || cyc === 'Accumulation') conf += 4;
     var fav = (dir === 'LONG' && dxyBias === 'baissier') || (dir === 'SHORT' && dxyBias === 'haussier');
     if (fav && cls === 'crypto') conf += 10;
-    conf = clamp(conf, 0, 96);
-    var inZone = price >= Math.min(f ? f.bottom : entry, f ? f.top : entry) && price <= Math.max(f ? f.bottom : entry, f ? f.top : entry);
-    var prog = clamp(conf + (inZone ? 8 : -4), 20, 100);
-    var win = clamp(Math.round(conf * 0.8), 35, 82);
-    var reason = [st.label, 'zone ' + zoneName + (fav && cls === 'crypto' ? ' · DXY favorable' : '')].join(' · ');
+    else if (dxyBias && dxyBias !== 'neutre' && cls === 'crypto') conf -= 8; // DXY à contre-courant
+    conf = clamp(conf, 0, 97);
+
+    var inZone = price >= Math.min(poi[0], poi[1]) && price <= Math.max(poi[0], poi[1]);
+    var prog = clamp(conf + (inZone ? 10 : -3) + (rr >= 2 ? 4 : 0), 20, 100);
+    var win = clamp(Math.round(conf * 0.82), 40, 85);
+    var reason = [st.label, 'zone ' + zoneName, poiType + ' aligné', 'cible liquidité (' + rr + 'R)']
+      .concat(fav && cls === 'crypto' ? ['DXY favorable'] : []).join(' · ');
     chart.entry = entry; chart.sl = sl; chart.tp = tp;
     return { sym: sym, name: name, cls: cls, price: price, chg: chg, dir: dir, conf: conf, cycle: cyc,
       entry: entry, sl: sl, tp: tp, rr: rr, win: win, prog: prog, note: reason, chart: chart };
