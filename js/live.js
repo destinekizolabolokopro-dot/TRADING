@@ -46,6 +46,21 @@
     if (!hi || !lo) return null;
     return { hi: hi.p, lo: lo.p, eq: (hi.p + lo.p) / 2 };
   }
+  function lastOB(c) {
+    for (var i = c.length - 3; i >= 1; i--) {
+      var b = c[i], down = b.c < b.o, up = b.c > b.o;
+      if (down && c[i + 1].c > b.h && c[i + 2].c >= c[i + 1].c) return { type: 'haussier', bottom: b.l, top: Math.max(b.o, b.c) };
+      if (up && c[i + 1].c < b.l && c[i + 2].c <= c[i + 1].c) return { type: 'baissier', bottom: Math.min(b.o, b.c), top: b.h };
+    }
+    return null;
+  }
+  function ote(c, s) {
+    var hi = s.hi[s.hi.length - 1], lo = s.lo[s.lo.length - 1];
+    if (!hi || !lo) return null;
+    var H = hi.p, L = lo.p, span = H - L;
+    if (hi.i > lo.i) return { type: 'achat', bottom: H - 0.79 * span, top: H - 0.62 * span };
+    return { type: 'vente', bottom: L + 0.62 * span, top: L + 0.79 * span };
+  }
   function cyclePhase(c) {
     var n = c.length, look = Math.min(12, n - 2), w = c.slice(n - look);
     var hi = Math.max.apply(0, w.map(function (x) { return x.h; })), lo = Math.min.apply(0, w.map(function (x) { return x.l; }));
@@ -70,11 +85,12 @@
     var chg = prev ? (price - prev) / prev * 100 : 0;
     var cyc = cyclePhase(htf);
     var dir = st.bias === 'haussier' ? 'LONG' : st.bias === 'baissier' ? 'SHORT' : 'WAIT';
+    var f = lastFVG(htf), ob = lastOB(htf), ot = ote(htf, swings(htf));
+    var chart = { candles: htf.slice(-48), fvg: f, ob: ob, ote: ot, range: r, entry: null, sl: null, tp: null, dir: dir };
     var base = { sym: sym, name: name, cls: cls, price: price, chg: chg, dir: 'WAIT', conf: 40, cycle: cyc,
-      entry: null, sl: null, tp: null, rr: null, win: null, prog: 38, note: note || 'Pas de biais net — on attend.' };
+      entry: null, sl: null, tp: null, rr: null, win: null, prog: 38, note: note || 'Pas de biais net — on attend.', chart: chart };
     if (dir === 'WAIT' || !r) return base;
 
-    var f = lastFVG(htf);
     var zoneName = price < r.eq ? 'discount' : 'premium';
     var entry, sl, tp;
     if (f && ((dir === 'LONG' && f.type === 'haussier') || (dir === 'SHORT' && f.type === 'baissier'))) entry = (f.bottom + f.top) / 2;
@@ -98,8 +114,9 @@
     var prog = clamp(conf + (inZone ? 8 : -4), 20, 100);
     var win = clamp(Math.round(conf * 0.8), 35, 82);
     var reason = [st.label, 'zone ' + zoneName + (fav && cls === 'crypto' ? ' · DXY favorable' : '')].join(' · ');
+    chart.entry = entry; chart.sl = sl; chart.tp = tp;
     return { sym: sym, name: name, cls: cls, price: price, chg: chg, dir: dir, conf: conf, cycle: cyc,
-      entry: entry, sl: sl, tp: tp, rr: rr, win: win, prog: prog, note: reason };
+      entry: entry, sl: sl, tp: tp, rr: rr, win: win, prog: prog, note: reason, chart: chart };
   }
 
   // ---- Sources --------------------------------------------------------------

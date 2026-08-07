@@ -145,6 +145,10 @@
   .card.open .detail{grid-template-rows:1fr;margin-top:18px}
   .detail-in{overflow:hidden}
   .sep{height:1px;background:var(--border);margin:0 0 16px}
+  .chartbox{background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:10px 10px 6px;margin-bottom:16px}
+  .chartbox canvas{width:100%;display:block}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:.7rem;color:var(--muted);margin-top:8px;padding:0 2px}
+  .legend i{display:inline-block;width:11px;height:8px;border-radius:2px;vertical-align:0;margin-right:5px}
   .levels{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
   .lvl{background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:11px 12px}
   .lvl .k{font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;color:var(--faint);margin-bottom:4px}
@@ -254,7 +258,50 @@ const fmt = n => n==null?'—':(Math.abs(n)>=1000?Math.round(n):+n.toFixed(Math.
 const VERD = { LONG:{c:'v-long',t:'Long'}, SHORT:{c:'v-short',t:'Short'}, WAIT:{c:'v-wait',t:'On attend'} };
 const COLOR = { LONG:'var(--long)', SHORT:'var(--short)', WAIT:'var(--wait)' };
 
+/* Génère des bougies de démo (mock) pour que le graphique s'affiche aussi hors ligne */
+function mockChart(p){
+  const n=48, out=[]; let px=p.price*(p.dir==='LONG'?0.94:p.dir==='SHORT'?1.06:0.98);
+  const drift=(p.price-px)/n;
+  for(let i=0;i<n;i++){ const o=px, vol=p.price*0.012*(0.5+Math.random());
+    px=o+drift+(Math.random()-0.5)*vol;
+    out.push({o, c:px, h:Math.max(o,px)+Math.random()*vol*0.6, l:Math.min(o,px)-Math.random()*vol*0.6}); }
+  const hi=Math.max(...out.map(c=>c.h)), lo=Math.min(...out.map(c=>c.l)), isT=p.dir!=='WAIT';
+  return { candles:out, range:{hi,lo,eq:(hi+lo)/2},
+    fvg:isT?{type:p.dir==='LONG'?'haussier':'baissier',bottom:p.entry*0.997,top:p.entry*1.003}:null,
+    ob:null, ote:null, entry:p.entry, sl:p.sl, tp:p.tp, dir:p.dir };
+}
+
+function drawChart(canvas, ch){
+  if(!ch||!ch.candles||!ch.candles.length) return;
+  const dpr=window.devicePixelRatio||1, W=canvas.clientWidth||560, H=210;
+  canvas.width=W*dpr; canvas.height=H*dpr; canvas.style.height=H+'px';
+  const g=canvas.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0); g.clearRect(0,0,W,H);
+  const cs=ch.candles;
+  let min=Math.min(...cs.map(c=>c.l)), max=Math.max(...cs.map(c=>c.h));
+  [ch.entry,ch.sl,ch.tp].forEach(v=>{ if(v!=null){min=Math.min(min,v);max=Math.max(max,v);} });
+  if(ch.range){ min=Math.min(min,ch.range.lo); max=Math.max(max,ch.range.hi); }
+  const pd=(max-min)*0.08||1; min-=pd; max+=pd;
+  const padL=6,padR=66,padT=8,padB=8, iw=(W-padL-padR)/cs.length, bw=Math.max(2,iw*0.6);
+  const x=i=>padL+i*iw, y=p=>padT+(1-(p-min)/(max-min))*(H-padT-padB);
+  const css=getComputedStyle(document.documentElement);
+  const long=css.getPropertyValue('--long').trim()||'#37c46b', short=css.getPropertyValue('--short').trim()||'#f0555b';
+  function band(z,c){ if(!z)return; const yt=y(z.top),yb=y(z.bottom); g.fillStyle=c; g.fillRect(padL,Math.min(yt,yb),W-padL-padR,Math.max(1,Math.abs(yb-yt))); }
+  band(ch.ob,'rgba(255,255,255,.06)');
+  if(ch.ote) band(ch.ote, ch.ote.type==='achat'?'rgba(55,196,107,.10)':'rgba(240,85,91,.10)');
+  band(ch.fvg,'rgba(224,166,63,.16)');
+  if(ch.range){ g.strokeStyle='rgba(255,255,255,.13)'; g.lineWidth=1; g.setLineDash([3,3]);
+    [ch.range.hi,ch.range.lo].forEach(v=>{g.beginPath();g.moveTo(padL,y(v));g.lineTo(W-padR,y(v));g.stroke();}); g.setLineDash([]); }
+  cs.forEach((c,i)=>{ const cx=x(i)+bw/2, up=c.c>=c.o; g.strokeStyle=up?long:short; g.fillStyle=up?long:short;
+    g.beginPath(); g.moveTo(cx,y(c.h)); g.lineTo(cx,y(c.l)); g.stroke();
+    const yo=y(c.o),yc=y(c.c); g.fillRect(x(i),Math.min(yo,yc),bw,Math.max(1,Math.abs(yc-yo))); });
+  function level(v,c,lbl){ if(v==null)return; g.strokeStyle=c; g.lineWidth=1.2; g.setLineDash([5,4]);
+    g.beginPath(); g.moveTo(padL,y(v)); g.lineTo(W-padR,y(v)); g.stroke(); g.setLineDash([]);
+    g.fillStyle=c; g.font='10px "IBM Plex Mono",monospace'; g.textBaseline='middle'; g.fillText(lbl, W-padR+5, y(v)); }
+  level(ch.entry,'rgba(245,245,246,.85)','Entrée'); level(ch.sl,short,'SL'); level(ch.tp,long,'TP');
+}
+
 function card(p){
+  if(!p.chart) p.chart = mockChart(p);
   const v = VERD[p.dir];
   const isTrade = p.dir!=='WAIT';
   const p10 = { risk:100, gain: isTrade ? Math.round(100*p.rr) : 0 };
@@ -276,6 +323,15 @@ function card(p){
     </div>
     <div class="detail"><div class="detail-in">
       <div class="sep"></div>
+      <div class="chartbox"><canvas></canvas>
+        <div class="legend">
+          <span><i style="background:rgba(224,166,63,.55)"></i>FVG</span>
+          <span><i style="background:rgba(255,255,255,.25)"></i>Order Block</span>
+          <span><i style="background:rgba(55,196,107,.4)"></i>OTE</span>
+          <span><i style="background:var(--long)"></i>haussière</span>
+          <span><i style="background:var(--short)"></i>baissière</span>
+        </div>
+      </div>
       ${isTrade ? `
       <div class="levels">
         <div class="lvl"><div class="k">Entrée</div><div class="v">${fmt(p.entry)}</div></div>
@@ -291,8 +347,14 @@ function card(p){
       <div class="metrics"><div class="m"><span class="k">Confluence</span><span class="v">${p.conf}%</span></div></div>`}
       <div class="note">💡 <span>${p.note}</span></div>
     </div></div>`;
-  el.addEventListener('click', ()=>{ el.classList.toggle('open'); });
-  el.addEventListener('keydown', e=>{ if(e.key==='Enter'||e.key===' '){e.preventDefault();el.classList.toggle('open');} });
+  function toggle(){
+    const opening = !el.classList.contains('open');
+    el.classList.toggle('open');
+    if(opening){ const cv=el.querySelector('canvas');
+      if(cv && !cv.dataset.drawn){ requestAnimationFrame(()=>{ drawChart(cv,p.chart); cv.dataset.drawn='1'; }); } }
+  }
+  el.addEventListener('click', toggle);
+  el.addEventListener('keydown', e=>{ if(e.key==='Enter'||e.key===' '){e.preventDefault();toggle();} });
   return el;
 }
 
