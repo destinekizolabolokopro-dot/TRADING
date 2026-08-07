@@ -506,8 +506,10 @@ $('#ai-run').addEventListener('click', async ()=>{
     if(!r.parsed){ out.innerHTML='<div class="ai-summary">'+(r.raw||'Réponse vide.').slice(0,1200)+'</div>'; out.classList.add('show'); return; }
     let html='';
     if(r.parsed.marche) html+='<div class="ai-summary">🧭 '+r.parsed.marche+'</div>';
-    const idees=r.parsed.idees||[];
-    if(!idees.length) html+='<div class="ai-summary">Aucune idée à haute probabilité pour l’instant — Claude préfère attendre.</div>';
+    // Sécurité : on n'affiche que les trades >= 1 RR, meilleurs ratios d'abord
+    let idees=(r.parsed.idees||[]).filter(i=> i.rr==null || +i.rr>=1);
+    idees.sort((a,b)=> (+b.rr||0)-(+a.rr||0));
+    if(!idees.length) html+='<div class="ai-summary">Aucune idée ≥ 1 RR pour l’instant — le Bot IA préfère attendre.</div>';
     idees.forEach(i=>{
       const long=(i.sens||'').toUpperCase()==='LONG';
       html+='<div class="ai-idea '+(long?'long':'short')+'">'+
