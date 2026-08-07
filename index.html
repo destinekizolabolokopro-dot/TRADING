@@ -198,6 +198,24 @@
   .ai-status{font-size:.86rem;color:var(--muted);margin-top:8px;min-height:1.2em}
   .modal-close{position:absolute;top:16px;right:18px;background:transparent;border:0;color:var(--muted);font-size:1.4rem;cursor:pointer}
   .modal{position:relative}
+  .ai-btn.ghost{background:var(--surface-2);color:var(--ink);border:1px solid var(--border)}
+  .bilan{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px}
+  .bilan .b{background:var(--surface-2);border:1px solid var(--border);border-radius:11px;padding:10px 14px;min-width:92px}
+  .bilan .b .k{font-size:.66rem;text-transform:uppercase;letter-spacing:.06em;color:var(--faint)}
+  .bilan .b .v{font-family:var(--display);font-weight:600;font-size:1.2rem}
+  .bilan .b .v.pos{color:var(--long)} .bilan .b .v.neg{color:var(--short)}
+  .htable{width:100%;border-collapse:collapse;font-size:.82rem}
+  .htable th{text-align:left;color:var(--faint);font-weight:600;font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;padding:8px 8px;border-bottom:1px solid var(--border)}
+  .htable td{padding:9px 8px;border-bottom:1px solid var(--border);font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .htable tr:last-child td{border-bottom:0}
+  .src{font-family:var(--sans);font-size:.72rem;padding:2px 8px;border-radius:999px;white-space:nowrap}
+  .src.regles{background:color-mix(in srgb,var(--blue) 18%,transparent);color:var(--blue)}
+  .src.ia{background:color-mix(in srgb,var(--long) 18%,transparent);color:var(--long)}
+  .rc{font-family:var(--sans);font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:999px}
+  .rc.win{background:var(--long-dim);color:var(--long)} .rc.loss{background:var(--short-dim);color:var(--short)} .rc.open{background:var(--surface-3);color:var(--muted)}
+  .hd-long{color:var(--long)} .hd-short{color:var(--short)}
+  .htable-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .hist-empty{color:var(--muted);font-size:.9rem;padding:14px 0}
   @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -208,6 +226,7 @@
     <div class="status">
       <span class="live"><span class="pulse"></span>Marché ouvert</span>
       <span class="clock" id="clock">--:--:--</span>
+      <button class="ai-btn ghost" id="hist-open">📒 Historique</button>
       <button class="ai-btn" id="ai-open">🤖 Bot IA</button>
     </div>
   </div>
@@ -285,6 +304,20 @@
   </div>
 </div>
 
+<div class="overlay" id="hist-overlay">
+  <div class="modal" style="max-width:820px">
+    <button class="modal-close" id="hist-close" aria-label="Fermer">×</button>
+    <h2>📒 Historique des trades</h2>
+    <p class="sub">Chaque trade proposé est enregistré avec le bot qui l'a envoyé, puis clôturé au TP (gagné) ou au SL (perdu). Journal stocké sur ton ordinateur.</p>
+    <div class="bilan" id="hist-bilan"></div>
+    <div class="htable-wrap" id="hist-table"></div>
+    <div class="modal-actions" style="margin-top:16px">
+      <button class="btn" id="hist-reset">Réinitialiser l'historique</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/history.js"></script>
 <script src="js/ai.js"></script>
 
 <script src="js/live.js"></script>
@@ -464,15 +497,27 @@ function setSource(live){
   s.className = 'srcbadge ' + (live?'on':'off');
 }
 
+function priceMap(){ const m={}; PAIRS.forEach(p=>{ if(p.price!=null) m[p.sym]=p.price; }); return m; }
+function journal(source){ if(!window.History) return; if(source) History.record(PAIRS, source); History.evaluate(priceMap()); }
+
+async function refreshLive(){
+  if(!window.LIVE) return false;
+  try{
+    const data = await LIVE.load();
+    if(data && data.length){ PAIRS=data; hero(); render(currentFilter); setSource(true);
+      journal('Bot règles');            // enregistre les trades du bot à règles + évalue
+      if(aiOverlay && aiOverlay.classList.contains('open')) {} // rien
+      return true; }
+  }catch(e){}
+  return false;
+}
+
 async function boot(){
   clock(); setInterval(clock,1000);
-  hero(); render();               // 1) affichage immédiat (mock) pour ne jamais avoir d'écran vide
+  hero(); render();               // affichage immédiat (mock) pour ne jamais avoir d'écran vide
   setSource(false);
-  if(!window.LIVE) return;
-  try{
-    const data = await LIVE.load(); // 2) puis on remplace par les vraies données
-    if(data && data.length){ PAIRS = data; hero(); render(currentFilter); setSource(true); }
-  }catch(e){ /* on garde le mock */ }
+  await refreshLive();            // vraies données + journal
+  setInterval(refreshLive, 300000); // rafraîchit toutes les 5 min (met à jour l'historique)
 }
 boot();
 
@@ -509,6 +554,7 @@ $('#ai-run').addEventListener('click', async ()=>{
     // Sécurité : on n'affiche que les trades >= 1 RR, meilleurs ratios d'abord
     let idees=(r.parsed.idees||[]).filter(i=> i.rr==null || +i.rr>=1);
     idees.sort((a,b)=> (+b.rr||0)-(+a.rr||0));
+    if(window.History){ History.record(idees.map(i=>({sym:i.paire,dir:(i.sens||'').toUpperCase(),entry:+i.entree,sl:+i.stop,tp:+i.objectif,rr:+i.rr})),'Bot IA'); History.evaluate(priceMap()); }
     if(!idees.length) html+='<div class="ai-summary">Aucune idée ≥ 1 RR pour l’instant — le Bot IA préfère attendre.</div>';
     idees.forEach(i=>{
       const long=(i.sens||'').toUpperCase()==='LONG';
@@ -523,6 +569,44 @@ $('#ai-run').addEventListener('click', async ()=>{
     out.innerHTML=html; out.classList.add('show');
   }catch(e){ st.textContent='❌ '+e.message; }
 });
+
+/* ---------- Historique des trades ---------- */
+const histOverlay=$('#hist-overlay');
+function frDate(ts){ return new Date(ts).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}); }
+function renderHist(){
+  if(!window.History) return;
+  const b=History.bilan();
+  $('#hist-bilan').innerHTML =
+    '<div class="b"><div class="k">Trades</div><div class="v">'+b.total+'</div></div>'+
+    '<div class="b"><div class="k">Gagnés</div><div class="v pos">'+b.wins+'</div></div>'+
+    '<div class="b"><div class="k">Perdus</div><div class="v neg">'+b.loss+'</div></div>'+
+    '<div class="b"><div class="k">Réussite</div><div class="v">'+(b.rate!=null?b.rate+'%':'—')+'</div></div>'+
+    '<div class="b"><div class="k">Résultat</div><div class="v '+(b.rsum>0?'pos':(b.rsum<0?'neg':''))+'">'+(b.rsum>=0?'+':'')+b.rsum+' R</div></div>'+
+    '<div class="b"><div class="k">En cours</div><div class="v">'+b.open+'</div></div>';
+  const rows=History.load().slice().sort((a,b)=>b.ts-a.ts);
+  const wrap=$('#hist-table');
+  if(!rows.length){ wrap.innerHTML='<div class="hist-empty">Aucun trade enregistré pour l’instant. Ils s’ajouteront dès qu’un bot proposera un trade (données en direct).</div>'; return; }
+  let h='<table class="htable"><thead><tr><th>Envoyé par</th><th>Paire</th><th>Sens</th><th>Entrée</th><th>SL</th><th>TP</th><th>RR</th><th>Résultat</th><th>Date</th></tr></thead><tbody>';
+  rows.forEach(t=>{
+    const long=t.direction==='LONG';
+    const src=(t.source||'').indexOf('IA')>=0?'ia':'regles';
+    const rc=t.status==='open'?'open':t.result;
+    const rlbl=t.status==='open'?'En cours':(t.result==='win'?('Gagné +'+t.rr+'R'):'Perdu −1R');
+    h+='<tr>'+
+      '<td><span class="src '+src+'">'+(t.source||'—')+'</span></td>'+
+      '<td>'+t.symbol+'</td>'+
+      '<td class="'+(long?'hd-long':'hd-short')+'">'+(long?'▲ LONG':'▼ SHORT')+'</td>'+
+      '<td>'+fmtN(t.entry)+'</td><td>'+fmtN(t.sl)+'</td><td>'+fmtN(t.tp)+'</td><td>'+t.rr+'</td>'+
+      '<td><span class="rc '+rc+'">'+rlbl+'</span></td>'+
+      '<td>'+frDate(t.ts)+'</td></tr>';
+  });
+  h+='</tbody></table>';
+  wrap.innerHTML=h;
+}
+$('#hist-open').addEventListener('click', ()=>{ renderHist(); histOverlay.classList.add('open'); });
+$('#hist-close').addEventListener('click', ()=> histOverlay.classList.remove('open'));
+histOverlay.addEventListener('click', e=>{ if(e.target===histOverlay) histOverlay.classList.remove('open'); });
+$('#hist-reset').addEventListener('click', ()=>{ if(window.History && confirm('Effacer tout l’historique des trades ?')){ History.reset(); renderHist(); } });
 </script>
 </body>
 </html>
