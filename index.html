@@ -515,6 +515,7 @@ $('#ai-run').addEventListener('click', async ()=>{
         '<span class="ilvl">'+(long?'▲ LONG':'▼ SHORT')+(i.tf?' · '+i.tf:'')+' · '+(i.confiance!=null?i.confiance+'%':'')+'</span></div>'+
         '<div class="inums"><span>Entrée '+fmtN(i.entree)+'</span><span class="lo">Stop '+fmtN(i.stop)+'</span>'+
         '<span class="tp">Objectif '+fmtN(i.objectif)+'</span><span>RR '+(i.rr!=null?i.rr:'—')+'</span></div>'+
+        (i.rr!=null?'<div class="inums"><span class="tp">💰 Sur 10 000 € (risque 1 %) : +'+Math.round(100*(+i.rr))+' € si TP</span><span class="lo">❌ −100 € si SL</span></div>':'')+
         '<div class="why">💡 '+(i.pourquoi||'')+'</div></div>';
     });
     out.innerHTML=html; out.classList.add('show');

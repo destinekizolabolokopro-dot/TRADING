@@ -100,8 +100,8 @@
     var risk = Math.abs(entry - sl), rew = Math.abs(tp - entry);
     if (!ok || risk <= 0) return base;
     var rr = +(rew / risk).toFixed(1);
-    // Garde-fou ICT : pas de trade sous 1,5R (mauvais point d'entrée) → on attend.
-    if (rr < 1.5) { base.prog = 45; base.note = 'Biais ' + st.bias + ', mais point d\'entrée à ' + rr + 'R seulement — on attend un retour en ' + (dir === 'LONG' ? 'discount' : 'premium') + '.'; return base; }
+    // Ratio minimum demandé : 1 RR. En dessous, pas de trade → on attend.
+    if (rr < 1) { base.prog = 45; base.note = 'Biais ' + st.bias + ', mais point d\'entrée sous 1R — on attend un retour en ' + (dir === 'LONG' ? 'discount' : 'premium') + '.'; return base; }
 
     var conf = 45;
     if ((dir === 'LONG' && zoneName === 'discount') || (dir === 'SHORT' && zoneName === 'premium')) conf += 15;

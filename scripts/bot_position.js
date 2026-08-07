@@ -16,7 +16,7 @@ const PAIRS = C.CRYPTO;
 const WEBHOOK = process.env.DISCORD_WEBHOOK_POSITION || '';
 const DRY = process.argv.includes('--dry');
 const HIST = 'position_history';
-const MIN_RR = 1.8;
+const MIN_RR = 1; // ratio minimum demandé : 1 RR
 
 // Contexte DXY : baissier = favorable au risque (cryptos), haussier = défavorable.
 async function dxyContext() {

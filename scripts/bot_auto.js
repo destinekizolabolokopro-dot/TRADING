@@ -14,7 +14,7 @@ const PAIRS = C.CRYPTO;
 const WEBHOOK = process.env.DISCORD_WEBHOOK_AUTO || '';
 const DRY = process.argv.includes('--dry');
 const HIST = 'auto_history';
-const MIN_CONF = 55, MIN_RR = 1.8;
+const MIN_CONF = 55, MIN_RR = 1; // ratio minimum demandé : 1 RR
 
 function score(a, dxyBias) {
   const dir = a.struct.bias === 'haussier' ? 'LONG' : a.struct.bias === 'baissier' ? 'SHORT' : null;
