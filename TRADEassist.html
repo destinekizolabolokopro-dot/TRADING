@@ -344,6 +344,13 @@
     var h = load(), added = 0;
     (list || []).forEach(function (t) {
       if (!t || t.dir === 'WAIT' || t.rr == null || t.entry == null || t.sl == null || t.tp == null) return;
+      // Si le prix courant a DÉJÀ dépassé le TP ou le SL, l'entrée est manquée/invalide -> on n'enregistre pas
+      // (évite les faux "gagné/perdu" instantanés dès la création du trade).
+      if (t.price != null) {
+        var pr = +t.price, lg = t.dir === 'LONG';
+        if (lg && (pr >= +t.tp || pr <= +t.sl)) return;
+        if (!lg && (pr <= +t.tp || pr >= +t.sl)) return;
+      }
       var open = h.some(function (x) { return x.status === 'open' && x.symbol === t.sym && x.source === source && x.direction === t.dir; });
       var cd = h.some(function (x) { return x.status === 'closed' && x.symbol === t.sym && x.source === source && x.direction === t.dir && x.closedTs && (Date.now() - x.closedTs) < COOLDOWN; });
       if (open || cd) return;
@@ -451,7 +458,7 @@
     var model = getModel();
     var body = {
       model: model,
-      max_tokens: 2000,
+      max_tokens: 4000, // marge pour la réflexion + le JSON (sinon risque de réponse coupée)
       output_config: { effort: 'low' }, // rapide & économique pour une analyse structurée
       system: SYSTEM,
       messages: [{ role: 'user', content: buildUser(pairs, mtf) }]
@@ -537,7 +544,11 @@
   function rng(s) {
     var hi = s.hi[s.hi.length - 1], lo = s.lo[s.lo.length - 1];
     if (!hi || !lo) return null;
-    return { hi: hi.p, lo: lo.p, eq: (hi.p + lo.p) / 2 };
+    // Sécurité : le dernier swing haut peut se trouver SOUS le dernier swing bas
+    // (détections indépendantes) -> on normalise pour ne jamais avoir un range inversé.
+    var top = Math.max(hi.p, lo.p), bot = Math.min(hi.p, lo.p);
+    if (top <= bot) return null;
+    return { hi: top, lo: bot, eq: (top + bot) / 2 };
   }
   function lastOB(c) {
     for (var i = c.length - 3; i >= 1; i--) {
@@ -555,7 +566,9 @@
     return { type: 'vente', bottom: L + 0.62 * span, top: L + 0.79 * span };
   }
   function cyclePhase(c) {
-    var n = c.length, look = Math.min(12, n - 2), w = c.slice(n - look);
+    var n = c.length;
+    if (n < 3) return 'Transition';
+    var look = Math.min(12, n - 2), w = c.slice(n - look);
     var hi = Math.max.apply(0, w.map(function (x) { return x.h; })), lo = Math.min.apply(0, w.map(function (x) { return x.l; }));
     var price = c[n - 1].c, rangePct = (hi - lo) / price, last = c[n - 1];
     var lastBody = Math.abs(last.c - last.o), avg = w.map(function (x) { return Math.abs(x.c - x.o); }).reduce(function (a, b) { return a + b; }, 0) / w.length;
@@ -571,17 +584,30 @@
   }
 
   // ---- Construction d'une carte de trade -----------------------------------
-  function buildCard(name, sym, cls, htf, dtf, dxyBias, note) {
+  function buildCard(name, sym, cls, htf, dtf, dxyBias, note, synthetic) {
     var ds = swings(dtf), st = structure(dtf, ds), r = rng(ds);
     var price = htf[htf.length - 1].c;
-    var prev = dtf.length >= 2 ? dtf[dtf.length - 2].c : price;
-    var chg = prev ? (price - prev) / prev * 100 : 0;
+    // Variation = clôture-à-clôture des 2 dernières bougies de l'unité "daily" (dtf).
+    var dl = dtf.length;
+    var chg = (dl >= 2 && dtf[dl - 2].c) ? (dtf[dl - 1].c - dtf[dl - 2].c) / dtf[dl - 2].c * 100 : 0;
     var cyc = cyclePhase(htf);
     var dir = st.bias === 'haussier' ? 'LONG' : st.bias === 'baissier' ? 'SHORT' : 'WAIT';
     var f = lastFVG(htf), ob = lastOB(htf), ot = ote(htf, swings(htf));
     var chart = { candles: htf.slice(-48), fvg: f, ob: ob, ote: ot, range: r, entry: null, sl: null, tp: null, dir: dir };
     var base = { sym: sym, name: name, cls: cls, price: price, chg: chg, dir: 'WAIT', conf: 40, cycle: cyc,
       entry: null, sl: null, tp: null, rr: null, win: null, prog: 38, note: note || 'Pas de biais net — on attend.', chart: chart };
+
+    // Données SYNTHÉTIQUES (DXY/forex reconstruits depuis les clôtures quotidiennes BCE) :
+    // pas de vraies mèches -> les FVG/OB seraient du bruit. On n'affiche QUE le contexte
+    // (tendance + zone), jamais un trade précis (entrée/SL/TP), pour rester honnête.
+    if (synthetic) {
+      base.note = r
+        ? 'Contexte ' + st.bias + ' · zone ' + (price < r.eq ? 'discount' : 'premium') + ' — clôtures quotidiennes (BCE), pas d\'entrée précise.'
+        : 'Contexte indéterminé — clôtures quotidiennes (BCE).';
+      base.prog = 42;
+      return base;
+    }
+
     if (dir === 'WAIT' || !r) return base;
 
     var zoneName = price < r.eq ? 'discount' : 'premium';
@@ -699,15 +725,15 @@
       var dxyBias = 'neutre';
       if (r.fx) {
         var dS = swings(r.fx.dxy), dSt = structure(r.fx.dxy, dS); dxyBias = dSt.bias;
-        cards.push(buildCard('Indice dollar', 'DXY', 'forex', r.fx.dxy, r.fx.dxy, null, null));
+        cards.push(buildCard('Indice dollar', 'DXY', 'forex', r.fx.dxy, r.fx.dxy, null, null, true));
       }
       if (r.btcD && r.btcH) cards.push(buildCard('Bitcoin', 'BTC/USD', 'crypto', r.btcH, r.btcD, dxyBias));
       if (r.ethD && r.ethH) cards.push(buildCard('Ethereum', 'ETH/USD', 'crypto', r.ethH, r.ethD, dxyBias));
       if (r.solD && r.solH) cards.push(buildCard('Solana', 'SOL/USD', 'crypto', r.solH, r.solD, dxyBias));
       if (r.fx) {
-        cards.push(buildCard('Livre / Dollar', 'GBP/USD', 'forex', r.fx.gbp, r.fx.gbp, dxyBias));
-        cards.push(buildCard('Dollar / Yen', 'USD/JPY', 'forex', r.fx.jpy, r.fx.jpy, dxyBias));
-        cards.push(buildCard('Euro / Yen', 'EUR/JPY', 'forex', r.fx.eurjpy, r.fx.eurjpy, dxyBias));
+        cards.push(buildCard('Livre / Dollar', 'GBP/USD', 'forex', r.fx.gbp, r.fx.gbp, dxyBias, null, true));
+        cards.push(buildCard('Dollar / Yen', 'USD/JPY', 'forex', r.fx.jpy, r.fx.jpy, dxyBias, null, true));
+        cards.push(buildCard('Euro / Yen', 'EUR/JPY', 'forex', r.fx.eurjpy, r.fx.eurjpy, dxyBias, null, true));
       }
       return cards.length ? cards : null;
     });
@@ -898,7 +924,8 @@ function hero(){
   const bcol = longs>shorts?'var(--long)':shorts>longs?'var(--short)':'var(--wait)';
   $('#s-bias').innerHTML = `<span class="dot" style="background:${bcol}"></span>${bias}`;
   const dxy = PAIRS.find(p=>p.sym==='DXY');
-  $('#s-dxy').innerHTML = `${fmt(dxy.price)} <span class="chg ${dxy.chg>=0?'up':'down'}" style="font-size:.8rem">${dxy.chg>=0?'+':''}${dxy.chg.toFixed(1)}%</span>`;
+  if(dxy){ $('#s-dxy').innerHTML = `${fmt(dxy.price)} <span class="chg ${dxy.chg>=0?'up':'down'}" style="font-size:.8rem">${dxy.chg>=0?'+':''}${(dxy.chg||0).toFixed(1)}%</span>`; }
+  else { $('#s-dxy').textContent = '—'; }
   $('#s-count').textContent = `${signals.length} / ${PAIRS.length}`;
 }
 
@@ -982,7 +1009,7 @@ $('#ai-run').addEventListener('click', async ()=>{
     // Sécurité : on n'affiche que les trades >= 1 RR, meilleurs ratios d'abord
     let idees=(r.parsed.idees||[]).filter(i=> i.rr==null || +i.rr>=1);
     idees.sort((a,b)=> (+b.rr||0)-(+a.rr||0));
-    if(window.History){ History.record(idees.map(i=>({sym:i.paire,dir:(i.sens||'').toUpperCase(),entry:+i.entree,sl:+i.stop,tp:+i.objectif,rr:+i.rr,note:i.pourquoi||''})),'Bot IA'); History.evaluate(priceMap()); }
+    if(window.History){ const pm=priceMap(); History.record(idees.map(i=>({sym:i.paire,dir:(i.sens||'').toUpperCase(),entry:+i.entree,sl:+i.stop,tp:+i.objectif,rr:+i.rr,note:i.pourquoi||'',price:(pm[i.paire]!=null?pm[i.paire]:null)})),'Bot IA'); History.evaluate(pm); }
     if(!idees.length) html+='<div class="ai-summary">Aucune idée ≥ 1 RR pour l’instant — le Bot IA préfère attendre.</div>';
     idees.forEach(i=>{
       const long=(i.sens||'').toUpperCase()==='LONG';

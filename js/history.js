@@ -18,6 +18,13 @@
     var h = load(), added = 0;
     (list || []).forEach(function (t) {
       if (!t || t.dir === 'WAIT' || t.rr == null || t.entry == null || t.sl == null || t.tp == null) return;
+      // Si le prix courant a DÉJÀ dépassé le TP ou le SL, l'entrée est manquée/invalide -> on n'enregistre pas
+      // (évite les faux "gagné/perdu" instantanés dès la création du trade).
+      if (t.price != null) {
+        var pr = +t.price, lg = t.dir === 'LONG';
+        if (lg && (pr >= +t.tp || pr <= +t.sl)) return;
+        if (!lg && (pr <= +t.tp || pr >= +t.sl)) return;
+      }
       var open = h.some(function (x) { return x.status === 'open' && x.symbol === t.sym && x.source === source && x.direction === t.dir; });
       var cd = h.some(function (x) { return x.status === 'closed' && x.symbol === t.sym && x.source === source && x.direction === t.dir && x.closedTs && (Date.now() - x.closedTs) < COOLDOWN; });
       if (open || cd) return;

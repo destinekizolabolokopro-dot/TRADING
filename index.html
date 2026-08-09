@@ -478,7 +478,8 @@ function hero(){
   const bcol = longs>shorts?'var(--long)':shorts>longs?'var(--short)':'var(--wait)';
   $('#s-bias').innerHTML = `<span class="dot" style="background:${bcol}"></span>${bias}`;
   const dxy = PAIRS.find(p=>p.sym==='DXY');
-  $('#s-dxy').innerHTML = `${fmt(dxy.price)} <span class="chg ${dxy.chg>=0?'up':'down'}" style="font-size:.8rem">${dxy.chg>=0?'+':''}${dxy.chg.toFixed(1)}%</span>`;
+  if(dxy){ $('#s-dxy').innerHTML = `${fmt(dxy.price)} <span class="chg ${dxy.chg>=0?'up':'down'}" style="font-size:.8rem">${dxy.chg>=0?'+':''}${(dxy.chg||0).toFixed(1)}%</span>`; }
+  else { $('#s-dxy').textContent = '—'; }
   $('#s-count').textContent = `${signals.length} / ${PAIRS.length}`;
 }
 
@@ -562,7 +563,7 @@ $('#ai-run').addEventListener('click', async ()=>{
     // Sécurité : on n'affiche que les trades >= 1 RR, meilleurs ratios d'abord
     let idees=(r.parsed.idees||[]).filter(i=> i.rr==null || +i.rr>=1);
     idees.sort((a,b)=> (+b.rr||0)-(+a.rr||0));
-    if(window.History){ History.record(idees.map(i=>({sym:i.paire,dir:(i.sens||'').toUpperCase(),entry:+i.entree,sl:+i.stop,tp:+i.objectif,rr:+i.rr,note:i.pourquoi||''})),'Bot IA'); History.evaluate(priceMap()); }
+    if(window.History){ const pm=priceMap(); History.record(idees.map(i=>({sym:i.paire,dir:(i.sens||'').toUpperCase(),entry:+i.entree,sl:+i.stop,tp:+i.objectif,rr:+i.rr,note:i.pourquoi||'',price:(pm[i.paire]!=null?pm[i.paire]:null)})),'Bot IA'); History.evaluate(pm); }
     if(!idees.length) html+='<div class="ai-summary">Aucune idée ≥ 1 RR pour l’instant — le Bot IA préfère attendre.</div>';
     idees.forEach(i=>{
       const long=(i.sens||'').toUpperCase()==='LONG';

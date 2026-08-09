@@ -62,7 +62,7 @@
     var model = getModel();
     var body = {
       model: model,
-      max_tokens: 2000,
+      max_tokens: 4000, // marge pour la réflexion + le JSON (sinon risque de réponse coupée)
       output_config: { effort: 'low' }, // rapide & économique pour une analyse structurée
       system: SYSTEM,
       messages: [{ role: 'user', content: buildUser(pairs, mtf) }]
