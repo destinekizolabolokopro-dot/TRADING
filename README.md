@@ -1,99 +1,59 @@
-# TRADEassist — Signaux ICT / SMC en direct
+# TRADEassist — assistant de trading ICT / SMC
 
-Un site **statique** (aucun serveur) qui affiche en **temps réel** des setups de trading
-fondés sur les concepts **ICT / SMC**, avec graphiques, calculateur de risque et alertes.
+Site autonome (un seul fichier HTML) qui lit le marché en **top-down** (D1 → H4 → H1)
+selon les concepts **ICT / SMC** et propose des trades **prêts à l'emploi** : sens,
+entrée, stop, objectif, ratio (RR) et gain estimé sur un compte de 10 000 € (risque 1 %).
 
-![TRADEassist](docs/preview.png)
+## Ce qui est branché en direct
 
-## Fonctionnalités
+| Marché | Source | État |
+|---|---|---|
+| **BTC / ETH / SOL / XRP / BNB** | Binance (bougies D1 + H4) | ✅ **vrais trades** (entrée / SL / TP / RR) |
+| **EUR/USD** | Binance `EUR/USDT` | ✅ **vrais trades** |
+| **XAU/USD (Or)** | Binance `PAXG/USDT` (or tokenisé) | ✅ **vrais trades** |
+| **DXY (indice dollar)** | BCE / Frankfurter (formule ICE) | 🧭 **boussole** : pilote le biais de tous les actifs cotés en USD |
 
-- **Deux stratégies**
-  - **Stratégie 1 — OTE + PD Array + CRT** : zone **OTE** (0.62–0.79) du Fibonacci +
-    **PD Array** (Fair Value Gap ou Order Block) en zone **discount/premium** +
-    **CRT obligatoire** (sweep de liquidité + retour).
-  - **Stratégie 2 — Previous Daily CRT** : balayage du **plus-haut / plus-bas de la veille**
-    (PDH / PDL) suivi d'un retour ; objectif sur la liquidité opposée.
-  - **Stratégie 5 — Support & Résistance** : zones testées **plusieurs fois** (rectangles, pas
-    des lignes) sur **H4/Daily** → retour sur la zone → confirmation (rejet longue mèche,
-    engloutissement, BOS/CHoCH) → stop derrière la zone, objectif sur la prochaine zone (ratio > 1:2).
-  - **Stratégie 4 — Smart Money (SMC)** : approche Price Action / SMC (pensée forex, appliquée
-    aussi à la crypto). **Tendance sur unité supérieure** (agrégée) → **retour sur une zone
-    d'offre/demande** (Order Block / FVG) → **confirmation BOS/CHoCH ou rejet** → **objectif sur
-    la prochaine liquidité** (swing opposé / equal highs-lows), ratio visé > 1:2.
-  - **Stratégie 3 — Scalping (M1)** : tendance déterminée sur **M5** (agrégée depuis le M1),
-    **retour sur une zone clé** (moyenne mobile / Order Block) puis **confirmation sur M1**,
-    stop serré derrière le dernier creux/sommet, **objectif ≥ 2R**, avec filtre de
-    **session** (Londres / New York). Le graphique de ces signaux s'affiche en M1.
-- **Confiance proportionnelle** : plus il y a de confluences dans le même sens (OTE, tendance
-  EMA 20/50, structure BOS/CHoCH, PD Array, clôture…), plus le pourcentage est élevé.
-- Un signal n'est émis qu'avec **R:R ≥ 1.2**. On retient la meilleure des deux stratégies par paire.
-- **Menu en sous-parties** : Signaux · Historique · Stratégies · Réglages.
-- **Historique & bilan** : chaque signal repéré est archivé ; dès que le prix touche le stop
-  ou l'objectif (TP1), le résultat est noté. Bilan gagnants / perdants, taux de réussite et
-  résultat cumulé (en R). Tout est stocké localement.
-- **Sélecteur de stratégies** : active/désactive chaque stratégie (registre extensible pour
-  en ajouter d'autres facilement).
-- **Apprentissage** : l'historique tire automatiquement des **conclusions** des trades clôturés
-  — meilleure/pire stratégie, biais achat/vente, meilleure paire, taux de réussite et R cumulé.
-- **10 stratégies** au total, dont 5 à indicateurs : **RSI Reversal**, **MACD Cross**,
-  **EMA Pullback**, **Bollinger Reversal**, **Cassure (Breakout)** — objectif 2R.
-- **Filtre par stratégie dans l'historique** et **unités de temps** S1 / D1 / H4 / H1 / M15 / M1.
-- Le **Bot Auto** a son propre **sélecteur d'unité de temps** (il peut travailler sur un TF
-  différent de l'affichage).
-- **% de réussite estimé** sur chaque signal : mélange la confiance du setup et le taux de
-  réussite réel de la stratégie (une fois assez de trades clôturés).
-- **Bot Auto** (section dédiée 🤖) : un bot qui **trade seul** en piochant dans toutes les
-  stratégies. Il teste chacune, **garde celles qui gagnent, écarte celles qui perdent**
-  (au-delà de 4 trades, une stratégie sous 50 % est mise de côté). Il possède son propre
-  historique, son bilan, son panneau « Ce que le bot a appris » (statut par stratégie) et ses
-  conclusions. Objectif : de meilleurs résultats sur la durée, sans intervention.
-- **Graphique chandeliers** intégré (façon TradingView, moteur Canvas maison, hors-ligne) :
-  bougies, EMA, niveaux Fibonacci, zone OTE, boxes FVG / Order Blocks, liquidité,
-  lignes Entrée / Stop / TP, croix de visée avec lecture OHLC.
-- **Tableau de bord** : statistiques (setups, achat/vente, confiance moyenne, R:R moyen),
-  filtres (direction, marché, tri), watchlist personnalisable.
-- **Calculateur de risque** : capital + risque % → taille de position suggérée sur chaque signal.
-- **Alertes** : son + notification navigateur + toast à chaque nouveau setup.
-- **Thème clair / sombre**, réglages mémorisés localement.
+- **Sans clé** pour les données de marché : Binance et Frankfurter sont gratuits et
+  ouverts au navigateur (CORS). `USDT ≈ USD` (la structure et les zones sont fidèles ;
+  seul le prix absolu peut varier de ~0,1 % vs le spot).
+- **Garde-fou anti-données périmées** : une paire figée (dernière bougie > 3 jours) est
+  automatiquement ignorée — jamais de prix vieux affiché comme s'il était live.
+- Le yen (USD/JPY, EUR/JPY) n'est pas proposé : pas de source intraday gratuite fiable.
 
-## Marchés & données
+## Les deux bots
 
-- **Crypto** (BTC/USD, ETH/USD, SOL/USD) : API publique **Binance**, gratuite, sans clé.
-- **Forex & Or** (GBP/USD, USD/JPY, EUR/JPY, XAU/USD, XAU/EUR) : **Twelve Data**,
-  qui nécessite une **clé API gratuite** (https://twelvedata.com/register) à coller dans l'interface.
+1. **Bot règles** (intégré, sans clé) : applique strictement l'ICT/SMC — biais D1,
+   zone premium/discount, POI aligné (FVG puis Order Block), stop logique, cible sur la
+   liquidité, **RR entre 1 et 6**. Il reste à l'écart quand la confluence n'est pas nette.
+2. **Bot IA (Claude)** *(optionnel)* : un 2ᵉ bot propulsé par l'API Anthropic. Il raisonne
+   sur H1/H4/D1, principalement en ICT/SMC, et envoie ses meilleures idées ≥ 1 RR.
+   Nécessite **ta** clé API Anthropic (console.anthropic.com), stockée **en local** dans
+   ton navigateur — elle ne quitte jamais ton ordinateur.
 
-La crypto se rafraîchit ~ toutes les 40 s ; le forex/or ~ toutes les 4 min (quota gratuit).
+## Historique
+
+Chaque trade proposé est enregistré (bot d'origine + motif), puis clôturé au TP (gagné)
+ou au SL (perdu) selon le prix réel. Le taux de réussite affiché sur les cartes devient
+**réel** dès qu'il y a assez de trades clôturés (avant, c'est une estimation marquée « est. »).
 
 ## Utilisation
 
-Site statique — il suffit de l'ouvrir :
+1. Télécharge **`TRADEassist.html`** (fichier autonome).
+2. **Double-clique** dessus → il s'ouvre dans ton navigateur.
+3. L'indicateur en haut à droite doit passer à **« Données en direct »**.
+   (Dans un simple aperçu en ligne, les données réelles sont bloquées → « Mode démo ».)
+4. Pour activer le Bot IA : bouton **Bot IA** → colle ta clé Anthropic → *Enregistrer*.
 
-```bash
-# option 1 : ouvrir directement
-#   double-clic sur index.html
+## Fichiers
 
-# option 2 : petit serveur local
-python3 -m http.server 8000   # puis http://localhost:8000
-```
+| Fichier | Rôle |
+|---|---|
+| `index.html` | Le site (structure + CSS + logique d'affichage) |
+| `js/live.js` | Données en direct + moteur ICT/SMC (calcul des trades) |
+| `js/ai.js` | Appel de l'API Claude (Bot IA) |
+| `js/history.js` | Journal des trades (bot d'origine, motif, bilan réel) |
+| `TRADEassist.html` | **Version autonome** (tout inliné) générée par `scripts/build_single.js` |
 
-### Déploiement (GitHub Pages)
-
-*Settings → Pages → Deploy from a branch → dossier `/root`.* Aucune étape de build.
-
-## Structure
-
-```
-index.html        Interface
-css/styles.css    Thème (clair + sombre)
-js/api.js         Données multi-fournisseurs (Binance + Twelve Data)
-js/ict.js         Moteur d'analyse ICT/SMC (+ métadonnées graphique) — testable sous Node
-js/chart.js       Graphique chandeliers Canvas
-js/app.js         Orchestration, UI, alertes, modale, calculateur
-```
-
-Les paramètres de stratégie sont regroupés dans `CONFIG` en tête de `js/ict.js`.
-
----
-
-⚠️ **Avertissement** — Outil **éducatif**. Ceci n'est **pas** un conseil financier.
-Le trading comporte un risque de perte. Fais toujours ta propre analyse et gère ton risque.
+> ⚠️ Outil **pédagogique** — pas un conseil financier. Les bots produisent des
+> signaux/analyses sur données réelles ; ils **n'exécutent aucun ordre** chez un courtier.
+> Risque max recommandé : 1 % du compte par trade.

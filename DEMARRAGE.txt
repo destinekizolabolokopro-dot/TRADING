@@ -1,86 +1,31 @@
-====================================================================
-  TRADEassist  —  Signaux ICT / SMC en direct  —  Guide de démarrage
-====================================================================
+TRADEassist — DÉMARRAGE RAPIDE
+==============================
 
-POUR OUVRIR (le plus simple)
-----------------------------
-1. Décompresse ce dossier ZIP quelque part (Bureau, Documents…).
-2. Double-clique sur le fichier :  index.html
-3. Ça s'ouvre dans ton navigateur (Chrome, Edge, Firefox…).
-   -> La CRYPTO (BTC/USD, ETH/USD, SOL/USD) s'affiche en DIRECT
-      immédiatement, sans rien configurer.
+1) OUVRIR LE SITE
+   - Télécharge le fichier "TRADEassist.html".
+   - Double-clique dessus : il s'ouvre dans ton navigateur (Chrome, Edge, Firefox...).
+   - En haut à droite, l'indicateur doit passer à "Données en direct".
+     Si c'est écrit "Mode démo", c'est que tu le regardes dans un aperçu en ligne :
+     télécharge-le et ouvre-le depuis ton ordinateur.
 
-POUR ACTIVER LE FOREX ET L'OR (GBP/USD, USD/JPY, EUR/JPY, XAU/USD, XAU/EUR)
---------------------------------------------------------------------------
-Ces marchés en temps réel nécessitent une clé API GRATUITE :
-1. Va sur :  https://twelvedata.com/register
-2. Crée un compte gratuit (30 secondes) et copie ta clé API.
-3. Dans TRADEassist, colle la clé dans le champ "Clé API forex / or"
-   puis clique "Enregistrer". La clé reste sur ton appareil.
+2) CE QUI TRADE POUR DE VRAI (sans aucune clé)
+   - Crypto : BTC, ETH, SOL, XRP, BNB  (données Binance)
+   - Forex  : EUR/USD                  (Binance EUR/USDT)
+   - Or     : XAU/USD                  (Binance PAXG/USDT)
+   - DXY (dollar) = boussole : il oriente le biais, il ne se trade pas.
+   Le bot est SÉLECTIF : beaucoup de paires restent "en attente" tant que la
+   confluence ICT/SMC n'est pas nette. C'est normal et voulu.
 
-LE MENU (4 sous-parties, en haut)
----------------------------------
-- SIGNAUX    : les trades du moment + les paires sous surveillance.
-- HISTORIQUE : le journal de tous les trades repérés + le bilan
-               (gagnants / perdants / taux de réussite / résultat en R),
-               un filtre par stratégie, et une ANALYSE qui tire des
-               conclusions de tes trades (points forts / à améliorer).
-- STRATÉGIES : coche/décoche les stratégies que tu veux suivre.
-- AUTO (🤖)  : un bot qui trade TOUT SEUL. Il teste toutes les stratégies,
-               garde celles qui gagnent, écarte celles qui perdent, et
-               affiche son propre historique + ce qu'il a appris.
-- RÉGLAGES   : tes paires, ta clé forex/or, ta gestion du risque.
+3) ACTIVER LE BOT IA (facultatif, payant à l'usage)
+   - Il faut une clé API Anthropic : https://console.anthropic.com (créer un compte,
+     ajouter un petit crédit, générer une clé "sk-ant-...").
+   - Sur le site : bouton "Bot IA" -> colle la clé -> "Enregistrer la clé".
+   - La clé reste EN LOCAL dans ton navigateur, elle ne part nulle part.
+   - L'abonnement Claude Pro ne donne PAS accès à l'API (c'est séparé).
 
-Chaque signal affiche aussi un % de RÉUSSITE ESTIMÉ (confiance du setup
-combinée au taux de réussite réel de la stratégie).
+4) HISTORIQUE
+   - Bouton "Historique" : tous les trades proposés, avec le bot d'origine et le motif,
+     séparés en "en cours" et "clôturés", avec le bilan réel.
 
-CE QUE TU PEUX FAIRE
---------------------
-- STATISTIQUES en haut : nombre de setups, achats/ventes, confiance et R:R moyens.
-- FILTRES : direction (achat/vente), marché (crypto/forex/or), tri (confiance/R:R/nom).
-- CLIQUE SUR UNE CARTE -> ouvre le GRAPHIQUE en chandeliers avec tous les
-  niveaux (Fibonacci, zone OTE, FVG, Entrée/Stop/TP, liquidité) + le
-  calculateur de risque et les confluences.
-- BOUTON RISQUE (⚙) : entre ton capital et ton risque % -> la taille de
-  position suggérée s'affiche sur chaque signal.
-- CLOCHE (🔔) : active les alertes (son + notification) à chaque nouveau setup.
-- LUNE/SOLEIL : bascule thème sombre / clair.
-- WATCHLIST : change les paires (seules les 8 prévues sont acceptées).
-- UNITÉ DE TEMPS : 5m / 15m / 1h / 4h.
-
-LES DEUX STRATÉGIES
--------------------
-  STRATÉGIE 1 — "OTE + PD Array + CRT" :
-     zone OTE (0.62-0.79) du Fibonacci
-     + PD Array (Fair Value Gap ou Order Block) en zone discount/premium
-     + CRT OBLIGATOIRE (prise de liquidité + retour)
-
-  STRATÉGIE 2 — "Previous Daily CRT" :
-     balayage du plus-haut / plus-bas de la VEILLE (PDH/PDL) + retour.
-
-  STRATÉGIE 5 — "Support & Résistance" :
-     zones testées plusieurs fois sur H4/Daily -> retour sur la zone
-     -> confirmation (rejet, engloutissement, BOS/CHoCH)
-     -> stop derrière la zone, objectif sur la prochaine zone (ratio > 1:2).
-
-  STRATÉGIE 4 — "Smart Money (SMC)" :
-     tendance sur unité supérieure -> retour sur une zone d'offre/demande
-     (Order Block / FVG) -> confirmation BOS/CHoCH ou rejet
-     -> objectif sur la prochaine liquidité (ratio > 1:2).
-
-  STRATÉGIE 3 — "Scalping (M1)" :
-     tendance sur M5 -> retour sur une zone clé (moyenne mobile / Order Block)
-     -> confirmation sur M1 -> stop serré, objectif >= 2R.
-     Meilleurs moments : sessions de Londres et de New York.
-
-Plus il y a de confluences dans le même sens, plus la CONFIANCE (%) est élevée.
-Un signal n'apparaît qu'avec un Risk:Reward >= 1.2. Filtre par stratégie en haut.
-Le site est en BLANC par défaut (bouton soleil/lune pour basculer).
-
-Le site se met à jour tout seul (crypto ~40 s, forex/or ~4 min).
-
---------------------------------------------------------------------
-IMPORTANT : Outil EDUCATIF. Ce n'est PAS un conseil financier.
-Le trading comporte un risque de perte. Fais toujours ta propre
-analyse et gère ton risque.
---------------------------------------------------------------------
+RAPPEL : outil pédagogique, pas un conseil financier. Les bots donnent des signaux,
+ils n'exécutent pas d'ordre chez un courtier. Risque conseillé : 1 % du compte / trade.

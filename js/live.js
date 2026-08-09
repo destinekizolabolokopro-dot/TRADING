@@ -1,9 +1,11 @@
 /*
  * Couche DONNÉES EN DIRECT du dashboard (navigateur, sans clé)
  * -----------------------------------------------------------------------------
- * - Crypto (BTC/ETH/SOL) : Binance (klines D1 + H4), CORS ouvert.
- * - DXY + Forex (GBP/USD, USD/JPY, EUR/JPY) : calculés depuis les taux BCE
- *   (Frankfurter, CORS ouvert, gratuit). Le DXY suit la formule ICE officielle.
+ * - Crypto (BTC/ETH/SOL/XRP/BNB) : Binance (klines D1 + H4), CORS ouvert -> VRAIS trades.
+ * - Forex EUR/USD + Or (XAU/USD) : Binance (EUR/USDT, PAXG/USDT), bougies réelles -> VRAIS trades.
+ * - DXY : reconstruit depuis les taux BCE (Frankfurter, formule ICE) -> boussole/contexte
+ *   qui pilote le biais de tous les actifs cotés en USD (il n'est pas traçable en direct sans clé).
+ * Garde-fou anti-données périmées : une paire figée (dernière bougie > 3 j) est ignorée.
  * Renvoie des cartes prêtes à afficher, même forme que les données mock.
  * En cas d'échec d'une source, la carte concernée retombe sur le mock.
  */
