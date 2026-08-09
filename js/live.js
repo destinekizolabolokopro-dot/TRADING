@@ -159,16 +159,17 @@
     var oteIn = ot && price >= Math.min(ot.bottom, ot.top) && price <= Math.max(ot.bottom, ot.top);
     if (oteIn) conf += 6;                          // prix dans l'OTE (62-79%)
     if (cyc === 'Expansion' || cyc === 'Accumulation') conf += 4;
+    // DXY inversé pour crypto/or ET forex quotés en USD (…/USD) : DXY baissier = dollar faible = favorable au long.
     var fav = (dir === 'LONG' && dxyBias === 'baissier') || (dir === 'SHORT' && dxyBias === 'haussier');
-    if (fav && cls === 'crypto') conf += 10;
-    else if (dxyBias && dxyBias !== 'neutre' && cls === 'crypto') conf -= 8; // DXY à contre-courant
+    if (fav) conf += 10;
+    else if (dxyBias && dxyBias !== 'neutre') conf -= 8; // DXY à contre-courant
     conf = clamp(conf, 0, 97);
 
     var inZone = price >= Math.min(poi[0], poi[1]) && price <= Math.max(poi[0], poi[1]);
     var prog = clamp(conf + (inZone ? 10 : -3) + (rr >= 2 ? 4 : 0), 20, 100);
     var win = clamp(Math.round(conf * 0.82), 40, 85);
     var reason = [st.label, 'zone ' + zoneName, poiType + ' aligné', 'cible liquidité (' + rr + 'R)']
-      .concat(fav && cls === 'crypto' ? ['DXY favorable'] : []).join(' · ');
+      .concat(fav ? ['DXY favorable'] : []).join(' · ');
     chart.entry = entry; chart.sl = sl; chart.tp = tp;
     return { sym: sym, name: name, cls: cls, price: price, chg: chg, dir: dir, conf: conf, cycle: cyc,
       entry: entry, sl: sl, tp: tp, rr: rr, win: win, prog: prog, note: reason, chart: chart };
@@ -214,6 +215,11 @@
       btcD: binance('BTCUSDT', '1d', 120), btcH: binance('BTCUSDT', '4h', 150),
       ethD: binance('ETHUSDT', '1d', 120), ethH: binance('ETHUSDT', '4h', 150),
       solD: binance('SOLUSDT', '1d', 120), solH: binance('SOLUSDT', '4h', 150),
+      // Forex & or en VRAIES bougies via Binance (EUR/USDT, GBP/USDT, PAXG/USDT).
+      // USDT ≈ USD ; la structure/les zones/les niveaux sont fidèles (écart ~0,1 % sur le prix absolu).
+      eurD: binance('EURUSDT', '1d', 120), eurH: binance('EURUSDT', '4h', 150),
+      gbpD: binance('GBPUSDT', '1d', 120), gbpH: binance('GBPUSDT', '4h', 150),
+      xauD: binance('PAXGUSDT', '1d', 120), xauH: binance('PAXGUSDT', '4h', 150),
       fx: frankfurter()
     };
     function safe(p) { return p.then(function (v) { return v; }, function () { return null; }); }
@@ -230,18 +236,18 @@
       if (r.btcD && r.btcH) cards.push(buildCard('Bitcoin', 'BTC/USD', 'crypto', r.btcH, r.btcD, dxyBias));
       if (r.ethD && r.ethH) cards.push(buildCard('Ethereum', 'ETH/USD', 'crypto', r.ethH, r.ethD, dxyBias));
       if (r.solD && r.solH) cards.push(buildCard('Solana', 'SOL/USD', 'crypto', r.solH, r.solD, dxyBias));
-      if (r.fx) {
-        cards.push(buildCard('Livre / Dollar', 'GBP/USD', 'forex', r.fx.gbp, r.fx.gbp, dxyBias, null, true));
-        cards.push(buildCard('Dollar / Yen', 'USD/JPY', 'forex', r.fx.jpy, r.fx.jpy, dxyBias, null, true));
-        cards.push(buildCard('Euro / Yen', 'EUR/JPY', 'forex', r.fx.eurjpy, r.fx.eurjpy, dxyBias, null, true));
-      }
+      // Forex majors + or : VRAIS trades (bougies réelles). USD au dénominateur -> même logique DXY que la crypto.
+      if (r.eurD && r.eurH) cards.push(buildCard('Euro / Dollar', 'EUR/USD', 'forex', r.eurH, r.eurD, dxyBias));
+      if (r.gbpD && r.gbpH) cards.push(buildCard('Livre / Dollar', 'GBP/USD', 'forex', r.gbpH, r.gbpD, dxyBias));
+      if (r.xauD && r.xauH) cards.push(buildCard('Or', 'XAU/USD', 'forex', r.xauH, r.xauD, dxyBias));
       return cards.length ? cards : null;
     });
   }
 
   // Contexte multi-unités (H1 / H4 / D1) pour le Bot IA — alignement top-down.
   function mtf() {
-    var pairs = [{ sym: 'BTC/USD', src: 'BTCUSDT' }, { sym: 'ETH/USD', src: 'ETHUSDT' }, { sym: 'SOL/USD', src: 'SOLUSDT' }];
+    var pairs = [{ sym: 'BTC/USD', src: 'BTCUSDT' }, { sym: 'ETH/USD', src: 'ETHUSDT' }, { sym: 'SOL/USD', src: 'SOLUSDT' },
+      { sym: 'EUR/USD', src: 'EURUSDT' }, { sym: 'GBP/USD', src: 'GBPUSDT' }, { sym: 'XAU/USD', src: 'PAXGUSDT' }];
     var tfs = [{ n: 'D1', i: '1d' }, { n: 'H4', i: '4h' }, { n: 'H1', i: '1h' }];
     var jobs = [];
     pairs.forEach(function (p) {

@@ -659,16 +659,17 @@
     var oteIn = ot && price >= Math.min(ot.bottom, ot.top) && price <= Math.max(ot.bottom, ot.top);
     if (oteIn) conf += 6;                          // prix dans l'OTE (62-79%)
     if (cyc === 'Expansion' || cyc === 'Accumulation') conf += 4;
+    // DXY inversé pour crypto/or ET forex quotés en USD (…/USD) : DXY baissier = dollar faible = favorable au long.
     var fav = (dir === 'LONG' && dxyBias === 'baissier') || (dir === 'SHORT' && dxyBias === 'haussier');
-    if (fav && cls === 'crypto') conf += 10;
-    else if (dxyBias && dxyBias !== 'neutre' && cls === 'crypto') conf -= 8; // DXY à contre-courant
+    if (fav) conf += 10;
+    else if (dxyBias && dxyBias !== 'neutre') conf -= 8; // DXY à contre-courant
     conf = clamp(conf, 0, 97);
 
     var inZone = price >= Math.min(poi[0], poi[1]) && price <= Math.max(poi[0], poi[1]);
     var prog = clamp(conf + (inZone ? 10 : -3) + (rr >= 2 ? 4 : 0), 20, 100);
     var win = clamp(Math.round(conf * 0.82), 40, 85);
     var reason = [st.label, 'zone ' + zoneName, poiType + ' aligné', 'cible liquidité (' + rr + 'R)']
-      .concat(fav && cls === 'crypto' ? ['DXY favorable'] : []).join(' · ');
+      .concat(fav ? ['DXY favorable'] : []).join(' · ');
     chart.entry = entry; chart.sl = sl; chart.tp = tp;
     return { sym: sym, name: name, cls: cls, price: price, chg: chg, dir: dir, conf: conf, cycle: cyc,
       entry: entry, sl: sl, tp: tp, rr: rr, win: win, prog: prog, note: reason, chart: chart };
@@ -714,6 +715,11 @@
       btcD: binance('BTCUSDT', '1d', 120), btcH: binance('BTCUSDT', '4h', 150),
       ethD: binance('ETHUSDT', '1d', 120), ethH: binance('ETHUSDT', '4h', 150),
       solD: binance('SOLUSDT', '1d', 120), solH: binance('SOLUSDT', '4h', 150),
+      // Forex & or en VRAIES bougies via Binance (EUR/USDT, GBP/USDT, PAXG/USDT).
+      // USDT ≈ USD ; la structure/les zones/les niveaux sont fidèles (écart ~0,1 % sur le prix absolu).
+      eurD: binance('EURUSDT', '1d', 120), eurH: binance('EURUSDT', '4h', 150),
+      gbpD: binance('GBPUSDT', '1d', 120), gbpH: binance('GBPUSDT', '4h', 150),
+      xauD: binance('PAXGUSDT', '1d', 120), xauH: binance('PAXGUSDT', '4h', 150),
       fx: frankfurter()
     };
     function safe(p) { return p.then(function (v) { return v; }, function () { return null; }); }
@@ -730,18 +736,18 @@
       if (r.btcD && r.btcH) cards.push(buildCard('Bitcoin', 'BTC/USD', 'crypto', r.btcH, r.btcD, dxyBias));
       if (r.ethD && r.ethH) cards.push(buildCard('Ethereum', 'ETH/USD', 'crypto', r.ethH, r.ethD, dxyBias));
       if (r.solD && r.solH) cards.push(buildCard('Solana', 'SOL/USD', 'crypto', r.solH, r.solD, dxyBias));
-      if (r.fx) {
-        cards.push(buildCard('Livre / Dollar', 'GBP/USD', 'forex', r.fx.gbp, r.fx.gbp, dxyBias, null, true));
-        cards.push(buildCard('Dollar / Yen', 'USD/JPY', 'forex', r.fx.jpy, r.fx.jpy, dxyBias, null, true));
-        cards.push(buildCard('Euro / Yen', 'EUR/JPY', 'forex', r.fx.eurjpy, r.fx.eurjpy, dxyBias, null, true));
-      }
+      // Forex majors + or : VRAIS trades (bougies réelles). USD au dénominateur -> même logique DXY que la crypto.
+      if (r.eurD && r.eurH) cards.push(buildCard('Euro / Dollar', 'EUR/USD', 'forex', r.eurH, r.eurD, dxyBias));
+      if (r.gbpD && r.gbpH) cards.push(buildCard('Livre / Dollar', 'GBP/USD', 'forex', r.gbpH, r.gbpD, dxyBias));
+      if (r.xauD && r.xauH) cards.push(buildCard('Or', 'XAU/USD', 'forex', r.xauH, r.xauD, dxyBias));
       return cards.length ? cards : null;
     });
   }
 
   // Contexte multi-unités (H1 / H4 / D1) pour le Bot IA — alignement top-down.
   function mtf() {
-    var pairs = [{ sym: 'BTC/USD', src: 'BTCUSDT' }, { sym: 'ETH/USD', src: 'ETHUSDT' }, { sym: 'SOL/USD', src: 'SOLUSDT' }];
+    var pairs = [{ sym: 'BTC/USD', src: 'BTCUSDT' }, { sym: 'ETH/USD', src: 'ETHUSDT' }, { sym: 'SOL/USD', src: 'SOLUSDT' },
+      { sym: 'EUR/USD', src: 'EURUSDT' }, { sym: 'GBP/USD', src: 'GBPUSDT' }, { sym: 'XAU/USD', src: 'PAXGUSDT' }];
     var tfs = [{ n: 'D1', i: '1d' }, { n: 'H4', i: '4h' }, { n: 'H1', i: '1h' }];
     var jobs = [];
     pairs.forEach(function (p) {
@@ -786,21 +792,18 @@ const MOCK = [
   { sym:'SOL/USD', name:'Solana', cls:'crypto', price:73.4, chg:-1.8, dir:'SHORT', conf:79, cycle:'Distribution',
     entry:74.9, sl:77.4, tp:70.5, rr:2.6, win:66, prog:74,
     note:'Calage en haut de range, premium, structure baissière.' },
-  { sym:'XAU/USD', name:'Or', cls:'forex', price:2418.5, chg:-0.4, dir:'WAIT', conf:41, cycle:'Transition',
-    entry:null, sl:null, tp:null, rr:null, win:null, prog:35,
-    note:'Pas de biais net — on reste à l\'écart tant que la structure n\'est pas claire.' },
+  { sym:'EUR/USD', name:'Euro / Dollar', cls:'forex', price:1.0842, chg:+0.2, dir:'LONG', conf:66, cycle:'Accumulation',
+    entry:1.0808, sl:1.0762, tp:1.0930, rr:2.6, win:62, prog:61,
+    note:'Discount + FVG H4, dollar (DXY) qui faiblit → favorable.' },
   { sym:'GBP/USD', name:'Livre / Dollar', cls:'forex', price:1.2712, chg:+0.3, dir:'LONG', conf:69, cycle:'Manipulation',
     entry:1.2668, sl:1.2610, tp:1.2840, rr:3.0, win:64, prog:67,
     note:'Liquidité prise sous un creux, clôture au-dessus → piège baissier.' },
-  { sym:'USD/JPY', name:'Dollar / Yen', cls:'forex', price:152.35, chg:-0.5, dir:'SHORT', conf:61, cycle:'Distribution',
-    entry:153.1, sl:154.0, tp:150.4, rr:3.0, win:60, prog:52,
-    note:'DXY qui faiblit, premium sur H4.' },
-  { sym:'EUR/JPY', name:'Euro / Yen', cls:'forex', price:164.8, chg:+0.1, dir:'WAIT', conf:38, cycle:'Transition',
-    entry:null, sl:null, tp:null, rr:null, win:null, prog:30,
-    note:'Biais contradictoire D1 / H4. On patiente.' },
-  { sym:'DXY', name:'Indice dollar', cls:'forex', price:99.71, chg:-0.6, dir:'SHORT', conf:58, cycle:'Expansion',
-    entry:100.05, sl:100.62, tp:98.60, rr:2.5, win:59, prog:55,
-    note:'Impulsion baissière — contexte favorable au risque (crypto / or).' },
+  { sym:'XAU/USD', name:'Or', cls:'forex', price:2418.5, chg:-0.4, dir:'WAIT', conf:41, cycle:'Transition',
+    entry:null, sl:null, tp:null, rr:null, win:null, prog:35,
+    note:'Pas de biais net — on reste à l\'écart tant que la structure n\'est pas claire.' },
+  { sym:'DXY', name:'Indice dollar', cls:'forex', price:99.71, chg:-0.6, dir:'WAIT', conf:58, cycle:'Expansion',
+    entry:null, sl:null, tp:null, rr:null, win:null, prog:55,
+    note:'Boussole du dollar — impulsion baissière, contexte favorable au risque (crypto / or / forex).' },
 ];
 let PAIRS = MOCK;
 
