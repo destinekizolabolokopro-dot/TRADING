@@ -52,8 +52,10 @@
     if (changed) save(h);
   }
 
-  function bilan() {
-    var all = load(), closed = all.filter(function (x) { return x.status === 'closed'; });
+  function bilan(source) {
+    var all = load();
+    if (source) all = all.filter(function (x) { return x.source === source; });
+    var closed = all.filter(function (x) { return x.status === 'closed'; });
     var wins = closed.filter(function (x) { return x.result === 'win'; }).length;
     var rsum = closed.reduce(function (a, x) { return a + (x.r || 0); }, 0);
     return { total: closed.length, wins: wins, loss: closed.length - wins,

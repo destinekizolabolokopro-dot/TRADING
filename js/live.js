@@ -12,6 +12,9 @@
 
   var BINANCE = ['https://api.binance.com', 'https://data-api.binance.vision', 'https://api1.binance.com'];
   var clamp = function (n, a, b) { return Math.max(a, Math.min(b, n)); };
+  // Anti-données périmées : une paire dont la dernière bougie a plus de 3 jours est ignorée
+  // (ex. certaines paires forex sont "mortes" sur Binance et resteraient figées).
+  var fresh = function (c) { return c && c.length && (Date.now() - c[c.length - 1].t) < 3 * 864e5; };
 
   // ---- Détections ICT compactes --------------------------------------------
   function swings(c) {
@@ -215,10 +218,11 @@
       btcD: binance('BTCUSDT', '1d', 120), btcH: binance('BTCUSDT', '4h', 150),
       ethD: binance('ETHUSDT', '1d', 120), ethH: binance('ETHUSDT', '4h', 150),
       solD: binance('SOLUSDT', '1d', 120), solH: binance('SOLUSDT', '4h', 150),
-      // Forex & or en VRAIES bougies via Binance (EUR/USDT, GBP/USDT, PAXG/USDT).
+      xrpD: binance('XRPUSDT', '1d', 120), xrpH: binance('XRPUSDT', '4h', 150),
+      bnbD: binance('BNBUSDT', '1d', 120), bnbH: binance('BNBUSDT', '4h', 150),
+      // Forex & or en VRAIES bougies via Binance (EUR/USDT, PAXG/USDT — paires liquides et à jour).
       // USDT ≈ USD ; la structure/les zones/les niveaux sont fidèles (écart ~0,1 % sur le prix absolu).
       eurD: binance('EURUSDT', '1d', 120), eurH: binance('EURUSDT', '4h', 150),
-      gbpD: binance('GBPUSDT', '1d', 120), gbpH: binance('GBPUSDT', '4h', 150),
       xauD: binance('PAXGUSDT', '1d', 120), xauH: binance('PAXGUSDT', '4h', 150),
       fx: frankfurter()
     };
@@ -233,13 +237,16 @@
         var dS = swings(r.fx.dxy), dSt = structure(r.fx.dxy, dS); dxyBias = dSt.bias;
         cards.push(buildCard('Indice dollar', 'DXY', 'forex', r.fx.dxy, r.fx.dxy, null, null, true));
       }
-      if (r.btcD && r.btcH) cards.push(buildCard('Bitcoin', 'BTC/USD', 'crypto', r.btcH, r.btcD, dxyBias));
-      if (r.ethD && r.ethH) cards.push(buildCard('Ethereum', 'ETH/USD', 'crypto', r.ethH, r.ethD, dxyBias));
-      if (r.solD && r.solH) cards.push(buildCard('Solana', 'SOL/USD', 'crypto', r.solH, r.solD, dxyBias));
-      // Forex majors + or : VRAIS trades (bougies réelles). USD au dénominateur -> même logique DXY que la crypto.
-      if (r.eurD && r.eurH) cards.push(buildCard('Euro / Dollar', 'EUR/USD', 'forex', r.eurH, r.eurD, dxyBias));
-      if (r.gbpD && r.gbpH) cards.push(buildCard('Livre / Dollar', 'GBP/USD', 'forex', r.gbpH, r.gbpD, dxyBias));
-      if (r.xauD && r.xauH) cards.push(buildCard('Or', 'XAU/USD', 'forex', r.xauH, r.xauD, dxyBias));
+      // Chaque paire n'est ajoutée que si ses données sont FRAÎCHES (garde-fou anti-prix figé).
+      function add(name, sym, cls, H, D) { if (H && D && fresh(H)) cards.push(buildCard(name, sym, cls, H, D, dxyBias)); }
+      add('Bitcoin', 'BTC/USD', 'crypto', r.btcH, r.btcD);
+      add('Ethereum', 'ETH/USD', 'crypto', r.ethH, r.ethD);
+      add('Solana', 'SOL/USD', 'crypto', r.solH, r.solD);
+      add('XRP', 'XRP/USD', 'crypto', r.xrpH, r.xrpD);
+      add('BNB', 'BNB/USD', 'crypto', r.bnbH, r.bnbD);
+      // Forex + or : VRAIS trades (bougies réelles). USD au dénominateur -> même logique DXY que la crypto.
+      add('Euro / Dollar', 'EUR/USD', 'forex', r.eurH, r.eurD);
+      add('Or', 'XAU/USD', 'forex', r.xauH, r.xauD);
       return cards.length ? cards : null;
     });
   }
@@ -247,7 +254,8 @@
   // Contexte multi-unités (H1 / H4 / D1) pour le Bot IA — alignement top-down.
   function mtf() {
     var pairs = [{ sym: 'BTC/USD', src: 'BTCUSDT' }, { sym: 'ETH/USD', src: 'ETHUSDT' }, { sym: 'SOL/USD', src: 'SOLUSDT' },
-      { sym: 'EUR/USD', src: 'EURUSDT' }, { sym: 'GBP/USD', src: 'GBPUSDT' }, { sym: 'XAU/USD', src: 'PAXGUSDT' }];
+      { sym: 'XRP/USD', src: 'XRPUSDT' }, { sym: 'BNB/USD', src: 'BNBUSDT' },
+      { sym: 'EUR/USD', src: 'EURUSDT' }, { sym: 'XAU/USD', src: 'PAXGUSDT' }];
     var tfs = [{ n: 'D1', i: '1d' }, { n: 'H4', i: '4h' }, { n: 'H1', i: '1h' }];
     var jobs = [];
     pairs.forEach(function (p) {

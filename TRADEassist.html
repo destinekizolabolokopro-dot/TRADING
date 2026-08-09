@@ -378,8 +378,10 @@
     if (changed) save(h);
   }
 
-  function bilan() {
-    var all = load(), closed = all.filter(function (x) { return x.status === 'closed'; });
+  function bilan(source) {
+    var all = load();
+    if (source) all = all.filter(function (x) { return x.source === source; });
+    var closed = all.filter(function (x) { return x.status === 'closed'; });
     var wins = closed.filter(function (x) { return x.result === 'win'; }).length;
     var rsum = closed.reduce(function (a, x) { return a + (x.r || 0); }, 0);
     return { total: closed.length, wins: wins, loss: closed.length - wins,
@@ -512,6 +514,9 @@
 
   var BINANCE = ['https://api.binance.com', 'https://data-api.binance.vision', 'https://api1.binance.com'];
   var clamp = function (n, a, b) { return Math.max(a, Math.min(b, n)); };
+  // Anti-données périmées : une paire dont la dernière bougie a plus de 3 jours est ignorée
+  // (ex. certaines paires forex sont "mortes" sur Binance et resteraient figées).
+  var fresh = function (c) { return c && c.length && (Date.now() - c[c.length - 1].t) < 3 * 864e5; };
 
   // ---- Détections ICT compactes --------------------------------------------
   function swings(c) {
@@ -715,10 +720,11 @@
       btcD: binance('BTCUSDT', '1d', 120), btcH: binance('BTCUSDT', '4h', 150),
       ethD: binance('ETHUSDT', '1d', 120), ethH: binance('ETHUSDT', '4h', 150),
       solD: binance('SOLUSDT', '1d', 120), solH: binance('SOLUSDT', '4h', 150),
-      // Forex & or en VRAIES bougies via Binance (EUR/USDT, GBP/USDT, PAXG/USDT).
+      xrpD: binance('XRPUSDT', '1d', 120), xrpH: binance('XRPUSDT', '4h', 150),
+      bnbD: binance('BNBUSDT', '1d', 120), bnbH: binance('BNBUSDT', '4h', 150),
+      // Forex & or en VRAIES bougies via Binance (EUR/USDT, PAXG/USDT — paires liquides et à jour).
       // USDT ≈ USD ; la structure/les zones/les niveaux sont fidèles (écart ~0,1 % sur le prix absolu).
       eurD: binance('EURUSDT', '1d', 120), eurH: binance('EURUSDT', '4h', 150),
-      gbpD: binance('GBPUSDT', '1d', 120), gbpH: binance('GBPUSDT', '4h', 150),
       xauD: binance('PAXGUSDT', '1d', 120), xauH: binance('PAXGUSDT', '4h', 150),
       fx: frankfurter()
     };
@@ -733,13 +739,16 @@
         var dS = swings(r.fx.dxy), dSt = structure(r.fx.dxy, dS); dxyBias = dSt.bias;
         cards.push(buildCard('Indice dollar', 'DXY', 'forex', r.fx.dxy, r.fx.dxy, null, null, true));
       }
-      if (r.btcD && r.btcH) cards.push(buildCard('Bitcoin', 'BTC/USD', 'crypto', r.btcH, r.btcD, dxyBias));
-      if (r.ethD && r.ethH) cards.push(buildCard('Ethereum', 'ETH/USD', 'crypto', r.ethH, r.ethD, dxyBias));
-      if (r.solD && r.solH) cards.push(buildCard('Solana', 'SOL/USD', 'crypto', r.solH, r.solD, dxyBias));
-      // Forex majors + or : VRAIS trades (bougies réelles). USD au dénominateur -> même logique DXY que la crypto.
-      if (r.eurD && r.eurH) cards.push(buildCard('Euro / Dollar', 'EUR/USD', 'forex', r.eurH, r.eurD, dxyBias));
-      if (r.gbpD && r.gbpH) cards.push(buildCard('Livre / Dollar', 'GBP/USD', 'forex', r.gbpH, r.gbpD, dxyBias));
-      if (r.xauD && r.xauH) cards.push(buildCard('Or', 'XAU/USD', 'forex', r.xauH, r.xauD, dxyBias));
+      // Chaque paire n'est ajoutée que si ses données sont FRAÎCHES (garde-fou anti-prix figé).
+      function add(name, sym, cls, H, D) { if (H && D && fresh(H)) cards.push(buildCard(name, sym, cls, H, D, dxyBias)); }
+      add('Bitcoin', 'BTC/USD', 'crypto', r.btcH, r.btcD);
+      add('Ethereum', 'ETH/USD', 'crypto', r.ethH, r.ethD);
+      add('Solana', 'SOL/USD', 'crypto', r.solH, r.solD);
+      add('XRP', 'XRP/USD', 'crypto', r.xrpH, r.xrpD);
+      add('BNB', 'BNB/USD', 'crypto', r.bnbH, r.bnbD);
+      // Forex + or : VRAIS trades (bougies réelles). USD au dénominateur -> même logique DXY que la crypto.
+      add('Euro / Dollar', 'EUR/USD', 'forex', r.eurH, r.eurD);
+      add('Or', 'XAU/USD', 'forex', r.xauH, r.xauD);
       return cards.length ? cards : null;
     });
   }
@@ -747,7 +756,8 @@
   // Contexte multi-unités (H1 / H4 / D1) pour le Bot IA — alignement top-down.
   function mtf() {
     var pairs = [{ sym: 'BTC/USD', src: 'BTCUSDT' }, { sym: 'ETH/USD', src: 'ETHUSDT' }, { sym: 'SOL/USD', src: 'SOLUSDT' },
-      { sym: 'EUR/USD', src: 'EURUSDT' }, { sym: 'GBP/USD', src: 'GBPUSDT' }, { sym: 'XAU/USD', src: 'PAXGUSDT' }];
+      { sym: 'XRP/USD', src: 'XRPUSDT' }, { sym: 'BNB/USD', src: 'BNBUSDT' },
+      { sym: 'EUR/USD', src: 'EURUSDT' }, { sym: 'XAU/USD', src: 'PAXGUSDT' }];
     var tfs = [{ n: 'D1', i: '1d' }, { n: 'H4', i: '4h' }, { n: 'H1', i: '1h' }];
     var jobs = [];
     pairs.forEach(function (p) {
@@ -792,12 +802,15 @@ const MOCK = [
   { sym:'SOL/USD', name:'Solana', cls:'crypto', price:73.4, chg:-1.8, dir:'SHORT', conf:79, cycle:'Distribution',
     entry:74.9, sl:77.4, tp:70.5, rr:2.6, win:66, prog:74,
     note:'Calage en haut de range, premium, structure baissière.' },
+  { sym:'XRP/USD', name:'XRP', cls:'crypto', price:1.03, chg:+2.1, dir:'LONG', conf:63, cycle:'Expansion',
+    entry:1.008, sl:0.982, tp:1.086, rr:3.0, win:60, prog:64,
+    note:'Cassure haussière, retour sur FVG en discount.' },
+  { sym:'BNB/USD', name:'BNB', cls:'crypto', price:604, chg:-0.7, dir:'WAIT', conf:44, cycle:'Transition',
+    entry:null, sl:null, tp:null, rr:null, win:null, prog:36,
+    note:'Range serré — on attend la sortie de zone.' },
   { sym:'EUR/USD', name:'Euro / Dollar', cls:'forex', price:1.0842, chg:+0.2, dir:'LONG', conf:66, cycle:'Accumulation',
     entry:1.0808, sl:1.0762, tp:1.0930, rr:2.6, win:62, prog:61,
     note:'Discount + FVG H4, dollar (DXY) qui faiblit → favorable.' },
-  { sym:'GBP/USD', name:'Livre / Dollar', cls:'forex', price:1.2712, chg:+0.3, dir:'LONG', conf:69, cycle:'Manipulation',
-    entry:1.2668, sl:1.2610, tp:1.2840, rr:3.0, win:64, prog:67,
-    note:'Liquidité prise sous un creux, clôture au-dessus → piège baissier.' },
   { sym:'XAU/USD', name:'Or', cls:'forex', price:2418.5, chg:-0.4, dir:'WAIT', conf:41, cycle:'Transition',
     entry:null, sl:null, tp:null, rr:null, win:null, prog:35,
     note:'Pas de biais net — on reste à l\'écart tant que la structure n\'est pas claire.' },
@@ -859,6 +872,11 @@ function card(p){
   const v = VERD[p.dir];
   const isTrade = p.dir!=='WAIT';
   const p10 = { risk:100, gain: isTrade ? Math.round(100*p.rr) : 0 };
+  // Réussite : le VRAI taux du bot (journal) dès qu'il y a assez de trades clôturés, sinon une estimation honnête.
+  const jb = (isTrade && window.History) ? History.bilan('Bot règles') : null;
+  const realRate = (jb && jb.total>=5) ? jb.rate : null;
+  const rateVal = realRate!=null ? realRate+'%' : '~'+p.win+'%';
+  const rateKey = realRate!=null ? ('Réussite ('+jb.total+')') : 'Réussite (est.)';
   const el = document.createElement('article');
   el.className='card'; el.tabIndex=0; el.dataset.cls=p.cls; el.dataset.signal=isTrade?'1':'0';
   el.innerHTML = `
@@ -894,7 +912,7 @@ function card(p){
       </div>
       <div class="metrics">
         <div class="m"><span class="k">Ratio</span><span class="v">${p.rr} R</span></div>
-        <div class="m"><span class="k">Réussite</span><span class="v">${p.win}%</span></div>
+        <div class="m"><span class="k">${rateKey}</span><span class="v">${rateVal}</span></div>
         <div class="m"><span class="k">Confluence</span><span class="v">${p.conf}%</span></div>
         <div class="m"><span class="k">Sur 10 000 €</span><span class="v"><span class="gain">+${p10.gain} €</span> / <span class="loss">−${p10.risk} €</span></span></div>
       </div>` : `
