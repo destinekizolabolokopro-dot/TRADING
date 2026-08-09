@@ -604,13 +604,23 @@
       return base;
     }
 
-    // Entrée au milieu du POI, STOP serré juste au-delà, CIBLE sur la liquidité (extrême de range).
+    // Entrée au milieu du POI. STOP au-delà du POI mais avec un PLANCHER réaliste,
+    // sinon un FVG très fin donne un risque minuscule et un RR délirant (30, 40…).
     var entry = (poi[0] + poi[1]) / 2;
     var span = Math.abs(poi[1] - poi[0]) || price * 0.0015;
-    var sl = dir === 'LONG' ? poi[0] - span * 0.6 : poi[1] + span * 0.6;
-    var tp = dir === 'LONG' ? r.hi : r.lo;
+    var rangeSpan = Math.abs(r.hi - r.lo) || price * 0.01;
+    // Un stop institutionnel se loge derrière le swing : au minimum ~12 % du dealing range.
+    var minRisk = Math.max(span * 1.1, rangeSpan * 0.12, price * 0.002);
+    var slRaw = dir === 'LONG' ? poi[0] - span * 0.6 : poi[1] + span * 0.6;
+    var slFloor = dir === 'LONG' ? entry - minRisk : entry + minRisk;
+    var sl = dir === 'LONG' ? Math.min(slRaw, slFloor) : Math.max(slRaw, slFloor);
+    var risk = Math.abs(entry - sl);
+    // CIBLE : la liquidité (extrême de range), mais RR PLAFONNÉ à un niveau atteignable.
+    var MAXRR = 6;
+    var tpLiq = dir === 'LONG' ? r.hi : r.lo;
+    var rew = Math.min(Math.abs(tpLiq - entry), risk * MAXRR);
+    var tp = dir === 'LONG' ? entry + rew : entry - rew;
     var ok = dir === 'LONG' ? (sl < entry && tp > entry) : (sl > entry && tp < entry);
-    var risk = Math.abs(entry - sl), rew = Math.abs(tp - entry);
     if (!ok || risk <= 0) { base.prog = 48; base.note = 'Géométrie invalide — on attend.'; return base; }
     var rr = +(rew / risk).toFixed(1);
     if (rr < 1) { base.prog = 48; base.note = 'Setup aligné mais RR < 1 (cible trop proche) — on attend un meilleur point.'; return base; }
