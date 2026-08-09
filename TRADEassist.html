@@ -323,10 +323,420 @@
   </div>
 </div>
 
-<script src="js/history.js"></script>
-<script src="js/ai.js"></script>
+<script>
+/*
+ * Historique des trades — journal local (localStorage).
+ * Enregistre chaque trade proposé par les bots (avec la SOURCE : quel bot),
+ * clôture au TP (gagné) ou au SL (perdu) selon le prix courant, et calcule le bilan.
+ */
+(function (root) {
+  'use strict';
+  var STORE = 'tradeassist.history.v2'; // v2 : ignore l'ancien historique gonflé/faux
+  var COOLDOWN = 6 * 3600 * 1000; // 6 h avant de rouvrir le même trade après clôture
+  // Nettoyage des anciens journaux pourris (bug des faux gains empilés).
+  try { localStorage.removeItem('tradeassist.history'); localStorage.removeItem('ictsmc.history'); } catch (e) {}
 
-<script src="js/live.js"></script>
+  function load() { try { return JSON.parse(localStorage.getItem(STORE) || '[]'); } catch (e) { return []; } }
+  function save(h) { try { localStorage.setItem(STORE, JSON.stringify(h)); } catch (e) {} }
+
+  // Ajoute les nouveaux trades (t = {sym,dir,entry,sl,tp,rr}) pour une source donnée.
+  function record(list, source) {
+    var h = load(), added = 0;
+    (list || []).forEach(function (t) {
+      if (!t || t.dir === 'WAIT' || t.rr == null || t.entry == null || t.sl == null || t.tp == null) return;
+      var open = h.some(function (x) { return x.status === 'open' && x.symbol === t.sym && x.source === source && x.direction === t.dir; });
+      var cd = h.some(function (x) { return x.status === 'closed' && x.symbol === t.sym && x.source === source && x.direction === t.dir && x.closedTs && (Date.now() - x.closedTs) < COOLDOWN; });
+      if (open || cd) return;
+      h.push({ id: Date.now() + '-' + t.sym + '-' + source + '-' + Math.random().toString(36).slice(2, 6),
+        ts: Date.now(), source: source, symbol: t.sym, direction: t.dir,
+        entry: +t.entry, sl: +t.sl, tp: +t.tp, rr: +t.rr, motif: t.note || '',
+        status: 'open', result: null, r: null });
+      added++;
+    });
+    if (added) save(h);
+    return added;
+  }
+
+  // Clôture les trades ouverts selon le prix courant {symbole: prix}.
+  function evaluate(priceBySym) {
+    var h = load(), changed = false;
+    h.forEach(function (x) {
+      if (x.status !== 'open') return;
+      var p = priceBySym[x.symbol]; if (p == null) return;
+      var hit = null;
+      if (x.direction === 'LONG') { if (p <= x.sl) hit = 'loss'; else if (p >= x.tp) hit = 'win'; }
+      else { if (p >= x.sl) hit = 'loss'; else if (p <= x.tp) hit = 'win'; }
+      if (hit) { x.status = 'closed'; x.result = hit; x.closedTs = Date.now(); x.r = hit === 'win' ? x.rr : -1; changed = true; }
+    });
+    if (changed) save(h);
+  }
+
+  function bilan() {
+    var all = load(), closed = all.filter(function (x) { return x.status === 'closed'; });
+    var wins = closed.filter(function (x) { return x.result === 'win'; }).length;
+    var rsum = closed.reduce(function (a, x) { return a + (x.r || 0); }, 0);
+    return { total: closed.length, wins: wins, loss: closed.length - wins,
+      open: all.filter(function (x) { return x.status === 'open'; }).length,
+      rate: closed.length ? Math.round(wins / closed.length * 100) : null, rsum: +rsum.toFixed(1) };
+  }
+
+  function reset() { save([]); }
+
+  root.History = { load: load, record: record, evaluate: evaluate, bilan: bilan, reset: reset };
+})(typeof window !== 'undefined' ? window : this);
+
+</script>
+<script>
+/*
+ * Couche IA — appelle l'API Claude (Anthropic) depuis le navigateur.
+ * -----------------------------------------------------------------------------
+ * La clé API reste EN LOCAL (localStorage), ne quitte pas la machine de l'utilisateur.
+ * Claude reçoit l'état du marché (données réelles déjà calculées) et renvoie
+ * ses meilleures idées de trade, raisonnées, en français.
+ *
+ * ⚠️ Idées pédagogiques, pas un conseil financier. L'IA n'est pas infaillible.
+ */
+(function (root) {
+  'use strict';
+
+  var KEY_STORE = 'anthropic.key';
+  var MODEL_STORE = 'anthropic.model';
+  var ENDPOINT = 'https://api.anthropic.com/v1/messages';
+
+  function getKey() { try { return localStorage.getItem(KEY_STORE) || ''; } catch (e) { return ''; } }
+  function setKey(k) { try { localStorage.setItem(KEY_STORE, (k || '').trim()); } catch (e) {} }
+  function getModel() { try { return localStorage.getItem(MODEL_STORE) || 'claude-opus-5'; } catch (e) { return 'claude-opus-5'; } }
+  function setModel(m) { try { localStorage.setItem(MODEL_STORE, m); } catch (e) {} }
+
+  var SYSTEM =
+    "Tu es un BOT DE TRADING autonome, propulsé par Claude (Anthropic), intégré à un site ICT/SMC. Tu écris en français. " +
+    "Tu opères UNIQUEMENT sur les unités de temps H1, H4 et D1 — jamais en dessous de H1. " +
+    "Tu raisonnes en TOP-DOWN : le biais vient du D1, tu affines en H4, tu synchronises l'entrée en H1. " +
+    "Tu bases tes décisions PRINCIPALEMENT sur les concepts ICT/SMC (structure & BOS/CHoCH, MSS, FVG, order blocks, " +
+    "breaker, OTE 62-79%, liquidité/equal highs-lows, premium/discount, cycles Accumulation-Manipulation-Expansion-Distribution), " +
+    "MAIS tu es LIBRE d'employer toute autre technique intelligente et pertinente (momentum, confluence multi-unités, " +
+    "corrélations, contexte DXY) si elle augmente la probabilité de gagner. " +
+    "Le DXY est inversé pour crypto/or : DXY baissier = favorable, DXY haussier = défavorable. " +
+    "Ton objectif est d'être RENTABLE : cherche EN PRIORITÉ les meilleurs ratios risque/rendement — vise 2, 3, 4 ou plus " +
+    "quand la structure le permet (objectif au prochain pool de liquidité / extrême de range, stop serré mais logique). " +
+    "RÈGLE STRICTE : n'envoie JAMAIS un trade sous 1 RR. Si tu ne peux pas obtenir au moins 1 RR avec un stop logique, " +
+    "n'envoie tout simplement PAS ce trade (ne le mets pas dans la liste). Point d'entrée précis, stop au-delà d'un balayage/structure, objectif atteignable. " +
+    "Sois HONNÊTE : si aucun setup n'est net, renvoie une liste vide plutôt que de forcer un trade. " +
+    "Tu n'es pas un conseiller financier ; règle de gestion : risque max 1 % du compte par trade.";
+
+  function buildUser(pairs, mtf) {
+    var snap = pairs.map(function (p) {
+      return {
+        paire: p.sym, prix: p.price, sens_calcule: p.dir, cycle: p.cycle,
+        confluence_pct: p.conf, entree: p.entry, stop: p.sl, objectif: p.tp, rr: p.rr, note: p.note
+      };
+    });
+    var txt = "Tu es le Bot IA du site. Analyse le marché et envoie TES meilleures idées de trade (0 à 3), " +
+      "sur H1/H4/D1 uniquement, classées de la plus forte à la plus faible. " +
+      "N'inclus QUE des trades dont le rr est >= 1 (privilégie 2, 3, 4 ou plus). Jamais de trade sous 1 RR. " +
+      "Réponds UNIQUEMENT avec un objet JSON valide, sans texte autour, de la forme :\n" +
+      '{"marche":"résumé global en 1-2 phrases","idees":[{"paire":"BTC/USD","sens":"LONG|SHORT","tf":"H1|H4|D1",' +
+      '"entree":00,"stop":00,"objectif":00,"rr":0.0,"confiance":0,"pourquoi":"explication ICT/SMC courte en français"}]}\n' +
+      "Si rien n'atteint au moins 1 RR, renvoie \"idees\": [].";
+    if (mtf && mtf.length) {
+      txt += "\n\nDONNÉES MULTI-UNITÉS (D1 → H4 → H1) pour l'alignement top-down :\n" + JSON.stringify(mtf, null, 2);
+    }
+    txt += "\n\nRÉSUMÉ par paire (toutes paires, dont DXY/forex) :\n" + JSON.stringify(snap, null, 2);
+    return txt;
+  }
+
+  function analyze(pairs, mtf) {
+    var key = getKey();
+    if (!key) return Promise.reject(new Error('Aucune clé API. Colle ta clé Anthropic dans les réglages.'));
+    var model = getModel();
+    var body = {
+      model: model,
+      max_tokens: 2000,
+      output_config: { effort: 'low' }, // rapide & économique pour une analyse structurée
+      system: SYSTEM,
+      messages: [{ role: 'user', content: buildUser(pairs, mtf) }]
+    };
+    return fetch(ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true' // requis pour appeler depuis un navigateur
+      },
+      body: JSON.stringify(body)
+    }).then(function (res) {
+      if (!res.ok) {
+        return res.text().then(function (t) {
+          if (res.status === 401) throw new Error('Clé API invalide (401).');
+          if (res.status === 429) throw new Error('Limite atteinte (429) — réessaie plus tard.');
+          throw new Error('Erreur API ' + res.status + ' : ' + t.slice(0, 200));
+        });
+      }
+      return res.json();
+    }).then(function (data) {
+      if (data.stop_reason === 'refusal') throw new Error('Requête refusée par la sécurité du modèle.');
+      var text = (data.content || []).filter(function (b) { return b.type === 'text'; })
+        .map(function (b) { return b.text; }).join('');
+      var parsed = null;
+      var m = text.match(/\{[\s\S]*\}/);
+      if (m) { try { parsed = JSON.parse(m[0]); } catch (e) {} }
+      return { raw: text, parsed: parsed, usage: data.usage || {}, model: data.model || model };
+    });
+  }
+
+  root.AI = { analyze: analyze, getKey: getKey, setKey: setKey, getModel: getModel, setModel: setModel };
+})(typeof window !== 'undefined' ? window : this);
+
+</script>
+
+<script>
+/*
+ * Couche DONNÉES EN DIRECT du dashboard (navigateur, sans clé)
+ * -----------------------------------------------------------------------------
+ * - Crypto (BTC/ETH/SOL) : Binance (klines D1 + H4), CORS ouvert.
+ * - DXY + Forex (GBP/USD, USD/JPY, EUR/JPY) : calculés depuis les taux BCE
+ *   (Frankfurter, CORS ouvert, gratuit). Le DXY suit la formule ICE officielle.
+ * Renvoie des cartes prêtes à afficher, même forme que les données mock.
+ * En cas d'échec d'une source, la carte concernée retombe sur le mock.
+ */
+(function (root) {
+  'use strict';
+
+  var BINANCE = ['https://api.binance.com', 'https://data-api.binance.vision', 'https://api1.binance.com'];
+  var clamp = function (n, a, b) { return Math.max(a, Math.min(b, n)); };
+
+  // ---- Détections ICT compactes --------------------------------------------
+  function swings(c) {
+    var hi = [], lo = [];
+    for (var i = 2; i < c.length - 2; i++) {
+      if (c[i].h > c[i - 1].h && c[i].h > c[i - 2].h && c[i].h > c[i + 1].h && c[i].h > c[i + 2].h) hi.push({ i: i, p: c[i].h });
+      if (c[i].l < c[i - 1].l && c[i].l < c[i - 2].l && c[i].l < c[i + 1].l && c[i].l < c[i + 2].l) lo.push({ i: i, p: c[i].l });
+    }
+    return { hi: hi, lo: lo };
+  }
+  function structure(c, s) {
+    var last = c[c.length - 1], h = s.hi, l = s.lo;
+    if (!h.length || !l.length) return { bias: 'neutre', label: 'indéterminée' };
+    var up = h.length >= 2 && h[h.length - 1].p > h[h.length - 2].p && l.length >= 2 && l[l.length - 1].p > l[l.length - 2].p;
+    var dn = h.length >= 2 && h[h.length - 1].p < h[h.length - 2].p && l.length >= 2 && l[l.length - 1].p < l[l.length - 2].p;
+    if (last.c > h[h.length - 1].p) return { bias: 'haussier', label: 'BOS haussier' };
+    if (last.c < l[l.length - 1].p) return { bias: 'baissier', label: 'BOS baissier' };
+    if (up) return { bias: 'haussier', label: 'structure haussière' };
+    if (dn) return { bias: 'baissier', label: 'structure baissière' };
+    return { bias: 'neutre', label: 'range' };
+  }
+  function lastFVG(c) {
+    for (var i = c.length - 2; i >= 1; i--) {
+      var p = c[i - 1], n = c[i + 1], last = c[c.length - 1];
+      if (p.h < n.l) { if (last.c > p.h) return { type: 'haussier', bottom: p.h, top: n.l }; }
+      else if (p.l > n.h) { if (last.c < p.l) return { type: 'baissier', bottom: n.h, top: p.l }; }
+    }
+    return null;
+  }
+  function rng(s) {
+    var hi = s.hi[s.hi.length - 1], lo = s.lo[s.lo.length - 1];
+    if (!hi || !lo) return null;
+    return { hi: hi.p, lo: lo.p, eq: (hi.p + lo.p) / 2 };
+  }
+  function lastOB(c) {
+    for (var i = c.length - 3; i >= 1; i--) {
+      var b = c[i], down = b.c < b.o, up = b.c > b.o;
+      if (down && c[i + 1].c > b.h && c[i + 2].c >= c[i + 1].c) return { type: 'haussier', bottom: b.l, top: Math.max(b.o, b.c) };
+      if (up && c[i + 1].c < b.l && c[i + 2].c <= c[i + 1].c) return { type: 'baissier', bottom: Math.min(b.o, b.c), top: b.h };
+    }
+    return null;
+  }
+  function ote(c, s) {
+    var hi = s.hi[s.hi.length - 1], lo = s.lo[s.lo.length - 1];
+    if (!hi || !lo) return null;
+    var H = hi.p, L = lo.p, span = H - L;
+    if (hi.i > lo.i) return { type: 'achat', bottom: H - 0.79 * span, top: H - 0.62 * span };
+    return { type: 'vente', bottom: L + 0.62 * span, top: L + 0.79 * span };
+  }
+  function cyclePhase(c) {
+    var n = c.length, look = Math.min(12, n - 2), w = c.slice(n - look);
+    var hi = Math.max.apply(0, w.map(function (x) { return x.h; })), lo = Math.min.apply(0, w.map(function (x) { return x.l; }));
+    var price = c[n - 1].c, rangePct = (hi - lo) / price, last = c[n - 1];
+    var lastBody = Math.abs(last.c - last.o), avg = w.map(function (x) { return Math.abs(x.c - x.o); }).reduce(function (a, b) { return a + b; }, 0) / w.length;
+    var lastHi = null, lastLo = null, s = swings(c);
+    lastHi = s.hi[s.hi.length - 1]; lastLo = s.lo[s.lo.length - 1];
+    if (lastLo && last.l < lastLo.p && last.c > lastLo.p) return 'Manipulation';
+    if (lastHi && last.h > lastHi.p && last.c < lastHi.p) return 'Manipulation';
+    if (lastBody > 1.6 * avg) return 'Expansion';
+    if (rangePct < 0.035) return 'Accumulation';
+    var pos = (price - lo) / (hi - lo || 1);
+    if (pos > 0.8 || pos < 0.2) return 'Distribution';
+    return 'Transition';
+  }
+
+  // ---- Construction d'une carte de trade -----------------------------------
+  function buildCard(name, sym, cls, htf, dtf, dxyBias, note) {
+    var ds = swings(dtf), st = structure(dtf, ds), r = rng(ds);
+    var price = htf[htf.length - 1].c;
+    var prev = dtf.length >= 2 ? dtf[dtf.length - 2].c : price;
+    var chg = prev ? (price - prev) / prev * 100 : 0;
+    var cyc = cyclePhase(htf);
+    var dir = st.bias === 'haussier' ? 'LONG' : st.bias === 'baissier' ? 'SHORT' : 'WAIT';
+    var f = lastFVG(htf), ob = lastOB(htf), ot = ote(htf, swings(htf));
+    var chart = { candles: htf.slice(-48), fvg: f, ob: ob, ote: ot, range: r, entry: null, sl: null, tp: null, dir: dir };
+    var base = { sym: sym, name: name, cls: cls, price: price, chg: chg, dir: 'WAIT', conf: 40, cycle: cyc,
+      entry: null, sl: null, tp: null, rr: null, win: null, prog: 38, note: note || 'Pas de biais net — on attend.', chart: chart };
+    if (dir === 'WAIT' || !r) return base;
+
+    var zoneName = price < r.eq ? 'discount' : 'premium';
+
+    // GARDE-FOU ICT 1 : on n'achète pas en premium, on ne vend pas en discount.
+    var zoneOk = (dir === 'LONG' && zoneName === 'discount') || (dir === 'SHORT' && zoneName === 'premium');
+    if (!zoneOk) {
+      base.prog = 46;
+      base.note = 'Biais ' + st.bias + ' mais prix en ' + zoneName + ' — mauvaise zone pour ' + dir + ', on attend un retour en ' + (dir === 'LONG' ? 'discount' : 'premium') + '.';
+      return base;
+    }
+
+    // GARDE-FOU ICT 2 : il faut un POI aligné (FVG puis OB) dans le sens du biais.
+    var poi = null, poiType = null;
+    if (f && f.type === st.bias) { poi = [f.bottom, f.top]; poiType = 'FVG'; }
+    else if (ob && ob.type === st.bias) { poi = [ob.bottom, ob.top]; poiType = 'Order Block'; }
+    if (!poi) {
+      base.prog = 50;
+      base.note = 'Biais ' + st.bias + ' en ' + zoneName + ', mais pas de FVG/OB aligné — on attend la formation d\'une zone.';
+      return base;
+    }
+
+    // Entrée au milieu du POI, STOP serré juste au-delà, CIBLE sur la liquidité (extrême de range).
+    var entry = (poi[0] + poi[1]) / 2;
+    var span = Math.abs(poi[1] - poi[0]) || price * 0.0015;
+    var sl = dir === 'LONG' ? poi[0] - span * 0.6 : poi[1] + span * 0.6;
+    var tp = dir === 'LONG' ? r.hi : r.lo;
+    var ok = dir === 'LONG' ? (sl < entry && tp > entry) : (sl > entry && tp < entry);
+    var risk = Math.abs(entry - sl), rew = Math.abs(tp - entry);
+    if (!ok || risk <= 0) { base.prog = 48; base.note = 'Géométrie invalide — on attend.'; return base; }
+    var rr = +(rew / risk).toFixed(1);
+    if (rr < 1) { base.prog = 48; base.note = 'Setup aligné mais RR < 1 (cible trop proche) — on attend un meilleur point.'; return base; }
+
+    // Confluence renforcée
+    var conf = 48;
+    conf += 12;                                   // zone correcte (déjà validée)
+    if (poiType === 'FVG') conf += 12; else conf += 8;
+    if (st.label.indexOf('BOS') >= 0) conf += 12; // cassure de structure confirmée
+    var oteIn = ot && price >= Math.min(ot.bottom, ot.top) && price <= Math.max(ot.bottom, ot.top);
+    if (oteIn) conf += 6;                          // prix dans l'OTE (62-79%)
+    if (cyc === 'Expansion' || cyc === 'Accumulation') conf += 4;
+    var fav = (dir === 'LONG' && dxyBias === 'baissier') || (dir === 'SHORT' && dxyBias === 'haussier');
+    if (fav && cls === 'crypto') conf += 10;
+    else if (dxyBias && dxyBias !== 'neutre' && cls === 'crypto') conf -= 8; // DXY à contre-courant
+    conf = clamp(conf, 0, 97);
+
+    var inZone = price >= Math.min(poi[0], poi[1]) && price <= Math.max(poi[0], poi[1]);
+    var prog = clamp(conf + (inZone ? 10 : -3) + (rr >= 2 ? 4 : 0), 20, 100);
+    var win = clamp(Math.round(conf * 0.82), 40, 85);
+    var reason = [st.label, 'zone ' + zoneName, poiType + ' aligné', 'cible liquidité (' + rr + 'R)']
+      .concat(fav && cls === 'crypto' ? ['DXY favorable'] : []).join(' · ');
+    chart.entry = entry; chart.sl = sl; chart.tp = tp;
+    return { sym: sym, name: name, cls: cls, price: price, chg: chg, dir: dir, conf: conf, cycle: cyc,
+      entry: entry, sl: sl, tp: tp, rr: rr, win: win, prog: prog, note: reason, chart: chart };
+  }
+
+  // ---- Sources --------------------------------------------------------------
+  function fetchJSON(url) {
+    return fetch(url).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
+  }
+  function binance(src, interval, limit) {
+    var path = '/api/v3/klines?symbol=' + src + '&interval=' + interval + '&limit=' + (limit || 150);
+    function tryHost(i) {
+      if (i >= BINANCE.length) return Promise.reject(new Error('Binance injoignable'));
+      return fetchJSON(BINANCE[i] + path).then(function (d) {
+        return d.map(function (k) { return { t: k[0], o: +k[1], h: +k[2], l: +k[3], c: +k[4] }; }).slice(0, -1);
+      }).catch(function () { return tryHost(i + 1); });
+    }
+    return tryHost(0);
+  }
+  // Séries FX quotidiennes depuis Frankfurter (base USD) → DXY + paires.
+  function frankfurter() {
+    var d = new Date(Date.now() - 100 * 86400000);
+    var start = d.toISOString().slice(0, 10);
+    var url = 'https://api.frankfurter.dev/v1/' + start + '..?base=USD&symbols=EUR,JPY,GBP,CAD,CHF,SEK';
+    return fetchJSON(url).then(function (j) {
+      var dates = Object.keys(j.rates).sort();
+      var dxy = [], gbp = [], jpy = [], eurjpy = [];
+      dates.forEach(function (dt) {
+        var r = j.rates[dt];
+        var EURUSD = 1 / r.EUR, GBPUSD = 1 / r.GBP, USDJPY = r.JPY;
+        var v = 50.14348112 * Math.pow(EURUSD, -0.576) * Math.pow(USDJPY, 0.136) * Math.pow(GBPUSD, -0.119) *
+          Math.pow(r.CAD, 0.091) * Math.pow(r.SEK, 0.042) * Math.pow(r.CHF, 0.036);
+        var mk = function (x) { return { t: dt, o: x, h: x, l: x, c: x }; };
+        dxy.push(mk(v)); gbp.push(mk(GBPUSD)); jpy.push(mk(USDJPY)); eurjpy.push(mk(r.JPY / r.EUR));
+      });
+      return { dxy: dxy, gbp: gbp, jpy: jpy, eurjpy: eurjpy };
+    });
+  }
+
+  // ---- Chargement global ----------------------------------------------------
+  function load() {
+    var jobs = {
+      btcD: binance('BTCUSDT', '1d', 120), btcH: binance('BTCUSDT', '4h', 150),
+      ethD: binance('ETHUSDT', '1d', 120), ethH: binance('ETHUSDT', '4h', 150),
+      solD: binance('SOLUSDT', '1d', 120), solH: binance('SOLUSDT', '4h', 150),
+      fx: frankfurter()
+    };
+    function safe(p) { return p.then(function (v) { return v; }, function () { return null; }); }
+    var keys = Object.keys(jobs);
+    return Promise.all(keys.map(function (k) { return safe(jobs[k]); })).then(function (res) {
+      var r = {}; keys.forEach(function (k, i) { r[k] = res[i]; });
+      var cards = [];
+      // DXY d'abord (contexte pour les cryptos)
+      var dxyBias = 'neutre';
+      if (r.fx) {
+        var dS = swings(r.fx.dxy), dSt = structure(r.fx.dxy, dS); dxyBias = dSt.bias;
+        cards.push(buildCard('Indice dollar', 'DXY', 'forex', r.fx.dxy, r.fx.dxy, null, null));
+      }
+      if (r.btcD && r.btcH) cards.push(buildCard('Bitcoin', 'BTC/USD', 'crypto', r.btcH, r.btcD, dxyBias));
+      if (r.ethD && r.ethH) cards.push(buildCard('Ethereum', 'ETH/USD', 'crypto', r.ethH, r.ethD, dxyBias));
+      if (r.solD && r.solH) cards.push(buildCard('Solana', 'SOL/USD', 'crypto', r.solH, r.solD, dxyBias));
+      if (r.fx) {
+        cards.push(buildCard('Livre / Dollar', 'GBP/USD', 'forex', r.fx.gbp, r.fx.gbp, dxyBias));
+        cards.push(buildCard('Dollar / Yen', 'USD/JPY', 'forex', r.fx.jpy, r.fx.jpy, dxyBias));
+        cards.push(buildCard('Euro / Yen', 'EUR/JPY', 'forex', r.fx.eurjpy, r.fx.eurjpy, dxyBias));
+      }
+      return cards.length ? cards : null;
+    });
+  }
+
+  // Contexte multi-unités (H1 / H4 / D1) pour le Bot IA — alignement top-down.
+  function mtf() {
+    var pairs = [{ sym: 'BTC/USD', src: 'BTCUSDT' }, { sym: 'ETH/USD', src: 'ETHUSDT' }, { sym: 'SOL/USD', src: 'SOLUSDT' }];
+    var tfs = [{ n: 'D1', i: '1d' }, { n: 'H4', i: '4h' }, { n: 'H1', i: '1h' }];
+    var jobs = [];
+    pairs.forEach(function (p) {
+      tfs.forEach(function (tf) {
+        jobs.push(binance(p.src, tf.i, 150).then(function (c) { return { p: p, tf: tf, c: c }; }, function () { return { p: p, tf: tf, c: null }; }));
+      });
+    });
+    return Promise.all(jobs).then(function (res) {
+      var byPair = {};
+      res.forEach(function (r) {
+        if (!byPair[r.p.sym]) byPair[r.p.sym] = { paire: r.p.sym, unites: {} };
+        if (!r.c || r.c.length < 30) return;
+        var c = r.c, s = swings(c), st = structure(c, s), rr = rng(s), price = c[c.length - 1].c, f = lastFVG(c), ot = ote(c, s), ob = lastOB(c);
+        var round = function (x) { return x == null ? null : +(x.toFixed(x >= 100 ? 2 : 4)); };
+        byPair[r.p.sym].unites[r.tf.n] = {
+          prix: round(price), structure: st.label, biais: st.bias, cycle: cyclePhase(c),
+          zone: rr ? (price < rr.eq ? 'discount' : 'premium') : '—',
+          fvg: f ? { type: f.type, bas: round(f.bottom), haut: round(f.top) } : null,
+          ote: ot ? { type: ot.type, bas: round(ot.bottom), haut: round(ot.top) } : null,
+          ob: ob ? { type: ob.type, bas: round(ob.bottom), haut: round(ob.top) } : null,
+          range: rr ? { haut: round(rr.hi), bas: round(rr.lo) } : null
+        };
+      });
+      return pairs.map(function (p) { return byPair[p.sym]; }).filter(Boolean);
+    });
+  }
+
+  root.LIVE = { load: load, mtf: mtf };
+})(typeof window !== 'undefined' ? window : this);
+
+</script>
 <script>
 /* ---------- Données mock (repli si le direct échoue) ---------- */
 const CYCLE_COLOR = { Accumulation:'#5b8', Manipulation:'var(--wait)', Expansion:'var(--long)', Distribution:'var(--short)', Transition:'var(--faint)' };

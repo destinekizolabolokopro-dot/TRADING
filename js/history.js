@@ -5,8 +5,10 @@
  */
 (function (root) {
   'use strict';
-  var STORE = 'tradeassist.history';
+  var STORE = 'tradeassist.history.v2'; // v2 : ignore l'ancien historique gonflé/faux
   var COOLDOWN = 6 * 3600 * 1000; // 6 h avant de rouvrir le même trade après clôture
+  // Nettoyage des anciens journaux pourris (bug des faux gains empilés).
+  try { localStorage.removeItem('tradeassist.history'); localStorage.removeItem('ictsmc.history'); } catch (e) {}
 
   function load() { try { return JSON.parse(localStorage.getItem(STORE) || '[]'); } catch (e) { return []; } }
   function save(h) { try { localStorage.setItem(STORE, JSON.stringify(h)); } catch (e) {} }
