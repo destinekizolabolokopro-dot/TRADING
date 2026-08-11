@@ -92,6 +92,15 @@
     }
     return null;
   }
+  // Displacement : bougie à corps impulsif (institutionnel), > 1,7× le corps moyen récent.
+  function displacement(c) {
+    var n = c.length; if (n < 11) return null;
+    var w = c.slice(n - 11, n - 1);
+    var avg = w.reduce(function (a, x) { return a + Math.abs(x.c - x.o); }, 0) / w.length;
+    var last = c[n - 1], body = Math.abs(last.c - last.o);
+    if (avg > 0 && body > 1.7 * avg) return last.c > last.o ? 'haussier' : 'baissier';
+    return null;
+  }
   function cyclePhase(c) {
     var n = c.length;
     if (n < 3) return 'Transition';
@@ -179,50 +188,55 @@
     var rr = +(rew / risk).toFixed(1);
     if (rr < 1) { base.prog = 48; base.note = 'Setup aligné mais RR < 1 (cible trop proche) — on attend un meilleur point.'; return base; }
 
-    // Confluence renforcée — chaque brique validée est un point de confluence, listé dans le motif.
-    var why = [st.label, 'zone ' + zoneName, poiType + ' aligné'];
-    var conf = 48 + 12;                            // base + zone correcte (déjà validée)
-    if (poiType === 'FVG') conf += 12; else conf += 8;
-    if (st.label.indexOf('BOS') >= 0) conf += 12;  // cassure de structure confirmée
-
-    // ALIGNEMENT TOP-DOWN : biais D1 (dtf) confirmé (ou non) par le H4 (htf).
-    var hBias = structure(htf, hsw).bias, aligned = hBias === st.bias;
-    if (aligned) { conf += 8; why.push('H4 aligné D1'); }
-    else if (hBias !== 'neutre') { conf -= 6; why.push('H4 divergent'); }
-
-    // MSS (Market Structure Shift) dans le sens du biais.
-    var ms = mss(htf, hsw);
-    if (ms === st.bias) { conf += 8; why.push('MSS ' + ms); }
-
-    // Liquidité : poche (equal highs/lows) visée dans le bon sens + balayage récent de la poche opposée.
-    var liqTarget = dir === 'LONG' ? liq.buy : liq.sell;
-    if (liqTarget != null) { conf += 6; why.push('liquidité ciblée'); }
-    var oppPool = dir === 'LONG' ? liq.sell : liq.buy, sweep = false;
+    // ================= CONFLUENCE DE CONCEPTS =================
+    // Chaque concept ICT/SMC "vote" une direction. Plus de concepts alignés = conviction plus forte.
+    var bias = st.bias; // 'haussier' (LONG) ou 'baissier' (SHORT) — dir en découle
+    var hBias = structure(htf, hsw).bias;                 // structure H4 (alignement top-down)
+    var ms = mss(htf, hsw);                               // Market Structure Shift / CHoCH
+    var disp = displacement(htf);                         // mouvement impulsif institutionnel
+    var zoneVote = zoneName === 'discount' ? 'haussier' : 'baissier';       // acheter bas / vendre haut
+    var oteVote = ot ? (ot.type === 'achat' ? 'haussier' : 'baissier') : null;
+    var oteIn = ot && price >= Math.min(ot.bottom, ot.top) && price <= Math.max(ot.bottom, ot.top);
+    var liqTarget = dir === 'LONG' ? liq.buy : liq.sell;  // poche de liquidité visée
+    var oppPool = dir === 'LONG' ? liq.sell : liq.buy, sweep = false;       // balayage de la poche opposée
     if (oppPool != null) htf.slice(-3).forEach(function (k) {
       if (dir === 'LONG' && k.l < oppPool && k.c > oppPool) sweep = true;
       if (dir === 'SHORT' && k.h > oppPool && k.c < oppPool) sweep = true;
     });
-    if (sweep) { conf += 8; why.push('balayage liquidité'); }
-
-    var oteIn = ot && price >= Math.min(ot.bottom, ot.top) && price <= Math.max(ot.bottom, ot.top);
-    if (oteIn) { conf += 6; why.push('OTE'); }     // prix dans l'OTE (62-79 %)
-    if (cyc === 'Expansion' || cyc === 'Accumulation') conf += 4;
-
     // DXY inversé pour crypto/or ET forex …/USD : DXY baissier = dollar faible = favorable au long.
-    var fav = (dir === 'LONG' && dxyBias === 'baissier') || (dir === 'SHORT' && dxyBias === 'haussier');
-    if (fav) conf += 10;
-    else if (dxyBias && dxyBias !== 'neutre') conf -= 8; // DXY à contre-courant
-    conf = clamp(conf, 0, 97);
+    var dxyVote = dxyBias === 'baissier' ? 'haussier' : dxyBias === 'haussier' ? 'baissier' : null;
 
+    var concepts = [
+      { n: 'Structure D1', d: st.bias },
+      { n: 'Structure H4', d: hBias },
+      { n: 'BOS', d: st.label.indexOf('BOS') >= 0 ? st.bias : null },
+      { n: 'Zone ' + zoneName, d: zoneVote },
+      { n: 'FVG', d: f ? f.type : null },
+      { n: 'Order Block', d: ob ? ob.type : null },
+      { n: 'OTE', d: (oteIn ? oteVote : null) },
+      { n: 'MSS / CHoCH', d: ms },
+      { n: 'Displacement', d: disp },
+      { n: 'Balayage liq.', d: sweep ? bias : null },
+      { n: 'Liquidité ciblée', d: liqTarget != null ? bias : null },
+      { n: 'DXY', d: dxyVote }
+    ].filter(function (x) { return x.d; });
+
+    var up = concepts.filter(function (x) { return x.d === 'haussier'; }).length;
+    var down = concepts.filter(function (x) { return x.d === 'baissier'; }).length;
+    var aligned = concepts.filter(function (x) { return x.d === bias; }).length;
+    var opposed = concepts.filter(function (x) { return x.d !== bias; }).length;
+
+    // Confiance = pilotée par le vote : chaque concept aligné pèse +, chaque concept opposé pèse -.
+    var conf = clamp(40 + aligned * 6 - opposed * 6 + (poiType === 'FVG' ? 4 : 0), 20, 97);
     var inZone = price >= Math.min(poi[0], poi[1]) && price <= Math.max(poi[0], poi[1]);
-    var prog = clamp(conf + (inZone ? 10 : -3) + (rr >= 2 ? 4 : 0), 20, 100);
+    var prog = clamp(conf + (inZone ? 8 : -3) + (rr >= 2 ? 4 : 0), 20, 100);
     var win = clamp(Math.round(conf * 0.82), 40, 85);
-    why.push('cible ' + rr + 'R');
-    if (fav) why.push('DXY favorable');
-    var reason = why.join(' · ');
+    // Motif = la liste des concepts qui vont dans le sens du trade.
+    var reason = concepts.filter(function (x) { return x.d === bias; }).map(function (x) { return x.n; }).join(' · ') + ' · cible ' + rr + 'R';
+    var conflu = { up: up, down: down, aligned: aligned, opposed: opposed, total: concepts.length, bias: bias, concepts: concepts };
     chart.entry = entry; chart.sl = sl; chart.tp = tp;
     return { sym: sym, name: name, cls: cls, price: price, chg: chg, dir: dir, conf: conf, cycle: cyc,
-      entry: entry, sl: sl, tp: tp, rr: rr, win: win, prog: prog, note: reason, chart: chart };
+      entry: entry, sl: sl, tp: tp, rr: rr, win: win, prog: prog, note: reason, conflu: conflu, chart: chart };
   }
 
   // ---- Sources --------------------------------------------------------------

@@ -158,6 +158,19 @@
   .metrics .m .v{font-family:var(--mono);font-weight:500;font-size:1rem}
   .gain{color:var(--long)} .loss{color:var(--short)}
   .note{margin-top:15px;font-size:.82rem;color:var(--muted);display:flex;gap:8px;line-height:1.5}
+  /* Confluence des concepts */
+  .conflu{margin-top:16px}
+  .conflu-head{display:flex;justify-content:space-between;align-items:baseline;font-size:.7rem;
+    text-transform:uppercase;letter-spacing:.06em;color:var(--faint);margin-bottom:7px}
+  .conflu-head b{font-family:var(--mono);font-size:.82rem;color:var(--ink);letter-spacing:0}
+  .conflu-bar{display:flex;height:7px;border-radius:99px;overflow:hidden;background:var(--surface-3);gap:2px}
+  .conflu-bar .up{background:var(--long)} .conflu-bar .down{background:var(--short)}
+  .conflu-bar span{min-width:2px}
+  .conflu-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+  .ctag{font-size:.7rem;padding:3px 9px;border-radius:99px;border:1px solid var(--border);white-space:nowrap;
+    font-family:var(--sans);color:var(--muted);background:var(--surface-2)}
+  .ctag.up{color:var(--long);border-color:color-mix(in srgb,var(--long) 40%,transparent)}
+  .ctag.down{color:var(--short);border-color:color-mix(in srgb,var(--short) 40%,transparent)}
 
   footer{border-top:1px solid var(--border);padding:26px 0 40px;color:var(--faint);font-size:.8rem;text-align:center}
 
@@ -466,6 +479,12 @@ function card(p){
         <div class="m"><span class="k">Sur 10 000 €</span><span class="v"><span class="gain">+${p10.gain} €</span> / <span class="loss">−${p10.risk} €</span></span></div>
       </div>` : `
       <div class="metrics"><div class="m"><span class="k">Confluence</span><span class="v">${p.conf}%</span></div></div>`}
+      ${isTrade && p.conflu ? `
+      <div class="conflu">
+        <div class="conflu-head"><span>Confluence des concepts</span><b>${p.conflu.aligned}/${p.conflu.total} dans le sens ${p.dir==='LONG'?'▲':'▼'}</b></div>
+        <div class="conflu-bar"><span class="up" style="flex:${p.conflu.up||0.001}"></span><span class="down" style="flex:${p.conflu.down||0.001}"></span></div>
+        <div class="conflu-tags">${p.conflu.concepts.map(c=>`<span class="ctag ${c.d==='haussier'?'up':'down'}">${c.d==='haussier'?'▲':'▼'} ${c.n}</span>`).join('')}</div>
+      </div>` : ``}
       <div class="note">💡 <span>${p.note}</span></div>
     </div></div>`;
   function toggle(){
