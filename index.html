@@ -396,6 +396,9 @@ function drawChart(canvas, ch){
   band(ch.ob,'rgba(255,255,255,.06)');
   if(ch.ote) band(ch.ote, ch.ote.type==='achat'?'rgba(55,196,107,.10)':'rgba(240,85,91,.10)');
   band(ch.fvg,'rgba(224,166,63,.16)');
+  // Zones de trade : gain (entrée→objectif) en vert, risque (entrée→stop) en rouge (fond translucide).
+  function zone(a,c,col){ if(a==null||c==null)return; const yt=y(a),yb=y(c); g.fillStyle=col; g.fillRect(padL,Math.min(yt,yb),W-padL-padR,Math.max(1,Math.abs(yb-yt))); }
+  if(ch.entry!=null){ zone(ch.entry,ch.tp,'rgba(55,196,107,.09)'); zone(ch.entry,ch.sl,'rgba(240,85,91,.10)'); }
   if(ch.range){ g.strokeStyle='rgba(255,255,255,.13)'; g.lineWidth=1; g.setLineDash([3,3]);
     [ch.range.hi,ch.range.lo].forEach(v=>{g.beginPath();g.moveTo(padL,y(v));g.lineTo(W-padR,y(v));g.stroke();}); g.setLineDash([]); }
   // Poches de liquidité (equal highs/lows) : lignes pointillées ambre "Liq"
