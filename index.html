@@ -217,6 +217,13 @@
   .verdict.up{background:var(--long-dim);color:var(--long)}
   .verdict.down{background:var(--short-dim);color:var(--short)}
   .verdict.neu{background:var(--surface-3);color:var(--muted)}
+  .conv{font-size:.68rem;font-weight:700;padding:2px 9px;border-radius:99px;border:1px solid var(--border)}
+  .conv.strong{color:var(--long);border-color:color-mix(in srgb,var(--long) 45%,transparent)}
+  .conv.mid{color:var(--wait);border-color:color-mix(in srgb,var(--wait) 40%,transparent)}
+  .conv.low{color:var(--faint)}
+  .synth-row.top{border-color:color-mix(in srgb,var(--long) 40%,transparent);background:color-mix(in srgb,var(--long) 6%,var(--surface-2))}
+  .pfit{font-size:.72rem;font-weight:600;margin-bottom:6px}
+  .pfit.ok{color:var(--long)} .pfit.no{color:var(--wait)}
   /* Backtest */
   .bt-caveat{font-size:.78rem;color:var(--faint);background:var(--surface-2);border:1px solid var(--border);
     border-radius:11px;padding:11px 13px;line-height:1.5;margin:0 0 16px}
@@ -745,9 +752,11 @@ function proSigCard(g){
   const levels = g.dir!=='WAIT'
     ? `<div class="plvl"><span>Entrée ${fmtN(g.entry)}</span><span class="sl">SL ${fmtN(g.sl)}</span><span class="tp">TP ${fmtN(g.tp)}</span><span>RR ${g.rr}</span></div>
        <div class="plvl"><span class="tp">+${Math.round(100*g.rr)} € si TP</span><span class="sl">−100 € si SL</span></div>` : '';
+  const fit = (g.dir!=='WAIT' && typeof g.fit==='boolean')
+    ? `<div class="pfit ${g.fit?'ok':'no'}">${g.fit?('✓ adapté au régime · '+(g.regType||'')):('⚠ hors régime · '+(g.regType||'')+' — moins fiable')}</div>` : '';
   return `<div class="psig ${cls}">
     <div class="ph"><span class="psym">${g.sym}</span><span class="pdir ${cls}">${dlabel}</span></div>
-    ${levels}<div class="pnote">${g.note||''}</div></div>`;
+    ${levels}${fit}<div class="pnote">${g.note||''}</div></div>`;
 }
 function proRank(list){
   const max = Math.max(1, ...list.map(r=>Math.abs(r.roc)));
@@ -768,11 +777,15 @@ function proSynth(list){
     const reg = s.regime||{type:'—',trend:false};
     const rcls = reg.trend ? (reg.dir==='haussier'?'up':'down') : 'neu';
     const chips = s.votes.map(v=>`<span class="ctag ${v.d==='haussier'?'up':'down'}">${v.d==='haussier'?'▲':'▼'} ${v.m}</span>`).join('');
-    return `<div class="synth-row">
+    const conv = s.conviction||'Faible';
+    const ccls = conv==='Forte'?'strong':conv==='Moyenne'?'mid':'low';
+    const star = conv==='Forte' ? '⭐ ' : '';
+    return `<div class="synth-row${conv==='Forte'?' top':''}">
       <div class="synth-head">
-        <span class="psym">${s.sym}</span>
+        <span class="psym">${star}${s.sym}</span>
         <span class="regime ${rcls}">${reg.type}</span>
         <span class="verdict ${vcls}">${vtxt} · ${s.up}▲/${s.down}▼</span>
+        <span class="conv ${ccls}">conviction ${conv}</span>
       </div>
       <div class="conflu-tags">${chips||'<span class="ctag">aucune méthode active</span>'}</div>
     </div>`;

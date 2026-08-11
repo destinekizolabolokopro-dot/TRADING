@@ -173,16 +173,26 @@
       rows = rows.filter(function (r) { return fresh(r.c); });
       if (!rows.length) return null;
 
+      // Régime par actif (calculé une fois) : sert au filtre "adapté / hors régime" et à la conviction.
+      var regBySym = {}; rows.forEach(function (r) { regBySym[r.a.sym] = regime(r.c); });
+
       // Momentum relatif (cross-asset) : classement par performance sur 30 jours.
       var mom = rows.map(function (r) { return { sym: r.a.sym, cls: r.a.cls, roc: +roc(r.c.map(function (x) { return x.c; }), 30).toFixed(1) }; })
         .sort(function (x, y) { return y.roc - x.roc; });
 
-      function pack(fn) {
+      // kind : 'trend' (stratégie de tendance) ou 'range' (retour à la moyenne) -> détermine si le régime est adapté.
+      function pack(fn, kind) {
         return rows.map(function (r) {
           var s = fn(r.c) || { dir: 'WAIT', note: '—' };
           s.sym = r.a.sym; s.cls = r.a.cls; s.price = r.c[r.c.length - 1].c;
+          var rg = regBySym[r.a.sym];
+          if (s.dir && s.dir !== 'WAIT' && kind) { s.fit = kind === 'trend' ? rg.trend : !rg.trend; s.regType = rg.type; }
           return s;
-        }).sort(function (x, y) { var a = x.dir !== 'WAIT' ? 1 : 0, b = y.dir !== 'WAIT' ? 1 : 0; return b - a; });
+        }).sort(function (x, y) {
+          var a = x.dir !== 'WAIT' ? 1 : 0, b = y.dir !== 'WAIT' ? 1 : 0;
+          if (a !== b) return b - a;
+          return (y.fit ? 1 : 0) - (x.fit ? 1 : 0); // les signaux adaptés au régime d'abord
+        });
       }
 
       // SYNTHÈSE MULTI-MÉTHODES : par actif, combien de méthodes vont dans le même sens + régime de marché.
@@ -199,9 +209,16 @@
         ].filter(function (v) { return v.d; });
         var up = votes.filter(function (v) { return v.d === 'haussier'; }).length;
         var down = votes.filter(function (v) { return v.d === 'baissier'; }).length;
-        return { sym: r.a.sym, cls: r.a.cls, price: r.c[r.c.length - 1].c, regime: regime(r.c),
-          up: up, down: down, total: votes.length, verdict: up > down ? 'haussier' : down > up ? 'baissier' : 'neutre', votes: votes };
-      }).sort(function (a, b) { return Math.max(b.up, b.down) - Math.max(a.up, a.down); });
+        var verdict = up > down ? 'haussier' : down > up ? 'baissier' : 'neutre';
+        var reg = regBySym[r.a.sym];
+        // Conviction = ampleur du consensus + régime qui confirme + marché en tendance.
+        var regAlign = reg.trend && reg.dir === verdict;
+        var score = Math.abs(up - down) + (regAlign ? 2 : 0) + (reg.trend ? 1 : 0);
+        var conviction = score >= 4 ? 'Forte' : score >= 2 ? 'Moyenne' : 'Faible';
+        return { sym: r.a.sym, cls: r.a.cls, price: r.c[r.c.length - 1].c, regime: reg,
+          up: up, down: down, total: votes.length, verdict: verdict,
+          regAlign: regAlign, score: score, conviction: conviction, votes: votes };
+      }).sort(function (a, b) { return b.score - a.score; });
 
       // Backtest de chaque stratégie sur tout l'historique dispo (toutes paires poolées).
       var perfTrend = backtest(rows, trendFollow), perfBreak = backtest(rows, breakout),
@@ -213,13 +230,13 @@
         strategies: [
           { key: 'trend', name: 'Suivi de tendance (CTA)', tag: 'trend-following', perf: perfTrend,
             how: 'Ce que font les fonds CTA (Winton, Man AHL) : ils ne prédisent rien, ils SUIVENT la tendance. Tant que la moyenne 50 est au-dessus de la 200, on reste acheteur ; on entre sur un repli vers la moyenne 50. Peu de trades, gardés longtemps, on laisse courir les gains.',
-            signals: pack(trendFollow) },
+            signals: pack(trendFollow, 'trend') },
           { key: 'breakout', name: 'Cassure Donchian (Turtle Traders)', tag: 'breakout', perf: perfBreak,
             how: 'La stratégie légendaire des « Tortues » : on achète quand le prix casse le plus haut des 20 dernières bougies (et on vend sous le plus bas). L\'idée : une vraie tendance démarre souvent par une cassure. Stop et objectif calés sur la volatilité (ATR).',
-            signals: pack(breakout) },
+            signals: pack(breakout, 'trend') },
           { key: 'revert', name: 'Retour à la moyenne (mean reversion)', tag: 'mean-reversion', perf: perfRev,
             how: 'Approche « statistical arbitrage » simplifiée : quand le prix s\'éloigne trop de sa moyenne (RSI sous 30 = survendu, ou au-dessus de 70 = suracheté), on parie sur le RETOUR vers la moyenne. Marche mieux en marché sans tendance (range).',
-            signals: pack(meanRevert) },
+            signals: pack(meanRevert, 'range') },
           { key: 'momentum', name: 'Momentum relatif (factor momentum)', tag: 'quant',
             how: 'Ce que font les quants (style AQR) : classer les actifs par performance récente et privilégier les plus FORTS (le momentum a tendance à persister). En haut du classement = biais acheteur ; en bas = biais vendeur.',
             ranking: mom }
@@ -227,7 +244,7 @@
         legends: [
           { name: 'Paul Tudor Jones', who: 'Macro + technique · a anticipé le krach de 1987',
             principle: '« Personne ne devrait être acheteur sous la moyenne 200 jours, ni vendeur au-dessus. » Il coupe vite ses pertes et vise un gain/risque d\'au moins 5:1. Sa règle des 200 jours, appliquée à tes actifs :',
-            perf: perfPtj, signals: pack(ptj) },
+            perf: perfPtj, signals: pack(ptj, 'trend') },
           { name: 'Ray Dalio', who: 'Bridgewater · plus gros hedge fund du monde',
             principle: '« All Weather / risk parity » : la diversification est le seul repas gratuit. On équilibre le RISQUE entre actifs (plus de poids aux moins volatils) au lieu de répartir le capital à l\'aveugle. Allocation risk-parity indicative sur tes actifs :',
             alloc: riskParity(rows) },
