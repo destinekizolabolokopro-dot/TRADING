@@ -270,6 +270,7 @@
     <div class="tabs" id="tabs">
       <button class="tab on" data-f="all">Toutes</button>
       <button class="tab" data-f="signal">En signal</button>
+      <button class="tab" data-f="strong">Forts ≥70%</button>
       <button class="tab" data-f="crypto">Crypto</button>
       <button class="tab" data-f="forex">Forex / Or</button>
     </div>
@@ -621,8 +622,9 @@
     var chg = (dl >= 2 && dtf[dl - 2].c) ? (dtf[dl - 1].c - dtf[dl - 2].c) / dtf[dl - 2].c * 100 : 0;
     var cyc = cyclePhase(htf);
     var dir = st.bias === 'haussier' ? 'LONG' : st.bias === 'baissier' ? 'SHORT' : 'WAIT';
-    var f = lastFVG(htf), ob = lastOB(htf), ot = ote(htf, swings(htf));
-    var chart = { candles: htf.slice(-48), fvg: f, ob: ob, ote: ot, range: r, entry: null, sl: null, tp: null, dir: dir };
+    var hsw = swings(htf);
+    var f = lastFVG(htf), ob = lastOB(htf), ot = ote(htf, hsw), liq = liquidity(htf, hsw);
+    var chart = { candles: htf.slice(-48), fvg: f, ob: ob, ote: ot, range: r, liq: liq, entry: null, sl: null, tp: null, dir: dir };
     var base = { sym: sym, name: name, cls: cls, price: price, chg: chg, dir: 'WAIT', conf: 40, cycle: cyc,
       entry: null, sl: null, tp: null, rr: null, win: null, prog: 38, note: note || 'Pas de biais net — on attend.', chart: chart };
 
@@ -681,7 +683,6 @@
     if (rr < 1) { base.prog = 48; base.note = 'Setup aligné mais RR < 1 (cible trop proche) — on attend un meilleur point.'; return base; }
 
     // Confluence renforcée — chaque brique validée est un point de confluence, listé dans le motif.
-    var hsw = swings(htf);
     var why = [st.label, 'zone ' + zoneName, poiType + ' aligné'];
     var conf = 48 + 12;                            // base + zone correcte (déjà validée)
     if (poiType === 'FVG') conf += 12; else conf += 8;
@@ -697,7 +698,6 @@
     if (ms === st.bias) { conf += 8; why.push('MSS ' + ms); }
 
     // Liquidité : poche (equal highs/lows) visée dans le bon sens + balayage récent de la poche opposée.
-    var liq = liquidity(htf, hsw);
     var liqTarget = dir === 'LONG' ? liq.buy : liq.sell;
     if (liqTarget != null) { conf += 6; why.push('liquidité ciblée'); }
     var oppPool = dir === 'LONG' ? liq.sell : liq.buy, sweep = false;
@@ -895,6 +895,7 @@ function drawChart(canvas, ch){
   let min=Math.min(...cs.map(c=>c.l)), max=Math.max(...cs.map(c=>c.h));
   [ch.entry,ch.sl,ch.tp].forEach(v=>{ if(v!=null){min=Math.min(min,v);max=Math.max(max,v);} });
   if(ch.range){ min=Math.min(min,ch.range.lo); max=Math.max(max,ch.range.hi); }
+  if(ch.liq){ [ch.liq.buy,ch.liq.sell].forEach(v=>{ if(v!=null){min=Math.min(min,v);max=Math.max(max,v);} }); }
   const pd=(max-min)*0.08||1; min-=pd; max+=pd;
   const padL=6,padR=66,padT=8,padB=8, iw=(W-padL-padR)/cs.length, bw=Math.max(2,iw*0.6);
   const x=i=>padL+i*iw, y=p=>padT+(1-(p-min)/(max-min))*(H-padT-padB);
@@ -906,6 +907,11 @@ function drawChart(canvas, ch){
   band(ch.fvg,'rgba(224,166,63,.16)');
   if(ch.range){ g.strokeStyle='rgba(255,255,255,.13)'; g.lineWidth=1; g.setLineDash([3,3]);
     [ch.range.hi,ch.range.lo].forEach(v=>{g.beginPath();g.moveTo(padL,y(v));g.lineTo(W-padR,y(v));g.stroke();}); g.setLineDash([]); }
+  // Poches de liquidité (equal highs/lows) : lignes pointillées ambre "Liq"
+  if(ch.liq){ g.lineWidth=1; g.setLineDash([2,4]); g.font='9px "IBM Plex Mono",monospace'; g.textBaseline='middle';
+    [ch.liq.buy,ch.liq.sell].forEach(v=>{ if(v==null) return;
+      g.strokeStyle='rgba(224,166,63,.5)'; g.beginPath(); g.moveTo(padL,y(v)); g.lineTo(W-padR,y(v)); g.stroke();
+      g.fillStyle='rgba(224,166,63,.85)'; g.fillText('Liq', W-padR+5, y(v)); }); g.setLineDash([]); }
   cs.forEach((c,i)=>{ const cx=x(i)+bw/2, up=c.c>=c.o; g.strokeStyle=up?long:short; g.fillStyle=up?long:short;
     g.beginPath(); g.moveTo(cx,y(c.h)); g.lineTo(cx,y(c.l)); g.stroke();
     const yo=y(c.o),yc=y(c.c); g.fillRect(x(i),Math.min(yo,yc),bw,Math.max(1,Math.abs(yc-yo))); });
@@ -948,6 +954,7 @@ function card(p){
           <span><i style="background:rgba(224,166,63,.55)"></i>FVG</span>
           <span><i style="background:rgba(255,255,255,.25)"></i>Order Block</span>
           <span><i style="background:rgba(55,196,107,.4)"></i>OTE</span>
+          <span><i style="background:rgba(224,166,63,.55)"></i>Liquidité</span>
           <span><i style="background:var(--long)"></i>haussière</span>
           <span><i style="background:var(--short)"></i>baissière</span>
         </div>
@@ -980,7 +987,7 @@ function card(p){
 
 function render(filter='all'){
   const grid = $('#grid'); grid.innerHTML='';
-  const list = PAIRS.filter(p=> filter==='all' ? true : filter==='signal' ? p.dir!=='WAIT' : p.cls===filter);
+  const list = PAIRS.filter(p=> filter==='all' ? true : filter==='signal' ? p.dir!=='WAIT' : filter==='strong' ? (p.dir!=='WAIT' && (p.conf||0)>=70) : p.cls===filter);
   // Les vrais signaux d'abord, triés par force du setup (progression) décroissante ; les "en attente" ensuite.
   list.sort((a,b)=>{ const sa=a.dir!=='WAIT'?1:0, sb=b.dir!=='WAIT'?1:0; if(sa!==sb) return sb-sa; return (b.prog||0)-(a.prog||0); });
   list.forEach(p=> grid.appendChild(card(p)));

@@ -119,8 +119,9 @@
     var chg = (dl >= 2 && dtf[dl - 2].c) ? (dtf[dl - 1].c - dtf[dl - 2].c) / dtf[dl - 2].c * 100 : 0;
     var cyc = cyclePhase(htf);
     var dir = st.bias === 'haussier' ? 'LONG' : st.bias === 'baissier' ? 'SHORT' : 'WAIT';
-    var f = lastFVG(htf), ob = lastOB(htf), ot = ote(htf, swings(htf));
-    var chart = { candles: htf.slice(-48), fvg: f, ob: ob, ote: ot, range: r, entry: null, sl: null, tp: null, dir: dir };
+    var hsw = swings(htf);
+    var f = lastFVG(htf), ob = lastOB(htf), ot = ote(htf, hsw), liq = liquidity(htf, hsw);
+    var chart = { candles: htf.slice(-48), fvg: f, ob: ob, ote: ot, range: r, liq: liq, entry: null, sl: null, tp: null, dir: dir };
     var base = { sym: sym, name: name, cls: cls, price: price, chg: chg, dir: 'WAIT', conf: 40, cycle: cyc,
       entry: null, sl: null, tp: null, rr: null, win: null, prog: 38, note: note || 'Pas de biais net — on attend.', chart: chart };
 
@@ -179,7 +180,6 @@
     if (rr < 1) { base.prog = 48; base.note = 'Setup aligné mais RR < 1 (cible trop proche) — on attend un meilleur point.'; return base; }
 
     // Confluence renforcée — chaque brique validée est un point de confluence, listé dans le motif.
-    var hsw = swings(htf);
     var why = [st.label, 'zone ' + zoneName, poiType + ' aligné'];
     var conf = 48 + 12;                            // base + zone correcte (déjà validée)
     if (poiType === 'FVG') conf += 12; else conf += 8;
@@ -195,7 +195,6 @@
     if (ms === st.bias) { conf += 8; why.push('MSS ' + ms); }
 
     // Liquidité : poche (equal highs/lows) visée dans le bon sens + balayage récent de la poche opposée.
-    var liq = liquidity(htf, hsw);
     var liqTarget = dir === 'LONG' ? liq.buy : liq.sell;
     if (liqTarget != null) { conf += 6; why.push('liquidité ciblée'); }
     var oppPool = dir === 'LONG' ? liq.sell : liq.buy, sweep = false;
