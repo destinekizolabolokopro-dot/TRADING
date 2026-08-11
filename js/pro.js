@@ -24,6 +24,8 @@
 
   // ---- Indicateurs -----------------------------------------------------------
   function ema(v, p) { var k = 2 / (p + 1), e = v[0], out = [e]; for (var i = 1; i < v.length; i++) { e = v[i] * k + e * (1 - k); out.push(e); } return out; }
+  function sma(v, p) { var out = [], s = 0; for (var i = 0; i < v.length; i++) { s += v[i]; if (i >= p) s -= v[i - p]; out.push(i >= p - 1 ? s / p : null); } return out; }
+  function stdev(cl, p) { var n = cl.length, r = [], i; for (i = Math.max(1, n - p); i < n; i++) r.push((cl[i] - cl[i - 1]) / cl[i - 1]); if (!r.length) return 0; var m = r.reduce(function (a, b) { return a + b; }, 0) / r.length; return Math.sqrt(r.reduce(function (a, b) { return a + (b - m) * (b - m); }, 0) / r.length); }
   function rsi(cl, p) {
     var out = []; var i; for (i = 0; i < p; i++) out.push(null);
     if (cl.length <= p) return out;
@@ -94,6 +96,23 @@
     return { dir: 'WAIT', note: 'RSI ' + Math.round(rv) + ' — pas d\'excès (ni survendu < 30, ni suracheté > 70).' };
   }
 
+  // 4. Règle des 200 jours de Paul Tudor Jones : jamais acheteur sous la MA200, ni vendeur au-dessus. Vise ~5:1.
+  function ptj(c) {
+    var cl = c.map(function (x) { return x.c; }), n = cl.length;
+    if (n < 210) return { dir: 'WAIT', note: 'Historique insuffisant (< 200 jours).' };
+    var ma = sma(cl, 200), a = atr(c, 14), price = cl[n - 1], m = ma[n - 1], above = price > m, risk = 1.2 * a;
+    var s = mk(above ? 'LONG' : 'SHORT', price, above ? price - risk : price + risk, above ? price + 5 * risk : price - 5 * risk);
+    if (!s) return { dir: 'WAIT', note: 'Géométrie invalide.' };
+    s.note = 'Prix ' + (above ? 'au-dessus' : 'en-dessous') + ' de la moyenne 200 jours → biais ' + (above ? 'acheteur' : 'vendeur') + ' (règle PTJ), objectif ambitieux ~5:1.';
+    return s;
+  }
+  // Allocation "risk parity" (Ray Dalio) : plus de poids aux actifs les MOINS volatils (risque équilibré).
+  function riskParity(rows) {
+    var vols = rows.map(function (r) { return { sym: r.a.sym, vol: stdev(r.c.map(function (x) { return x.c; }), 30) || 1e-6 }; });
+    var inv = vols.map(function (v) { return 1 / v.vol; }), tot = inv.reduce(function (a, b) { return a + b; }, 0) || 1;
+    return vols.map(function (v, i) { return { sym: v.sym, w: +(inv[i] / tot * 100).toFixed(1) }; }).sort(function (a, b) { return b.w - a.w; });
+  }
+
   // ---- Chargement + assemblage ----------------------------------------------
   function fetchKlines(src) {
     var path = '/api/v3/klines?symbol=' + src + '&interval=1d&limit=300';
@@ -141,6 +160,22 @@
           { key: 'momentum', name: 'Momentum relatif (factor momentum)', tag: 'quant',
             how: 'Ce que font les quants (style AQR) : classer les actifs par performance récente et privilégier les plus FORTS (le momentum a tendance à persister). En haut du classement = biais acheteur ; en bas = biais vendeur.',
             ranking: mom }
+        ],
+        legends: [
+          { name: 'Paul Tudor Jones', who: 'Macro + technique · a anticipé le krach de 1987',
+            principle: '« Personne ne devrait être acheteur sous la moyenne 200 jours, ni vendeur au-dessus. » Il coupe vite ses pertes et vise un gain/risque d\'au moins 5:1. Sa règle des 200 jours, appliquée à tes actifs :',
+            signals: pack(ptj) },
+          { name: 'Ray Dalio', who: 'Bridgewater · plus gros hedge fund du monde',
+            principle: '« All Weather / risk parity » : la diversification est le seul repas gratuit. On équilibre le RISQUE entre actifs (plus de poids aux moins volatils) au lieu de répartir le capital à l\'aveugle. Allocation risk-parity indicative sur tes actifs :',
+            alloc: riskParity(rows) },
+          { name: 'Jim Simons', who: 'Renaissance / Medallion · meilleur track record de l\'histoire',
+            principle: 'Pur quantitatif : des milliers de petits signaux statistiques tenus très court terme, exécutés par des maths et des machines. Le RETOUR À LA MOYENNE (stratégie plus haut) en est une brique accessible. Son fonds Medallion a fait ~66 %/an brut pendant 30 ans — mais fermé au public.' },
+          { name: 'Jesse Livermore', who: '« Boy Plunger » · légende du début XXᵉ siècle',
+            principle: 'Suivre la tendance, acheter sur les cassures de sommets (« points pivots »), renforcer les positions gagnantes (pyramiding) et couper vite les perdantes. C\'est l\'esprit de la CASSURE DONCHIAN plus haut. « Ce n\'est pas la réflexion qui rapporte, c\'est la patience de rester dans le trade gagnant. »' },
+          { name: 'George Soros', who: '« A fait sauter la Banque d\'Angleterre » en 1992',
+            principle: 'Théorie de la réflexivité : les marchés s\'auto-alimentent (les croyances des gens changent la réalité). Gros paris macro quand la conviction est forte, taille énorme, sortie immédiate si on a tort. « L\'important n\'est pas d\'avoir raison ou tort, mais combien tu gagnes quand tu as raison et combien tu perds quand tu as tort. »' },
+          { name: 'Warren Buffett', who: 'Le plus grand investisseur long terme',
+            principle: 'Value investing : acheter des entreprises de qualité sous leur vraie valeur, avec une marge de sécurité, et les garder des décennies. « Sois craintif quand les autres sont avides, avide quand ils sont craintifs. » ⚠️ C\'est pour les ACTIONS et le LONG terme — ça ne s\'applique pas au trading crypto/forex court terme.' }
         ]
       };
     });
