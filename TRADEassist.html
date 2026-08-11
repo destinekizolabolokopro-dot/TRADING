@@ -663,6 +663,11 @@
     conf += 12;                                   // zone correcte (déjà validée)
     if (poiType === 'FVG') conf += 12; else conf += 8;
     if (st.label.indexOf('BOS') >= 0) conf += 12; // cassure de structure confirmée
+    // ALIGNEMENT TOP-DOWN : le biais vient du D1 (dtf) ; on vérifie que le H4 (htf) confirme.
+    var hBias = structure(htf, swings(htf)).bias;
+    var aligned = hBias === st.bias;
+    if (aligned) conf += 8;                        // H4 confirme le D1 -> setup plus fiable
+    else if (hBias !== 'neutre') conf -= 6;        // H4 à contre-courant du D1 -> prudence
     var oteIn = ot && price >= Math.min(ot.bottom, ot.top) && price <= Math.max(ot.bottom, ot.top);
     if (oteIn) conf += 6;                          // prix dans l'OTE (62-79%)
     if (cyc === 'Expansion' || cyc === 'Accumulation') conf += 4;
@@ -675,7 +680,9 @@
     var inZone = price >= Math.min(poi[0], poi[1]) && price <= Math.max(poi[0], poi[1]);
     var prog = clamp(conf + (inZone ? 10 : -3) + (rr >= 2 ? 4 : 0), 20, 100);
     var win = clamp(Math.round(conf * 0.82), 40, 85);
-    var reason = [st.label, 'zone ' + zoneName, poiType + ' aligné', 'cible liquidité (' + rr + 'R)']
+    var reason = [st.label, 'zone ' + zoneName, poiType + ' aligné']
+      .concat(aligned ? ['H4 aligné D1'] : (hBias !== 'neutre' ? ['H4 divergent'] : []))
+      .concat(['cible liquidité (' + rr + 'R)'])
       .concat(fav ? ['DXY favorable'] : []).join(' · ');
     chart.entry = entry; chart.sl = sl; chart.tp = tp;
     return { sym: sym, name: name, cls: cls, price: price, chg: chg, dir: dir, conf: conf, cycle: cyc,
