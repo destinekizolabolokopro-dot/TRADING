@@ -217,6 +217,19 @@
   .verdict.up{background:var(--long-dim);color:var(--long)}
   .verdict.down{background:var(--short-dim);color:var(--short)}
   .verdict.neu{background:var(--surface-3);color:var(--muted)}
+  /* Backtest */
+  .bt-caveat{font-size:.78rem;color:var(--faint);background:var(--surface-2);border:1px solid var(--border);
+    border-radius:11px;padding:11px 13px;line-height:1.5;margin:0 0 16px}
+  .perf{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;font-size:.78rem;color:var(--muted);
+    margin:-2px 0 12px;padding:8px 11px;border-radius:9px;background:var(--surface-2);border:1px solid var(--border)}
+  .perf.ok{border-color:color-mix(in srgb,var(--long) 35%,transparent)}
+  .perf.bad{border-color:color-mix(in srgb,var(--short) 35%,transparent)}
+  .perf .pk{font-family:var(--mono);font-size:.64rem;text-transform:uppercase;letter-spacing:.06em;
+    color:var(--faint);border-right:1px solid var(--border);padding-right:10px}
+  .perf b{color:var(--ink);font-family:var(--mono)}
+  .perf.ok b:nth-child(1){color:var(--long)}
+  .best{font-size:.68rem;font-weight:700;color:var(--wait);border:1px solid color-mix(in srgb,var(--wait) 40%,transparent);
+    border-radius:99px;padding:2px 9px}
   footer{border-top:1px solid var(--border);padding:26px 0 40px;color:var(--faint);font-size:.8rem;text-align:center}
 
   /* Bouton IA + modale */
@@ -774,19 +787,34 @@ function renderPro(data){
       <p class="pro-how">Pour chaque actif : combien de méthodes systématiques vont dans le même sens, et le <b>régime</b> du marché (une tendance favorise Tendance/Cassure ; un range favorise le Retour à la moyenne).</p>
       ${proSynth(data.synthese)}</section>`;
   }
+  // Meilleure stratégie mesurée (expectancy la plus haute, min 10 trades) → étoile.
+  const withPerf = data.strategies.filter(s=>s.perf&&s.perf.trades>=10).sort((a,b)=>b.perf.expectancy-a.perf.expectancy);
+  const bestKey = withPerf.length ? withPerf[0].key : null;
+  html += `<p class="bt-caveat">📊 Les stats « backtest » ci-dessous sont mesurées sur l'historique réel disponible (~10 mois de bougies journalières, toutes paires). <b>Échantillon court, sans frais ni slippage — c'est indicatif, pas une promesse.</b> Le passé ne garantit pas le futur.</p>`;
   html += data.strategies.map(s=>{
     const inner = s.ranking ? proRank(s.ranking) : `<div class="pro-sigs">${s.signals.map(proSigCard).join('')}</div>`;
-    return `<section class="pro-strat"><h3>${s.name}<span class="stag">${s.tag}</span></h3><p class="pro-how">${s.how}</p>${inner}</section>`;
+    const star = s.key===bestKey ? '<span class="best">⭐ meilleur edge mesuré</span>' : '';
+    return `<section class="pro-strat"><h3>${s.name}<span class="stag">${s.tag}</span>${star}</h3>${perfBadge(s.perf)}<p class="pro-how">${s.how}</p>${inner}</section>`;
   }).join('');
   if(data.legends && data.legends.length){
     html += `<div class="pro-legends-h">🏛️ Légendes de la finance — leurs stratégies</div>`;
     html += data.legends.map(l=>{
       const inner = l.signals ? `<div class="pro-sigs">${l.signals.map(proSigCard).join('')}</div>`
                   : l.alloc ? proAlloc(l.alloc) : '';
-      return `<section class="pro-strat"><h3>${l.name}</h3><div class="legend-who">${l.who}</div><p class="pro-how">${l.principle}</p>${inner}</section>`;
+      return `<section class="pro-strat"><h3>${l.name}</h3><div class="legend-who">${l.who}</div>${perfBadge(l.perf)}<p class="pro-how">${l.principle}</p>${inner}</section>`;
     }).join('');
   }
   body.innerHTML = html;
+}
+function perfBadge(p){
+  if(!p || !p.trades) return '';
+  const good = p.expectancy>0;
+  return `<div class="perf ${good?'ok':'bad'}"><span class="pk">Backtest</span>`+
+    `<span><b>${p.winRate}%</b> réussite</span>`+
+    `<span><b>${p.expectancy>0?'+':''}${p.expectancy} R</b>/trade</span>`+
+    `<span>PF <b>${p.pf}</b></span>`+
+    `<span>${p.trades} trades</span>`+
+    `<span>pire série <b>−${p.maxDD} R</b></span></div>`;
 }
 function loadPro(){
   if(proLoaded||proLoading||!window.PRO) return;

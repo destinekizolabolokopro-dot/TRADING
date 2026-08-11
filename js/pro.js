@@ -122,6 +122,37 @@
     return vols.map(function (v, i) { return { sym: v.sym, w: +(inv[i] / tot * 100).toFixed(1) }; }).sort(function (a, b) { return b.w - a.w; });
   }
 
+  // ---- Backtest : mesure la VRAIE performance passée d'une stratégie ---------
+  // Rejoue la stratégie bougie par bougie sur l'historique, simule TP/SL, et calcule les stats.
+  function btOne(c, fn) {
+    var open = null, R = [], i, n = c.length;
+    for (i = 205; i < n; i++) {
+      if (open) {
+        var bar = c[i], hitSL, hitTP;
+        if (open.dir === 'LONG') { hitSL = bar.l <= open.sl; hitTP = bar.h >= open.tp; }
+        else { hitSL = bar.h >= open.sl; hitTP = bar.l <= open.tp; }
+        if (hitSL) { R.push(-1); open = null; }           // SL prioritaire si les deux touchés (prudence)
+        else if (hitTP) { R.push(open.rr); open = null; }
+        continue;                                         // un seul trade à la fois
+      }
+      var s = fn(c.slice(0, i + 1));
+      if (s && s.dir && s.dir !== 'WAIT' && s.rr) open = { dir: s.dir, sl: s.sl, tp: s.tp, rr: s.rr };
+    }
+    return R;
+  }
+  function btStats(R) {
+    var n = R.length; if (!n) return { trades: 0 };
+    var wins = R.filter(function (r) { return r > 0; }).length;
+    var rSum = R.reduce(function (a, b) { return a + b; }, 0);
+    var gross = R.filter(function (r) { return r > 0; }).reduce(function (a, b) { return a + b; }, 0);
+    var lossSum = -R.filter(function (r) { return r < 0; }).reduce(function (a, b) { return a + b; }, 0);
+    var eq = 0, peak = 0, dd = 0;
+    R.forEach(function (r) { eq += r; if (eq > peak) peak = eq; if (peak - eq > dd) dd = peak - eq; });
+    return { trades: n, winRate: Math.round(wins / n * 100), expectancy: +(rSum / n).toFixed(2),
+      pf: lossSum ? +(gross / lossSum).toFixed(2) : (gross > 0 ? 99 : 0), rSum: +rSum.toFixed(1), maxDD: +dd.toFixed(1) };
+  }
+  function backtest(rows, fn) { var R = []; rows.forEach(function (r) { R = R.concat(btOne(r.c, fn)); }); return btStats(R); }
+
   // ---- Chargement + assemblage ----------------------------------------------
   function fetchKlines(src) {
     var path = '/api/v3/klines?symbol=' + src + '&interval=1d&limit=300';
@@ -172,17 +203,21 @@
           up: up, down: down, total: votes.length, verdict: up > down ? 'haussier' : down > up ? 'baissier' : 'neutre', votes: votes };
       }).sort(function (a, b) { return Math.max(b.up, b.down) - Math.max(a.up, a.down); });
 
+      // Backtest de chaque stratégie sur tout l'historique dispo (toutes paires poolées).
+      var perfTrend = backtest(rows, trendFollow), perfBreak = backtest(rows, breakout),
+        perfRev = backtest(rows, meanRevert), perfPtj = backtest(rows, ptj);
+
       return {
         synthese: synthese,
         updated: Date.now(),
         strategies: [
-          { key: 'trend', name: 'Suivi de tendance (CTA)', tag: 'trend-following',
+          { key: 'trend', name: 'Suivi de tendance (CTA)', tag: 'trend-following', perf: perfTrend,
             how: 'Ce que font les fonds CTA (Winton, Man AHL) : ils ne prédisent rien, ils SUIVENT la tendance. Tant que la moyenne 50 est au-dessus de la 200, on reste acheteur ; on entre sur un repli vers la moyenne 50. Peu de trades, gardés longtemps, on laisse courir les gains.',
             signals: pack(trendFollow) },
-          { key: 'breakout', name: 'Cassure Donchian (Turtle Traders)', tag: 'breakout',
+          { key: 'breakout', name: 'Cassure Donchian (Turtle Traders)', tag: 'breakout', perf: perfBreak,
             how: 'La stratégie légendaire des « Tortues » : on achète quand le prix casse le plus haut des 20 dernières bougies (et on vend sous le plus bas). L\'idée : une vraie tendance démarre souvent par une cassure. Stop et objectif calés sur la volatilité (ATR).',
             signals: pack(breakout) },
-          { key: 'revert', name: 'Retour à la moyenne (mean reversion)', tag: 'mean-reversion',
+          { key: 'revert', name: 'Retour à la moyenne (mean reversion)', tag: 'mean-reversion', perf: perfRev,
             how: 'Approche « statistical arbitrage » simplifiée : quand le prix s\'éloigne trop de sa moyenne (RSI sous 30 = survendu, ou au-dessus de 70 = suracheté), on parie sur le RETOUR vers la moyenne. Marche mieux en marché sans tendance (range).',
             signals: pack(meanRevert) },
           { key: 'momentum', name: 'Momentum relatif (factor momentum)', tag: 'quant',
@@ -192,7 +227,7 @@
         legends: [
           { name: 'Paul Tudor Jones', who: 'Macro + technique · a anticipé le krach de 1987',
             principle: '« Personne ne devrait être acheteur sous la moyenne 200 jours, ni vendeur au-dessus. » Il coupe vite ses pertes et vise un gain/risque d\'au moins 5:1. Sa règle des 200 jours, appliquée à tes actifs :',
-            signals: pack(ptj) },
+            perf: perfPtj, signals: pack(ptj) },
           { name: 'Ray Dalio', who: 'Bridgewater · plus gros hedge fund du monde',
             principle: '« All Weather / risk parity » : la diversification est le seul repas gratuit. On équilibre le RISQUE entre actifs (plus de poids aux moins volatils) au lieu de répartir le capital à l\'aveugle. Allocation risk-parity indicative sur tes actifs :',
             alloc: riskParity(rows) },

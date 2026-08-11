@@ -217,6 +217,19 @@
   .verdict.up{background:var(--long-dim);color:var(--long)}
   .verdict.down{background:var(--short-dim);color:var(--short)}
   .verdict.neu{background:var(--surface-3);color:var(--muted)}
+  /* Backtest */
+  .bt-caveat{font-size:.78rem;color:var(--faint);background:var(--surface-2);border:1px solid var(--border);
+    border-radius:11px;padding:11px 13px;line-height:1.5;margin:0 0 16px}
+  .perf{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;font-size:.78rem;color:var(--muted);
+    margin:-2px 0 12px;padding:8px 11px;border-radius:9px;background:var(--surface-2);border:1px solid var(--border)}
+  .perf.ok{border-color:color-mix(in srgb,var(--long) 35%,transparent)}
+  .perf.bad{border-color:color-mix(in srgb,var(--short) 35%,transparent)}
+  .perf .pk{font-family:var(--mono);font-size:.64rem;text-transform:uppercase;letter-spacing:.06em;
+    color:var(--faint);border-right:1px solid var(--border);padding-right:10px}
+  .perf b{color:var(--ink);font-family:var(--mono)}
+  .perf.ok b:nth-child(1){color:var(--long)}
+  .best{font-size:.68rem;font-weight:700;color:var(--wait);border:1px solid color-mix(in srgb,var(--wait) 40%,transparent);
+    border-radius:99px;padding:2px 9px}
   footer{border-top:1px solid var(--border);padding:26px 0 40px;color:var(--faint);font-size:.8rem;text-align:center}
 
   /* Bouton IA + modale */
@@ -693,6 +706,37 @@
     return vols.map(function (v, i) { return { sym: v.sym, w: +(inv[i] / tot * 100).toFixed(1) }; }).sort(function (a, b) { return b.w - a.w; });
   }
 
+  // ---- Backtest : mesure la VRAIE performance passée d'une stratégie ---------
+  // Rejoue la stratégie bougie par bougie sur l'historique, simule TP/SL, et calcule les stats.
+  function btOne(c, fn) {
+    var open = null, R = [], i, n = c.length;
+    for (i = 205; i < n; i++) {
+      if (open) {
+        var bar = c[i], hitSL, hitTP;
+        if (open.dir === 'LONG') { hitSL = bar.l <= open.sl; hitTP = bar.h >= open.tp; }
+        else { hitSL = bar.h >= open.sl; hitTP = bar.l <= open.tp; }
+        if (hitSL) { R.push(-1); open = null; }           // SL prioritaire si les deux touchés (prudence)
+        else if (hitTP) { R.push(open.rr); open = null; }
+        continue;                                         // un seul trade à la fois
+      }
+      var s = fn(c.slice(0, i + 1));
+      if (s && s.dir && s.dir !== 'WAIT' && s.rr) open = { dir: s.dir, sl: s.sl, tp: s.tp, rr: s.rr };
+    }
+    return R;
+  }
+  function btStats(R) {
+    var n = R.length; if (!n) return { trades: 0 };
+    var wins = R.filter(function (r) { return r > 0; }).length;
+    var rSum = R.reduce(function (a, b) { return a + b; }, 0);
+    var gross = R.filter(function (r) { return r > 0; }).reduce(function (a, b) { return a + b; }, 0);
+    var lossSum = -R.filter(function (r) { return r < 0; }).reduce(function (a, b) { return a + b; }, 0);
+    var eq = 0, peak = 0, dd = 0;
+    R.forEach(function (r) { eq += r; if (eq > peak) peak = eq; if (peak - eq > dd) dd = peak - eq; });
+    return { trades: n, winRate: Math.round(wins / n * 100), expectancy: +(rSum / n).toFixed(2),
+      pf: lossSum ? +(gross / lossSum).toFixed(2) : (gross > 0 ? 99 : 0), rSum: +rSum.toFixed(1), maxDD: +dd.toFixed(1) };
+  }
+  function backtest(rows, fn) { var R = []; rows.forEach(function (r) { R = R.concat(btOne(r.c, fn)); }); return btStats(R); }
+
   // ---- Chargement + assemblage ----------------------------------------------
   function fetchKlines(src) {
     var path = '/api/v3/klines?symbol=' + src + '&interval=1d&limit=300';
@@ -743,17 +787,21 @@
           up: up, down: down, total: votes.length, verdict: up > down ? 'haussier' : down > up ? 'baissier' : 'neutre', votes: votes };
       }).sort(function (a, b) { return Math.max(b.up, b.down) - Math.max(a.up, a.down); });
 
+      // Backtest de chaque stratégie sur tout l'historique dispo (toutes paires poolées).
+      var perfTrend = backtest(rows, trendFollow), perfBreak = backtest(rows, breakout),
+        perfRev = backtest(rows, meanRevert), perfPtj = backtest(rows, ptj);
+
       return {
         synthese: synthese,
         updated: Date.now(),
         strategies: [
-          { key: 'trend', name: 'Suivi de tendance (CTA)', tag: 'trend-following',
+          { key: 'trend', name: 'Suivi de tendance (CTA)', tag: 'trend-following', perf: perfTrend,
             how: 'Ce que font les fonds CTA (Winton, Man AHL) : ils ne prédisent rien, ils SUIVENT la tendance. Tant que la moyenne 50 est au-dessus de la 200, on reste acheteur ; on entre sur un repli vers la moyenne 50. Peu de trades, gardés longtemps, on laisse courir les gains.',
             signals: pack(trendFollow) },
-          { key: 'breakout', name: 'Cassure Donchian (Turtle Traders)', tag: 'breakout',
+          { key: 'breakout', name: 'Cassure Donchian (Turtle Traders)', tag: 'breakout', perf: perfBreak,
             how: 'La stratégie légendaire des « Tortues » : on achète quand le prix casse le plus haut des 20 dernières bougies (et on vend sous le plus bas). L\'idée : une vraie tendance démarre souvent par une cassure. Stop et objectif calés sur la volatilité (ATR).',
             signals: pack(breakout) },
-          { key: 'revert', name: 'Retour à la moyenne (mean reversion)', tag: 'mean-reversion',
+          { key: 'revert', name: 'Retour à la moyenne (mean reversion)', tag: 'mean-reversion', perf: perfRev,
             how: 'Approche « statistical arbitrage » simplifiée : quand le prix s\'éloigne trop de sa moyenne (RSI sous 30 = survendu, ou au-dessus de 70 = suracheté), on parie sur le RETOUR vers la moyenne. Marche mieux en marché sans tendance (range).',
             signals: pack(meanRevert) },
           { key: 'momentum', name: 'Momentum relatif (factor momentum)', tag: 'quant',
@@ -763,7 +811,7 @@
         legends: [
           { name: 'Paul Tudor Jones', who: 'Macro + technique · a anticipé le krach de 1987',
             principle: '« Personne ne devrait être acheteur sous la moyenne 200 jours, ni vendeur au-dessus. » Il coupe vite ses pertes et vise un gain/risque d\'au moins 5:1. Sa règle des 200 jours, appliquée à tes actifs :',
-            signals: pack(ptj) },
+            perf: perfPtj, signals: pack(ptj) },
           { name: 'Ray Dalio', who: 'Bridgewater · plus gros hedge fund du monde',
             principle: '« All Weather / risk parity » : la diversification est le seul repas gratuit. On équilibre le RISQUE entre actifs (plus de poids aux moins volatils) au lieu de répartir le capital à l\'aveugle. Allocation risk-parity indicative sur tes actifs :',
             alloc: riskParity(rows) },
@@ -1512,19 +1560,34 @@ function renderPro(data){
       <p class="pro-how">Pour chaque actif : combien de méthodes systématiques vont dans le même sens, et le <b>régime</b> du marché (une tendance favorise Tendance/Cassure ; un range favorise le Retour à la moyenne).</p>
       ${proSynth(data.synthese)}</section>`;
   }
+  // Meilleure stratégie mesurée (expectancy la plus haute, min 10 trades) → étoile.
+  const withPerf = data.strategies.filter(s=>s.perf&&s.perf.trades>=10).sort((a,b)=>b.perf.expectancy-a.perf.expectancy);
+  const bestKey = withPerf.length ? withPerf[0].key : null;
+  html += `<p class="bt-caveat">📊 Les stats « backtest » ci-dessous sont mesurées sur l'historique réel disponible (~10 mois de bougies journalières, toutes paires). <b>Échantillon court, sans frais ni slippage — c'est indicatif, pas une promesse.</b> Le passé ne garantit pas le futur.</p>`;
   html += data.strategies.map(s=>{
     const inner = s.ranking ? proRank(s.ranking) : `<div class="pro-sigs">${s.signals.map(proSigCard).join('')}</div>`;
-    return `<section class="pro-strat"><h3>${s.name}<span class="stag">${s.tag}</span></h3><p class="pro-how">${s.how}</p>${inner}</section>`;
+    const star = s.key===bestKey ? '<span class="best">⭐ meilleur edge mesuré</span>' : '';
+    return `<section class="pro-strat"><h3>${s.name}<span class="stag">${s.tag}</span>${star}</h3>${perfBadge(s.perf)}<p class="pro-how">${s.how}</p>${inner}</section>`;
   }).join('');
   if(data.legends && data.legends.length){
     html += `<div class="pro-legends-h">🏛️ Légendes de la finance — leurs stratégies</div>`;
     html += data.legends.map(l=>{
       const inner = l.signals ? `<div class="pro-sigs">${l.signals.map(proSigCard).join('')}</div>`
                   : l.alloc ? proAlloc(l.alloc) : '';
-      return `<section class="pro-strat"><h3>${l.name}</h3><div class="legend-who">${l.who}</div><p class="pro-how">${l.principle}</p>${inner}</section>`;
+      return `<section class="pro-strat"><h3>${l.name}</h3><div class="legend-who">${l.who}</div>${perfBadge(l.perf)}<p class="pro-how">${l.principle}</p>${inner}</section>`;
     }).join('');
   }
   body.innerHTML = html;
+}
+function perfBadge(p){
+  if(!p || !p.trades) return '';
+  const good = p.expectancy>0;
+  return `<div class="perf ${good?'ok':'bad'}"><span class="pk">Backtest</span>`+
+    `<span><b>${p.winRate}%</b> réussite</span>`+
+    `<span><b>${p.expectancy>0?'+':''}${p.expectancy} R</b>/trade</span>`+
+    `<span>PF <b>${p.pf}</b></span>`+
+    `<span>${p.trades} trades</span>`+
+    `<span>pire série <b>−${p.maxDD} R</b></span></div>`;
 }
 function loadPro(){
   if(proLoaded||proLoading||!window.PRO) return;
