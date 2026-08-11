@@ -205,6 +205,18 @@
   .pro-legends-h{font-family:var(--display);font-weight:600;font-size:1.15rem;margin:30px 0 14px;
     padding-top:22px;border-top:1px solid var(--border)}
   .legend-who{font-size:.76rem;color:var(--faint);margin:-2px 0 9px}
+  /* Synthèse multi-méthodes */
+  .synth-grid{display:flex;flex-direction:column;gap:10px}
+  .synth-row{border:1px solid var(--border);border-radius:11px;padding:11px 13px;background:var(--surface-2)}
+  .synth-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:9px}
+  .synth-head .psym{font-weight:700;font-size:.92rem}
+  .regime,.verdict{font-size:.7rem;font-weight:600;padding:2px 9px;border-radius:99px;white-space:nowrap}
+  .regime{border:1px solid var(--border);color:var(--muted);background:var(--surface-3)}
+  .regime.up{color:var(--long)} .regime.down{color:var(--short)}
+  .verdict{font-family:var(--mono);letter-spacing:-.01em}
+  .verdict.up{background:var(--long-dim);color:var(--long)}
+  .verdict.down{background:var(--short-dim);color:var(--short)}
+  .verdict.neu{background:var(--surface-3);color:var(--muted)}
   footer{border-top:1px solid var(--border);padding:26px 0 40px;color:var(--faint);font-size:.8rem;text-align:center}
 
   /* Bouton IA + modale */
@@ -608,6 +620,15 @@
     return a;
   }
   function roc(cl, p) { var n = cl.length; if (n <= p || !cl[n - 1 - p]) return 0; return (cl[n - 1] - cl[n - 1 - p]) / cl[n - 1 - p] * 100; }
+  // Efficiency Ratio (Kaufman) : proche de 1 = tendance nette, proche de 0 = marché haché (range).
+  function effRatio(cl, p) { var n = cl.length; if (n <= p) return 0; var chg = Math.abs(cl[n - 1] - cl[n - 1 - p]), vol = 0; for (var i = n - p; i < n; i++) vol += Math.abs(cl[i] - cl[i - 1]); return vol ? chg / vol : 0; }
+  // Régime de marché : tendance (et son sens) ou range. Sert à savoir quelle stratégie privilégier.
+  function regime(c) {
+    var cl = c.map(function (x) { return x.c; }), n = cl.length, er = effRatio(cl, 20);
+    var e50 = ema(cl, 50), e200 = ema(cl, 200), up = (e50[n - 1] || 0) > (e200[n - 1] || 0);
+    if (er >= 0.35) return { type: up ? 'Tendance haussière' : 'Tendance baissière', trend: true, dir: up ? 'haussier' : 'baissier', er: +er.toFixed(2) };
+    return { type: 'Range (sans tendance)', trend: false, dir: null, er: +er.toFixed(2) };
+  }
   function donchian(c, p) { var s = c.slice(c.length - 1 - p, c.length - 1); var hi = -Infinity, lo = Infinity; s.forEach(function (x) { if (x.h > hi) hi = x.h; if (x.l < lo) lo = x.l; }); return { hi: hi, lo: lo }; }
 
   // Construit un signal cohérent (RR ≥ 1, plafonné à 6) ou null.
@@ -704,7 +725,26 @@
         }).sort(function (x, y) { var a = x.dir !== 'WAIT' ? 1 : 0, b = y.dir !== 'WAIT' ? 1 : 0; return b - a; });
       }
 
+      // SYNTHÈSE MULTI-MÉTHODES : par actif, combien de méthodes vont dans le même sens + régime de marché.
+      function dirOf(s) { return (s && s.dir && s.dir !== 'WAIT') ? (s.dir === 'LONG' ? 'haussier' : 'baissier') : null; }
+      var third = Math.max(1, Math.ceil(mom.length / 3)), momDir = {};
+      mom.forEach(function (m, i) { momDir[m.sym] = i < third ? 'haussier' : (i >= mom.length - third ? 'baissier' : null); });
+      var synthese = rows.map(function (r) {
+        var votes = [
+          { m: 'Tendance', d: dirOf(trendFollow(r.c)) },
+          { m: 'Cassure', d: dirOf(breakout(r.c)) },
+          { m: 'Retour moy.', d: dirOf(meanRevert(r.c)) },
+          { m: 'PTJ 200j', d: dirOf(ptj(r.c)) },
+          { m: 'Momentum', d: momDir[r.a.sym] || null }
+        ].filter(function (v) { return v.d; });
+        var up = votes.filter(function (v) { return v.d === 'haussier'; }).length;
+        var down = votes.filter(function (v) { return v.d === 'baissier'; }).length;
+        return { sym: r.a.sym, cls: r.a.cls, price: r.c[r.c.length - 1].c, regime: regime(r.c),
+          up: up, down: down, total: votes.length, verdict: up > down ? 'haussier' : down > up ? 'baissier' : 'neutre', votes: votes };
+      }).sort(function (a, b) { return Math.max(b.up, b.down) - Math.max(a.up, a.down); });
+
       return {
+        synthese: synthese,
         updated: Date.now(),
         strategies: [
           { key: 'trend', name: 'Suivi de tendance (CTA)', tag: 'trend-following',
@@ -1446,10 +1486,33 @@ function proAlloc(list){
   const max=Math.max(1,...list.map(r=>r.w));
   return '<div class="pro-rank">'+list.map(r=>`<div class="rrow"><span class="rsym">${r.sym}</span><span class="rbar"><i style="left:0;width:${Math.max(2,r.w/max*100)}%;background:var(--grad)"></i></span><span class="rval">${r.w}%</span></div>`).join('')+'</div>';
 }
+function proSynth(list){
+  return '<div class="synth-grid">'+list.map(s=>{
+    const vcls = s.verdict==='haussier'?'up':s.verdict==='baissier'?'down':'neu';
+    const vtxt = s.verdict==='haussier'?'consensus haussier':s.verdict==='baissier'?'consensus baissier':'partagé';
+    const reg = s.regime||{type:'—',trend:false};
+    const rcls = reg.trend ? (reg.dir==='haussier'?'up':'down') : 'neu';
+    const chips = s.votes.map(v=>`<span class="ctag ${v.d==='haussier'?'up':'down'}">${v.d==='haussier'?'▲':'▼'} ${v.m}</span>`).join('');
+    return `<div class="synth-row">
+      <div class="synth-head">
+        <span class="psym">${s.sym}</span>
+        <span class="regime ${rcls}">${reg.type}</span>
+        <span class="verdict ${vcls}">${vtxt} · ${s.up}▲/${s.down}▼</span>
+      </div>
+      <div class="conflu-tags">${chips||'<span class="ctag">aucune méthode active</span>'}</div>
+    </div>`;
+  }).join('')+'</div>';
+}
 function renderPro(data){
   const body=$('#pro-body');
   if(!data){ body.innerHTML='<div class="hist-empty">Impossible de charger les données en direct. Ouvre le fichier depuis ton PC (double-clic) pour les vraies données.</div>'; return; }
-  let html = data.strategies.map(s=>{
+  let html='';
+  if(data.synthese && data.synthese.length){
+    html += `<section class="pro-strat synth"><h3>Synthèse multi-méthodes<span class="stag">consensus</span></h3>
+      <p class="pro-how">Pour chaque actif : combien de méthodes systématiques vont dans le même sens, et le <b>régime</b> du marché (une tendance favorise Tendance/Cassure ; un range favorise le Retour à la moyenne).</p>
+      ${proSynth(data.synthese)}</section>`;
+  }
+  html += data.strategies.map(s=>{
     const inner = s.ranking ? proRank(s.ranking) : `<div class="pro-sigs">${s.signals.map(proSigCard).join('')}</div>`;
     return `<section class="pro-strat"><h3>${s.name}<span class="stag">${s.tag}</span></h3><p class="pro-how">${s.how}</p>${inner}</section>`;
   }).join('');

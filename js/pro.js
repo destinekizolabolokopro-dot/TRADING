@@ -49,6 +49,15 @@
     return a;
   }
   function roc(cl, p) { var n = cl.length; if (n <= p || !cl[n - 1 - p]) return 0; return (cl[n - 1] - cl[n - 1 - p]) / cl[n - 1 - p] * 100; }
+  // Efficiency Ratio (Kaufman) : proche de 1 = tendance nette, proche de 0 = marché haché (range).
+  function effRatio(cl, p) { var n = cl.length; if (n <= p) return 0; var chg = Math.abs(cl[n - 1] - cl[n - 1 - p]), vol = 0; for (var i = n - p; i < n; i++) vol += Math.abs(cl[i] - cl[i - 1]); return vol ? chg / vol : 0; }
+  // Régime de marché : tendance (et son sens) ou range. Sert à savoir quelle stratégie privilégier.
+  function regime(c) {
+    var cl = c.map(function (x) { return x.c; }), n = cl.length, er = effRatio(cl, 20);
+    var e50 = ema(cl, 50), e200 = ema(cl, 200), up = (e50[n - 1] || 0) > (e200[n - 1] || 0);
+    if (er >= 0.35) return { type: up ? 'Tendance haussière' : 'Tendance baissière', trend: true, dir: up ? 'haussier' : 'baissier', er: +er.toFixed(2) };
+    return { type: 'Range (sans tendance)', trend: false, dir: null, er: +er.toFixed(2) };
+  }
   function donchian(c, p) { var s = c.slice(c.length - 1 - p, c.length - 1); var hi = -Infinity, lo = Infinity; s.forEach(function (x) { if (x.h > hi) hi = x.h; if (x.l < lo) lo = x.l; }); return { hi: hi, lo: lo }; }
 
   // Construit un signal cohérent (RR ≥ 1, plafonné à 6) ou null.
@@ -145,7 +154,26 @@
         }).sort(function (x, y) { var a = x.dir !== 'WAIT' ? 1 : 0, b = y.dir !== 'WAIT' ? 1 : 0; return b - a; });
       }
 
+      // SYNTHÈSE MULTI-MÉTHODES : par actif, combien de méthodes vont dans le même sens + régime de marché.
+      function dirOf(s) { return (s && s.dir && s.dir !== 'WAIT') ? (s.dir === 'LONG' ? 'haussier' : 'baissier') : null; }
+      var third = Math.max(1, Math.ceil(mom.length / 3)), momDir = {};
+      mom.forEach(function (m, i) { momDir[m.sym] = i < third ? 'haussier' : (i >= mom.length - third ? 'baissier' : null); });
+      var synthese = rows.map(function (r) {
+        var votes = [
+          { m: 'Tendance', d: dirOf(trendFollow(r.c)) },
+          { m: 'Cassure', d: dirOf(breakout(r.c)) },
+          { m: 'Retour moy.', d: dirOf(meanRevert(r.c)) },
+          { m: 'PTJ 200j', d: dirOf(ptj(r.c)) },
+          { m: 'Momentum', d: momDir[r.a.sym] || null }
+        ].filter(function (v) { return v.d; });
+        var up = votes.filter(function (v) { return v.d === 'haussier'; }).length;
+        var down = votes.filter(function (v) { return v.d === 'baissier'; }).length;
+        return { sym: r.a.sym, cls: r.a.cls, price: r.c[r.c.length - 1].c, regime: regime(r.c),
+          up: up, down: down, total: votes.length, verdict: up > down ? 'haussier' : down > up ? 'baissier' : 'neutre', votes: votes };
+      }).sort(function (a, b) { return Math.max(b.up, b.down) - Math.max(a.up, a.down); });
+
       return {
+        synthese: synthese,
         updated: Date.now(),
         strategies: [
           { key: 'trend', name: 'Suivi de tendance (CTA)', tag: 'trend-following',
