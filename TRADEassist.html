@@ -172,6 +172,36 @@
   .ctag.up{color:var(--long);border-color:color-mix(in srgb,var(--long) 40%,transparent)}
   .ctag.down{color:var(--short);border-color:color-mix(in srgb,var(--short) 40%,transparent)}
 
+  /* Bascule de vue ICT / Pro */
+  .viewswitch{display:inline-flex;gap:4px;padding:4px;background:var(--surface-2);border:1px solid var(--border);
+    border-radius:12px;margin:4px 0 22px}
+  .viewswitch .vs{font:inherit;font-weight:600;font-size:.86rem;padding:8px 16px;border-radius:9px;border:0;
+    background:transparent;color:var(--muted);cursor:pointer;transition:.15s}
+  .viewswitch .vs.on{background:var(--grad);color:#0a0a12}
+  .pro-intro{color:var(--muted);font-size:.9rem;max-width:70ch;margin:0 0 20px;line-height:1.55}
+  .pro-warn{color:var(--faint)}
+  .pro-strat{border:1px solid var(--border);border-radius:16px;background:var(--surface);padding:18px 18px 20px;margin-bottom:16px}
+  .pro-strat h3{font-family:var(--display);font-weight:600;font-size:1.05rem;margin:0 0 4px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .pro-strat .stag{font-family:var(--mono);font-size:.64rem;text-transform:uppercase;letter-spacing:.05em;
+    color:var(--faint);border:1px solid var(--border);border-radius:99px;padding:2px 8px}
+  .pro-how{color:var(--muted);font-size:.84rem;line-height:1.55;margin:0 0 14px}
+  .pro-sigs{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
+  .psig{border:1px solid var(--border);border-radius:11px;padding:11px 12px;background:var(--surface-2)}
+  .psig.long{border-left:3px solid var(--long)} .psig.short{border-left:3px solid var(--short)} .psig.wait{opacity:.72}
+  .psig .ph{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}
+  .psig .psym{font-weight:700;font-size:.9rem}
+  .psig .pdir{font-family:var(--mono);font-size:.74rem;font-weight:700;padding:2px 8px;border-radius:99px}
+  .psig .pdir.long{background:var(--long-dim);color:var(--long)} .psig .pdir.short{background:var(--short-dim);color:var(--short)}
+  .psig .pdir.wait{background:var(--surface-3);color:var(--muted)}
+  .psig .plvl{font-family:var(--mono);font-size:.74rem;color:var(--muted);display:flex;flex-wrap:wrap;gap:3px 12px;margin-bottom:6px}
+  .psig .plvl .tp{color:var(--long)} .psig .plvl .sl{color:var(--short)}
+  .psig .pnote{font-size:.76rem;color:var(--muted);line-height:1.4}
+  .pro-rank{display:flex;flex-direction:column;gap:7px}
+  .pro-rank .rrow{display:flex;align-items:center;gap:10px;font-size:.84rem}
+  .pro-rank .rsym{width:80px;font-weight:600}
+  .pro-rank .rbar{flex:1;height:8px;border-radius:99px;background:var(--surface-3);overflow:hidden;position:relative}
+  .pro-rank .rbar i{position:absolute;top:0;bottom:0;left:50%;border-radius:99px}
+  .pro-rank .rval{width:64px;text-align:right;font-family:var(--mono);font-size:.8rem}
   footer{border-top:1px solid var(--border);padding:26px 0 40px;color:var(--faint);font-size:.8rem;text-align:center}
 
   /* Bouton IA + modale */
@@ -279,18 +309,29 @@
     </div>
   </section>
 
-  <div class="toolbar">
-    <div class="tabs" id="tabs">
-      <button class="tab on" data-f="all">Toutes</button>
-      <button class="tab" data-f="signal">En signal</button>
-      <button class="tab" data-f="strong">Forts ≥70%</button>
-      <button class="tab" data-f="crypto">Crypto</button>
-      <button class="tab" data-f="forex">Forex / Or</button>
-    </div>
-    <div class="count"><span class="srcbadge off" id="src">● …</span> <span id="count"></span></div>
+  <div class="viewswitch">
+    <button class="vs on" data-v="ict">Signaux ICT / SMC</button>
+    <button class="vs" data-v="pro">Stratégies Pro</button>
   </div>
 
-  <main class="grid" id="grid"></main>
+  <div id="view-ict">
+    <div class="toolbar">
+      <div class="tabs" id="tabs">
+        <button class="tab on" data-f="all">Toutes</button>
+        <button class="tab" data-f="signal">En signal</button>
+        <button class="tab" data-f="strong">Forts ≥70%</button>
+        <button class="tab" data-f="crypto">Crypto</button>
+        <button class="tab" data-f="forex">Forex / Or</button>
+      </div>
+      <div class="count"><span class="srcbadge off" id="src">● …</span> <span id="count"></span></div>
+    </div>
+    <main class="grid" id="grid"></main>
+  </div>
+
+  <div id="view-pro" style="display:none">
+    <p class="pro-intro">Les méthodes <b>systématiques</b> réellement utilisées par les fonds — calculées sur les vraies bougies journalières. Chaque bloc explique comment la stratégie marche. <span class="pro-warn">Chacune a sa propre logique : elles peuvent être en désaccord, c'est normal.</span></p>
+    <div id="pro-body"><div class="hist-empty">Chargement des stratégies…</div></div>
+  </div>
 </div>
 
 <footer class="wrap">
@@ -512,7 +553,159 @@
 })(typeof window !== 'undefined' ? window : this);
 
 </script>
+<script>
+/*
+ * Stratégies "Trader Pro" — méthodes SYSTÉMATIQUES réellement utilisées par les fonds,
+ * calculées sur les vraies bougies journalières (Binance, sans clé). Contrairement à
+ * l'ICT/SMC (lecture de structure), ce sont des règles quantitatives simples et éprouvées :
+ *   1. Suivi de tendance (CTA / trend following)      — EMA 50/200 + repli
+ *   2. Cassure Donchian (Turtle Traders)              — plus haut/bas des 20 bougies
+ *   3. Retour à la moyenne (mean reversion / RSI)     — extrême + retour vers la moyenne
+ *   4. Momentum relatif (factor momentum, cross-asset)— on privilégie ce qui va le plus fort
+ * Chaque signal a entrée / SL / TP / RR (RR plafonné à 6, jamais sous 1).
+ */
+(function (root) {
+  'use strict';
 
+  var HOSTS = ['https://api.binance.com', 'https://data-api.binance.vision', 'https://api1.binance.com'];
+  var ASSETS = [
+    { sym: 'BTC/USD', src: 'BTCUSDT', cls: 'crypto' },
+    { sym: 'ETH/USD', src: 'ETHUSDT', cls: 'crypto' },
+    { sym: 'SOL/USD', src: 'SOLUSDT', cls: 'crypto' },
+    { sym: 'XRP/USD', src: 'XRPUSDT', cls: 'crypto' },
+    { sym: 'BNB/USD', src: 'BNBUSDT', cls: 'crypto' },
+    { sym: 'EUR/USD', src: 'EURUSDT', cls: 'forex' },
+    { sym: 'XAU/USD', src: 'PAXGUSDT', cls: 'forex' }
+  ];
+
+  // ---- Indicateurs -----------------------------------------------------------
+  function ema(v, p) { var k = 2 / (p + 1), e = v[0], out = [e]; for (var i = 1; i < v.length; i++) { e = v[i] * k + e * (1 - k); out.push(e); } return out; }
+  function rsi(cl, p) {
+    var out = []; var i; for (i = 0; i < p; i++) out.push(null);
+    if (cl.length <= p) return out;
+    var g = 0, l = 0;
+    for (i = 1; i <= p; i++) { var d = cl[i] - cl[i - 1]; if (d >= 0) g += d; else l -= d; }
+    var ag = g / p, al = l / p;
+    out[p] = al === 0 ? 100 : 100 - 100 / (1 + ag / al);
+    for (i = p + 1; i < cl.length; i++) {
+      var dd = cl[i] - cl[i - 1], gg = dd > 0 ? dd : 0, ll = dd < 0 ? -dd : 0;
+      ag = (ag * (p - 1) + gg) / p; al = (al * (p - 1) + ll) / p;
+      out.push(al === 0 ? 100 : 100 - 100 / (1 + ag / al));
+    }
+    return out;
+  }
+  function atr(c, p) { // renvoie la dernière valeur (Wilder)
+    if (c.length <= p) return null;
+    var trs = [], i;
+    for (i = 1; i < c.length; i++) { var h = c[i].h, lo = c[i].l, pc = c[i - 1].c; trs.push(Math.max(h - lo, Math.abs(h - pc), Math.abs(lo - pc))); }
+    var a = 0; for (i = 0; i < p; i++) a += trs[i]; a /= p;
+    for (i = p; i < trs.length; i++) a = (a * (p - 1) + trs[i]) / p;
+    return a;
+  }
+  function roc(cl, p) { var n = cl.length; if (n <= p || !cl[n - 1 - p]) return 0; return (cl[n - 1] - cl[n - 1 - p]) / cl[n - 1 - p] * 100; }
+  function donchian(c, p) { var s = c.slice(c.length - 1 - p, c.length - 1); var hi = -Infinity, lo = Infinity; s.forEach(function (x) { if (x.h > hi) hi = x.h; if (x.l < lo) lo = x.l; }); return { hi: hi, lo: lo }; }
+
+  // Construit un signal cohérent (RR ≥ 1, plafonné à 6) ou null.
+  function mk(dir, entry, sl, tp) {
+    var risk = Math.abs(entry - sl), rew = Math.abs(tp - entry);
+    if (risk <= 0) return null;
+    var ok = dir === 'LONG' ? (sl < entry && tp > entry) : (sl > entry && tp < entry);
+    if (!ok) return null;
+    var rr = rew / risk;
+    if (rr < 1) return null;
+    if (rr > 6) { rew = risk * 6; tp = dir === 'LONG' ? entry + rew : entry - rew; rr = 6; }
+    return { dir: dir, entry: +entry, sl: +sl, tp: +tp, rr: +rr.toFixed(1) };
+  }
+
+  // ---- Stratégies (sur bougies D1) ------------------------------------------
+  // 1. Suivi de tendance : EMA50 vs EMA200 = sens ; on entre sur un repli vers l'EMA50.
+  function trendFollow(c) {
+    var cl = c.map(function (x) { return x.c; }), n = cl.length;
+    if (n < 210) return { dir: 'WAIT', note: 'Pas assez d\'historique.' };
+    var e50 = ema(cl, 50), e200 = ema(cl, 200), a = atr(c, 14), price = cl[n - 1];
+    var up = e50[n - 1] > e200[n - 1], dir = up ? 'LONG' : 'SHORT';
+    if (Math.abs(price - e50[n - 1]) > 1.6 * a)
+      return { dir: 'WAIT', note: 'Tendance ' + (up ? 'haussière' : 'baissière') + ' (EMA50 ' + (up ? '>' : '<') + ' EMA200), mais pas de repli — on attend un retour vers l\'EMA50.' };
+    var s = mk(dir, price, up ? price - 1.5 * a : price + 1.5 * a, up ? price + 3 * a : price - 3 * a);
+    if (!s) return { dir: 'WAIT', note: 'Géométrie invalide.' };
+    s.note = 'Tendance ' + (up ? 'haussière' : 'baissière') + ' confirmée (EMA50/EMA200) + repli sur l\'EMA50 → on suit la tendance.';
+    return s;
+  }
+  // 2. Cassure Donchian (Turtle Traders) : cassure du plus haut/bas des 20 bougies.
+  function breakout(c) {
+    var n = c.length; if (n < 25) return { dir: 'WAIT', note: 'Pas assez d\'historique.' };
+    var d = donchian(c, 20), a = atr(c, 14), price = c[n - 1].c;
+    if (price >= d.hi) { var L = mk('LONG', price, price - 2 * a, price + 4 * a); if (L) { L.note = 'Cassure du plus haut des 20 bougies → percée haussière (méthode des Tortues).'; return L; } }
+    if (price <= d.lo) { var S = mk('SHORT', price, price + 2 * a, price - 4 * a); if (S) { S.note = 'Cassure du plus bas des 20 bougies → percée baissière (méthode des Tortues).'; return S; } }
+    return { dir: 'WAIT', note: 'Prix dans le canal des 20 bougies — pas de cassure.' };
+  }
+  // 3. Retour à la moyenne : RSI extrême + prix éloigné de sa moyenne (EMA20) → retour visé.
+  function meanRevert(c) {
+    var cl = c.map(function (x) { return x.c; }), n = cl.length;
+    if (n < 30) return { dir: 'WAIT', note: 'Pas assez d\'historique.' };
+    var r = rsi(cl, 14), e20 = ema(cl, 20), a = atr(c, 14), price = cl[n - 1], rv = r[n - 1], mean = e20[n - 1];
+    if (rv == null) return { dir: 'WAIT', note: 'RSI indisponible.' };
+    if (rv < 30 && price < mean) { var L = mk('LONG', price, price - 1.5 * a, mean); if (L) { L.note = 'Survendu (RSI ' + Math.round(rv) + ') et sous la moyenne → pari sur le retour vers la moyenne.'; return L; } }
+    if (rv > 70 && price > mean) { var S = mk('SHORT', price, price + 1.5 * a, mean); if (S) { S.note = 'Suracheté (RSI ' + Math.round(rv) + ') et au-dessus de la moyenne → pari sur le retour vers la moyenne.'; return S; } }
+    return { dir: 'WAIT', note: 'RSI ' + Math.round(rv) + ' — pas d\'excès (ni survendu < 30, ni suracheté > 70).' };
+  }
+
+  // ---- Chargement + assemblage ----------------------------------------------
+  function fetchKlines(src) {
+    var path = '/api/v3/klines?symbol=' + src + '&interval=1d&limit=300';
+    function tryHost(i) {
+      if (i >= HOSTS.length) return Promise.reject(new Error('Binance injoignable'));
+      return fetch(HOSTS[i] + path).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then(function (d) { return d.map(function (k) { return { t: k[0], o: +k[1], h: +k[2], l: +k[3], c: +k[4] }; }).slice(0, -1); })
+        .catch(function () { return tryHost(i + 1); });
+    }
+    return tryHost(0);
+  }
+  var fresh = function (c) { return c && c.length && (Date.now() - c[c.length - 1].t) < 3 * 864e5; };
+
+  function load() {
+    return Promise.all(ASSETS.map(function (a) {
+      return fetchKlines(a.src).then(function (c) { return { a: a, c: c }; }, function () { return { a: a, c: null }; });
+    })).then(function (rows) {
+      rows = rows.filter(function (r) { return fresh(r.c); });
+      if (!rows.length) return null;
+
+      // Momentum relatif (cross-asset) : classement par performance sur 30 jours.
+      var mom = rows.map(function (r) { return { sym: r.a.sym, cls: r.a.cls, roc: +roc(r.c.map(function (x) { return x.c; }), 30).toFixed(1) }; })
+        .sort(function (x, y) { return y.roc - x.roc; });
+
+      function pack(fn) {
+        return rows.map(function (r) {
+          var s = fn(r.c) || { dir: 'WAIT', note: '—' };
+          s.sym = r.a.sym; s.cls = r.a.cls; s.price = r.c[r.c.length - 1].c;
+          return s;
+        }).sort(function (x, y) { var a = x.dir !== 'WAIT' ? 1 : 0, b = y.dir !== 'WAIT' ? 1 : 0; return b - a; });
+      }
+
+      return {
+        updated: Date.now(),
+        strategies: [
+          { key: 'trend', name: 'Suivi de tendance (CTA)', tag: 'trend-following',
+            how: 'Ce que font les fonds CTA (Winton, Man AHL) : ils ne prédisent rien, ils SUIVENT la tendance. Tant que la moyenne 50 est au-dessus de la 200, on reste acheteur ; on entre sur un repli vers la moyenne 50. Peu de trades, gardés longtemps, on laisse courir les gains.',
+            signals: pack(trendFollow) },
+          { key: 'breakout', name: 'Cassure Donchian (Turtle Traders)', tag: 'breakout',
+            how: 'La stratégie légendaire des « Tortues » : on achète quand le prix casse le plus haut des 20 dernières bougies (et on vend sous le plus bas). L\'idée : une vraie tendance démarre souvent par une cassure. Stop et objectif calés sur la volatilité (ATR).',
+            signals: pack(breakout) },
+          { key: 'revert', name: 'Retour à la moyenne (mean reversion)', tag: 'mean-reversion',
+            how: 'Approche « statistical arbitrage » simplifiée : quand le prix s\'éloigne trop de sa moyenne (RSI sous 30 = survendu, ou au-dessus de 70 = suracheté), on parie sur le RETOUR vers la moyenne. Marche mieux en marché sans tendance (range).',
+            signals: pack(meanRevert) },
+          { key: 'momentum', name: 'Momentum relatif (factor momentum)', tag: 'quant',
+            how: 'Ce que font les quants (style AQR) : classer les actifs par performance récente et privilégier les plus FORTS (le momentum a tendance à persister). En haut du classement = biais acheteur ; en bas = biais vendeur.',
+            ranking: mom }
+        ]
+      };
+    });
+  }
+
+  root.PRO = { load: load };
+})(typeof window !== 'undefined' ? window : this);
+
+</script>
 <script>
 /*
  * Couche DONNÉES EN DIRECT du dashboard (navigateur, sans clé)
@@ -1190,6 +1383,51 @@ $('#hist-open').addEventListener('click', ()=>{ renderHist(); histOverlay.classL
 $('#hist-close').addEventListener('click', ()=> histOverlay.classList.remove('open'));
 histOverlay.addEventListener('click', e=>{ if(e.target===histOverlay) histOverlay.classList.remove('open'); });
 $('#hist-reset').addEventListener('click', ()=>{ if(window.History && confirm('Effacer tout l’historique des trades ?')){ History.reset(); renderHist(); } });
+
+/* ---------- Stratégies Pro (nouvel onglet) ---------- */
+let proLoaded=false, proLoading=false;
+function proSigCard(g){
+  const cls = g.dir==='LONG'?'long':g.dir==='SHORT'?'short':'wait';
+  const dlabel = g.dir==='LONG'?'▲ LONG':g.dir==='SHORT'?'▼ SHORT':'En attente';
+  const levels = g.dir!=='WAIT'
+    ? `<div class="plvl"><span>Entrée ${fmtN(g.entry)}</span><span class="sl">SL ${fmtN(g.sl)}</span><span class="tp">TP ${fmtN(g.tp)}</span><span>RR ${g.rr}</span></div>
+       <div class="plvl"><span class="tp">+${Math.round(100*g.rr)} € si TP</span><span class="sl">−100 € si SL</span></div>` : '';
+  return `<div class="psig ${cls}">
+    <div class="ph"><span class="psym">${g.sym}</span><span class="pdir ${cls}">${dlabel}</span></div>
+    ${levels}<div class="pnote">${g.note||''}</div></div>`;
+}
+function proRank(list){
+  const max = Math.max(1, ...list.map(r=>Math.abs(r.roc)));
+  return '<div class="pro-rank">'+list.map(r=>{
+    const w = Math.max(2, Math.abs(r.roc)/max*50), up=r.roc>=0;
+    const bar = `<i style="${up?'left:50%':('right:50%;left:auto')};width:${w}%;background:${up?'var(--long)':'var(--short)'}"></i>`;
+    return `<div class="rrow"><span class="rsym">${r.sym}</span><span class="rbar">${bar}</span><span class="rval ${up?'':'neg'}" style="color:${up?'var(--long)':'var(--short)'}">${up?'+':''}${r.roc}%</span></div>`;
+  }).join('')+'</div>';
+}
+function renderPro(data){
+  const body=$('#pro-body');
+  if(!data){ body.innerHTML='<div class="hist-empty">Impossible de charger les données en direct. Ouvre le fichier depuis ton PC (double-clic) pour les vraies données.</div>'; return; }
+  body.innerHTML = data.strategies.map(s=>{
+    const inner = s.ranking ? proRank(s.ranking) : `<div class="pro-sigs">${s.signals.map(proSigCard).join('')}</div>`;
+    return `<section class="pro-strat">
+      <h3>${s.name}<span class="stag">${s.tag}</span></h3>
+      <p class="pro-how">${s.how}</p>${inner}</section>`;
+  }).join('');
+}
+function loadPro(){
+  if(proLoaded||proLoading||!window.PRO) return;
+  proLoading=true;
+  PRO.load().then(d=>{ proLoaded=true; proLoading=false; renderPro(d); })
+            .catch(()=>{ proLoading=false; renderPro(null); });
+}
+$('.viewswitch').addEventListener('click', e=>{
+  const b=e.target.closest('.vs'); if(!b) return;
+  $('.viewswitch .on').classList.remove('on'); b.classList.add('on');
+  const pro = b.dataset.v==='pro';
+  $('#view-ict').style.display = pro?'none':'';
+  $('#view-pro').style.display = pro?'':'none';
+  if(pro) loadPro();
+});
 </script>
 </body>
 </html>

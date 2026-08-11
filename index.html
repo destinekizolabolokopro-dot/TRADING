@@ -172,6 +172,36 @@
   .ctag.up{color:var(--long);border-color:color-mix(in srgb,var(--long) 40%,transparent)}
   .ctag.down{color:var(--short);border-color:color-mix(in srgb,var(--short) 40%,transparent)}
 
+  /* Bascule de vue ICT / Pro */
+  .viewswitch{display:inline-flex;gap:4px;padding:4px;background:var(--surface-2);border:1px solid var(--border);
+    border-radius:12px;margin:4px 0 22px}
+  .viewswitch .vs{font:inherit;font-weight:600;font-size:.86rem;padding:8px 16px;border-radius:9px;border:0;
+    background:transparent;color:var(--muted);cursor:pointer;transition:.15s}
+  .viewswitch .vs.on{background:var(--grad);color:#0a0a12}
+  .pro-intro{color:var(--muted);font-size:.9rem;max-width:70ch;margin:0 0 20px;line-height:1.55}
+  .pro-warn{color:var(--faint)}
+  .pro-strat{border:1px solid var(--border);border-radius:16px;background:var(--surface);padding:18px 18px 20px;margin-bottom:16px}
+  .pro-strat h3{font-family:var(--display);font-weight:600;font-size:1.05rem;margin:0 0 4px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .pro-strat .stag{font-family:var(--mono);font-size:.64rem;text-transform:uppercase;letter-spacing:.05em;
+    color:var(--faint);border:1px solid var(--border);border-radius:99px;padding:2px 8px}
+  .pro-how{color:var(--muted);font-size:.84rem;line-height:1.55;margin:0 0 14px}
+  .pro-sigs{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
+  .psig{border:1px solid var(--border);border-radius:11px;padding:11px 12px;background:var(--surface-2)}
+  .psig.long{border-left:3px solid var(--long)} .psig.short{border-left:3px solid var(--short)} .psig.wait{opacity:.72}
+  .psig .ph{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}
+  .psig .psym{font-weight:700;font-size:.9rem}
+  .psig .pdir{font-family:var(--mono);font-size:.74rem;font-weight:700;padding:2px 8px;border-radius:99px}
+  .psig .pdir.long{background:var(--long-dim);color:var(--long)} .psig .pdir.short{background:var(--short-dim);color:var(--short)}
+  .psig .pdir.wait{background:var(--surface-3);color:var(--muted)}
+  .psig .plvl{font-family:var(--mono);font-size:.74rem;color:var(--muted);display:flex;flex-wrap:wrap;gap:3px 12px;margin-bottom:6px}
+  .psig .plvl .tp{color:var(--long)} .psig .plvl .sl{color:var(--short)}
+  .psig .pnote{font-size:.76rem;color:var(--muted);line-height:1.4}
+  .pro-rank{display:flex;flex-direction:column;gap:7px}
+  .pro-rank .rrow{display:flex;align-items:center;gap:10px;font-size:.84rem}
+  .pro-rank .rsym{width:80px;font-weight:600}
+  .pro-rank .rbar{flex:1;height:8px;border-radius:99px;background:var(--surface-3);overflow:hidden;position:relative}
+  .pro-rank .rbar i{position:absolute;top:0;bottom:0;left:50%;border-radius:99px}
+  .pro-rank .rval{width:64px;text-align:right;font-family:var(--mono);font-size:.8rem}
   footer{border-top:1px solid var(--border);padding:26px 0 40px;color:var(--faint);font-size:.8rem;text-align:center}
 
   /* Bouton IA + modale */
@@ -279,18 +309,29 @@
     </div>
   </section>
 
-  <div class="toolbar">
-    <div class="tabs" id="tabs">
-      <button class="tab on" data-f="all">Toutes</button>
-      <button class="tab" data-f="signal">En signal</button>
-      <button class="tab" data-f="strong">Forts ≥70%</button>
-      <button class="tab" data-f="crypto">Crypto</button>
-      <button class="tab" data-f="forex">Forex / Or</button>
-    </div>
-    <div class="count"><span class="srcbadge off" id="src">● …</span> <span id="count"></span></div>
+  <div class="viewswitch">
+    <button class="vs on" data-v="ict">Signaux ICT / SMC</button>
+    <button class="vs" data-v="pro">Stratégies Pro</button>
   </div>
 
-  <main class="grid" id="grid"></main>
+  <div id="view-ict">
+    <div class="toolbar">
+      <div class="tabs" id="tabs">
+        <button class="tab on" data-f="all">Toutes</button>
+        <button class="tab" data-f="signal">En signal</button>
+        <button class="tab" data-f="strong">Forts ≥70%</button>
+        <button class="tab" data-f="crypto">Crypto</button>
+        <button class="tab" data-f="forex">Forex / Or</button>
+      </div>
+      <div class="count"><span class="srcbadge off" id="src">● …</span> <span id="count"></span></div>
+    </div>
+    <main class="grid" id="grid"></main>
+  </div>
+
+  <div id="view-pro" style="display:none">
+    <p class="pro-intro">Les méthodes <b>systématiques</b> réellement utilisées par les fonds — calculées sur les vraies bougies journalières. Chaque bloc explique comment la stratégie marche. <span class="pro-warn">Chacune a sa propre logique : elles peuvent être en désaccord, c'est normal.</span></p>
+    <div id="pro-body"><div class="hist-empty">Chargement des stratégies…</div></div>
+  </div>
 </div>
 
 <footer class="wrap">
@@ -339,7 +380,7 @@
 
 <script src="js/history.js"></script>
 <script src="js/ai.js"></script>
-
+<script src="js/pro.js"></script>
 <script src="js/live.js"></script>
 <script>
 /* ---------- Données mock (repli si le direct échoue) ---------- */
@@ -667,6 +708,51 @@ $('#hist-open').addEventListener('click', ()=>{ renderHist(); histOverlay.classL
 $('#hist-close').addEventListener('click', ()=> histOverlay.classList.remove('open'));
 histOverlay.addEventListener('click', e=>{ if(e.target===histOverlay) histOverlay.classList.remove('open'); });
 $('#hist-reset').addEventListener('click', ()=>{ if(window.History && confirm('Effacer tout l’historique des trades ?')){ History.reset(); renderHist(); } });
+
+/* ---------- Stratégies Pro (nouvel onglet) ---------- */
+let proLoaded=false, proLoading=false;
+function proSigCard(g){
+  const cls = g.dir==='LONG'?'long':g.dir==='SHORT'?'short':'wait';
+  const dlabel = g.dir==='LONG'?'▲ LONG':g.dir==='SHORT'?'▼ SHORT':'En attente';
+  const levels = g.dir!=='WAIT'
+    ? `<div class="plvl"><span>Entrée ${fmtN(g.entry)}</span><span class="sl">SL ${fmtN(g.sl)}</span><span class="tp">TP ${fmtN(g.tp)}</span><span>RR ${g.rr}</span></div>
+       <div class="plvl"><span class="tp">+${Math.round(100*g.rr)} € si TP</span><span class="sl">−100 € si SL</span></div>` : '';
+  return `<div class="psig ${cls}">
+    <div class="ph"><span class="psym">${g.sym}</span><span class="pdir ${cls}">${dlabel}</span></div>
+    ${levels}<div class="pnote">${g.note||''}</div></div>`;
+}
+function proRank(list){
+  const max = Math.max(1, ...list.map(r=>Math.abs(r.roc)));
+  return '<div class="pro-rank">'+list.map(r=>{
+    const w = Math.max(2, Math.abs(r.roc)/max*50), up=r.roc>=0;
+    const bar = `<i style="${up?'left:50%':('right:50%;left:auto')};width:${w}%;background:${up?'var(--long)':'var(--short)'}"></i>`;
+    return `<div class="rrow"><span class="rsym">${r.sym}</span><span class="rbar">${bar}</span><span class="rval ${up?'':'neg'}" style="color:${up?'var(--long)':'var(--short)'}">${up?'+':''}${r.roc}%</span></div>`;
+  }).join('')+'</div>';
+}
+function renderPro(data){
+  const body=$('#pro-body');
+  if(!data){ body.innerHTML='<div class="hist-empty">Impossible de charger les données en direct. Ouvre le fichier depuis ton PC (double-clic) pour les vraies données.</div>'; return; }
+  body.innerHTML = data.strategies.map(s=>{
+    const inner = s.ranking ? proRank(s.ranking) : `<div class="pro-sigs">${s.signals.map(proSigCard).join('')}</div>`;
+    return `<section class="pro-strat">
+      <h3>${s.name}<span class="stag">${s.tag}</span></h3>
+      <p class="pro-how">${s.how}</p>${inner}</section>`;
+  }).join('');
+}
+function loadPro(){
+  if(proLoaded||proLoading||!window.PRO) return;
+  proLoading=true;
+  PRO.load().then(d=>{ proLoaded=true; proLoading=false; renderPro(d); })
+            .catch(()=>{ proLoading=false; renderPro(null); });
+}
+$('.viewswitch').addEventListener('click', e=>{
+  const b=e.target.closest('.vs'); if(!b) return;
+  $('.viewswitch .on').classList.remove('on'); b.classList.add('on');
+  const pro = b.dataset.v==='pro';
+  $('#view-ict').style.display = pro?'none':'';
+  $('#view-pro').style.display = pro?'':'none';
+  if(pro) loadPro();
+});
 </script>
 </body>
 </html>
