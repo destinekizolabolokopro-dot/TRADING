@@ -70,6 +70,28 @@
     if (hi.i > lo.i) return { type: 'achat', bottom: H - 0.79 * span, top: H - 0.62 * span };
     return { type: 'vente', bottom: L + 0.62 * span, top: L + 0.79 * span };
   }
+  // Poches de liquidité : "equal highs" (liquidité acheteuse au-dessus) et "equal lows"
+  // (liquidité vendeuse en-dessous) = niveaux où reposent des stops que le prix vient chercher.
+  function liquidity(c, s) {
+    var price = c[c.length - 1].c, tol = price * 0.0018;
+    function cluster(pts) { // renvoie le niveau moyen d'une paire de swings quasi-égaux (récents), sinon null
+      var last = pts.slice(-6), best = null;
+      for (var i = 0; i < last.length; i++)
+        for (var j = i + 1; j < last.length; j++)
+          if (Math.abs(last[i].p - last[j].p) <= tol) best = (last[i].p + last[j].p) / 2;
+      return best;
+    }
+    return { buy: cluster(s.hi), sell: cluster(s.lo) };
+  }
+  // MSS (Market Structure Shift) : cassure de la dernière structure opposée = bascule de momentum.
+  function mss(c, s) {
+    var h = s.hi, l = s.lo, last = c[c.length - 1].c;
+    if (h.length >= 2 && l.length >= 2) {
+      if (h[h.length - 1].p < h[h.length - 2].p && last > h[h.length - 1].p) return 'haussier'; // cassure haussière après plus-hauts descendants
+      if (l[l.length - 1].p > l[l.length - 2].p && last < l[l.length - 1].p) return 'baissier';  // cassure baissière après plus-bas montants
+    }
+    return null;
+  }
   function cyclePhase(c) {
     var n = c.length;
     if (n < 3) return 'Transition';
@@ -156,20 +178,38 @@
     var rr = +(rew / risk).toFixed(1);
     if (rr < 1) { base.prog = 48; base.note = 'Setup aligné mais RR < 1 (cible trop proche) — on attend un meilleur point.'; return base; }
 
-    // Confluence renforcée
-    var conf = 48;
-    conf += 12;                                   // zone correcte (déjà validée)
+    // Confluence renforcée — chaque brique validée est un point de confluence, listé dans le motif.
+    var hsw = swings(htf);
+    var why = [st.label, 'zone ' + zoneName, poiType + ' aligné'];
+    var conf = 48 + 12;                            // base + zone correcte (déjà validée)
     if (poiType === 'FVG') conf += 12; else conf += 8;
-    if (st.label.indexOf('BOS') >= 0) conf += 12; // cassure de structure confirmée
-    // ALIGNEMENT TOP-DOWN : le biais vient du D1 (dtf) ; on vérifie que le H4 (htf) confirme.
-    var hBias = structure(htf, swings(htf)).bias;
-    var aligned = hBias === st.bias;
-    if (aligned) conf += 8;                        // H4 confirme le D1 -> setup plus fiable
-    else if (hBias !== 'neutre') conf -= 6;        // H4 à contre-courant du D1 -> prudence
+    if (st.label.indexOf('BOS') >= 0) conf += 12;  // cassure de structure confirmée
+
+    // ALIGNEMENT TOP-DOWN : biais D1 (dtf) confirmé (ou non) par le H4 (htf).
+    var hBias = structure(htf, hsw).bias, aligned = hBias === st.bias;
+    if (aligned) { conf += 8; why.push('H4 aligné D1'); }
+    else if (hBias !== 'neutre') { conf -= 6; why.push('H4 divergent'); }
+
+    // MSS (Market Structure Shift) dans le sens du biais.
+    var ms = mss(htf, hsw);
+    if (ms === st.bias) { conf += 8; why.push('MSS ' + ms); }
+
+    // Liquidité : poche (equal highs/lows) visée dans le bon sens + balayage récent de la poche opposée.
+    var liq = liquidity(htf, hsw);
+    var liqTarget = dir === 'LONG' ? liq.buy : liq.sell;
+    if (liqTarget != null) { conf += 6; why.push('liquidité ciblée'); }
+    var oppPool = dir === 'LONG' ? liq.sell : liq.buy, sweep = false;
+    if (oppPool != null) htf.slice(-3).forEach(function (k) {
+      if (dir === 'LONG' && k.l < oppPool && k.c > oppPool) sweep = true;
+      if (dir === 'SHORT' && k.h > oppPool && k.c < oppPool) sweep = true;
+    });
+    if (sweep) { conf += 8; why.push('balayage liquidité'); }
+
     var oteIn = ot && price >= Math.min(ot.bottom, ot.top) && price <= Math.max(ot.bottom, ot.top);
-    if (oteIn) conf += 6;                          // prix dans l'OTE (62-79%)
+    if (oteIn) { conf += 6; why.push('OTE'); }     // prix dans l'OTE (62-79 %)
     if (cyc === 'Expansion' || cyc === 'Accumulation') conf += 4;
-    // DXY inversé pour crypto/or ET forex quotés en USD (…/USD) : DXY baissier = dollar faible = favorable au long.
+
+    // DXY inversé pour crypto/or ET forex …/USD : DXY baissier = dollar faible = favorable au long.
     var fav = (dir === 'LONG' && dxyBias === 'baissier') || (dir === 'SHORT' && dxyBias === 'haussier');
     if (fav) conf += 10;
     else if (dxyBias && dxyBias !== 'neutre') conf -= 8; // DXY à contre-courant
@@ -178,10 +218,9 @@
     var inZone = price >= Math.min(poi[0], poi[1]) && price <= Math.max(poi[0], poi[1]);
     var prog = clamp(conf + (inZone ? 10 : -3) + (rr >= 2 ? 4 : 0), 20, 100);
     var win = clamp(Math.round(conf * 0.82), 40, 85);
-    var reason = [st.label, 'zone ' + zoneName, poiType + ' aligné']
-      .concat(aligned ? ['H4 aligné D1'] : (hBias !== 'neutre' ? ['H4 divergent'] : []))
-      .concat(['cible liquidité (' + rr + 'R)'])
-      .concat(fav ? ['DXY favorable'] : []).join(' · ');
+    why.push('cible ' + rr + 'R');
+    if (fav) why.push('DXY favorable');
+    var reason = why.join(' · ');
     chart.entry = entry; chart.sl = sl; chart.tp = tp;
     return { sym: sym, name: name, cls: cls, price: price, chg: chg, dir: dir, conf: conf, cycle: cyc,
       entry: entry, sl: sl, tp: tp, rr: rr, win: win, prog: prog, note: reason, chart: chart };

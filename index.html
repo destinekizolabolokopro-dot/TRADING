@@ -471,6 +471,8 @@ function card(p){
 function render(filter='all'){
   const grid = $('#grid'); grid.innerHTML='';
   const list = PAIRS.filter(p=> filter==='all' ? true : filter==='signal' ? p.dir!=='WAIT' : p.cls===filter);
+  // Les vrais signaux d'abord, triés par force du setup (progression) décroissante ; les "en attente" ensuite.
+  list.sort((a,b)=>{ const sa=a.dir!=='WAIT'?1:0, sb=b.dir!=='WAIT'?1:0; if(sa!==sb) return sb-sa; return (b.prog||0)-(a.prog||0); });
   list.forEach(p=> grid.appendChild(card(p)));
   $('#count').textContent = `${list.length} paire${list.length>1?'s':''}`;
   requestAnimationFrame(()=> grid.querySelectorAll('.fill').forEach(f=> f.style.width=f.dataset.w+'%'));
