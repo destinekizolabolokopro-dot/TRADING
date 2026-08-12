@@ -40,16 +40,21 @@
     { sym: 'EUR/USD', src: 'EURUSDT', cls: 'forex' },
     { sym: 'XAU/USD', src: 'PAXGUSDT', cls: 'forex' }
   ];
-  // Horizon long (~20 j) : c'est là que la tendance/le momentum persistent le mieux (le seul
-  // "signal" légèrement exploitable et défendable). En dessous, c'est du pur pile ou face.
-  var HORIZON = 20;
-  var MODEL_VERSION = 5;        // cible RELATIVE (surperformer le panier) : on ré-apprend de zéro
+  // Horizon ~30 j (rotation mensuelle) : c'est là que le momentum RELATIF persiste le mieux.
+  var HORIZON = 30;
+  var MODEL_VERSION = 6;        // + features cross-sectionnelles : on ré-apprend de zéro
+  // 11 features ABSOLUES (l'actif seul) + 7 features RELATIVES (sa position vs le panier).
+  // Comme la cible est relative (surperformer le panier), ces features relatives sont le bon
+  // carburant : elles disent "cet actif est-il plus fort/faible que les autres MAINTENANT ?".
   var FEATURE_NAMES = [
     'Biais HTF (EMA50/200)', 'Zone premium/discount', 'RSI (excès)', 'Momentum (ROC)',
     'Régime (efficiency)', 'Displacement', 'Position dans le range (liquidité)',
-    'Cassure de structure (BOS)', 'Volatilité (ATR)', 'Dernière variation', 'Pente EMA50'
+    'Cassure de structure (BOS)', 'Volatilité (ATR)', 'Dernière variation', 'Pente EMA50',
+    'Momentum relatif (vs panier)', 'Rang de momentum', 'Momentum relatif long',
+    'RSI relatif', 'Force de tendance relative', 'Écart au prix relatif', 'Volatilité relative'
   ];
-  var NF = FEATURE_NAMES.length;
+  var BF = 11;                  // nombre de features de base (absolues)
+  var NF = FEATURE_NAMES.length; // total (18)
 
   // ---- Indicateurs (mêmes définitions que le moteur, cohérence garantie) -----
   function ema(v, p) { var k = 2 / (p + 1), e = v[0], out = [e]; for (var i = 1; i < v.length; i++) { e = v[i] * k + e * (1 - k); out.push(e); } return out; }
@@ -85,7 +90,7 @@
     var cl = c.map(function (x) { return x.c; });
     var e20 = ema(cl, 20), e50 = ema(cl, 50), e200 = ema(cl, 200);
     var rsi = rsiArr(cl, 14), atr = atrArr(c, 14);
-    var X = [], meta = [];
+    var X = [], RAW = [], meta = [];
     var start = 50, end = n; // on garde les dernières bougies pour la prédiction "live"
     for (var i = start; i < end; i++) {
       var price = cl[i], a = atr[i] || price * 0.01;
@@ -112,6 +117,12 @@
       // 11. Pente de l'EMA50 (dynamique de la tendance)
       var slope = i >= 5 ? clampf((e50[i] - e50[i - 5]) / a, -3, 3) : 0;
       X.push([bias, distE20, rsiN, roc10, er, dispv, rp, bos, atrN, ret1, slope]);
+      // Métriques BRUTES (non bornées) pour le calcul cross-sectionnel dans load() :
+      // momentum 20/40, RSI, force de tendance, écart au prix, volatilité.
+      var mom20 = i >= 20 && cl[i - 20] ? (price - cl[i - 20]) / cl[i - 20] : 0;
+      var mom40 = i >= 40 && cl[i - 40] ? (price - cl[i - 40]) / cl[i - 40] : 0;
+      var trendv = e200[i] ? (e50[i] - e200[i]) / price : 0;
+      RAW.push([mom20, mom40, rsi[i], trendv, (price - e20[i]) / a, a / price]);
       meta.push({ i: i, t: c[i].t });
     }
     // On expose, pour chaque bougie exploitable, sa feature + son horodatage + son rendement
@@ -120,11 +131,26 @@
     var rows = [], last = null;
     for (var k = 0; k < meta.length; k++) {
       var idx = meta[k].i, future = idx + HORIZON;
-      if (future < n) rows.push({ x: X[k], t: meta[k].t, fret: (cl[future] - cl[idx]) / cl[idx] });
-      if (idx === n - 1) last = X[k]; // dernière bougie = point de prédiction "live"
+      if (future < n) rows.push({ x: X[k], raw: RAW[k], t: meta[k].t, fret: (cl[future] - cl[idx]) / cl[idx] });
+      if (idx === n - 1) last = { x: X[k], raw: RAW[k], t: meta[k].t }; // dernière bougie = point "live"
     }
-    if (last == null) last = X[X.length - 1];
+    if (last == null) last = { x: X[X.length - 1], raw: RAW[X.length - 1], t: meta[meta.length - 1].t };
     return { rows: rows, live: last, price: cl[n - 1] };
+  }
+  // Features RELATIVES : z-score et rang cross-sectionnels d'un actif vs le panier à l'instant T.
+  // Entrée = { sym: raw6 }. Sortie = { sym: rel7 }. Aligne les features sur la cible relative.
+  function crossFeatures(rawBySym) {
+    var syms = Object.keys(rawBySym); if (syms.length < 4) return null;
+    function z(idx) { var v = syms.map(function (s) { return rawBySym[s][idx]; }), n = v.length,
+      mu = v.reduce(function (a, b) { return a + b; }, 0) / n,
+      sd = Math.sqrt(v.reduce(function (a, b) { return a + (b - mu) * (b - mu); }, 0) / n) || 1, o = {};
+      syms.forEach(function (s) { o[s] = clampf((rawBySym[s][idx] - mu) / sd, -3, 3); }); return o; }
+    function rank(idx) { var ord = syms.slice().sort(function (a, b) { return rawBySym[a][idx] - rawBySym[b][idx]; }),
+      n = ord.length, o = {}; ord.forEach(function (s, i) { o[s] = n > 1 ? (i / (n - 1)) * 2 - 1 : 0; }); return o; }
+    var zMom20 = z(0), rMom20 = rank(0), zMom40 = z(1), zRsi = z(2), zTrend = z(3), zDist = z(4), zVol = z(5);
+    var out = {};
+    syms.forEach(function (s) { out[s] = [zMom20[s], rMom20[s], zMom40[s], zRsi[s], zTrend[s], zDist[s], zVol[s]]; });
+    return out;
   }
   function clampf(v, a, b) { return v < a ? a : v > b ? b : v; }
   function effR(cl, i, p) { if (i < p) return 0; var chg = Math.abs(cl[i] - cl[i - p]), vol = 0; for (var j = i - p + 1; j <= i; j++) vol += Math.abs(cl[j] - cl[j - 1]); return vol ? clampf(chg / vol * 2 - 1, -1, 1) : 0; }
@@ -314,18 +340,37 @@
       // futurs du panier. Étiquette = 1 si l'actif SURPERFORME cette médiane. C'est la seule
       // question réellement apprenable (le momentum relatif est une anomalie robuste) — bien
       // plus que « le prix va-t-il monter ? » qui est du pur pile ou face.
-      var byT = {};
-      perAsset.forEach(function (pa) { pa.f.rows.forEach(function (row) { (byT[row.t] = byT[row.t] || []).push(row.fret); }); });
-      var medByT = {};
+      // Par timestamp : rendements futurs du panier (pour la médiane-cible) ET métriques brutes
+      // de chaque actif (pour les features relatives z-score/rang).
+      var byT = {}, rawByT = {};
+      perAsset.forEach(function (pa) {
+        pa.f.rows.forEach(function (row) {
+          (byT[row.t] = byT[row.t] || []).push(row.fret);
+          (rawByT[row.t] = rawByT[row.t] || {})[pa.a.sym] = row.raw;
+        });
+      });
+      var medByT = {}, relByT = {};
       Object.keys(byT).forEach(function (t) { var a = byT[t].slice().sort(function (x, y) { return x - y; }); medByT[t] = a[Math.floor(a.length / 2)]; });
+      Object.keys(rawByT).forEach(function (t) { var r = crossFeatures(rawByT[t]); if (r) relByT[t] = r; });
 
+      // Features complètes = base (11) + relatives (7). Étiquette = surperforme la médiane ?
       var poolX = [], poolY = [];
       perAsset.forEach(function (pa) {
-        var X = [], y = [];
-        pa.f.rows.forEach(function (row) { var m = medByT[row.t]; if (m == null) return; X.push(row.x); y.push(row.fret > m ? 1 : 0); });
+        var X = [], y = [], sym = pa.a.sym;
+        pa.f.rows.forEach(function (row) {
+          var m = medByT[row.t], rel = relByT[row.t] && relByT[row.t][sym];
+          if (m == null || !rel) return;
+          X.push(row.x.concat(rel)); y.push(row.fret > m ? 1 : 0);
+        });
         pa.labX = X; pa.labY = y; poolX = poolX.concat(X); poolY = poolY.concat(y);
       });
       if (poolX.length < 200) return null;
+
+      // Features relatives LIVE : cross-section sur la dernière bougie de chaque actif.
+      var liveRawBySym = {};
+      perAsset.forEach(function (pa) { liveRawBySym[pa.a.sym] = pa.f.live.raw; });
+      var liveRel = crossFeatures(liveRawBySym) || {};
+      var ZERO7 = [0, 0, 0, 0, 0, 0, 0];
 
       return idbGet().then(function (saved) {
         // 3) Cerveau sauvegardé (apprentissage continu) — sauf si le modèle a changé de version
@@ -341,14 +386,15 @@
         var w = train(Xs, poolY, warm, brain.sessions > 0 ? 120 : 250);
 
         // 6) Prédictions "live" : proba que CHAQUE actif surperforme le panier (force relative)
-        var priceBySym = {}, dataBySym = {};
+        var priceBySym = {};
         var signals = perAsset.map(function (pa) {
-          var prob = predictOne(pa.f.live, w, std);
-          priceBySym[pa.a.sym] = pa.f.price; dataBySym[pa.a.sym] = pa.f;
+          var full = pa.f.live.x.concat(liveRel[pa.a.sym] || ZERO7);
+          var prob = predictOne(full, w, std);
+          priceBySym[pa.a.sym] = pa.f.price;
           var dir = prob >= 0.56 ? 'up' : prob <= 0.44 ? 'down' : 'neutre'; // up = fort, down = faible
           var conf = Math.round(Math.abs(prob - 0.5) * 200); // 0..100
           // Contribution de chaque concept = poids × feature standardisée (pourquoi la déci)
-          var xs = applyStd(pa.f.live, std);
+          var xs = applyStd(full, std);
           var contrib = [];
           for (var j = 0; j < NF; j++) contrib.push({ n: FEATURE_NAMES[j], v: w[j] * xs[j] });
           contrib.sort(function (a, b) { return Math.abs(b.v) - Math.abs(a.v); });
@@ -404,5 +450,5 @@
   function reset() { return idbPut({ v: MODEL_VERSION, log: [], sessions: 0 }); }
 
   root.IA = { load: load, exportBrain: exportBrain, importBrain: importBrain, status: status, reset: reset,
-    _internals: { buildFeatures: buildFeatures, train: train, walkForward: walkForward, standardize: standardize, applyStd: applyStd, predictOne: predictOne, NF: NF } };
+    _internals: { buildFeatures: buildFeatures, crossFeatures: crossFeatures, train: train, walkForward: walkForward, standardize: standardize, applyStd: applyStd, predictOne: predictOne, NF: NF, BF: BF } };
 })(typeof window !== 'undefined' ? window : this);

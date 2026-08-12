@@ -33,8 +33,10 @@ entrée, stop, objectif, ratio (RR) et gain estimé sur un compte de 10 000 € 
    logistique) qui **tourne dans la page**, pas une IA externe. Point clé : au lieu de deviner
    « le prix va-t-il monter ? » (du **pile ou face**, ~50 %), elle apprend une question
    **réellement exploitable** — **quels actifs vont surperformer le panier** (momentum relatif
-   / cross-sectionnel, une anomalie quant robuste). Elle **s'entraîne automatiquement à chaque
-   ouverture** (apprentissage continu) sur **14 actifs** et **13 000+ exemples**, **note ses
+   / cross-sectionnel, une anomalie quant robuste). Ses features mêlent **11 concepts absolus**
+   (structure, FVG, RSI, régime…) et **7 features relatives** (rang / écart de l'actif *vs le
+   panier* à l'instant T) — alignées sur la cible relative. Elle **s'entraîne automatiquement à
+   chaque ouverture** (apprentissage continu) sur **14 actifs** et **13 000+ exemples**, **note ses
    prédictions passées** (elle apprend de ses erreurs) et affiche sa **précision walk-forward**
    mesurée **strictement par actif (zéro fuite temporelle)**. Résultat honnête : **~63 % quand
    elle s'engage** pour repérer les plus forts, contre ~57 % d'un choix naïf → un **avantage
