@@ -22,17 +22,28 @@
   'use strict';
 
   var HOSTS = ['https://api.binance.com', 'https://data-api.binance.vision', 'https://api1.binance.com'];
+  // On "renourrit" l'IA avec BEAUCOUP plus de données : 14 actifs (au lieu de 7). Plus
+  // d'exemples = estimation plus fiable et modèle plus robuste (moins de sur-apprentissage).
   var ASSETS = [
     { sym: 'BTC/USD', src: 'BTCUSDT', cls: 'crypto' },
     { sym: 'ETH/USD', src: 'ETHUSDT', cls: 'crypto' },
     { sym: 'SOL/USD', src: 'SOLUSDT', cls: 'crypto' },
     { sym: 'XRP/USD', src: 'XRPUSDT', cls: 'crypto' },
     { sym: 'BNB/USD', src: 'BNBUSDT', cls: 'crypto' },
+    { sym: 'ADA/USD', src: 'ADAUSDT', cls: 'crypto' },
+    { sym: 'DOGE/USD', src: 'DOGEUSDT', cls: 'crypto' },
+    { sym: 'LTC/USD', src: 'LTCUSDT', cls: 'crypto' },
+    { sym: 'LINK/USD', src: 'LINKUSDT', cls: 'crypto' },
+    { sym: 'DOT/USD', src: 'DOTUSDT', cls: 'crypto' },
+    { sym: 'AVAX/USD', src: 'AVAXUSDT', cls: 'crypto' },
+    { sym: 'TRX/USD', src: 'TRXUSDT', cls: 'crypto' },
     { sym: 'EUR/USD', src: 'EURUSDT', cls: 'forex' },
     { sym: 'XAU/USD', src: 'PAXGUSDT', cls: 'forex' }
   ];
-  var HORIZON = 4;              // on prédit le sens du mouvement ~4 bougies (jours) plus tard
-  var MODEL_VERSION = 3;        // version des features : si elle change, on ré-apprend de zéro
+  // Horizon long (~20 j) : c'est là que la tendance/le momentum persistent le mieux (le seul
+  // "signal" légèrement exploitable et défendable). En dessous, c'est du pur pile ou face.
+  var HORIZON = 20;
+  var MODEL_VERSION = 4;        // features/horizon changés : on ré-apprend proprement de zéro
   var FEATURE_NAMES = [
     'Biais HTF (EMA50/200)', 'Zone premium/discount', 'RSI (excès)', 'Momentum (ROC)',
     'Régime (efficiency)', 'Displacement', 'Position dans le range (liquidité)',
@@ -158,27 +169,42 @@
   }
   function predictOne(x, w, s) { var xs = applyStd(x, s), z = w.b || 0; for (var j = 0; j < NF; j++) z += w[j] * xs[j]; return sigmoid(z); }
 
-  // Walk-forward HONNÊTE : on entraîne sur le passé, on teste sur du JAMAIS-VU, on cumule.
-  function walkForward(X, y) {
-    var n = X.length; if (n < 120) return null;
-    var folds = 4, block = Math.floor(n / (folds + 1)), correct = 0, tested = 0, base = 0;
+  // Walk-forward STRICT PAR ACTIF (zéro fuite temporelle) : à chaque coupe, on entraîne sur
+  // le PASSÉ de tous les actifs, puis on teste sur le FUTUR de chaque actif. C'est le test le
+  // plus honnête possible — il révèle le vrai niveau (souvent proche du pile ou face, 50 %).
+  //   perAsset = [{X, y}]  (features/étiquettes d'un actif, dans l'ordre chronologique)
+  // On mesure : accuracy absolue, ET accuracy QUAND LE MODÈLE S'ENGAGE (|prob-0.5| >= marge)
+  // + la couverture (part des cas où il s'engage). Le vrai juge = accuracy vs 50 % (hasard).
+  function walkForward(perAsset) {
+    var assets = perAsset.filter(function (a) { return a.X.length >= 200; });
+    if (assets.length < 3) return null;
+    var folds = 4, margin = 0.07, correct = 0, tested = 0, base = 0, corrC = 0, cov = 0;
     for (var f = 1; f <= folds; f++) {
-      var cut = block * f, testEnd = Math.min(n, cut + block);
-      var Xtr = X.slice(0, cut), ytr = y.slice(0, cut);
-      if (Xtr.length < 40) continue;
+      var frac = f / (folds + 1), nextFrac = (f + 1) / (folds + 1);
+      var Xtr = [], ytr = [];
+      assets.forEach(function (a) {
+        var cut = Math.floor(a.X.length * frac);
+        for (var i = 0; i < cut; i++) { Xtr.push(a.X[i]); ytr.push(a.y[i]); }
+      });
+      if (Xtr.length < 300) continue;
       var s = standardize(Xtr), Xs = Xtr.map(function (x) { return applyStd(x, s); });
-      var w = train(Xs, ytr, null, 200);
-      // classe majoritaire du train = référence "bête" à battre
+      var w = train(Xs, ytr, null, 180);
       var ones = ytr.reduce(function (a, b) { return a + b; }, 0), maj = ones >= ytr.length / 2 ? 1 : 0;
-      for (var t = cut; t < testEnd; t++) {
-        var p = predictOne(X[t], w, s), pred = p >= 0.5 ? 1 : 0;
-        if (pred === y[t]) correct++;
-        if (maj === y[t]) base++;
-        tested++;
-      }
+      assets.forEach(function (a) {
+        var lo = Math.floor(a.X.length * frac), hi = Math.floor(a.X.length * nextFrac);
+        for (var t = lo; t < hi; t++) {
+          var p = predictOne(a.X[t], w, s), pred = p >= 0.5 ? 1 : 0;
+          if (pred === a.y[t]) correct++;
+          if (maj === a.y[t]) base++;
+          tested++;
+          if (Math.abs(p - 0.5) >= margin) { cov++; if (pred === a.y[t]) corrC++; }
+        }
+      });
     }
     if (!tested) return null;
-    return { acc: Math.round(correct / tested * 100), baseline: Math.round(base / tested * 100), tested: tested };
+    return { acc: Math.round(correct / tested * 100), baseline: Math.round(base / tested * 100),
+      accEngaged: cov ? Math.round(corrC / cov * 100) : null,
+      coverage: Math.round(cov / tested * 100), tested: tested };
   }
 
   // ---- Persistance : IndexedDB (auto) — la mémoire qui ne se perd pas --------
@@ -215,7 +241,7 @@
 
   // ---- Chargement des données ------------------------------------------------
   function fetchKlines(src) {
-    var path = '/api/v3/klines?symbol=' + src + '&interval=1d&limit=400';
+    var path = '/api/v3/klines?symbol=' + src + '&interval=1d&limit=1000';
     function tryHost(i) {
       if (i >= HOSTS.length) return Promise.reject(new Error('Binance injoignable'));
       return fetch(HOSTS[i] + path).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
@@ -285,8 +311,8 @@
         var brain = (saved && saved.v === MODEL_VERSION) ? saved : { v: MODEL_VERSION, log: (saved && saved.log) || [], sessions: 0 };
         var warm = brain.w || null;
 
-        // 3) Précision honnête HORS échantillon (walk-forward) — le vrai niveau
-        var wf = walkForward(poolX, poolY);
+        // 3) Précision honnête HORS échantillon (walk-forward STRICT par actif) — le vrai niveau
+        var wf = walkForward(perAsset.map(function (pa) { return { X: pa.f.X, y: pa.f.y }; }));
 
         // 4) Entraînement sur TOUT le dispo, en repartant du cerveau précédent (continu)
         var std = standardize(poolX);

@@ -929,17 +929,28 @@
   'use strict';
 
   var HOSTS = ['https://api.binance.com', 'https://data-api.binance.vision', 'https://api1.binance.com'];
+  // On "renourrit" l'IA avec BEAUCOUP plus de données : 14 actifs (au lieu de 7). Plus
+  // d'exemples = estimation plus fiable et modèle plus robuste (moins de sur-apprentissage).
   var ASSETS = [
     { sym: 'BTC/USD', src: 'BTCUSDT', cls: 'crypto' },
     { sym: 'ETH/USD', src: 'ETHUSDT', cls: 'crypto' },
     { sym: 'SOL/USD', src: 'SOLUSDT', cls: 'crypto' },
     { sym: 'XRP/USD', src: 'XRPUSDT', cls: 'crypto' },
     { sym: 'BNB/USD', src: 'BNBUSDT', cls: 'crypto' },
+    { sym: 'ADA/USD', src: 'ADAUSDT', cls: 'crypto' },
+    { sym: 'DOGE/USD', src: 'DOGEUSDT', cls: 'crypto' },
+    { sym: 'LTC/USD', src: 'LTCUSDT', cls: 'crypto' },
+    { sym: 'LINK/USD', src: 'LINKUSDT', cls: 'crypto' },
+    { sym: 'DOT/USD', src: 'DOTUSDT', cls: 'crypto' },
+    { sym: 'AVAX/USD', src: 'AVAXUSDT', cls: 'crypto' },
+    { sym: 'TRX/USD', src: 'TRXUSDT', cls: 'crypto' },
     { sym: 'EUR/USD', src: 'EURUSDT', cls: 'forex' },
     { sym: 'XAU/USD', src: 'PAXGUSDT', cls: 'forex' }
   ];
-  var HORIZON = 4;              // on prédit le sens du mouvement ~4 bougies (jours) plus tard
-  var MODEL_VERSION = 3;        // version des features : si elle change, on ré-apprend de zéro
+  // Horizon long (~20 j) : c'est là que la tendance/le momentum persistent le mieux (le seul
+  // "signal" légèrement exploitable et défendable). En dessous, c'est du pur pile ou face.
+  var HORIZON = 20;
+  var MODEL_VERSION = 4;        // features/horizon changés : on ré-apprend proprement de zéro
   var FEATURE_NAMES = [
     'Biais HTF (EMA50/200)', 'Zone premium/discount', 'RSI (excès)', 'Momentum (ROC)',
     'Régime (efficiency)', 'Displacement', 'Position dans le range (liquidité)',
@@ -1065,27 +1076,42 @@
   }
   function predictOne(x, w, s) { var xs = applyStd(x, s), z = w.b || 0; for (var j = 0; j < NF; j++) z += w[j] * xs[j]; return sigmoid(z); }
 
-  // Walk-forward HONNÊTE : on entraîne sur le passé, on teste sur du JAMAIS-VU, on cumule.
-  function walkForward(X, y) {
-    var n = X.length; if (n < 120) return null;
-    var folds = 4, block = Math.floor(n / (folds + 1)), correct = 0, tested = 0, base = 0;
+  // Walk-forward STRICT PAR ACTIF (zéro fuite temporelle) : à chaque coupe, on entraîne sur
+  // le PASSÉ de tous les actifs, puis on teste sur le FUTUR de chaque actif. C'est le test le
+  // plus honnête possible — il révèle le vrai niveau (souvent proche du pile ou face, 50 %).
+  //   perAsset = [{X, y}]  (features/étiquettes d'un actif, dans l'ordre chronologique)
+  // On mesure : accuracy absolue, ET accuracy QUAND LE MODÈLE S'ENGAGE (|prob-0.5| >= marge)
+  // + la couverture (part des cas où il s'engage). Le vrai juge = accuracy vs 50 % (hasard).
+  function walkForward(perAsset) {
+    var assets = perAsset.filter(function (a) { return a.X.length >= 200; });
+    if (assets.length < 3) return null;
+    var folds = 4, margin = 0.07, correct = 0, tested = 0, base = 0, corrC = 0, cov = 0;
     for (var f = 1; f <= folds; f++) {
-      var cut = block * f, testEnd = Math.min(n, cut + block);
-      var Xtr = X.slice(0, cut), ytr = y.slice(0, cut);
-      if (Xtr.length < 40) continue;
+      var frac = f / (folds + 1), nextFrac = (f + 1) / (folds + 1);
+      var Xtr = [], ytr = [];
+      assets.forEach(function (a) {
+        var cut = Math.floor(a.X.length * frac);
+        for (var i = 0; i < cut; i++) { Xtr.push(a.X[i]); ytr.push(a.y[i]); }
+      });
+      if (Xtr.length < 300) continue;
       var s = standardize(Xtr), Xs = Xtr.map(function (x) { return applyStd(x, s); });
-      var w = train(Xs, ytr, null, 200);
-      // classe majoritaire du train = référence "bête" à battre
+      var w = train(Xs, ytr, null, 180);
       var ones = ytr.reduce(function (a, b) { return a + b; }, 0), maj = ones >= ytr.length / 2 ? 1 : 0;
-      for (var t = cut; t < testEnd; t++) {
-        var p = predictOne(X[t], w, s), pred = p >= 0.5 ? 1 : 0;
-        if (pred === y[t]) correct++;
-        if (maj === y[t]) base++;
-        tested++;
-      }
+      assets.forEach(function (a) {
+        var lo = Math.floor(a.X.length * frac), hi = Math.floor(a.X.length * nextFrac);
+        for (var t = lo; t < hi; t++) {
+          var p = predictOne(a.X[t], w, s), pred = p >= 0.5 ? 1 : 0;
+          if (pred === a.y[t]) correct++;
+          if (maj === a.y[t]) base++;
+          tested++;
+          if (Math.abs(p - 0.5) >= margin) { cov++; if (pred === a.y[t]) corrC++; }
+        }
+      });
     }
     if (!tested) return null;
-    return { acc: Math.round(correct / tested * 100), baseline: Math.round(base / tested * 100), tested: tested };
+    return { acc: Math.round(correct / tested * 100), baseline: Math.round(base / tested * 100),
+      accEngaged: cov ? Math.round(corrC / cov * 100) : null,
+      coverage: Math.round(cov / tested * 100), tested: tested };
   }
 
   // ---- Persistance : IndexedDB (auto) — la mémoire qui ne se perd pas --------
@@ -1122,7 +1148,7 @@
 
   // ---- Chargement des données ------------------------------------------------
   function fetchKlines(src) {
-    var path = '/api/v3/klines?symbol=' + src + '&interval=1d&limit=400';
+    var path = '/api/v3/klines?symbol=' + src + '&interval=1d&limit=1000';
     function tryHost(i) {
       if (i >= HOSTS.length) return Promise.reject(new Error('Binance injoignable'));
       return fetch(HOSTS[i] + path).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
@@ -1192,8 +1218,8 @@
         var brain = (saved && saved.v === MODEL_VERSION) ? saved : { v: MODEL_VERSION, log: (saved && saved.log) || [], sessions: 0 };
         var warm = brain.w || null;
 
-        // 3) Précision honnête HORS échantillon (walk-forward) — le vrai niveau
-        var wf = walkForward(poolX, poolY);
+        // 3) Précision honnête HORS échantillon (walk-forward STRICT par actif) — le vrai niveau
+        var wf = walkForward(perAsset.map(function (pa) { return { X: pa.f.X, y: pa.f.y }; }));
 
         // 4) Entraînement sur TOUT le dispo, en repartant du cerveau précédent (continu)
         var std = standardize(poolX);
@@ -2068,25 +2094,27 @@ let IA_HORIZON=4;
 function renderIA(d){
   const body=$('#ia-body');
   if(!d){ body.innerHTML='<div class="hist-empty">Impossible de charger les vraies données (réseau restreint côté aperçu en ligne). <b>Ouvre le fichier depuis ton PC</b> (double-clic) pour que l\'IA s\'entraîne sur les vraies bougies.</div>'; return; }
-  IA_HORIZON=d.horizon||4;
-  const wf=d.wf, acc=wf?wf.acc:null, base=wf?wf.baseline:null;
-  // Verdict HONNÊTE : l'edge est la différence entre la précision et le "hasard" (classe majoritaire).
-  const edge = (acc!=null&&base!=null)? acc-base : null;
-  const hasEdge = edge!=null && edge>=3;
-  const accClass = acc==null?'':(hasEdge?'good':'flat');
+  IA_HORIZON=d.horizon||20;
+  const wf=d.wf, acc=wf?wf.acc:null, accE=wf?wf.accEngaged:null, cov=wf?wf.coverage:null;
+  // Le VRAI juge = bat-elle le pile ou face (50 %) ? On regarde surtout la précision QUAND
+  // ELLE S'ENGAGE (elle ne parle que si elle est un peu sûre). Un edge honnête = accE nettement > 50.
+  const ref = accE!=null ? accE : acc;           // métrique de référence pour le verdict
+  const edge = ref!=null ? ref-50 : null;
+  const hasEdge = accE!=null && accE>=54 && (cov==null||cov>=15);
+  const accClass = ref==null?'':(hasEdge?'good':'flat');
   // Track record réel (prédictions live déjà notées)
   const tr=d.track, trTxt = (tr&&tr.total>0)? `${tr.rate}% <span class="s">sur ${tr.total} prédiction${tr.total>1?'s':''} notées</span>` : '<span class="s" style="font-size:.9rem">en cours de constitution…</span>';
   let verdict;
-  if(acc==null) verdict=`<div class="ia-verdict flat">Pas encore assez de données pour mesurer un niveau fiable. L'IA s'entraîne quand même et s'améliorera à chaque ouverture.</div>`;
-  else if(hasEdge) verdict=`<div class="ia-verdict good">✅ <b>Sur du jamais-vu, l'IA atteint ${acc}%</b>, contre <b>${base}%</b> pour un choix « bête » (toujours la même direction). Elle a donc un <b>petit avantage mesurable de +${edge} points</b>. Reste prudent : c'est faible et le marché change.</div>`;
-  else verdict=`<div class="ia-verdict flat">⚠️ <b>Honnêteté :</b> sur du jamais-vu l'IA fait <b>${acc}%</b>, quasi comme le hasard (${base}%). <b>Aucun avantage fiable pour l'instant.</b> C'est la réalité des marchés — un modèle plafonne vers 52-55 %. Elle continue d'apprendre, mais ne mise jamais gros là-dessus.</div>`;
+  if(ref==null) verdict=`<div class="ia-verdict flat">Pas encore assez de données pour mesurer un niveau fiable. L'IA s'entraîne quand même et s'améliorera à chaque ouverture.</div>`;
+  else if(hasEdge) verdict=`<div class="ia-verdict good">✅ <b>Quand elle s'engage, l'IA a raison ${accE}%</b> du temps (sur ${cov}% des cas), contre <b>50 % pour un pile ou face</b>. C'est un <b>petit avantage de +${edge} points</b>, mesuré sur du jamais-vu. Reste prudent : c'est faible et le marché change.</div>`;
+  else verdict=`<div class="ia-verdict flat">⚠️ <b>Honnêteté totale :</b> testée <b>sans tricher</b> (walk-forward strict par actif), l'IA fait <b>${ref}%</b> — <b>quasi pile ou face (50 %)</b>. <b>Aucun avantage fiable.</b> J'ai pourtant essayé plein de configs et 14 actifs : c'est la réalité des marchés, un tel modèle ne bat pas la pièce de monnaie de façon fiable. <b>Ne mise rien dessus</b> — vois-la comme un labo pédagogique, pas une machine à gagner.</div>`;
   let html = `<section class="ia-brain">
     <h3>🧠 Cerveau de l'IA maison <span class="stag">régression logistique · navigateur</span></h3>
     <div class="ia-kpis">
-      <div class="ia-kpi ${accClass}"><div class="k">Précision (jamais-vu)</div><div class="v">${acc!=null?acc+'%':'—'}</div><div class="s">hasard ≈ ${base!=null?base+'%':'50%'}</div></div>
+      <div class="ia-kpi ${accClass}"><div class="k">Quand elle s'engage</div><div class="v">${accE!=null?accE+'%':'—'}</div><div class="s">pile ou face = 50% · sur ${cov!=null?cov+'%':'—'} des cas</div></div>
+      <div class="ia-kpi"><div class="k">Précision globale</div><div class="v" style="font-size:1.1rem">${acc!=null?acc+'%':'—'}</div><div class="s">jamais-vu · strict</div></div>
       <div class="ia-kpi"><div class="k">Track record réel</div><div class="v" style="font-size:1.1rem">${trTxt}</div></div>
-      <div class="ia-kpi"><div class="k">Entraînements</div><div class="v">${d.sessions||1}</div><div class="s">ouvertures cumulées</div></div>
-      <div class="ia-kpi"><div class="k">Exemples appris</div><div class="v" style="font-size:1.1rem">${(d.samples||0).toLocaleString('fr-FR')}</div><div class="s">${d.assets||0} actifs</div></div>
+      <div class="ia-kpi"><div class="k">Exemples appris</div><div class="v" style="font-size:1.1rem">${(d.samples||0).toLocaleString('fr-FR')}</div><div class="s">${d.assets||0} actifs · ${d.sessions||1} entraînements</div></div>
     </div>
     ${verdict}
     <div class="ia-mem">

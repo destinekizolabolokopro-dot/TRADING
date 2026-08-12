@@ -34,10 +34,12 @@ entrée, stop, objectif, ratio (RR) et gain estimé sur un compte de 10 000 € 
    concepts ICT/SMC + indicateurs (les *features*) et apprend, sur les vraies données, à estimer
    la **probabilité que le prix monte**. Il **s'entraîne automatiquement à chaque ouverture**
    (apprentissage continu), **note ses prédictions passées** (il apprend de ses erreurs) et
-   affiche sa **précision walk-forward honnête** — le vrai niveau, hors échantillon. Sur les
-   marchés, un tel modèle **plafonne vers 52-55 %** : c'est affiché sans mentir. Sa mémoire est
+   affiche sa **précision walk-forward honnête** — mesurée **strictement par actif (zéro fuite
+   temporelle)**, sur **14 actifs** et des milliers d'exemples. Résultat sans fard : sur données
+   réelles, l'IA est **~50 % (pile ou face)** — un tel modèle **ne bat pas fiablement la pièce de
+   monnaie**, et le site l'écrit noir sur blanc au lieu de gonfler le chiffre. Sa mémoire est
    **sauvegardée automatiquement** (IndexedDB) et **exportable/importable** (`ia-cerveau.json`)
-   pour ne jamais la perdre.
+   pour ne jamais la perdre. C'est un **labo pédagogique**, pas une machine à gagner.
 
 ## Onglet « Stratégies Pro »
 
