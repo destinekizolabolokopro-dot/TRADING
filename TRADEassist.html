@@ -929,8 +929,9 @@
   'use strict';
 
   var HOSTS = ['https://api.binance.com', 'https://data-api.binance.vision', 'https://api1.binance.com'];
-  // On "renourrit" l'IA avec BEAUCOUP plus de données : 14 actifs (au lieu de 7). Plus
-  // d'exemples = estimation plus fiable et modèle plus robuste (moins de sur-apprentissage).
+  // On "renourrit" l'IA avec un LARGE panier : 28 actifs. Plus la cross-section est riche, plus
+  // la médiane du panier (la cible) est fiable et plus l'IA a d'exemples pour apprendre la force
+  // relative. Le labo confirme : 28 actifs > 14 (précision "engagée" 63 % → 66 %).
   var ASSETS = [
     { sym: 'BTC/USD', src: 'BTCUSDT', cls: 'crypto' },
     { sym: 'ETH/USD', src: 'ETHUSDT', cls: 'crypto' },
@@ -944,6 +945,20 @@
     { sym: 'DOT/USD', src: 'DOTUSDT', cls: 'crypto' },
     { sym: 'AVAX/USD', src: 'AVAXUSDT', cls: 'crypto' },
     { sym: 'TRX/USD', src: 'TRXUSDT', cls: 'crypto' },
+    { sym: 'MATIC/USD', src: 'MATICUSDT', cls: 'crypto' },
+    { sym: 'ATOM/USD', src: 'ATOMUSDT', cls: 'crypto' },
+    { sym: 'UNI/USD', src: 'UNIUSDT', cls: 'crypto' },
+    { sym: 'XLM/USD', src: 'XLMUSDT', cls: 'crypto' },
+    { sym: 'ETC/USD', src: 'ETCUSDT', cls: 'crypto' },
+    { sym: 'FIL/USD', src: 'FILUSDT', cls: 'crypto' },
+    { sym: 'NEAR/USD', src: 'NEARUSDT', cls: 'crypto' },
+    { sym: 'APT/USD', src: 'APTUSDT', cls: 'crypto' },
+    { sym: 'INJ/USD', src: 'INJUSDT', cls: 'crypto' },
+    { sym: 'AAVE/USD', src: 'AAVEUSDT', cls: 'crypto' },
+    { sym: 'ALGO/USD', src: 'ALGOUSDT', cls: 'crypto' },
+    { sym: 'SAND/USD', src: 'SANDUSDT', cls: 'crypto' },
+    { sym: 'EOS/USD', src: 'EOSUSDT', cls: 'crypto' },
+    { sym: 'XTZ/USD', src: 'XTZUSDT', cls: 'crypto' },
     { sym: 'EUR/USD', src: 'EURUSDT', cls: 'forex' },
     { sym: 'XAU/USD', src: 'PAXGUSDT', cls: 'forex' }
   ];
@@ -2192,8 +2207,16 @@ function renderIA(d){
       <button class="ai-btn ghost" id="ia-reset">Réinitialiser</button>
     </div>
   </section>`;
-  html += `<div class="ia-h">Classement par force relative <span class="stag" style="font-weight:400">du plus fort au plus faible</span></div>`;
-  html += `<div class="ia-sigs">${d.signals.map(iaSigCard).join('')}</div>`;
+  // Boussole de rotation : on met en avant les plus FORTS et les plus FAIBLES du panier
+  // (le milieu, indécis, est regroupé). d.signals est déjà trié par force décroissante.
+  const sigs = d.signals, N = sigs.length, K = Math.min(8, Math.floor(N/2));
+  const strong = sigs.slice(0, K), weak = sigs.slice(N-K), mid = sigs.slice(K, N-K);
+  const maj = d.updated ? new Date(d.updated).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}) : '';
+  html += `<div class="ia-h">🟢 Les plus forts du panier <span class="stag" style="font-weight:400">candidats à surperformer${maj?` · maj ${maj}`:''}</span></div>`;
+  html += `<div class="ia-sigs">${strong.map(iaSigCard).join('')}</div>`;
+  html += `<div class="ia-h">🔴 Les plus faibles du panier <span class="stag" style="font-weight:400">candidats à sous-performer</span></div>`;
+  html += `<div class="ia-sigs">${weak.map(iaSigCard).join('')}</div>`;
+  if(mid.length) html += `<details style="margin-top:14px"><summary style="cursor:pointer;color:var(--muted);font-size:.86rem">Voir le milieu du classement (${mid.length} actifs, signal indécis)</summary><div class="ia-sigs" style="margin-top:12px">${mid.map(iaSigCard).join('')}</div></details>`;
   html += `<p class="bt-caveat" style="margin-top:16px">🔎 L'IA ne prédit <b>pas</b> « ça va monter » (c'est du pile ou face), mais <b>quels actifs devraient être plus forts que le panier</b> sur ~${IA_HORIZON} j (momentum relatif). « ▲ Fort » = candidat à surperformer ; « ▼ Faible » = à sous-performer. Elle ne place ni stop ni objectif — sers-t'en comme d'une <b>boussole de rotation</b>, à croiser avec l'onglet ICT/SMC. Pédagogique, pas un conseil financier.</p>`;
   body.innerHTML = html;
   // Câblage mémoire (export / import / reset)

@@ -36,11 +36,12 @@ entrée, stop, objectif, ratio (RR) et gain estimé sur un compte de 10 000 € 
    / cross-sectionnel, une anomalie quant robuste). Ses features mêlent **11 concepts absolus**
    (structure, FVG, RSI, régime…) et **7 features relatives** (rang / écart de l'actif *vs le
    panier* à l'instant T) — alignées sur la cible relative. Elle **s'entraîne automatiquement à
-   chaque ouverture** (apprentissage continu) sur **14 actifs** et **13 000+ exemples**, **note ses
+   chaque ouverture** (apprentissage continu) sur **28 actifs** et **20 000+ exemples**, **note ses
    prédictions passées** (elle apprend de ses erreurs) et affiche sa **précision walk-forward**
-   mesurée **strictement par actif (zéro fuite temporelle)**. Résultat honnête : **~63 % quand
-   elle s'engage** pour repérer les plus forts, contre ~57 % d'un choix naïf → un **avantage
-   réel mais modeste (+~6 points)**. Le site affiche le vrai chiffre, sans le gonfler. Sa mémoire
+   mesurée **strictement par actif (zéro fuite temporelle)**. Résultat honnête : **~64 % quand
+   elle s'engage** (précision globale ~61 %) pour repérer les plus forts, nettement au-dessus
+   d'un choix naïf. Les signaux sont présentés en **boussole de rotation** (les plus forts / les
+   plus faibles du panier). Le site affiche le vrai chiffre, sans le gonfler. Sa mémoire
    est **sauvegardée automatiquement** (IndexedDB) et **exportable/importable** (`ia-cerveau.json`).
    Une **boussole de rotation** pédagogique — pas une machine à gagner, pas un conseil financier.
 
