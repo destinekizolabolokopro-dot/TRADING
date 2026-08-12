@@ -237,6 +237,46 @@
   .perf.ok b:nth-child(1){color:var(--long)}
   .best{font-size:.68rem;font-weight:700;color:var(--wait);border:1px solid color-mix(in srgb,var(--wait) 40%,transparent);
     border-radius:99px;padding:2px 9px}
+
+  /* ---------- IA maison (machine learning navigateur) ---------- */
+  .ia-brain{border:1px solid var(--border);border-radius:16px;background:var(--surface);padding:18px;margin-bottom:16px}
+  .ia-brain h3{font-family:var(--display);font-weight:600;font-size:1.05rem;margin:0 0 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .ia-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:14px}
+  .ia-kpi{background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:12px 14px}
+  .ia-kpi .k{font-size:.66rem;text-transform:uppercase;letter-spacing:.06em;color:var(--faint);margin-bottom:5px}
+  .ia-kpi .v{font-family:var(--display);font-weight:600;font-size:1.32rem;line-height:1.1}
+  .ia-kpi .s{font-size:.72rem;color:var(--muted);margin-top:3px;font-family:var(--mono)}
+  .ia-kpi.good{border-color:color-mix(in srgb,var(--long) 40%,transparent)}
+  .ia-kpi.good .v{color:var(--long)}
+  .ia-kpi.flat{border-color:color-mix(in srgb,var(--wait) 40%,transparent)}
+  .ia-kpi.flat .v{color:var(--wait)}
+  .ia-verdict{font-size:.86rem;line-height:1.55;padding:12px 14px;border-radius:12px;margin-bottom:14px;
+    background:var(--surface-2);border:1px solid var(--border);color:var(--muted)}
+  .ia-verdict.good{border-color:color-mix(in srgb,var(--long) 35%,transparent)}
+  .ia-verdict.flat{border-color:color-mix(in srgb,var(--wait) 35%,transparent)}
+  .ia-verdict b{color:var(--ink)}
+  .ia-mem{display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:.8rem;color:var(--faint);
+    border-top:1px solid var(--border);padding-top:14px}
+  .ia-mem .grow{flex:1;min-width:120px}
+  .ia-mem .ai-btn{font-size:.78rem}
+  .ia-sigs{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+  .iasig{border:1px solid var(--border);border-radius:13px;padding:14px;background:var(--surface)}
+  .iasig.up{border-left:3px solid var(--long)} .iasig.down{border-left:3px solid var(--short)} .iasig.neu{opacity:.78}
+  .iasig .ih{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px}
+  .iasig .isym{font-family:var(--display);font-weight:600;font-size:1.05rem}
+  .iasig .idir{font-family:var(--mono);font-size:.74rem;font-weight:700;padding:2px 9px;border-radius:99px}
+  .iasig .idir.up{background:var(--long-dim);color:var(--long)}
+  .iasig .idir.down{background:var(--short-dim);color:var(--short)}
+  .iasig .idir.neu{background:var(--surface-3);color:var(--muted)}
+  .iasig .iprob{display:flex;align-items:baseline;gap:8px;margin-bottom:8px}
+  .iasig .iprob .big{font-family:var(--display);font-weight:600;font-size:1.5rem}
+  .iasig .iprob .lbl{font-size:.72rem;color:var(--faint)}
+  .iasig .ibar{height:6px;border-radius:99px;background:var(--surface-3);overflow:hidden;margin-bottom:10px;position:relative}
+  .iasig .ibar i{position:absolute;top:0;bottom:0;left:0;border-radius:99px}
+  .iasig .idrv{font-size:.72rem;color:var(--muted);line-height:1.5}
+  .iasig .idrv .dv{white-space:nowrap}
+  .iasig .idrv .up{color:var(--long)} .iasig .idrv .down{color:var(--short)}
+  .ia-h{font-family:var(--display);font-weight:600;font-size:1.02rem;margin:22px 0 12px}
   footer{border-top:1px solid var(--border);padding:26px 0 40px;color:var(--faint);font-size:.8rem;text-align:center}
 
   /* Bouton IA + modale */
@@ -347,6 +387,7 @@
   <div class="viewswitch">
     <button class="vs on" data-v="ict">Signaux ICT / SMC</button>
     <button class="vs" data-v="pro">Stratégies Pro</button>
+    <button class="vs" data-v="ia">IA maison</button>
   </div>
 
   <div id="view-ict">
@@ -366,6 +407,11 @@
   <div id="view-pro" style="display:none">
     <p class="pro-intro">Les méthodes <b>systématiques</b> réellement utilisées par les fonds — calculées sur les vraies bougies journalières. Chaque bloc explique comment la stratégie marche. <span class="pro-warn">Chacune a sa propre logique : elles peuvent être en désaccord, c'est normal.</span></p>
     <div id="pro-body"><div class="hist-empty">Chargement des stratégies…</div></div>
+  </div>
+
+  <div id="view-ia" style="display:none">
+    <p class="pro-intro">Un <b>vrai modèle de machine learning qui tourne chez toi</b>, dans cette page — pas une IA externe. Il transforme chaque bougie en concepts ICT/SMC + indicateurs, puis apprend, sur les <b>vraies</b> données, à estimer la probabilité que le prix monte. <span class="pro-warn">Il s'entraîne tout seul à chaque ouverture, se souvient d'une fois sur l'autre, et note ses propres prédictions passées.</span></p>
+    <div id="ia-body"><div class="hist-empty">⏳ L'IA maison récupère les vraies bougies et s'entraîne…</div></div>
   </div>
 </div>
 
@@ -413,9 +459,12 @@
   </div>
 </div>
 
+<input type="file" id="ia-import-file" accept="application/json,.json" style="display:none">
+
 <script src="js/history.js"></script>
 <script src="js/ai.js"></script>
 <script src="js/pro.js"></script>
+<script src="js/ia.js"></script>
 <script src="js/live.js"></script>
 <script>
 /* ---------- Données mock (repli si le direct échoue) ---------- */
@@ -838,10 +887,91 @@ function loadPro(){
 $('.viewswitch').addEventListener('click', e=>{
   const b=e.target.closest('.vs'); if(!b) return;
   $('.viewswitch .on').classList.remove('on'); b.classList.add('on');
-  const pro = b.dataset.v==='pro';
-  $('#view-ict').style.display = pro?'none':'';
-  $('#view-pro').style.display = pro?'':'none';
-  if(pro) loadPro();
+  const v=b.dataset.v;
+  $('#view-ict').style.display = v==='ict'?'':'none';
+  $('#view-pro').style.display = v==='pro'?'':'none';
+  $('#view-ia').style.display  = v==='ia' ?'':'none';
+  if(v==='pro') loadPro();
+  if(v==='ia')  loadIA();
+});
+
+/* ---------- IA maison (machine learning dans le navigateur) ---------- */
+let iaLoaded=false, iaLoading=false;
+function iaProb(s){ return Math.round(s.prob*100); }
+function iaSigCard(s){
+  const cls = s.dir==='up'?'up':s.dir==='down'?'down':'neu';
+  const dlabel = s.dir==='up'?'▲ Hausse':s.dir==='down'?'▼ Baisse':'≈ Neutre';
+  const pct = iaProb(s);
+  const col = s.dir==='up'?'var(--long)':s.dir==='down'?'var(--short)':'var(--wait)';
+  const drv = (s.drivers||[]).map(d=>`<span class="dv ${d.d==='haussier'?'up':'down'}">${d.d==='haussier'?'▲':'▼'} ${d.n}</span>`).join(' · ');
+  return `<div class="iasig ${cls}">
+    <div class="ih"><span class="isym">${s.sym}</span><span class="idir ${cls}">${dlabel}</span></div>
+    <div class="iprob"><span class="big" style="color:${col}">${pct}%</span><span class="lbl">proba. de hausse à ~${IA_HORIZON} j · confiance ${s.conf}%</span></div>
+    <div class="ibar"><i style="width:${pct}%;background:${col}"></i></div>
+    <div class="idrv">Concepts qui pèsent le plus : ${drv||'—'}</div>
+  </div>`;
+}
+let IA_HORIZON=4;
+function renderIA(d){
+  const body=$('#ia-body');
+  if(!d){ body.innerHTML='<div class="hist-empty">Impossible de charger les vraies données (réseau restreint côté aperçu en ligne). <b>Ouvre le fichier depuis ton PC</b> (double-clic) pour que l\'IA s\'entraîne sur les vraies bougies.</div>'; return; }
+  IA_HORIZON=d.horizon||4;
+  const wf=d.wf, acc=wf?wf.acc:null, base=wf?wf.baseline:null;
+  // Verdict HONNÊTE : l'edge est la différence entre la précision et le "hasard" (classe majoritaire).
+  const edge = (acc!=null&&base!=null)? acc-base : null;
+  const hasEdge = edge!=null && edge>=3;
+  const accClass = acc==null?'':(hasEdge?'good':'flat');
+  // Track record réel (prédictions live déjà notées)
+  const tr=d.track, trTxt = (tr&&tr.total>0)? `${tr.rate}% <span class="s">sur ${tr.total} prédiction${tr.total>1?'s':''} notées</span>` : '<span class="s" style="font-size:.9rem">en cours de constitution…</span>';
+  let verdict;
+  if(acc==null) verdict=`<div class="ia-verdict flat">Pas encore assez de données pour mesurer un niveau fiable. L'IA s'entraîne quand même et s'améliorera à chaque ouverture.</div>`;
+  else if(hasEdge) verdict=`<div class="ia-verdict good">✅ <b>Sur du jamais-vu, l'IA atteint ${acc}%</b>, contre <b>${base}%</b> pour un choix « bête » (toujours la même direction). Elle a donc un <b>petit avantage mesurable de +${edge} points</b>. Reste prudent : c'est faible et le marché change.</div>`;
+  else verdict=`<div class="ia-verdict flat">⚠️ <b>Honnêteté :</b> sur du jamais-vu l'IA fait <b>${acc}%</b>, quasi comme le hasard (${base}%). <b>Aucun avantage fiable pour l'instant.</b> C'est la réalité des marchés — un modèle plafonne vers 52-55 %. Elle continue d'apprendre, mais ne mise jamais gros là-dessus.</div>`;
+  let html = `<section class="ia-brain">
+    <h3>🧠 Cerveau de l'IA maison <span class="stag">régression logistique · navigateur</span></h3>
+    <div class="ia-kpis">
+      <div class="ia-kpi ${accClass}"><div class="k">Précision (jamais-vu)</div><div class="v">${acc!=null?acc+'%':'—'}</div><div class="s">hasard ≈ ${base!=null?base+'%':'50%'}</div></div>
+      <div class="ia-kpi"><div class="k">Track record réel</div><div class="v" style="font-size:1.1rem">${trTxt}</div></div>
+      <div class="ia-kpi"><div class="k">Entraînements</div><div class="v">${d.sessions||1}</div><div class="s">ouvertures cumulées</div></div>
+      <div class="ia-kpi"><div class="k">Exemples appris</div><div class="v" style="font-size:1.1rem">${(d.samples||0).toLocaleString('fr-FR')}</div><div class="s">${d.assets||0} actifs</div></div>
+    </div>
+    ${verdict}
+    <div class="ia-mem">
+      <span class="grow">💾 Mémoire sauvegardée automatiquement (IndexedDB). Filet de sécurité : garde une copie de son cerveau.</span>
+      <button class="ai-btn ghost" id="ia-export">⬇️ Exporter le cerveau</button>
+      <button class="ai-btn ghost" id="ia-import-btn">⬆️ Importer</button>
+      <button class="ai-btn ghost" id="ia-reset">Réinitialiser</button>
+    </div>
+  </section>`;
+  html += `<div class="ia-h">Ce que l'IA voit maintenant <span class="stag" style="font-weight:400">triées par confiance</span></div>`;
+  html += `<div class="ia-sigs">${d.signals.map(iaSigCard).join('')}</div>`;
+  html += `<p class="bt-caveat" style="margin-top:16px">🔎 « Confiance » = à quel point la proba s'éloigne de 50/50, <b>pas</b> une garantie de gain. Les « concepts qui pèsent » montrent quelles features ont poussé la décision. L'IA prédit un <b>sens probable</b>, elle ne place ni stop ni objectif — croise-la avec l'onglet ICT/SMC. Pédagogique, pas un conseil financier.</p>`;
+  body.innerHTML = html;
+  // Câblage mémoire (export / import / reset)
+  $('#ia-export').addEventListener('click', ()=>{
+    if(!window.IA) return;
+    IA.exportBrain().then(()=>{}).catch(err=> alert(err.message));
+  });
+  $('#ia-import-btn').addEventListener('click', ()=> $('#ia-import-file').click());
+  $('#ia-reset').addEventListener('click', ()=>{
+    if(window.IA && confirm('Effacer le cerveau de l\'IA et repartir de zéro ?')){
+      IA.reset().then(()=>{ iaLoaded=false; loadIA(true); });
+    }
+  });
+}
+function loadIA(force){
+  if((iaLoaded&&!force)||iaLoading||!window.IA) return;
+  iaLoading=true;
+  const body=$('#ia-body');
+  if(force) body.innerHTML='<div class="hist-empty">⏳ Ré-entraînement…</div>';
+  IA.load().then(d=>{ iaLoaded=true; iaLoading=false; renderIA(d); })
+           .catch(()=>{ iaLoading=false; renderIA(null); });
+}
+$('#ia-import-file').addEventListener('change', e=>{
+  const f=e.target.files&&e.target.files[0]; if(!f||!window.IA) return;
+  IA.importBrain(f).then(()=>{ iaLoaded=false; loadIA(true); alert('✅ Cerveau importé — l\'IA repart de cette mémoire.'); })
+                   .catch(err=> alert('❌ '+err.message));
+  e.target.value='';
 });
 </script>
 </body>

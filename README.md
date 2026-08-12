@@ -20,7 +20,7 @@ entrée, stop, objectif, ratio (RR) et gain estimé sur un compte de 10 000 € 
   automatiquement ignorée — jamais de prix vieux affiché comme s'il était live.
 - Le yen (USD/JPY, EUR/JPY) n'est pas proposé : pas de source intraday gratuite fiable.
 
-## Les deux bots
+## Les trois moteurs
 
 1. **Bot règles** (intégré, sans clé) : applique strictement l'ICT/SMC — biais D1,
    zone premium/discount, POI aligné (FVG puis Order Block), stop logique, cible sur la
@@ -29,6 +29,23 @@ entrée, stop, objectif, ratio (RR) et gain estimé sur un compte de 10 000 € 
    sur H1/H4/D1, principalement en ICT/SMC, et envoie ses meilleures idées ≥ 1 RR.
    Nécessite **ta** clé API Anthropic (console.anthropic.com), stockée **en local** dans
    ton navigateur — elle ne quitte jamais ton ordinateur.
+3. **IA maison** (onglet dédié, sans clé) : un **vrai modèle de machine learning** (régression
+   logistique) qui **tourne dans la page**, pas une IA externe. Il transforme chaque bougie en
+   concepts ICT/SMC + indicateurs (les *features*) et apprend, sur les vraies données, à estimer
+   la **probabilité que le prix monte**. Il **s'entraîne automatiquement à chaque ouverture**
+   (apprentissage continu), **note ses prédictions passées** (il apprend de ses erreurs) et
+   affiche sa **précision walk-forward honnête** — le vrai niveau, hors échantillon. Sur les
+   marchés, un tel modèle **plafonne vers 52-55 %** : c'est affiché sans mentir. Sa mémoire est
+   **sauvegardée automatiquement** (IndexedDB) et **exportable/importable** (`ia-cerveau.json`)
+   pour ne jamais la perdre.
+
+## Onglet « Stratégies Pro »
+
+Les méthodes **systématiques** réellement utilisées par les fonds (suivi de tendance CTA,
+cassure Donchian/Turtle, retour à la moyenne, momentum, règle des 200 jours de PTJ,
+risk-parity de Dalio…), calculées sur les vraies bougies journalières et **backtestées** sur
+l'historique dispo (échantillon court, sans frais → indicatif). Une synthèse multi-méthodes
+donne, par actif, le consensus et le régime de marché.
 
 ## Historique
 
@@ -50,6 +67,8 @@ ou au SL (perdu) selon le prix réel. Le taux de réussite affiché sur les cart
 |---|---|
 | `index.html` | Le site (structure + CSS + logique d'affichage) |
 | `js/live.js` | Données en direct + moteur ICT/SMC (calcul des trades) |
+| `js/pro.js` | Stratégies systématiques des fonds + backtest (onglet Stratégies Pro) |
+| `js/ia.js` | **IA maison** : modèle ML dans le navigateur + entraînement auto + mémoire (onglet IA maison) |
 | `js/ai.js` | Appel de l'API Claude (Bot IA) |
 | `js/history.js` | Journal des trades (bot d'origine, motif, bilan réel) |
 | `TRADEassist.html` | **Version autonome** (tout inliné) générée par `scripts/build_single.js` |
