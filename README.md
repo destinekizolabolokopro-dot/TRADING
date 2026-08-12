@@ -45,6 +45,18 @@ entrée, stop, objectif, ratio (RR) et gain estimé sur un compte de 10 000 € 
    est **sauvegardée automatiquement** (IndexedDB) et **exportable/importable** (`ia-cerveau.json`).
    Une **boussole de rotation** pédagogique — pas une machine à gagner, pas un conseil financier.
 
+## Onglet « Quant / Institutionnel »
+
+Reproduit le fonctionnement réel des grands fonds (Renaissance, Two Sigma, Citadel…) :
+un **panier market-neutral long/short**. On note chaque actif sur des **facteurs** (momentum
+90 j, tendance vs EMA200, faible volatilité), on **combine** en un score composite (ensemble),
+on classe les 28 actifs, puis on va **long le top 20 %** et **short le bottom 20 %**. On gagne
+sur l'**écart** entre les deux jambes → peu importe que le marché monte ou baisse. La métrique
+visée est le **Sharpe** (rendement ÷ risque), pas le win rate. Backtest walk-forward affiché
+(Sharpe, win rate, rendement annualisé, drawdown). ⚠️ Échantillon court, **sans frais ni coût
+de vente à découvert**, marché haussier → **indicatif**. Le facteur « reversal court terme »,
+mesuré négatif, a été exclu. Market-neutral **≠ sans risque**.
+
 ## Onglet « Stratégies Pro »
 
 Les méthodes **systématiques** réellement utilisées par les fonds (suivi de tendance CTA,

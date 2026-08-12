@@ -277,6 +277,35 @@
   .iasig .idrv .dv{white-space:nowrap}
   .iasig .idrv .up{color:var(--long)} .iasig .idrv .down{color:var(--short)}
   .ia-h{font-family:var(--display);font-weight:600;font-size:1.02rem;margin:22px 0 12px}
+
+  /* ---------- Quant / Institutionnel (market-neutral factoriel) ---------- */
+  .q-hero{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:14px}
+  .q-stat{background:var(--surface);border:1px solid var(--border);border-radius:13px;padding:14px 16px}
+  .q-stat .k{font-size:.66rem;text-transform:uppercase;letter-spacing:.06em;color:var(--faint);margin-bottom:5px}
+  .q-stat .v{font-family:var(--display);font-weight:600;font-size:1.5rem;line-height:1}
+  .q-stat .s{font-size:.72rem;color:var(--muted);margin-top:4px}
+  .q-stat.hi{border-color:color-mix(in srgb,var(--long) 40%,transparent)} .q-stat.hi .v{color:var(--long)}
+  .q-stat.lo{border-color:color-mix(in srgb,var(--short) 40%,transparent)} .q-stat.lo .v{color:var(--short)}
+  .q-pillars{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin:16px 0}
+  .q-pill{background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:12px 14px}
+  .q-pill h4{margin:0 0 4px;font-family:var(--display);font-weight:600;font-size:.9rem;display:flex;gap:7px;align-items:center}
+  .q-pill p{margin:0;font-size:.78rem;color:var(--muted);line-height:1.5}
+  .q-side{margin-top:20px}
+  .q-side h3{font-family:var(--display);font-weight:600;font-size:1.05rem;margin:0 0 4px;display:flex;align-items:center;gap:9px}
+  .q-side .sub{font-size:.78rem;color:var(--faint);margin:0 0 12px}
+  .q-basket{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:11px}
+  .qcard{border:1px solid var(--border);border-radius:12px;padding:13px 14px;background:var(--surface)}
+  .qcard.long{border-left:3px solid var(--long)} .qcard.short{border-left:3px solid var(--short)}
+  .qcard .qh{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px}
+  .qcard .qsym{font-family:var(--display);font-weight:600;font-size:1.02rem}
+  .qcard .qscore{font-family:var(--mono);font-size:.82rem;font-weight:700;padding:2px 8px;border-radius:99px;background:var(--surface-3)}
+  .qcard.long .qscore{color:var(--long)} .qcard.short .qscore{color:var(--short)}
+  .qfac{display:flex;flex-direction:column;gap:6px}
+  .qfac .row{display:flex;align-items:center;gap:8px;font-size:.72rem}
+  .qfac .row .lb{width:74px;color:var(--muted);flex-shrink:0}
+  .qfac .row .bar{flex:1;height:6px;border-radius:99px;background:var(--surface-3);position:relative;overflow:hidden}
+  .qfac .row .bar i{position:absolute;top:0;bottom:0;left:50%;border-radius:99px}
+  .qfac .row .val{width:38px;text-align:right;font-family:var(--mono);color:var(--faint)}
   footer{border-top:1px solid var(--border);padding:26px 0 40px;color:var(--faint);font-size:.8rem;text-align:center}
 
   /* Bouton IA + modale */
@@ -388,6 +417,7 @@
     <button class="vs on" data-v="ict">Signaux ICT / SMC</button>
     <button class="vs" data-v="pro">Stratégies Pro</button>
     <button class="vs" data-v="ia">IA maison</button>
+    <button class="vs" data-v="quant">Quant / Institutionnel</button>
   </div>
 
   <div id="view-ict">
@@ -412,6 +442,11 @@
   <div id="view-ia" style="display:none">
     <p class="pro-intro">Un <b>vrai modèle de machine learning qui tourne chez toi</b>, dans cette page — pas une IA externe. Plutôt que de deviner « ça va monter » (pile ou face), il apprend une question <b>réellement exploitable</b> : <b>quels actifs vont être plus forts que le panier</b> (momentum relatif). <span class="pro-warn">Il s'entraîne tout seul à chaque ouverture sur 14 actifs, se souvient d'une fois sur l'autre, et note ses propres prédictions passées.</span></p>
     <div id="ia-body"><div class="hist-empty">⏳ L'IA maison récupère les vraies bougies et s'entraîne…</div></div>
+  </div>
+
+  <div id="view-quant" style="display:none">
+    <p class="pro-intro">La façon dont travaillent <b>réellement les grands fonds</b> (Renaissance, Two Sigma, Citadel…). On ne prédit pas la direction (pile ou face) : on construit un panier <b>market-neutral</b> — <b>long</b> les plus forts, <b>short</b> les plus faibles — noté sur des <b>facteurs</b> (momentum, tendance, faible volatilité). <span class="pro-warn">On gagne sur l'écart, peu importe que le marché monte ou baisse. La vraie métrique visée : le <b>Sharpe</b> (rendement ÷ risque), pas le win rate.</span></p>
+    <div id="quant-body"><div class="hist-empty">⏳ Construction du panier factoriel + backtest market-neutral…</div></div>
   </div>
 </div>
 
@@ -1378,6 +1413,145 @@
 </script>
 <script>
 /*
+ * Moteur QUANT / INSTITUTIONNEL — inspiré du fonctionnement réel des grands fonds
+ * (Renaissance, Two Sigma, Citadel, DE Shaw…). Il ne prédit PAS la direction du marché
+ * (pile ou face) : il construit un panier MARKET-NEUTRAL long/short par FACTEURS.
+ *
+ * Les 4 piliers repris des pros :
+ *  1. FACTEURS : on note chaque actif sur des primes de risque documentées —
+ *     Momentum (90 j), Tendance (prix vs EMA200), Faible volatilité (low-vol anomaly).
+ *     (Le facteur "reversal court terme" a été mesuré NÉGATIF sur ces actifs → exclu.)
+ *  2. ENSEMBLE : on combine ces facteurs (z-scores) en un score composite unique.
+ *  3. CLASSEMENT CROSS-SECTIONNEL : on va LONG le haut du panier, SHORT le bas.
+ *  4. MARKET-NEUTRAL : long + short en même temps → on gagne sur l'ÉCART, peu importe
+ *     que le marché monte ou baisse. La vraie métrique visée n'est pas le win rate mais
+ *     le SHARPE (rendement ÷ risque).
+ *
+ * Backtest walk-forward honnête (rebalance tous les 20 j). ⚠️ Échantillon court, sans frais
+ * ni coût de short, marché majoritairement haussier → INDICATIF, pas une promesse.
+ */
+(function (root) {
+  'use strict';
+
+  var HOSTS = ['https://api.binance.com', 'https://data-api.binance.vision', 'https://api1.binance.com'];
+  var ASSETS = [
+    { sym: 'BTC/USD', src: 'BTCUSDT' }, { sym: 'ETH/USD', src: 'ETHUSDT' }, { sym: 'SOL/USD', src: 'SOLUSDT' },
+    { sym: 'XRP/USD', src: 'XRPUSDT' }, { sym: 'BNB/USD', src: 'BNBUSDT' }, { sym: 'ADA/USD', src: 'ADAUSDT' },
+    { sym: 'DOGE/USD', src: 'DOGEUSDT' }, { sym: 'LTC/USD', src: 'LTCUSDT' }, { sym: 'LINK/USD', src: 'LINKUSDT' },
+    { sym: 'DOT/USD', src: 'DOTUSDT' }, { sym: 'AVAX/USD', src: 'AVAXUSDT' }, { sym: 'TRX/USD', src: 'TRXUSDT' },
+    { sym: 'MATIC/USD', src: 'MATICUSDT' }, { sym: 'ATOM/USD', src: 'ATOMUSDT' }, { sym: 'UNI/USD', src: 'UNIUSDT' },
+    { sym: 'XLM/USD', src: 'XLMUSDT' }, { sym: 'ETC/USD', src: 'ETCUSDT' }, { sym: 'FIL/USD', src: 'FILUSDT' },
+    { sym: 'NEAR/USD', src: 'NEARUSDT' }, { sym: 'APT/USD', src: 'APTUSDT' }, { sym: 'INJ/USD', src: 'INJUSDT' },
+    { sym: 'AAVE/USD', src: 'AAVEUSDT' }, { sym: 'ALGO/USD', src: 'ALGOUSDT' }, { sym: 'SAND/USD', src: 'SANDUSDT' },
+    { sym: 'EOS/USD', src: 'EOSUSDT' }, { sym: 'XTZ/USD', src: 'XTZUSDT' }, { sym: 'EUR/USD', src: 'EURUSDT' },
+    { sym: 'XAU/USD', src: 'PAXGUSDT' }
+  ];
+  var H = 20;                    // horizon / période de rebalance (jours)
+  var W = { mom: 1, trend: 1, lowvol: 0.5 }; // poids de l'ensemble de facteurs
+  var fresh = function (c) { return c && c.length && (Date.now() - c[c.length - 1].t) < 3 * 864e5; };
+
+  function ema(v, p) { var k = 2 / (p + 1), e = v[0], o = [e]; for (var i = 1; i < v.length; i++) { e = v[i] * k + e * (1 - k); o.push(e); } return o; }
+  function ret(cl, i, p) { return i >= p && cl[i - p] ? (cl[i] - cl[i - p]) / cl[i - p] : 0; }
+  function vol(cl, i, p) { if (i < p) return 0; var r = [], j; for (j = i - p + 1; j <= i; j++) r.push((cl[j] - cl[j - 1]) / cl[j - 1]); var m = r.reduce(function (a, b) { return a + b; }, 0) / r.length; return Math.sqrt(r.reduce(function (a, b) { return a + (b - m) * (b - m); }, 0) / r.length); }
+  function zmap(map) { var s = Object.keys(map), a = s.map(function (x) { return map[x]; }), n = a.length,
+    mu = a.reduce(function (p, q) { return p + q; }, 0) / n, sd = Math.sqrt(a.reduce(function (p, q) { return p + (q - mu) * (q - mu); }, 0) / n) || 1, o = {};
+    s.forEach(function (x) { o[x] = (map[x] - mu) / sd; }); return o; }
+
+  // Facteurs bruts d'un actif à l'indice i
+  function factorsAt(a, i) {
+    var cl = a.cl;
+    return { mom: ret(cl, i, 90), trend: a.e200[i] ? cl[i] / a.e200[i] - 1 : 0, lowvol: -vol(cl, i, 30) };
+  }
+  // Score composite cross-sectionnel à un instant : z-score chaque facteur puis pondère
+  function compositeAt(assets, idxByT, t) {
+    var mom = {}, tr = {}, lv = {}, present = [];
+    assets.forEach(function (a) { var i = idxByT[a.sym][t]; if (i == null || i < 205) return;
+      var f = factorsAt(a, i); mom[a.sym] = f.mom; tr[a.sym] = f.trend; lv[a.sym] = f.lowvol; present.push(a.sym); });
+    if (present.length < 8) return null;
+    var zM = zmap(mom), zT = zmap(tr), zL = zmap(lv), comp = {}, sub = {};
+    present.forEach(function (s) { comp[s] = W.mom * zM[s] + W.trend * zT[s] + W.lowvol * zL[s];
+      sub[s] = { mom: zM[s], trend: zT[s], lowvol: zL[s] }; });
+    return { comp: comp, sub: sub };
+  }
+
+  // Backtest market-neutral : rebalance tous les H j, long topK / short bottomK, on mesure le spread.
+  function backtest(assets, idxByT, times, K) {
+    var rets = [], i;
+    for (i = 210; i < times.length - H; i += H) {
+      var t = times[i], c = compositeAt(assets, idxByT, t); if (!c) continue;
+      var fr = {};
+      assets.forEach(function (a) { var ii = idxByT[a.sym][t]; if (ii != null && ii + H < a.cl.length) fr[a.sym] = (a.cl[ii + H] - a.cl[ii]) / a.cl[ii]; });
+      var ranked = Object.keys(c.comp).filter(function (s) { return fr[s] != null; }).sort(function (x, y) { return c.comp[y] - c.comp[x]; });
+      if (ranked.length < 2 * K) continue;
+      var longs = ranked.slice(0, K), shorts = ranked.slice(-K);
+      var lm = longs.reduce(function (a, s) { return a + fr[s]; }, 0) / K;
+      var sm = shorts.reduce(function (a, s) { return a + fr[s]; }, 0) / K;
+      rets.push(lm - sm);
+    }
+    return rets;
+  }
+  function stats(rets) {
+    var n = rets.length; if (!n) return null;
+    var mean = rets.reduce(function (a, b) { return a + b; }, 0) / n;
+    var sd = Math.sqrt(rets.reduce(function (a, b) { return a + (b - mean) * (b - mean); }, 0) / n) || 1e-9;
+    var perYear = 365 / H, sharpe = (mean / sd) * Math.sqrt(perYear);
+    var win = rets.filter(function (r) { return r > 0; }).length / n * 100;
+    var ann = Math.pow(1 + mean, perYear) - 1;
+    var eq = 1, peak = 1, dd = 0;
+    rets.forEach(function (r) { eq *= 1 + r; if (eq > peak) peak = eq; var d = (peak - eq) / peak; if (d > dd) dd = d; });
+    return { n: n, sharpe: +sharpe.toFixed(2), win: Math.round(win), ann: Math.round(ann * 100), dd: Math.round(dd * 100), meanPct: +(mean * 100).toFixed(2) };
+  }
+
+  function fetchKlines(src) {
+    var path = '/api/v3/klines?symbol=' + src + '&interval=1d&limit=1000';
+    function tryHost(i) {
+      if (i >= HOSTS.length) return Promise.reject(new Error('Binance injoignable'));
+      return fetch(HOSTS[i] + path).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then(function (d) { return d.map(function (k) { return { t: k[0], o: +k[1], h: +k[2], l: +k[3], c: +k[4] }; }).slice(0, -1); })
+        .catch(function () { return tryHost(i + 1); });
+    }
+    return tryHost(0);
+  }
+
+  function load() {
+    return Promise.all(ASSETS.map(function (a) {
+      return fetchKlines(a.src).then(function (c) { return { a: a, c: c }; }, function () { return { a: a, c: null }; });
+    })).then(function (rows) {
+      var assets = [];
+      rows.forEach(function (r) {
+        if (!fresh(r.c)) return;
+        var cl = r.c.map(function (x) { return x.c; }), idx = {};
+        r.c.forEach(function (k, i) { idx[k.t] = i; });
+        assets.push({ sym: r.a.sym, cl: cl, c: r.c, e200: ema(cl, 200), _t: idx });
+      });
+      if (assets.length < 8) return null;
+
+      var idxByT = {}; assets.forEach(function (a) { idxByT[a.sym] = a._t; });
+      var allT = {}; assets.forEach(function (a) { a.c.forEach(function (k) { allT[k.t] = 1; }); });
+      var times = Object.keys(allT).map(Number).sort(function (x, y) { return x - y; });
+      var K = Math.max(3, Math.round(assets.length / 5)); // quintiles (top/bottom 20 %, standard académique)
+
+      // Panier LIVE : composite au dernier instant commun
+      var tLive = times[times.length - 1];
+      var c = compositeAt(assets, idxByT, tLive) || compositeAt(assets, idxByT, times[times.length - 2]);
+      var ranked = c ? Object.keys(c.comp).sort(function (x, y) { return c.comp[y] - c.comp[x]; }) : [];
+      function pack(s) { var a = assets.find(function (x) { return x.sym === s; }); return { sym: s, score: +c.comp[s].toFixed(2), sub: c.sub[s],
+        price: a ? a.cl[a.cl.length - 1] : null }; }
+      var longs = ranked.slice(0, K).map(pack), shorts = ranked.slice(-K).map(pack).reverse();
+      var mids = ranked.slice(K, ranked.length - K).map(pack);
+
+      var perf = stats(backtest(assets, idxByT, times, K));
+      return { longs: longs, shorts: shorts, mids: mids, perf: perf, K: K, H: H,
+        assets: assets.length, updated: Date.now() };
+    });
+  }
+
+  root.QUANT = { load: load };
+})(typeof window !== 'undefined' ? window : this);
+
+</script>
+<script>
+/*
  * Couche DONNÉES EN DIRECT du dashboard (navigateur, sans clé)
  * -----------------------------------------------------------------------------
  * - Crypto (BTC/ETH/SOL/XRP/BNB) : Binance (klines D1 + H4), CORS ouvert -> VRAIS trades.
@@ -2149,12 +2323,69 @@ $('.viewswitch').addEventListener('click', e=>{
   const b=e.target.closest('.vs'); if(!b) return;
   $('.viewswitch .on').classList.remove('on'); b.classList.add('on');
   const v=b.dataset.v;
-  $('#view-ict').style.display = v==='ict'?'':'none';
-  $('#view-pro').style.display = v==='pro'?'':'none';
-  $('#view-ia').style.display  = v==='ia' ?'':'none';
+  $('#view-ict').style.display   = v==='ict'?'':'none';
+  $('#view-pro').style.display   = v==='pro'?'':'none';
+  $('#view-ia').style.display    = v==='ia' ?'':'none';
+  $('#view-quant').style.display = v==='quant'?'':'none';
   if(v==='pro') loadPro();
   if(v==='ia')  loadIA();
+  if(v==='quant') loadQuant();
 });
+
+/* ---------- Quant / Institutionnel (market-neutral factoriel) ---------- */
+let quantLoaded=false, quantLoading=false;
+function qFacRow(lbl, v){
+  const w = Math.min(50, Math.abs(v)/3*50), up=v>=0;
+  const col = up?'var(--long)':'var(--short)';
+  const bar = `<i style="${up?'left:50%':'right:50%;left:auto'};width:${Math.max(2,w)}%;background:${col}"></i>`;
+  return `<div class="row"><span class="lb">${lbl}</span><span class="bar">${bar}</span><span class="val">${v>=0?'+':''}${v.toFixed(1)}</span></div>`;
+}
+function qCard(g, side){
+  return `<div class="qcard ${side}">
+    <div class="qh"><span class="qsym">${g.sym}</span><span class="qscore">${g.score>=0?'+':''}${g.score}</span></div>
+    <div class="qfac">
+      ${qFacRow('Momentum', g.sub.mom)}
+      ${qFacRow('Tendance', g.sub.trend)}
+      ${qFacRow('Faible vol.', g.sub.lowvol)}
+    </div></div>`;
+}
+function renderQuant(d){
+  const body=$('#quant-body');
+  if(!d){ body.innerHTML='<div class="hist-empty">Impossible de charger les vraies données (réseau restreint en aperçu). <b>Ouvre le fichier depuis ton PC</b> pour le panier factoriel.</div>'; return; }
+  const p=d.perf||{};
+  const maj = d.updated ? new Date(d.updated).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}) : '';
+  const goodSharpe = (p.sharpe||0) >= 1;
+  let html = `<section class="ia-brain">
+    <h3>🏛️ Panier market-neutral factoriel <span class="stag">long/short · ${d.assets} actifs${maj?` · maj ${maj}`:''}</span></h3>
+    <div class="q-hero">
+      <div class="q-stat ${goodSharpe?'hi':''}"><div class="k">Sharpe (backtest)</div><div class="v">${p.sharpe!=null?p.sharpe:'—'}</div><div class="s">rendement ÷ risque</div></div>
+      <div class="q-stat"><div class="k">Win rate</div><div class="v">${p.win!=null?p.win+'%':'—'}</div><div class="s">périodes gagnantes</div></div>
+      <div class="q-stat ${(p.ann||0)>0?'hi':'lo'}"><div class="k">Rendement annualisé</div><div class="v">${p.ann!=null?(p.ann>0?'+':'')+p.ann+'%':'—'}</div><div class="s">spread long−short</div></div>
+      <div class="q-stat lo"><div class="k">Pire perte (DD)</div><div class="v">−${p.dd!=null?p.dd:'—'}%</div><div class="s">sur ${p.n||'—'} périodes</div></div>
+    </div>
+    <p class="bt-caveat">📊 Backtest walk-forward du panier long/short (rebalance ~${d.H} j, quintiles). <b>Échantillon court (${p.n||'—'} périodes), SANS frais ni coût de vente à découvert, sur un marché majoritairement haussier — INDICATIF, pas une promesse.</b> Le Sharpe idéal (celui des grands fonds) est &gt; 1 ; en dessous, l'edge est faible.</p>
+    <div class="q-pillars">
+      <div class="q-pill"><h4>🎯 Facteurs</h4><p>On note chaque actif sur des primes documentées : momentum, tendance, faible volatilité.</p></div>
+      <div class="q-pill"><h4>🧩 Ensemble</h4><p>On combine ces facteurs (z-scores) en un seul score composite — comme les quants.</p></div>
+      <div class="q-pill"><h4>📊 Cross-section</h4><p>On classe les actifs entre eux : long le top 20 %, short le bottom 20 %.</p></div>
+      <div class="q-pill"><h4>⚖️ Market-neutral</h4><p>Long + short en même temps → on gagne sur l'écart, peu importe le sens du marché.</p></div>
+    </div>
+  </section>`;
+  html += `<div class="q-side"><h3>🟢 Jambe LONGUE <span class="stag" style="font-weight:400">top ${d.longs.length} · à privilégier</span></h3>
+    <p class="sub">Les plus forts du panier (score composite le plus élevé).</p>
+    <div class="q-basket">${d.longs.map(g=>qCard(g,'long')).join('')}</div></div>`;
+  html += `<div class="q-side"><h3>🔴 Jambe COURTE <span class="stag" style="font-weight:400">bottom ${d.shorts.length} · à éviter / short</span></h3>
+    <p class="sub">Les plus faibles du panier. En market-neutral, on les vend à découvert (coût de short réel à prévoir).</p>
+    <div class="q-basket">${d.shorts.map(g=>qCard(g,'short')).join('')}</div></div>`;
+  html += `<p class="bt-caveat" style="margin-top:18px">🔎 Chaque barre montre la force du facteur (z-score vs le panier) : à droite = fort, à gauche = faible. C'est la logique des grands fonds — un panier diversifié de paris relatifs, jugé au Sharpe. <b>Pédagogique, market-neutral ≠ sans risque, pas un conseil financier.</b></p>`;
+  body.innerHTML = html;
+}
+function loadQuant(force){
+  if((quantLoaded&&!force)||quantLoading||!window.QUANT) return;
+  quantLoading=true;
+  QUANT.load().then(d=>{ quantLoaded=true; quantLoading=false; renderQuant(d); })
+             .catch(()=>{ quantLoading=false; renderQuant(null); });
+}
 
 /* ---------- IA maison (machine learning dans le navigateur) ---------- */
 let iaLoaded=false, iaLoading=false;
