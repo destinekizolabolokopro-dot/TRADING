@@ -410,7 +410,7 @@
   </div>
 
   <div id="view-ia" style="display:none">
-    <p class="pro-intro">Un <b>vrai modèle de machine learning qui tourne chez toi</b>, dans cette page — pas une IA externe. Il transforme chaque bougie en concepts ICT/SMC + indicateurs, puis apprend, sur les <b>vraies</b> données, à estimer la probabilité que le prix monte. <span class="pro-warn">Il s'entraîne tout seul à chaque ouverture, se souvient d'une fois sur l'autre, et note ses propres prédictions passées.</span></p>
+    <p class="pro-intro">Un <b>vrai modèle de machine learning qui tourne chez toi</b>, dans cette page — pas une IA externe. Plutôt que de deviner « ça va monter » (pile ou face), il apprend une question <b>réellement exploitable</b> : <b>quels actifs vont être plus forts que le panier</b> (momentum relatif). <span class="pro-warn">Il s'entraîne tout seul à chaque ouverture sur 14 actifs, se souvient d'une fois sur l'autre, et note ses propres prédictions passées.</span></p>
     <div id="ia-body"><div class="hist-empty">⏳ L'IA maison récupère les vraies bougies et s'entraîne…</div></div>
   </div>
 </div>
@@ -900,13 +900,13 @@ let iaLoaded=false, iaLoading=false;
 function iaProb(s){ return Math.round(s.prob*100); }
 function iaSigCard(s){
   const cls = s.dir==='up'?'up':s.dir==='down'?'down':'neu';
-  const dlabel = s.dir==='up'?'▲ Hausse':s.dir==='down'?'▼ Baisse':'≈ Neutre';
+  const dlabel = s.dir==='up'?'▲ Fort':s.dir==='down'?'▼ Faible':'≈ Neutre';
   const pct = iaProb(s);
   const col = s.dir==='up'?'var(--long)':s.dir==='down'?'var(--short)':'var(--wait)';
   const drv = (s.drivers||[]).map(d=>`<span class="dv ${d.d==='haussier'?'up':'down'}">${d.d==='haussier'?'▲':'▼'} ${d.n}</span>`).join(' · ');
   return `<div class="iasig ${cls}">
     <div class="ih"><span class="isym">${s.sym}</span><span class="idir ${cls}">${dlabel}</span></div>
-    <div class="iprob"><span class="big" style="color:${col}">${pct}%</span><span class="lbl">proba. de hausse à ~${IA_HORIZON} j · confiance ${s.conf}%</span></div>
+    <div class="iprob"><span class="big" style="color:${col}">${pct}%</span><span class="lbl">proba. de <b>surperformer le panier</b> à ~${IA_HORIZON} j · confiance ${s.conf}%</span></div>
     <div class="ibar"><i style="width:${pct}%;background:${col}"></i></div>
     <div class="idrv">Concepts qui pèsent le plus : ${drv||'—'}</div>
   </div>`;
@@ -916,23 +916,24 @@ function renderIA(d){
   const body=$('#ia-body');
   if(!d){ body.innerHTML='<div class="hist-empty">Impossible de charger les vraies données (réseau restreint côté aperçu en ligne). <b>Ouvre le fichier depuis ton PC</b> (double-clic) pour que l\'IA s\'entraîne sur les vraies bougies.</div>'; return; }
   IA_HORIZON=d.horizon||20;
-  const wf=d.wf, acc=wf?wf.acc:null, accE=wf?wf.accEngaged:null, cov=wf?wf.coverage:null;
-  // Le VRAI juge = bat-elle le pile ou face (50 %) ? On regarde surtout la précision QUAND
-  // ELLE S'ENGAGE (elle ne parle que si elle est un peu sûre). Un edge honnête = accE nettement > 50.
-  const ref = accE!=null ? accE : acc;           // métrique de référence pour le verdict
-  const edge = ref!=null ? ref-50 : null;
-  const hasEdge = accE!=null && accE>=54 && (cov==null||cov>=15);
+  const wf=d.wf, acc=wf?wf.acc:null, accE=wf?wf.accEngaged:null, cov=wf?wf.coverage:null, base=wf?wf.baseline:null;
+  // Cible RELATIVE : la bonne référence n'est pas 50 % mais le choix NAÏF (toujours prédire le
+  // cas le plus fréquent = baseline). L'edge honnête = précision quand engagée − baseline.
+  const ref = accE!=null ? accE : acc;
+  const cmp = base!=null ? base : 50;
+  const edge = ref!=null ? ref-cmp : null;
+  const hasEdge = accE!=null && edge!=null && edge>=3 && accE>52 && (cov==null||cov>=15);
   const accClass = ref==null?'':(hasEdge?'good':'flat');
   // Track record réel (prédictions live déjà notées)
   const tr=d.track, trTxt = (tr&&tr.total>0)? `${tr.rate}% <span class="s">sur ${tr.total} prédiction${tr.total>1?'s':''} notées</span>` : '<span class="s" style="font-size:.9rem">en cours de constitution…</span>';
   let verdict;
   if(ref==null) verdict=`<div class="ia-verdict flat">Pas encore assez de données pour mesurer un niveau fiable. L'IA s'entraîne quand même et s'améliorera à chaque ouverture.</div>`;
-  else if(hasEdge) verdict=`<div class="ia-verdict good">✅ <b>Quand elle s'engage, l'IA a raison ${accE}%</b> du temps (sur ${cov}% des cas), contre <b>50 % pour un pile ou face</b>. C'est un <b>petit avantage de +${edge} points</b>, mesuré sur du jamais-vu. Reste prudent : c'est faible et le marché change.</div>`;
-  else verdict=`<div class="ia-verdict flat">⚠️ <b>Honnêteté totale :</b> testée <b>sans tricher</b> (walk-forward strict par actif), l'IA fait <b>${ref}%</b> — <b>quasi pile ou face (50 %)</b>. <b>Aucun avantage fiable.</b> J'ai pourtant essayé plein de configs et 14 actifs : c'est la réalité des marchés, un tel modèle ne bat pas la pièce de monnaie de façon fiable. <b>Ne mise rien dessus</b> — vois-la comme un labo pédagogique, pas une machine à gagner.</div>`;
+  else if(hasEdge) verdict=`<div class="ia-verdict good">✅ <b>Quand elle s'engage, l'IA vise juste ${accE}%</b> du temps (sur ${cov}% des cas) pour repérer qui <b>surperforme le panier</b>, contre <b>${cmp}%</b> pour un choix naïf. Soit un <b>avantage réel de +${edge} points</b>, mesuré sur du jamais-vu (walk-forward strict). C'est <b>modeste mais réel</b> — l'anomalie de momentum relatif. Reste prudent : ça ne remplace pas la gestion du risque.</div>`;
+  else verdict=`<div class="ia-verdict flat">⚠️ <b>Honnêteté totale :</b> testée sans tricher, l'IA fait <b>${ref}%</b> pour ${cmp}% attendu d'un choix naïf — <b>avantage trop faible pour être fiable</b>. J'ai essayé plein d'approches (14 actifs, réseau de neurones, cible relative). Sur les marchés, c'est normal : le signal exploitable est minuscule. <b>Ne mise rien dessus</b> — labo pédagogique, pas une machine à gagner.</div>`;
   let html = `<section class="ia-brain">
-    <h3>🧠 Cerveau de l'IA maison <span class="stag">régression logistique · navigateur</span></h3>
+    <h3>🧠 Cerveau de l'IA maison <span class="stag">force relative · momentum · navigateur</span></h3>
     <div class="ia-kpis">
-      <div class="ia-kpi ${accClass}"><div class="k">Quand elle s'engage</div><div class="v">${accE!=null?accE+'%':'—'}</div><div class="s">pile ou face = 50% · sur ${cov!=null?cov+'%':'—'} des cas</div></div>
+      <div class="ia-kpi ${accClass}"><div class="k">Quand elle s'engage</div><div class="v">${accE!=null?accE+'%':'—'}</div><div class="s">choix naïf = ${cmp}% · sur ${cov!=null?cov+'%':'—'} des cas</div></div>
       <div class="ia-kpi"><div class="k">Précision globale</div><div class="v" style="font-size:1.1rem">${acc!=null?acc+'%':'—'}</div><div class="s">jamais-vu · strict</div></div>
       <div class="ia-kpi"><div class="k">Track record réel</div><div class="v" style="font-size:1.1rem">${trTxt}</div></div>
       <div class="ia-kpi"><div class="k">Exemples appris</div><div class="v" style="font-size:1.1rem">${(d.samples||0).toLocaleString('fr-FR')}</div><div class="s">${d.assets||0} actifs · ${d.sessions||1} entraînements</div></div>
@@ -945,9 +946,9 @@ function renderIA(d){
       <button class="ai-btn ghost" id="ia-reset">Réinitialiser</button>
     </div>
   </section>`;
-  html += `<div class="ia-h">Ce que l'IA voit maintenant <span class="stag" style="font-weight:400">triées par confiance</span></div>`;
+  html += `<div class="ia-h">Classement par force relative <span class="stag" style="font-weight:400">du plus fort au plus faible</span></div>`;
   html += `<div class="ia-sigs">${d.signals.map(iaSigCard).join('')}</div>`;
-  html += `<p class="bt-caveat" style="margin-top:16px">🔎 « Confiance » = à quel point la proba s'éloigne de 50/50, <b>pas</b> une garantie de gain. Les « concepts qui pèsent » montrent quelles features ont poussé la décision. L'IA prédit un <b>sens probable</b>, elle ne place ni stop ni objectif — croise-la avec l'onglet ICT/SMC. Pédagogique, pas un conseil financier.</p>`;
+  html += `<p class="bt-caveat" style="margin-top:16px">🔎 L'IA ne prédit <b>pas</b> « ça va monter » (c'est du pile ou face), mais <b>quels actifs devraient être plus forts que le panier</b> sur ~${IA_HORIZON} j (momentum relatif). « ▲ Fort » = candidat à surperformer ; « ▼ Faible » = à sous-performer. Elle ne place ni stop ni objectif — sers-t'en comme d'une <b>boussole de rotation</b>, à croiser avec l'onglet ICT/SMC. Pédagogique, pas un conseil financier.</p>`;
   body.innerHTML = html;
   // Câblage mémoire (export / import / reset)
   $('#ia-export').addEventListener('click', ()=>{

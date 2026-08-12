@@ -43,7 +43,7 @@
   // Horizon long (~20 j) : c'est là que la tendance/le momentum persistent le mieux (le seul
   // "signal" légèrement exploitable et défendable). En dessous, c'est du pur pile ou face.
   var HORIZON = 20;
-  var MODEL_VERSION = 4;        // features/horizon changés : on ré-apprend proprement de zéro
+  var MODEL_VERSION = 5;        // cible RELATIVE (surperformer le panier) : on ré-apprend de zéro
   var FEATURE_NAMES = [
     'Biais HTF (EMA50/200)', 'Zone premium/discount', 'RSI (excès)', 'Momentum (ROC)',
     'Régime (efficiency)', 'Displacement', 'Position dans le range (liquidité)',
@@ -112,17 +112,19 @@
       // 11. Pente de l'EMA50 (dynamique de la tendance)
       var slope = i >= 5 ? clampf((e50[i] - e50[i - 5]) / a, -3, 3) : 0;
       X.push([bias, distE20, rsiN, roc10, er, dispv, rp, bos, atrN, ret1, slope]);
-      meta.push({ i: i, price: price });
+      meta.push({ i: i, t: c[i].t });
     }
-    // Étiquette : le prix a-t-il MONTÉ dans HORIZON bougies ? (uniquement là où le futur est connu)
-    var y = [], Xt = [], last = null;
+    // On expose, pour chaque bougie exploitable, sa feature + son horodatage + son rendement
+    // FUTUR sur HORIZON. L'étiquette (surperforme-t-il le panier ?) est calculée dans load(),
+    // car elle a besoin de TOUS les actifs au même instant (cible RELATIVE / cross-sectionnelle).
+    var rows = [], last = null;
     for (var k = 0; k < meta.length; k++) {
       var idx = meta[k].i, future = idx + HORIZON;
-      if (future < n) { y.push(cl[future] > cl[idx] ? 1 : 0); Xt.push(X[k]); }
-      else if (idx === n - 1) { last = X[k]; } // dernière bougie = point de prédiction "live"
+      if (future < n) rows.push({ x: X[k], t: meta[k].t, fret: (cl[future] - cl[idx]) / cl[idx] });
+      if (idx === n - 1) last = X[k]; // dernière bougie = point de prédiction "live"
     }
     if (last == null) last = X[X.length - 1];
-    return { X: Xt, y: y, live: last, price: cl[n - 1] };
+    return { rows: rows, live: last, price: cl[n - 1] };
   }
   function clampf(v, a, b) { return v < a ? a : v > b ? b : v; }
   function effR(cl, i, p) { if (i < p) return 0; var chg = Math.abs(cl[i] - cl[i - p]), vol = 0; for (var j = i - p + 1; j <= i; j++) vol += Math.abs(cl[j] - cl[j - 1]); return vol ? clampf(chg / vol * 2 - 1, -1, 1) : 0; }
@@ -253,36 +255,39 @@
   var fresh = function (c) { return c && c.length && (Date.now() - c[c.length - 1].t) < 3 * 864e5; };
 
   // ---- Notation des prédictions passées : "apprendre de ses erreurs" ---------
-  // brain.log = [{sym, ts, dueTs, price, prob, dir, price0, graded, correct}]
-  // À chaque ouverture, on note celles dont l'échéance (HORIZON jours) est passée.
-  function gradeLog(brain, priceBySym, dataBySym) {
-    var log = brain.log || [], now = Date.now(), changed = false;
-    log.forEach(function (e) {
-      if (e.graded) return;
-      // On cherche la bougie de clôture à l'échéance dans les données fraîches, sinon on
-      // attend simplement (le prix actuel sert de repli une fois l'échéance dépassée).
-      var priceNow = priceBySym[e.sym];
-      if (now < e.dueTs || priceNow == null) return;
-      var went = priceNow > e.price0 ? 1 : 0;         // le prix a-t-il monté depuis l'entrée ?
-      e.correct = (went === (e.dir === 'up' ? 1 : 0)) ? 1 : 0;
-      e.graded = true; e.priceEnd = priceNow; changed = true;
+  // brain.log = [{sym, ts, dueTs, price0, prob, dir, graded, correct}]
+  // La cible est RELATIVE : une prédiction est correcte si l'actif a bien SURPERFORMÉ (ou
+  // sous-performé) le panier sur la période. On regroupe donc par jour et on compare chaque
+  // rendement réalisé à la MÉDIANE du groupe. On note à l'échéance (HORIZON jours passés).
+  function gradeLog(brain, priceBySym) {
+    var log = brain.log || [], now = Date.now(), day = 864e5, changed = false;
+    var due = log.filter(function (e) { return !e.graded && now >= e.dueTs && priceBySym[e.sym] != null; });
+    var byDay = {};
+    due.forEach(function (e) { var d = Math.floor(e.ts / day); (byDay[d] = byDay[d] || []).push(e); });
+    Object.keys(byDay).forEach(function (d) {
+      var grp = byDay[d]; if (grp.length < 3) return; // médiane peu fiable -> on attend
+      var rets = grp.map(function (e) { return priceBySym[e.sym] / e.price0 - 1; });
+      var med = rets.slice().sort(function (a, b) { return a - b; })[Math.floor(rets.length / 2)];
+      grp.forEach(function (e, i) {
+        var out = rets[i] > med ? 1 : 0;
+        e.correct = (out === (e.dir === 'up' ? 1 : 0)) ? 1 : 0;
+        e.ret = +(rets[i] * 100).toFixed(2); e.graded = true; changed = true;
+      });
     });
-    // Bilan du track record réel (prédictions live notées)
-    var graded = log.filter(function (e) { return e.graded; });
+    // Track record réel = prédictions notées ET engagées (l'IA s'est prononcée : fort/faible)
+    var graded = log.filter(function (e) { return e.graded && e.dir !== 'neutre'; });
     var ok = graded.filter(function (e) { return e.correct; }).length;
     brain.track = { total: graded.length, correct: ok, rate: graded.length ? Math.round(ok / graded.length * 100) : null };
-    // On borne le journal (garde les 400 plus récents)
-    if (log.length > 400) brain.log = log.slice(log.length - 400);
+    if (log.length > 600) brain.log = log.slice(log.length - 600);
     return changed;
   }
-  // Enregistre les prédictions "live" du jour (une par actif, pas de doublon < 1 j).
+  // Enregistre le panier COMPLET du jour (tous les actifs, y compris neutres) pour pouvoir
+  // calculer une médiane fiable à la notation. Un seul enregistrement par jour (batch cohérent).
   function logPredictions(brain, signals) {
     brain.log = brain.log || [];
     var now = Date.now(), day = 864e5;
+    if (brain.log.some(function (e) { return (now - e.ts) < day; })) return; // déjà loggé aujourd'hui
     signals.forEach(function (s) {
-      if (s.dir === 'neutre') return;
-      var dup = brain.log.some(function (e) { return e.sym === s.sym && !e.graded && (now - e.ts) < day; });
-      if (dup) return;
       brain.log.push({ sym: s.sym, ts: now, dueTs: now + HORIZON * day, price0: s.price,
         prob: s.prob, dir: s.dir, graded: false });
     });
@@ -296,35 +301,51 @@
       rows = rows.filter(function (r) { return fresh(r.c); });
       if (!rows.length) return null;
 
-      // 1) On assemble le grand jeu de données (toutes paires poolées = plus d'exemples)
-      var poolX = [], poolY = [], perAsset = [];
+      // 1) Features par actif (avec horodatage + rendement futur de chaque bougie)
+      var perAsset = [];
       rows.forEach(function (r) {
         var f = buildFeatures(r.c);
-        if (!f) return;
-        poolX = poolX.concat(f.X); poolY = poolY.concat(f.y);
+        if (!f || !f.rows.length) return;
         perAsset.push({ a: r.a, f: f });
       });
-      if (poolX.length < 120) return null;
+      if (perAsset.length < 3) return null;
+
+      // 2) CIBLE RELATIVE (cross-sectionnelle) : pour chaque instant, la médiane des rendements
+      // futurs du panier. Étiquette = 1 si l'actif SURPERFORME cette médiane. C'est la seule
+      // question réellement apprenable (le momentum relatif est une anomalie robuste) — bien
+      // plus que « le prix va-t-il monter ? » qui est du pur pile ou face.
+      var byT = {};
+      perAsset.forEach(function (pa) { pa.f.rows.forEach(function (row) { (byT[row.t] = byT[row.t] || []).push(row.fret); }); });
+      var medByT = {};
+      Object.keys(byT).forEach(function (t) { var a = byT[t].slice().sort(function (x, y) { return x - y; }); medByT[t] = a[Math.floor(a.length / 2)]; });
+
+      var poolX = [], poolY = [];
+      perAsset.forEach(function (pa) {
+        var X = [], y = [];
+        pa.f.rows.forEach(function (row) { var m = medByT[row.t]; if (m == null) return; X.push(row.x); y.push(row.fret > m ? 1 : 0); });
+        pa.labX = X; pa.labY = y; poolX = poolX.concat(X); poolY = poolY.concat(y);
+      });
+      if (poolX.length < 200) return null;
 
       return idbGet().then(function (saved) {
-        // 2) Cerveau sauvegardé (apprentissage continu) — sauf si les features ont changé
+        // 3) Cerveau sauvegardé (apprentissage continu) — sauf si le modèle a changé de version
         var brain = (saved && saved.v === MODEL_VERSION) ? saved : { v: MODEL_VERSION, log: (saved && saved.log) || [], sessions: 0 };
         var warm = brain.w || null;
 
-        // 3) Précision honnête HORS échantillon (walk-forward STRICT par actif) — le vrai niveau
-        var wf = walkForward(perAsset.map(function (pa) { return { X: pa.f.X, y: pa.f.y }; }));
+        // 4) Précision honnête HORS échantillon (walk-forward STRICT par actif) — le vrai niveau
+        var wf = walkForward(perAsset.map(function (pa) { return { X: pa.labX, y: pa.labY }; }));
 
-        // 4) Entraînement sur TOUT le dispo, en repartant du cerveau précédent (continu)
+        // 5) Entraînement sur TOUT le dispo, en repartant du cerveau précédent (continu)
         var std = standardize(poolX);
         var Xs = poolX.map(function (x) { return applyStd(x, std); });
         var w = train(Xs, poolY, warm, brain.sessions > 0 ? 120 : 250);
 
-        // 5) Prédictions "live" par actif + concepts qui poussent la décision
+        // 6) Prédictions "live" : proba que CHAQUE actif surperforme le panier (force relative)
         var priceBySym = {}, dataBySym = {};
         var signals = perAsset.map(function (pa) {
           var prob = predictOne(pa.f.live, w, std);
           priceBySym[pa.a.sym] = pa.f.price; dataBySym[pa.a.sym] = pa.f;
-          var dir = prob >= 0.56 ? 'up' : prob <= 0.44 ? 'down' : 'neutre';
+          var dir = prob >= 0.56 ? 'up' : prob <= 0.44 ? 'down' : 'neutre'; // up = fort, down = faible
           var conf = Math.round(Math.abs(prob - 0.5) * 200); // 0..100
           // Contribution de chaque concept = poids × feature standardisée (pourquoi la déci)
           var xs = applyStd(pa.f.live, std);
@@ -334,10 +355,10 @@
           var drivers = contrib.slice(0, 3).map(function (cc) { return { n: cc.n, d: cc.v >= 0 ? 'haussier' : 'baissier' }; });
           return { sym: pa.a.sym, cls: pa.a.cls, price: pa.f.price, prob: +prob.toFixed(3),
             dir: dir, conf: conf, drivers: drivers };
-        }).sort(function (a, b) { return b.conf - a.conf; });
+        }).sort(function (a, b) { return b.prob - a.prob; }); // classement par force relative décroissante
 
-        // 6) Apprendre de ses erreurs : noter les anciennes prédictions, puis logger celles du jour
-        gradeLog(brain, priceBySym, dataBySym);
+        // 7) Apprendre de ses erreurs : noter les anciennes prédictions, puis logger celles du jour
+        gradeLog(brain, priceBySym);
         logPredictions(brain, signals);
 
         // 7) Sauvegarde du cerveau (auto) — mémoire persistante

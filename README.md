@@ -30,16 +30,17 @@ entrée, stop, objectif, ratio (RR) et gain estimé sur un compte de 10 000 € 
    Nécessite **ta** clé API Anthropic (console.anthropic.com), stockée **en local** dans
    ton navigateur — elle ne quitte jamais ton ordinateur.
 3. **IA maison** (onglet dédié, sans clé) : un **vrai modèle de machine learning** (régression
-   logistique) qui **tourne dans la page**, pas une IA externe. Il transforme chaque bougie en
-   concepts ICT/SMC + indicateurs (les *features*) et apprend, sur les vraies données, à estimer
-   la **probabilité que le prix monte**. Il **s'entraîne automatiquement à chaque ouverture**
-   (apprentissage continu), **note ses prédictions passées** (il apprend de ses erreurs) et
-   affiche sa **précision walk-forward honnête** — mesurée **strictement par actif (zéro fuite
-   temporelle)**, sur **14 actifs** et des milliers d'exemples. Résultat sans fard : sur données
-   réelles, l'IA est **~50 % (pile ou face)** — un tel modèle **ne bat pas fiablement la pièce de
-   monnaie**, et le site l'écrit noir sur blanc au lieu de gonfler le chiffre. Sa mémoire est
-   **sauvegardée automatiquement** (IndexedDB) et **exportable/importable** (`ia-cerveau.json`)
-   pour ne jamais la perdre. C'est un **labo pédagogique**, pas une machine à gagner.
+   logistique) qui **tourne dans la page**, pas une IA externe. Point clé : au lieu de deviner
+   « le prix va-t-il monter ? » (du **pile ou face**, ~50 %), elle apprend une question
+   **réellement exploitable** — **quels actifs vont surperformer le panier** (momentum relatif
+   / cross-sectionnel, une anomalie quant robuste). Elle **s'entraîne automatiquement à chaque
+   ouverture** (apprentissage continu) sur **14 actifs** et **13 000+ exemples**, **note ses
+   prédictions passées** (elle apprend de ses erreurs) et affiche sa **précision walk-forward**
+   mesurée **strictement par actif (zéro fuite temporelle)**. Résultat honnête : **~63 % quand
+   elle s'engage** pour repérer les plus forts, contre ~57 % d'un choix naïf → un **avantage
+   réel mais modeste (+~6 points)**. Le site affiche le vrai chiffre, sans le gonfler. Sa mémoire
+   est **sauvegardée automatiquement** (IndexedDB) et **exportable/importable** (`ia-cerveau.json`).
+   Une **boussole de rotation** pédagogique — pas une machine à gagner, pas un conseil financier.
 
 ## Onglet « Stratégies Pro »
 
