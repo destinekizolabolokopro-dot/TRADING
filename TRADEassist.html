@@ -278,6 +278,23 @@
   .iasig .idrv .up{color:var(--long)} .iasig .idrv .down{color:var(--short)}
   .ia-h{font-family:var(--display);font-weight:600;font-size:1.02rem;margin:22px 0 12px}
 
+  /* ---------- Sélecteur d'outils ---------- */
+  .tools-list{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
+  .tool-row{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--border);
+    border-radius:12px;background:var(--surface-2);cursor:pointer;transition:.15s}
+  .tool-row:hover{border-color:var(--border-strong)}
+  .tool-row .tinfo{flex:1;min-width:0}
+  .tool-row .tname{font-weight:600;font-size:.94rem;display:flex;align-items:center;gap:8px}
+  .tool-row .tdesc{font-size:.76rem;color:var(--faint);margin-top:2px}
+  .tool-row .tkind{font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.05em;
+    color:var(--faint);border:1px solid var(--border);border-radius:99px;padding:1px 7px}
+  .switch{position:relative;width:42px;height:24px;flex-shrink:0;border-radius:99px;background:var(--surface-3);
+    border:1px solid var(--border-strong);transition:.2s}
+  .switch::after{content:'';position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;
+    background:var(--faint);transition:.2s}
+  .tool-row.on .switch{background:var(--grad);border-color:transparent}
+  .tool-row.on .switch::after{left:20px;background:#0a0a12}
+
   /* ---------- Quant / Institutionnel (market-neutral factoriel) ---------- */
   .q-hero{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:14px}
   .q-stat{background:var(--surface);border:1px solid var(--border);border-radius:13px;padding:14px 16px}
@@ -379,6 +396,7 @@
     <div class="status">
       <span class="live"><span class="dot" id="live-dot"></span><span id="live-txt">Connexion…</span></span>
       <span class="clock" id="clock">--:--:--</span>
+      <button class="ai-btn ghost" id="tools-open">⚙️&nbsp;Mes&nbsp;outils</button>
       <button class="ai-btn ghost" id="hist-open">Historique</button>
       <button class="ai-btn" id="ai-open">Bot&nbsp;IA</button>
     </div>
@@ -478,6 +496,20 @@
     <div class="ai-status" id="ai-status"></div>
     <div class="ai-out" id="ai-out"></div>
     <p class="ai-note">⚠️ Idées pédagogiques générées par une IA — pas un conseil financier, aucune garantie. Chaque analyse consomme des tokens (payants) sur ta clé.</p>
+  </div>
+</div>
+
+<div class="overlay" id="tools-overlay">
+  <div class="modal">
+    <button class="modal-close" id="tools-close" aria-label="Fermer">×</button>
+    <h2>⚙️ Mes outils</h2>
+    <p class="sub">Choisis les modules à afficher sur ton tableau de bord. Tes réglages sont mémorisés sur cet appareil (rien n'est envoyé nulle part).</p>
+    <div id="tools-list" class="tools-list"></div>
+    <div class="modal-actions" style="margin-top:6px">
+      <button class="btn" id="tools-all">Tout activer</button>
+      <button class="btn" id="tools-reset">Réinitialiser</button>
+    </div>
+    <p class="ai-note">Astuce : garde seulement les outils que tu utilises pour un tableau de bord épuré. Au moins un onglet reste toujours actif.</p>
   </div>
 </div>
 
@@ -2390,6 +2422,68 @@ function loadQuant(force){
   QUANT.load().then(d=>{ quantLoaded=true; quantLoading=false; renderQuant(d); })
              .catch(()=>{ quantLoading=false; renderQuant(null); });
 }
+
+/* ---------- Sélecteur d'outils (« Mes outils ») ---------- */
+const TOOLS = [
+  { id:'ict',   name:'Signaux ICT / SMC',   desc:'Le bot à règles : structure, FVG, Order Blocks, liquidité, confluence.', kind:'Onglet', type:'view' },
+  { id:'ia',    name:'IA maison',            desc:'Machine learning « force relative » entraîné dans ton navigateur.',      kind:'Onglet', type:'view' },
+  { id:'quant', name:'Quant / Institutionnel', desc:'Panier market-neutral factoriel, à la manière des grands fonds.',      kind:'Onglet', type:'view' },
+  { id:'pro',   name:'Stratégies Pro',       desc:'Méthodes systématiques des fonds (tendance, cassure…) + backtest.',      kind:'Onglet', type:'view' },
+  { id:'botia', name:'Bot IA (Claude)',      desc:'Analyse par l\'API Anthropic — nécessite ta clé (reste en local).',      kind:'Bouton', type:'btn', sel:'#ai-open' },
+  { id:'hist',  name:'Historique',           desc:'Journal des trades proposés par les bots (gagné / perdu).',              kind:'Bouton', type:'btn', sel:'#hist-open' }
+];
+const TOOLS_KEY='tradeassist.tools.v1';
+function toolsState(){ try{ return Object.assign({}, JSON.parse(localStorage.getItem(TOOLS_KEY)||'{}')); }catch(e){ return {}; } }
+function toolEnabled(st,id){ return st[id]!==false; } // activé par défaut
+function saveTools(st){ try{ localStorage.setItem(TOOLS_KEY, JSON.stringify(st)); }catch(e){} }
+function tabBtn(id){ return $(`.viewswitch .vs[data-v="${id}"]`); }
+function applyTools(){
+  const st=toolsState();
+  TOOLS.forEach(t=>{
+    const on=toolEnabled(st,t.id);
+    if(t.type==='view'){ const b=tabBtn(t.id); if(b) b.style.display=on?'':'none'; }
+    else { const b=$(t.sel); if(b) b.style.display=on?'':'none'; }
+  });
+  // Si l'onglet actif est masqué, bascule vers le premier onglet visible.
+  const active=$('.viewswitch .vs.on');
+  if(active && active.style.display==='none'){
+    const first=[...document.querySelectorAll('.viewswitch .vs')].find(b=>b.style.display!=='none');
+    if(first) first.click();
+  }
+}
+function renderToolsList(){
+  const st=toolsState(), wrap=$('#tools-list');
+  const viewsOn = TOOLS.filter(t=>t.type==='view'&&toolEnabled(st,t.id)).length;
+  wrap.innerHTML = TOOLS.map(t=>{
+    const on=toolEnabled(st,t.id);
+    return `<div class="tool-row ${on?'on':''}" data-id="${t.id}" role="button" tabindex="0" aria-pressed="${on}">
+      <div class="tinfo"><div class="tname">${t.name} <span class="tkind">${t.kind}</span></div><div class="tdesc">${t.desc}</div></div>
+      <span class="switch"></span></div>`;
+  }).join('');
+  wrap.querySelectorAll('.tool-row').forEach(row=>{
+    const toggle=()=>{
+      const id=row.dataset.id, st=toolsState(), t=TOOLS.find(x=>x.id===id);
+      const willOff = toolEnabled(st,id);
+      // Empêche de désactiver le dernier onglet visible.
+      if(willOff && t.type==='view'){
+        const remaining=TOOLS.filter(x=>x.type==='view'&&x.id!==id&&toolEnabled(st,x.id)).length;
+        if(remaining===0){ row.animate?.([{transform:'translateX(0)'},{transform:'translateX(-4px)'},{transform:'translateX(4px)'},{transform:'translateX(0)'}],{duration:200}); return; }
+      }
+      st[id]=!willOff; saveTools(st);
+      row.classList.toggle('on', st[id]); row.setAttribute('aria-pressed', st[id]);
+      applyTools();
+    };
+    row.addEventListener('click', toggle);
+    row.addEventListener('keydown', e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); toggle(); } });
+  });
+}
+const toolsOverlay=$('#tools-overlay');
+$('#tools-open').addEventListener('click', ()=>{ renderToolsList(); toolsOverlay.classList.add('open'); });
+$('#tools-close').addEventListener('click', ()=> toolsOverlay.classList.remove('open'));
+toolsOverlay.addEventListener('click', e=>{ if(e.target===toolsOverlay) toolsOverlay.classList.remove('open'); });
+$('#tools-all').addEventListener('click', ()=>{ const st={}; TOOLS.forEach(t=>st[t.id]=true); saveTools(st); renderToolsList(); applyTools(); });
+$('#tools-reset').addEventListener('click', ()=>{ try{ localStorage.removeItem(TOOLS_KEY); }catch(e){} renderToolsList(); applyTools(); });
+applyTools(); // applique les préférences mémorisées au démarrage
 
 /* ---------- IA maison (machine learning dans le navigateur) ---------- */
 let iaLoaded=false, iaLoading=false;

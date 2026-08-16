@@ -65,6 +65,13 @@ risk-parity de Dalio…), calculées sur les vraies bougies journalières et **b
 l'historique dispo (échantillon court, sans frais → indicatif). Une synthèse multi-méthodes
 donne, par actif, le consensus et le régime de marché.
 
+## Sélecteur « Mes outils »
+
+Un bouton **⚙️ Mes outils** (en-tête) ouvre un panneau où tu **actives/désactives** chaque
+module : les 4 onglets (ICT/SMC, IA maison, Quant, Stratégies Pro) et les boutons (Bot IA,
+Historique). Garde seulement ce que tu utilises → tableau de bord épuré. Les réglages sont
+**mémorisés en local** (localStorage), au moins un onglet reste toujours actif.
+
 ## Historique
 
 Chaque trade proposé est enregistré (bot d'origine + motif), puis clôturé au TP (gagné)
