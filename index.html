@@ -178,8 +178,33 @@
   .viewswitch .vs{font:inherit;font-weight:600;font-size:.86rem;padding:8px 16px;border-radius:9px;border:0;
     background:transparent;color:var(--muted);cursor:pointer;transition:.15s}
   .viewswitch .vs.on{background:var(--grad);color:#0a0a12}
+  .viewswitch{flex-wrap:wrap}
   .pro-intro{color:var(--muted);font-size:.9rem;max-width:70ch;margin:0 0 20px;line-height:1.55}
   .pro-warn{color:var(--faint)}
+  /* Bibliothèque (base de connaissances) */
+  .kb-toolbar{margin:0 0 18px}
+  #kb-search{width:100%;max-width:640px;font:inherit;font-size:.95rem;padding:12px 16px;border-radius:12px;
+    border:1px solid var(--border);background:var(--surface);color:var(--ink);outline:none}
+  #kb-search:focus{border-color:color-mix(in srgb,var(--long) 45%,var(--border))}
+  .kb-cats{display:flex;flex-wrap:wrap;gap:7px;margin-top:14px}
+  .kb-cat{font:inherit;font-size:.8rem;font-weight:600;padding:6px 12px;border-radius:99px;cursor:pointer;
+    border:1px solid var(--border);background:var(--surface-2);color:var(--muted);transition:.15s;white-space:nowrap}
+  .kb-cat:hover{color:var(--ink)}
+  .kb-cat.on{background:var(--grad);color:#0a0a12;border-color:transparent}
+  .kb-cat .n{font-family:var(--mono);font-size:.7rem;opacity:.7;margin-left:5px}
+  .kb-count{color:var(--faint);font-size:.82rem;margin:0 0 14px}
+  .kb-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px}
+  .kb-card{border:1px solid var(--border);border-radius:16px;background:var(--surface);padding:16px 17px 17px;
+    display:flex;flex-direction:column;gap:9px}
+  .kb-card h4{font-family:var(--display);font-weight:600;font-size:1rem;margin:0;display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+  .kb-badge{font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);
+    border:1px solid var(--border);border-radius:99px;padding:2px 8px;font-weight:500}
+  .kb-def{color:var(--ink);font-size:.86rem;line-height:1.5;margin:0}
+  .kb-row{font-size:.82rem;line-height:1.5;color:var(--muted);margin:0}
+  .kb-row b{color:var(--ink);font-weight:600}
+  .kb-alias{display:flex;flex-wrap:wrap;gap:5px;margin-top:2px}
+  .kb-tag{font-size:.68rem;color:var(--faint);background:var(--surface-3);border-radius:6px;padding:2px 7px}
+  .kb-empty{color:var(--muted);font-size:.9rem;padding:20px 0}
   .pro-strat{border:1px solid var(--border);border-radius:16px;background:var(--surface);padding:18px 18px 20px;margin-bottom:16px}
   .pro-strat h3{font-family:var(--display);font-weight:600;font-size:1.05rem;margin:0 0 4px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
   .pro-strat .stag{font-family:var(--mono);font-size:.64rem;text-transform:uppercase;letter-spacing:.05em;
@@ -436,6 +461,7 @@
     <button class="vs" data-v="pro">Stratégies Pro</button>
     <button class="vs" data-v="ia">IA maison</button>
     <button class="vs" data-v="quant">Quant / Institutionnel</button>
+    <button class="vs" data-v="kb">📚 Bibliothèque</button>
   </div>
 
   <div id="view-ict">
@@ -465,6 +491,15 @@
   <div id="view-quant" style="display:none">
     <p class="pro-intro">La façon dont travaillent <b>réellement les grands fonds</b> (Renaissance, Two Sigma, Citadel…). On ne prédit pas la direction (pile ou face) : on construit un panier <b>market-neutral</b> — <b>long</b> les plus forts, <b>short</b> les plus faibles — noté sur des <b>facteurs</b> (momentum, tendance, faible volatilité). <span class="pro-warn">On gagne sur l'écart, peu importe que le marché monte ou baisse. La vraie métrique visée : le <b>Sharpe</b> (rendement ÷ risque), pas le win rate.</span></p>
     <div id="quant-body"><div class="hist-empty">⏳ Construction du panier factoriel + backtest market-neutral…</div></div>
+  </div>
+
+  <div id="view-kb" style="display:none">
+    <p class="pro-intro">La <b>base de connaissances</b> du site : tous les concepts de trading, expliqués simplement. <b>ICT, SMC, analyse technique, chandeliers, indicateurs, gestion du risque, psychologie, macro, quant…</b> <span class="pro-warn">C'est la même base à laquelle se réfère le Bot IA (Claude) pour raisonner. Cherche un terme ou explore par catégorie.</span></p>
+    <div class="kb-toolbar">
+      <input type="search" id="kb-search" placeholder="🔎 Rechercher un concept (ex. order block, RSI, liquidité, RR…)" autocomplete="off">
+      <div class="kb-cats" id="kb-cats"></div>
+    </div>
+    <div id="kb-body"><div class="hist-empty">Chargement de la base…</div></div>
   </div>
 </div>
 
@@ -529,6 +564,7 @@
 <input type="file" id="ia-import-file" accept="application/json,.json" style="display:none">
 
 <script src="js/history.js"></script>
+<script src="js/kb.js"></script>
 <script src="js/ai.js"></script>
 <script src="js/pro.js"></script>
 <script src="js/ia.js"></script>
@@ -960,10 +996,57 @@ $('.viewswitch').addEventListener('click', e=>{
   $('#view-pro').style.display   = v==='pro'?'':'none';
   $('#view-ia').style.display    = v==='ia' ?'':'none';
   $('#view-quant').style.display = v==='quant'?'':'none';
+  $('#view-kb').style.display    = v==='kb'?'':'none';
   if(v==='pro') loadPro();
   if(v==='ia')  loadIA();
   if(v==='quant') loadQuant();
+  if(v==='kb')  loadKB();
 });
+
+/* ---------- Bibliothèque (base de connaissances) ---------- */
+let kbInit=false, kbCat='all', kbQuery='';
+function kbEsc(s){ return (s||'').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function kbCatMeta(id){ return (window.KB.CATEGORIES.filter(c=>c.id===id)[0])||{nom:id,emoji:''}; }
+function kbCard(it){
+  const m=kbCatMeta(it.cat);
+  const alias=(it.alias||[]).slice(0,6).map(a=>`<span class="kb-tag">${kbEsc(a)}</span>`).join('');
+  return `<div class="kb-card">
+    <h4>${kbEsc(it.nom)} <span class="kb-badge">${m.emoji} ${kbEsc(m.nom)}</span></h4>
+    <p class="kb-def">${kbEsc(it.def)}</p>
+    <p class="kb-row"><b>Comment s'en servir :</b> ${kbEsc(it.usage)}</p>
+    <p class="kb-row"><b>Signal :</b> ${kbEsc(it.biais)}</p>
+    ${alias?`<div class="kb-alias">${alias}</div>`:''}
+  </div>`;
+}
+function renderKB(){
+  const body=$('#kb-body'); if(!window.KB){ body.innerHTML='<div class="kb-empty">Base indisponible.</div>'; return; }
+  let list;
+  if(kbQuery.trim()){ list=KB.search(kbQuery, 300); }
+  else if(kbCat==='all'){ list=KB.all.slice(); }
+  else { list=KB.byCat(kbCat); }
+  const n=list.length;
+  const head=`<p class="kb-count">${n} concept${n>1?'s':''}${kbQuery.trim()?` pour « ${kbEsc(kbQuery.trim())} »`:kbCat!=='all'?` · ${kbEsc(kbCatMeta(kbCat).nom)}`:''}</p>`;
+  body.innerHTML = head + (n? `<div class="kb-grid">${list.map(kbCard).join('')}</div>` : '<div class="kb-empty">Aucun concept trouvé. Essaie un autre mot (ex. « FVG », « stop », « momentum »).</div>');
+}
+function renderKBCats(){
+  const wrap=$('#kb-cats'); if(!wrap||!window.KB) return;
+  const st=KB.stats();
+  let html=`<button class="kb-cat ${kbCat==='all'?'on':''}" data-c="all">Tout <span class="n">${st.total}</span></button>`;
+  html+=KB.CATEGORIES.map(c=>`<button class="kb-cat ${kbCat===c.id?'on':''}" data-c="${c.id}">${c.emoji} ${kbEsc(c.nom)} <span class="n">${st.parCategorie[c.id]||0}</span></button>`).join('');
+  wrap.innerHTML=html;
+}
+function loadKB(){
+  if(kbInit||!window.KB) return; kbInit=true;
+  renderKBCats(); renderKB();
+  $('#kb-cats').addEventListener('click', e=>{
+    const b=e.target.closest('.kb-cat'); if(!b) return;
+    kbCat=b.dataset.c; kbQuery=''; $('#kb-search').value='';
+    renderKBCats(); renderKB();
+  });
+  let t; $('#kb-search').addEventListener('input', e=>{
+    kbQuery=e.target.value; clearTimeout(t); t=setTimeout(renderKB, 120);
+  });
+}
 
 /* ---------- Quant / Institutionnel (market-neutral factoriel) ---------- */
 let quantLoaded=false, quantLoading=false;
@@ -1026,6 +1109,7 @@ const TOOLS = [
   { id:'ia',    name:'IA maison',            desc:'Machine learning « force relative » entraîné dans ton navigateur.',      kind:'Onglet', type:'view' },
   { id:'quant', name:'Quant / Institutionnel', desc:'Panier market-neutral factoriel, à la manière des grands fonds.',      kind:'Onglet', type:'view' },
   { id:'pro',   name:'Stratégies Pro',       desc:'Méthodes systématiques des fonds (tendance, cassure…) + backtest.',      kind:'Onglet', type:'view' },
+  { id:'kb',    name:'Bibliothèque',         desc:'Base de connaissances : tous les concepts trading (ICT, SMC, AT, risque…).', kind:'Onglet', type:'view' },
   { id:'botia', name:'Bot IA (Claude)',      desc:'Analyse par l\'API Anthropic — nécessite ta clé (reste en local).',      kind:'Bouton', type:'btn', sel:'#ai-open' },
   { id:'hist',  name:'Historique',           desc:'Journal des trades proposés par les bots (gagné / perdu).',              kind:'Bouton', type:'btn', sel:'#hist-open' }
 ];

@@ -53,6 +53,18 @@
       txt += "\n\nDONNÉES MULTI-UNITÉS (D1 → H4 → H1) pour l'alignement top-down :\n" + JSON.stringify(mtf, null, 2);
     }
     txt += "\n\nRÉSUMÉ par paire (toutes paires, dont DXY/forex) :\n" + JSON.stringify(snap, null, 2);
+    // Base de connaissances : on injecte les concepts pertinents pour que
+    // l'IA raisonne sur des définitions cohérentes avec le site (RAG léger).
+    var kb = root.KB;
+    if (kb && typeof kb.contextFor === 'function') {
+      var ref = kb.contextFor(
+        'structure BOS CHoCH MSS FVG order block breaker OTE liquidité balayage ' +
+        'premium discount inducement DXY risque RR stop objectif sessions killzone',
+        18
+      );
+      txt += "\n\nRéfère-toi à cette base de connaissances du site pour rester cohérent " +
+        "dans tes définitions et ton raisonnement :\n" + ref;
+    }
     return txt;
   }
 
