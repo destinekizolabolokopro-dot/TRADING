@@ -684,7 +684,10 @@
     { id: 'macro',    nom: 'Macro & fondamental',         emoji: '🌍' },
     { id: 'session',  nom: 'Sessions & horaires',         emoji: '⏰' },
     { id: 'quant',    nom: 'Quant & statistiques',        emoji: '🔬' },
-    { id: 'produits', nom: 'Produits & marchés',          emoji: '💱' }
+    { id: 'produits', nom: 'Produits & marchés',          emoji: '💱' },
+    { id: 'strat',    nom: 'Stratégies de trading',       emoji: '♟️' },
+    { id: 'wyckoff',  nom: 'Wyckoff',                     emoji: '📉' },
+    { id: 'onchain',  nom: 'Crypto & on-chain',           emoji: '⛓️' }
   ];
 
   // ---------------------------------------------------------------------------
@@ -1193,6 +1196,318 @@
     usage:"On trade le comblement du gap (retour au niveau) ou sa continuation s'il tient sur volume.",
     biais:'contexte — souvent comblé' });
 
+  /* ===================== ICT (compléments avancés) ===================== */
+  add({ id:'crt', nom:'CRT (Candle Range Theory)', alias:['crt','candle range theory','range de bougie'], cat:'ict', tags:['range','manipulation','fractal'],
+    def:"Théorie ICT où chaque grande bougie contient un cycle complet : un range se forme, un balayage d'un côté (manipulation), puis expansion vers l'autre extrême. Fractale du Power of Three.",
+    usage:"On repère le range de la bougie mère, on attend le balayage d'un côté puis on trade l'expansion vers l'extrême opposé.",
+    biais:'cadre directionnel intra-bougie' });
+  add({ id:'unicorn', nom:'Modèle Unicorn (Breaker + FVG)', alias:['unicorn','breaker fvg','unicorn model'], cat:'ict', tags:['confluence','entrée','haute proba'],
+    def:"Setup à haute probabilité où un breaker block et un FVG se chevauchent exactement sur la même zone, après un balayage de liquidité + MSS.",
+    usage:"Entrée dans la zone de recouvrement breaker+FVG ; double confluence = signal plus fiable.",
+    biais:'contexte — entrée haute proba' });
+  add({ id:'bpr', nom:'Balanced Price Range (BPR)', alias:['bpr','balanced price range','fvg opposés'], cat:'ict', tags:['fvg','zone','réaction'],
+    def:"Zone où deux FVG opposés (un haussier et un baissier) se superposent : le prix y a été « équilibré » dans les deux sens, créant une zone de réaction sensible.",
+    usage:"Zone d'entrée/rejet : le prix réagit souvent nettement en revenant sur un BPR.",
+    biais:'contexte — zone de réaction' });
+  add({ id:'cbdr', nom:'CBDR / Range de nuit', alias:['cbdr','central bank dealers range','flout','range de nuit'], cat:'ict', tags:['range','nuit','projection'],
+    def:"Range formé la nuit (heures des dealers de banques centrales, ~14h-20h NY). Ses écarts-types servent à projeter les extrêmes probables de la séance suivante.",
+    usage:"On projette 1-3 écarts-types du CBDR pour anticiper les cibles de la journée.",
+    biais:'cadre — projection de cibles' });
+  add({ id:'std-projection', nom:'Projections en écarts-types (ICT)', alias:['standard deviation','projection écart-type','std dev ict'], cat:'ict', tags:['projection','objectif','range'],
+    def:"Technique ICT : projeter des multiples d'écart-type d'un range (CBDR, range asiatique, FVG) pour estimer jusqu'où le prix peut aller.",
+    usage:"Fixe des objectifs mesurés (-1, -2, -2,5 dev) au lieu de cibles arbitraires.",
+    biais:'objectif — mesuré' });
+  add({ id:'quarterly-theory', nom:'Quarterly Theory / Cycles 90 min', alias:['quarterly theory','90 minute cycles','cycles trimestriels','time theory'], cat:'ict', tags:['temps','cycle','fractal'],
+    def:"Le temps se découpe en quarts fractals (année→trimestres, journée→4 sessions, session→90 min, 90min→22,5min), chacun suivant un cycle Accumulation-Manipulation-Distribution-Continuation.",
+    usage:"On aligne le setup avec le bon quart temporel pour timer l'entrée (souvent le 2ᵉ quart = manipulation).",
+    biais:'cadre — timing fractal' });
+  add({ id:'daily-bias', nom:'Biais journalier (Daily Bias)', alias:['daily bias','biais du jour','direction du jour'], cat:'ict', tags:['biais','htf','direction'],
+    def:"Direction attendue de la journée, déduite du contexte HTF : liquidité prise, FVG à combler, position dans le dealing range, tendance D1.",
+    usage:"On établit le biais AVANT la séance, puis on ne prend que les setups qui vont dans son sens.",
+    biais:'directionnel — cadre du jour' });
+  add({ id:'ict-macros', nom:'ICT Macros (fenêtres algo)', alias:['ict macro','macro times','fenêtres algorithmiques'], cat:'ict', tags:['horaire','algo','liquidité'],
+    def:"Courtes fenêtres (souvent ~20 min, ex. 09h50-10h10 NY) où l'algorithme rechercherait activement la liquidité et rééquilibrerait les FVG.",
+    usage:"On surveille ces fenêtres pour des mouvements dirigés vers la liquidité proche.",
+    biais:'contexte — timing algo' });
+  add({ id:'reclaimed-ob', nom:'Order Block récupéré / Propulsion', alias:['reclaimed order block','propulsion block','ob récupéré'], cat:'ict', tags:['ob','continuation','réentrée'],
+    def:"Order block réactivé après avoir été partiellement traversé puis « repris » par le prix (propulsion), servant de tremplin pour continuer le mouvement.",
+    usage:"Zone de réentrée en continuation quand un OB tient malgré une incursion.",
+    biais:'contexte — continuation' });
+  add({ id:'volume-imbalance', nom:'Volume Imbalance', alias:['volume imbalance','vi','déséquilibre corps'], cat:'ict', tags:['gap corps','déséquilibre','micro'],
+    def:"Petit écart entre la clôture d'une bougie et l'ouverture de la suivante (les corps ne se touchent pas, mais les mèches oui). Micro-déséquilibre à combler.",
+    usage:"Micro-cible de rééquilibrage, utile pour affiner entrées/stops en bas timeframe.",
+    biais:'micro-aimant' });
+
+  /* ===================== Wyckoff ===================== */
+  add({ id:'wyckoff-cycle', nom:'Cycle de Wyckoff', alias:['wyckoff','accumulation distribution','cycle wyckoff'], cat:'wyckoff', tags:['cycle','phases','institutionnel'],
+    def:"Le marché évolue en 4 phases : Accumulation (les mains fortes achètent en range), Hausse (markup), Distribution (elles revendent en range), Baisse (markdown). Base historique du smart money.",
+    usage:"Situer la phase actuelle : on achète en fin d'accumulation, on vend en fin de distribution.",
+    biais:'cadre — cycle de fond' });
+  add({ id:'composite-man', nom:'Composite Man', alias:['composite man','homme composite','main forte'], cat:'wyckoff', tags:['théorie','institutionnel','manipulation'],
+    def:"Métaphore de Wyckoff : imaginer un unique opérateur institutionnel qui manipule le marché de façon logique (accumule bas, distribue haut) pour lire ses intentions.",
+    usage:"On se demande « que ferait la main forte ici ? » pour anticiper les pièges.",
+    biais:'cadre théorique' });
+  add({ id:'spring', nom:'Spring (Ressort)', alias:['spring','ressort','faux plus-bas wyckoff'], cat:'wyckoff', tags:['balayage','retournement','accumulation'],
+    def:"En fin d'accumulation, le prix casse brièvement sous le support pour piéger les vendeurs (balayage), puis remonte vivement : signal haussier fort.",
+    usage:"Entrée longue après le retour au-dessus du support ; équivalent Wyckoff du liquidity sweep haussier.",
+    biais:'retournement haussier' });
+  add({ id:'upthrust', nom:'Upthrust (UTAD)', alias:['upthrust','utad','faux plus-haut wyckoff'], cat:'wyckoff', tags:['balayage','retournement','distribution'],
+    def:"En fin de distribution, le prix casse brièvement au-dessus de la résistance pour piéger les acheteurs, puis rechute : signal baissier fort.",
+    usage:"Entrée courte après le retour sous la résistance ; miroir baissier du spring.",
+    biais:'retournement baissier' });
+  add({ id:'sos-sow', nom:'SOS / SOW (Signes de force/faiblesse)', alias:['sos','sow','sign of strength','sign of weakness'], cat:'wyckoff', tags:['confirmation','volume','phase'],
+    def:"SOS = mouvement large et volumineux prouvant la demande (fin d'accumulation) ; SOW = équivalent baissier prouvant l'offre (fin de distribution).",
+    usage:"Confirmation qu'une phase se termine et que le markup/markdown commence.",
+    biais:'confirmation de phase' });
+
+  /* ===================== Figures harmoniques (compléments) ===================== */
+  add({ id:'quasimodo', nom:'Quasimodo (QM)', alias:['quasimodo','qm','over and under','qml'], cat:'figures', tags:['retournement','smc','structure'],
+    def:"Figure de retournement SMC : un plus-haut est dépassé (prise de liquidité) puis la structure casse dans l'autre sens, dessinant une tête-épaules asymétrique.",
+    usage:"Entrée sur le retour à la QM line (niveau de l'épaule gauche) après la cassure.",
+    biais:'retournement' });
+  add({ id:'harmonics', nom:'Figures harmoniques (Gartley, Bat, Butterfly, Crab)', alias:['harmonic','gartley','bat','butterfly','crab','shark','cypher','harmoniques'], cat:'figures', tags:['fibonacci','ratios','retournement'],
+    def:"Figures en 5 points (XABCD) définies par des ratios de Fibonacci précis. Chaque figure (Gartley 0,786 ; Bat 0,886 ; Butterfly 1,27 ; Crab 1,618) donne une zone de retournement (PRZ).",
+    usage:"On entre dans la PRZ (zone de retournement potentiel) avec stop juste au-delà du point D. Précis mais exigeant.",
+    biais:'retournement — zones Fibonacci' });
+  add({ id:'abcd', nom:'Pattern ABCD', alias:['abcd','ab=cd','pattern abcd'], cat:'figures', tags:['fibonacci','symétrie','projection'],
+    def:"Figure symétrique où la jambe CD reproduit la jambe AB (en distance/temps), souvent avec un retracement BC de 0,618. Base des harmoniques.",
+    usage:"Projeter le point D comme zone de retournement/objectif.",
+    biais:'retournement / objectif' });
+  add({ id:'three-drives', nom:'Trois poussées (Three Drives)', alias:['three drives','trois poussées','trois sommets fibo'], cat:'figures', tags:['épuisement','fibonacci','retournement'],
+    def:"Trois poussées successives vers de nouveaux extrêmes reliées par des retracements Fibonacci symétriques : épuisement de la tendance.",
+    usage:"Signal de retournement après la 3ᵉ poussée, surtout avec divergence.",
+    biais:'retournement' });
+  add({ id:'rectangle', nom:'Rectangle / Range chartiste', alias:['rectangle','range horizontal','box'], cat:'figures', tags:['range','borne','breakout'],
+    def:"Consolidation entre un support et une résistance horizontaux parallèles. Continuation ou retournement selon le sens de sortie.",
+    usage:"On trade les bornes ou la cassure ; objectif = hauteur du rectangle.",
+    biais:'neutre — jusqu’à la sortie' });
+  add({ id:'broadening', nom:'Élargissement (Megaphone)', alias:['broadening','megaphone','élargissement','expanding'], cat:'figures', tags:['volatilité','instabilité'],
+    def:"Figure où les sommets montent et les creux baissent (extrêmes divergents) : volatilité croissante, marché instable et émotionnel.",
+    usage:"Difficile à trader ; souvent signe de sommet de marché. On fade les extrêmes avec prudence.",
+    biais:'instabilité — retournement possible' });
+  add({ id:'island-reversal', nom:'Île de retournement', alias:['island reversal','île de retournement','gap isolé'], cat:'figures', tags:['gap','retournement','isolé'],
+    def:"Groupe de bougies isolé par un gap de chaque côté (un gap à l'entrée, un gap opposé à la sortie) : retournement violent.",
+    usage:"Signal de retournement marqué ; rare mais fiable.",
+    biais:'retournement' });
+
+  /* ===================== Chandeliers (compléments) ===================== */
+  add({ id:'piercing-darkcloud', nom:'Ligne perçante / Couvert en nuage noir', alias:['piercing line','dark cloud cover','ligne perçante','nuage noir'], cat:'chandelier', tags:['retournement','deux bougies'],
+    def:"Ligne perçante (haussière) : bougie qui ouvre sous puis clôture au-dessus de la moitié de la précédente baissière. Nuage noir : miroir baissier.",
+    usage:"Retournement modéré à un niveau ; moins fort que l'avalement.",
+    biais:'retournement' });
+  add({ id:'tweezer', nom:'Pinces (Tweezer top/bottom)', alias:['tweezer','pinces','sommets jumeaux','mèches égales'], cat:'chandelier', tags:['retournement','niveau','mèches'],
+    def:"Deux bougies aux extrêmes (mèches) quasi identiques, marquant un rejet répété du même niveau.",
+    usage:"Confirme un support/résistance et un retournement local.",
+    biais:'retournement' });
+  add({ id:'marubozu', nom:'Marubozu', alias:['marubozu','bougie pleine','sans mèche'], cat:'chandelier', tags:['momentum','conviction'],
+    def:"Grande bougie sans mèche (ou presque) : les acheteurs (ou vendeurs) ont dominé du début à la fin. Forte conviction directionnelle.",
+    usage:"Confirme un momentum puissant ; souvent au cœur d'un déplacement (impulsion).",
+    biais:'continuation forte' });
+  add({ id:'inside-outside-bar', nom:'Inside bar / Outside bar', alias:['inside bar','outside bar','bougie intérieure','englobante'], cat:'chandelier', tags:['compression','expansion','breakout'],
+    def:"Inside bar : bougie entièrement contenue dans la précédente (compression, pause). Outside bar : bougie qui englobe la précédente (expansion, volatilité).",
+    usage:"Inside bar = setup de cassure ; outside bar = signal de retournement/force selon la clôture.",
+    biais:'contexte — compression ou expansion' });
+  add({ id:'dragonfly-gravestone', nom:'Doji libellule / pierre tombale', alias:['dragonfly doji','gravestone doji','libellule','pierre tombale'], cat:'chandelier', tags:['rejet','doji','retournement'],
+    def:"Doji libellule : longue mèche basse, pas de mèche haute (rejet des bas = haussier). Pierre tombale : l'inverse (rejet des hauts = baissier).",
+    usage:"Signal de rejet directionnel à un niveau clé.",
+    biais:'retournement selon le type' });
+
+  /* ===================== Indicateurs (compléments) ===================== */
+  add({ id:'cci', nom:'CCI (Commodity Channel Index)', alias:['cci','commodity channel index'], cat:'indic', tags:['momentum','oscillateur','excès'],
+    def:"Oscillateur mesurant l'écart du prix à sa moyenne. Au-delà de +100/−100 = mouvement fort ou excès selon le contexte.",
+    usage:"Détecter début de tendance (sortie de ±100) ou excès/divergences.",
+    biais:'momentum' });
+  add({ id:'williams-r', nom:'Williams %R', alias:['williams %r','%r','williams'], cat:'indic', tags:['momentum','surachat','oscillateur'],
+    def:"Oscillateur (0 à −100) proche du stochastique : −20 suracheté, −80 survendu.",
+    usage:"Timing de retournement dans les ranges ; peu fiable seul en tendance.",
+    biais:'momentum' });
+  add({ id:'psar', nom:'Parabolic SAR', alias:['parabolic sar','psar','sar','stop and reverse'], cat:'indic', tags:['tendance','trailing','retournement'],
+    def:"Points qui suivent le prix et basculent d'un côté à l'autre : donnent un stop suiveur et un signal de retournement.",
+    usage:"Trailing stop en tendance ; génère beaucoup de faux signaux en range.",
+    biais:'directionnel + trailing' });
+  add({ id:'keltner-donchian', nom:'Canaux de Keltner / Donchian', alias:['keltner','donchian','canaux','breakout channel'], cat:'indic', tags:['volatilité','breakout','canal'],
+    def:"Keltner : canal basé sur l'ATR autour d'une EMA. Donchian : plus-haut/plus-bas des N périodes (base du système Turtle).",
+    usage:"Donchian pour trader les cassures (breakout) ; Keltner combiné à Bollinger pour repérer les squeezes.",
+    biais:'volatilité / breakout' });
+  add({ id:'heikin-ashi', nom:'Heikin Ashi', alias:['heikin ashi','ha','bougies moyennées'], cat:'indic', tags:['lissage','tendance','visuel'],
+    def:"Bougies recalculées (moyennes) qui lissent le bruit et rendent les tendances plus lisibles : suite de bougies pleines sans mèche opposée = tendance forte.",
+    usage:"Rester dans une tendance ; le changement de couleur + mèches signale l'essoufflement. Attention : prix affiché ≠ prix réel.",
+    biais:'directionnel — lissé' });
+  add({ id:'mfi', nom:'MFI (Money Flow Index)', alias:['mfi','money flow index','rsi volumique'], cat:'indic', tags:['volume','momentum','flux'],
+    def:"« RSI pondéré par le volume » (0-100) : mesure la pression d'achat/vente en tenant compte des volumes. >80 suracheté, <20 survendu.",
+    usage:"Divergences prix/MFI plus fiables que le RSI seul car elles intègrent le volume.",
+    biais:'momentum + volume' });
+  add({ id:'renko', nom:'Renko', alias:['renko','briques','filtre bruit'], cat:'indic', tags:['tendance','filtre','prix pur'],
+    def:"Graphique en briques basées uniquement sur le mouvement de prix (pas le temps) : une nouvelle brique n'apparaît qu'après un déplacement fixe. Filtre le bruit.",
+    usage:"Isoler la tendance de fond et les vrais supports/résistances ; peu adapté au timing précis.",
+    biais:'directionnel — filtré' });
+
+  /* ===================== Order flow (compléments) ===================== */
+  add({ id:'market-profile', nom:'Market Profile (TPO)', alias:['market profile','tpo','profil de marché','value area'], cat:'flow', tags:['distribution','value area','auction'],
+    def:"Représentation de la distribution du temps passé à chaque prix (lettres TPO), révélant la value area, le POC et la forme de l'enchère (équilibre vs tendance).",
+    usage:"Trader les retours vers la value area (équilibre) ou les cassures hors value (déséquilibre).",
+    biais:'niveau — équilibre/déséquilibre' });
+  add({ id:'auction-theory', nom:'Théorie de l’enchère', alias:['auction market theory','théorie enchère','équilibre déséquilibre'], cat:'flow', tags:['fondement','value','déséquilibre'],
+    def:"Le marché est une enchère continue cherchant un prix « juste » (équilibre) : il s'y attarde, puis le rejette (déséquilibre) pour chercher un nouveau niveau.",
+    usage:"Cadre mental : acheter le déséquilibre confirmé, fader les excès loin de la valeur.",
+    biais:'cadre — logique de fond' });
+  add({ id:'liquidity-heatmap', nom:'Heatmap de liquidité', alias:['liquidity heatmap','carte de liquidité','clusters de liquidation'], cat:'flow', tags:['liquidation','levier','crypto'],
+    def:"Carte montrant où sont accumulés les ordres de liquidation à effet de levier. Ces amas agissent comme des aimants pour le prix.",
+    usage:"On anticipe les mouvements vers les grosses zones de liquidation (chasse aux stops à grande échelle).",
+    biais:'aimant — cibles de liquidation' });
+  add({ id:'tape-reading', nom:'Lecture du tape (Time & Sales)', alias:['tape reading','time and sales','fil des transactions'], cat:'flow', tags:['micro','vitesse','institutionnel'],
+    def:"Lire le flux brut des transactions exécutées (prix, taille, vitesse) pour sentir l'agressivité acheteuse/vendeuse en temps réel.",
+    usage:"Scalping avancé : détecter accélérations, gros blocs, absorption au niveau du tick.",
+    biais:'micro — agressivité' });
+
+  /* ===================== Gestion du risque (compléments) ===================== */
+  add({ id:'risk-of-ruin', nom:'Risque de ruine', alias:['risk of ruin','risque de ruine','faillite'], cat:'risque', tags:['probabilité','survie','sizing'],
+    def:"Probabilité de perdre tout (ou une part fatale) de son capital compte tenu du win rate, du RR et de la taille de position. Explose quand on risque trop par trade.",
+    usage:"On la maintient quasi nulle en risquant peu par trade (1 %) — c'est la survie avant la performance.",
+    biais:'gestion — survie' });
+  add({ id:'r-multiple', nom:'R-multiple', alias:['r multiple','r','gain en r','unité de risque'], cat:'risque', tags:['mesure','normalisation','journal'],
+    def:"Exprimer chaque résultat en multiples du risque initial (1R = le montant risqué). Un trade qui rapporte 3× le risque = +3R ; un stop touché = −1R.",
+    usage:"Standardise le suivi : on juge la performance en R cumulés, indépendamment des montants.",
+    biais:'mesure — normalise les résultats' });
+  add({ id:'winrate-rr', nom:'Win rate vs RR (seuil de rentabilité)', alias:['win rate rr','taux de réussite','break-even winrate'], cat:'risque', tags:['maths','rentabilité','arbitrage'],
+    def:"Relation clé : plus le RR est élevé, moins il faut de trades gagnants pour être rentable. À RR 2, il suffit de ~34 % de réussite ; à RR 3, ~26 %.",
+    usage:"Choisir sa cible de RR selon son win rate réel (mesuré dans le journal), pas l'inverse.",
+    biais:'maths — arbitrage clé' });
+  add({ id:'max-daily-loss', nom:'Perte journalière max', alias:['max daily loss','stop journalier','limite du jour'], cat:'risque', tags:['discipline','circuit breaker','tilt'],
+    def:"Plafond de perte quotidien (ex. 3 %) au-delà duquel on arrête de trader pour la journée. Coupe les spirales émotionnelles.",
+    usage:"Règle mécanique anti-tilt : atteint = on ferme la plateforme, point.",
+    biais:'gestion — discipline' });
+  add({ id:'portfolio-heat', nom:'Chaleur du portefeuille (Heat)', alias:['portfolio heat','exposition totale','risque agrégé'], cat:'risque', tags:['exposition','agrégat','corrélation'],
+    def:"Somme des risques ouverts simultanément (toutes positions). Même à 1 % chacune, 6 positions corrélées = 6 % de risque réel d'un coup.",
+    usage:"On plafonne la chaleur totale (ex. 3-6 %) et on réduit quand plusieurs paris sont corrélés.",
+    biais:'gestion — exposition globale' });
+  add({ id:'scaling', nom:'Scaling in / out & pyramidage', alias:['scaling in','scaling out','pyramidage','partiels','anti-martingale'], cat:'risque', tags:['exécution','partiels','gestion'],
+    def:"Entrer/sortir en plusieurs fois : scaling in (bâtir la position par paliers), scaling out (prendre des profits partiels), pyramidage (ajouter sur une position gagnante).",
+    usage:"Lisse l'exécution et sécurise des gains ; on n'ajoute JAMAIS sur une position perdante (≠ moyenne à la baisse).",
+    biais:'gestion — exécution' });
+  add({ id:'hedging', nom:'Couverture (Hedging)', alias:['hedging','couverture','protection'], cat:'risque', tags:['protection','corrélation','options'],
+    def:"Prendre une position opposée/corrélée (ou une option) pour neutraliser temporairement le risque d'une position existante.",
+    usage:"Protéger un portefeuille avant un événement à risque sans tout liquider ; a un coût.",
+    biais:'gestion — protection' });
+
+  /* ===================== Psychologie (compléments) ===================== */
+  add({ id:'recency-bias', nom:'Biais de récence', alias:['recency bias','biais de récence'], cat:'psycho', tags:['biais cognitif','mémoire'],
+    def:"Surpondérer les événements récents : après quelques pertes on devient trop craintif, après quelques gains trop confiant.",
+    usage:"Antidote : raisonner sur un large échantillon (le journal), pas sur les 3 derniers trades.",
+    biais:'biais cognitif' });
+  add({ id:'gamblers-fallacy', nom:'Illusion du joueur', alias:['gamblers fallacy','illusion du joueur','loi des séries'], cat:'psycho', tags:['biais cognitif','probabilité'],
+    def:"Croire qu'après plusieurs pertes un gain est « dû » (ou l'inverse). Chaque trade est indépendant : le marché n'a pas de mémoire de tes trades.",
+    usage:"Antidote : garder une taille constante ; ne pas augmenter pour « compenser ».",
+    biais:'biais cognitif' });
+  add({ id:'process-outcome', nom:'Process vs Résultat', alias:['process over outcome','process résultat','bon trade perdant'], cat:'psycho', tags:['état d’esprit','probabilité','constance'],
+    def:"Un bon trade (plan respecté) peut perdre, un mauvais trade (impulsif) peut gagner. Sur un seul trade, le hasard domine ; c'est le process répété qui paie.",
+    usage:"On s'évalue sur la qualité d'exécution, pas sur le P&L d'un trade isolé. Clé de la stabilité mentale.",
+    biais:'état d’esprit — fondamental' });
+  add({ id:'analysis-paralysis', nom:'Paralysie d’analyse', alias:['analysis paralysis','paralysie','trop d’indicateurs'], cat:'psycho', tags:['surcharge','indécision'],
+    def:"Empiler trop d'indicateurs/avis jusqu'à ne plus pouvoir décider — ou toujours trouver une raison de douter.",
+    usage:"Antidote : un plan simple avec 2-3 critères clairs. La confluence, pas la surcharge.",
+    biais:'biais — indécision' });
+
+  /* ===================== Macro (compléments) ===================== */
+  add({ id:'yield-curve', nom:'Courbe des taux / Inversion', alias:['yield curve','courbe des taux','inversion','obligations'], cat:'macro', tags:['obligations','récession','signal'],
+    def:"Écart entre taux courts et longs. Quand elle s'inverse (courts > longs), c'est un signal historique de récession à venir (avec délai).",
+    usage:"Contexte de fond pour le régime risk-on/off ; signal lent, pas de timing.",
+    biais:'contexte macro — récession' });
+  add({ id:'pmi', nom:'PMI / Indices d’activité', alias:['pmi','ism','indices avancés','activité'], cat:'macro', tags:['données','cycle','avancé'],
+    def:"Enquêtes auprès des directeurs d'achat. >50 = expansion, <50 = contraction. Indicateurs avancés du cycle économique.",
+    usage:"Situer le cycle (expansion/ralentissement) qui oriente l'appétit pour le risque.",
+    biais:'contexte — cycle' });
+  add({ id:'qe-qt', nom:'QE / QT (Liquidité des banques centrales)', alias:['qe','qt','quantitative easing','tightening','liquidité'], cat:'macro', tags:['liquidité','bilan','fed'],
+    def:"QE = la banque centrale injecte des liquidités (achète des actifs) → favorable au risque. QT = elle retire des liquidités → défavorable.",
+    usage:"Le régime de liquidité globale est un moteur de fond majeur des actifs risqués (dont crypto).",
+    biais:'contexte macro — liquidité' });
+  add({ id:'opex', nom:'OPEX / Expiration des options', alias:['opex','triple witching','expiration options','quadruple witching'], cat:'session', tags:['options','volatilité','flux'],
+    def:"Jours d'expiration des options (mensuels, et « triple witching » trimestriel) : gros volumes, aimantation du prix vers les strikes majeurs (max pain), volatilité.",
+    usage:"On s'attend à des mouvements liés aux gros strikes et à un regain de volatilité autour de ces dates.",
+    biais:'contexte — flux d’options' });
+
+  /* ===================== Crypto & on-chain ===================== */
+  add({ id:'btc-dominance', nom:'Dominance BTC', alias:['btc dominance','dominance bitcoin','dominance','alt season'], cat:'onchain', tags:['crypto','rotation','altcoins'],
+    def:"Part de la capitalisation totale crypto détenue par le Bitcoin. Sa baisse (avec marché haussier) signale une rotation vers les altcoins (alt season).",
+    usage:"Filtre de rotation : dominance qui monte = privilégier BTC ; qui baisse = les alts surperforment.",
+    biais:'contexte — rotation crypto' });
+  add({ id:'onchain-metrics', nom:'Métriques on-chain (MVRV, SOPR…)', alias:['on-chain','mvrv','sopr','nupl','realized price'], cat:'onchain', tags:['crypto','valorisation','cycle'],
+    def:"Données de la blockchain mesurant profits/pertes latents des détenteurs (MVRV, SOPR, NUPL) et le prix de revient moyen (realized price). Repèrent extrêmes de cycle.",
+    usage:"Situer les sommets/creux de cycle crypto (euphorie vs capitulation) ; contexte de fond, pas du timing court.",
+    biais:'contexte — extrêmes de cycle' });
+  add({ id:'exchange-flows', nom:'Flux vers/depuis les exchanges', alias:['exchange flows','netflow','réserves exchange','stablecoins'], cat:'onchain', tags:['crypto','offre','pression'],
+    def:"Entrées de coins vers les exchanges = pression vendeuse potentielle ; sorties (vers cold wallets) = accumulation. Les réserves de stablecoins = « poudre sèche » prête à acheter.",
+    usage:"Contexte de pression achat/vente : grosses sorties = signal d'accumulation de fond.",
+    biais:'contexte — pression offre/demande' });
+  add({ id:'whale-activity', nom:'Activité des baleines', alias:['whales','baleines','gros portefeuilles','smart money crypto'], cat:'onchain', tags:['crypto','institutionnel','flux'],
+    def:"Suivi des très gros portefeuilles : leurs accumulations/distributions précèdent souvent les mouvements majeurs.",
+    usage:"Indice de positionnement du smart money crypto ; à croiser avec la technique.",
+    biais:'contexte — positionnement' });
+  add({ id:'etf-flows', nom:'Flux des ETF (spot BTC/ETH)', alias:['etf flows','etf spot','flux etf','institutionnels'], cat:'onchain', tags:['crypto','institutionnel','demande'],
+    def:"Entrées/sorties nettes des ETF spot crypto : mesurent la demande institutionnelle réelle. De fortes entrées soutiennent le prix.",
+    usage:"Baromètre de la demande institutionnelle ; entrées soutenues = biais de fond haussier.",
+    biais:'contexte — demande institutionnelle' });
+
+  /* ===================== Produits & marchés (compléments) ===================== */
+  add({ id:'order-types', nom:'Types d’ordres', alias:['order types','limit','market','stop','oco','iceberg','ordre limite'], cat:'produits', tags:['exécution','base','plateforme'],
+    def:"Marché (exécution immédiate, subit le spread/slippage), Limite (prix fixé, exécution non garantie), Stop (déclenché à un niveau), OCO (l'un annule l'autre), Iceberg (gros ordre masqué).",
+    usage:"On privilégie les ordres limites pour maîtriser le prix d'entrée ; les stops pour la protection automatique.",
+    biais:'exécution — outils de base' });
+  add({ id:'options-greeks', nom:'Options & Grecques (Delta/Gamma/Theta/Vega)', alias:['options','greeks','delta','gamma','theta','vega','calls','puts'], cat:'produits', tags:['dérivés','volatilité','couverture'],
+    def:"Options = droit d'acheter (call) / vendre (put) à un prix. Les grecques mesurent la sensibilité : Delta (au prix), Gamma (au delta), Theta (au temps), Vega (à la volatilité).",
+    usage:"Spéculer avec risque défini, se couvrir, ou jouer la volatilité. Le gamma des market makers influence aussi le spot (gamma exposure).",
+    biais:'dérivés — outils avancés' });
+  add({ id:'contango-backwardation', nom:'Contango / Backwardation', alias:['contango','backwardation','structure à terme','basis'], cat:'produits', tags:['futures','structure','coût'],
+    def:"Contango : les contrats à terme cotent plus cher que le spot (marché normal, coût de portage). Backwardation : à terme moins cher que le spot (tension sur l'offre).",
+    usage:"Impacte le coût de roulement des positions à terme et signale l'état de l'offre/demande.",
+    biais:'contexte — structure des futures' });
+  add({ id:'margin-call', nom:'Appel de marge / Liquidation', alias:['margin call','appel de marge','marge de maintenance'], cat:'produits', tags:['levier','risque','marge'],
+    def:"Quand les pertes érodent la marge sous le seuil de maintenance, le courtier exige des fonds ou liquide la position de force.",
+    usage:"À éviter absolument : garder une marge tampon large, ne jamais utiliser le levier maximal.",
+    biais:'risque — à prévenir' });
+
+  /* ===================== Stratégies de trading ===================== */
+  add({ id:'styles', nom:'Styles de trading (Scalp/Day/Swing/Position)', alias:['scalping','day trading','swing trading','position trading','horizon'], cat:'strat', tags:['horizon','style','base'],
+    def:"Scalping (secondes-minutes), Day trading (intraday, clôturé le soir), Swing (jours-semaines), Position (semaines-mois). Plus l'horizon est court, plus il faut de temps d'écran et de discipline.",
+    usage:"Choisir le style adapté à sa disponibilité et son tempérament. Le site vise le swing/day sur H1-D1.",
+    biais:'cadre — choix d’horizon' });
+  add({ id:'trend-following', nom:'Suivi de tendance', alias:['trend following','suivi de tendance','momentum trading'], cat:'strat', tags:['tendance','laisser courir','systématique'],
+    def:"Entrer dans le sens d'une tendance établie et la suivre jusqu'à son épuisement, avec stop suiveur. Peu de trades gagnants mais gros gains (asymétrie).",
+    usage:"On accepte beaucoup de petites pertes en échange de quelques grosses tendances. Discipline du trailing stop essentielle.",
+    biais:'stratégie — tendance' });
+  add({ id:'breakout-trading', nom:'Trading de cassure (Breakout)', alias:['breakout','cassure','sortie de range','retest'], cat:'strat', tags:['range','volume','momentum'],
+    def:"Entrer quand le prix casse un niveau clé (range, figure) sur volume, pariant sur la continuation. Le retest du niveau cassé offre une entrée plus sûre.",
+    usage:"On filtre les faux breakouts par le volume et l'attente d'une clôture confirmée / d'un retest.",
+    biais:'stratégie — cassure' });
+  add({ id:'range-trading', nom:'Trading de range', alias:['range trading','mean reversion range','achat bas vente haut'], cat:'strat', tags:['range','borne','contrarian'],
+    def:"Dans un marché latéral, acheter le support et vendre la résistance en pariant sur le rebond. Opposé du breakout.",
+    usage:"Fonctionne tant que le range tient ; on coupe vite si le niveau cède (cassure).",
+    biais:'stratégie — range' });
+  add({ id:'dca', nom:'DCA (Dollar Cost Averaging)', alias:['dca','dollar cost averaging','achats programmés','lissage'], cat:'strat', tags:['investissement','long terme','discipline'],
+    def:"Investir un montant fixe à intervalles réguliers quel que soit le prix, pour lisser le prix d'entrée dans le temps. Approche d'investissement, pas de trading.",
+    usage:"Réduit le risque de mal timer le marché sur le long terme ; populaire en crypto.",
+    biais:'stratégie — investissement' });
+  add({ id:'carry-trade', nom:'Carry trade', alias:['carry trade','portage','différentiel de taux'], cat:'strat', tags:['taux','forex','rendement'],
+    def:"Emprunter dans une devise à faible taux pour placer dans une à taux élevé, en encaissant le différentiel (le carry). Risque : un retournement violent efface des mois de carry.",
+    usage:"Stratégie forex/macro ; sensible aux crises (débouclage brutal en risk-off).",
+    biais:'stratégie — rendement' });
+  add({ id:'arbitrage', nom:'Arbitrage', alias:['arbitrage','arb','écart de prix','funding arb'], cat:'strat', tags:['sans risque','écart','institutionnel'],
+    def:"Exploiter un écart de prix du même actif entre deux marchés (ou spot vs futures) pour un gain quasi sans risque directionnel. Les écarts sont minuscules et disparaissent vite.",
+    usage:"Réservé aux acteurs rapides/automatisés ; en crypto, l'arbitrage de funding est courant.",
+    biais:'stratégie — écart' });
+  add({ id:'grid-martingale', nom:'Grid & Martingale (⚠️ risqué)', alias:['grid trading','martingale','grille','doubler la mise'], cat:'strat', tags:['danger','automatisé','ruine'],
+    def:"Grid : placer des ordres en grille pour profiter des oscillations. Martingale : doubler la mise après chaque perte. La martingale mène statistiquement à la ruine sur une longue série.",
+    usage:"À manier avec extrême prudence : ces approches cachent le risque et explosent en tendance forte. Le site déconseille la martingale.",
+    biais:'stratégie — haut risque' });
+  add({ id:'confluence', nom:'Confluence', alias:['confluence','alignement','faisceau','a+'], cat:'strat', tags:['probabilité','filtre','setup'],
+    def:"Superposition de plusieurs signaux indépendants au même endroit (ex. OB + FVG + niveau Fibo + liquidité + biais HTF). Plus il y a de confluence, plus la probabilité monte.",
+    usage:"Cœur de la sélection : ne prendre que les setups « A+ » riches en confluence, ignorer les signaux isolés. Le site affiche un score de confluence.",
+    biais:'stratégie — filtre de qualité' });
+  add({ id:'checklist', nom:'Checklist de trade', alias:['checklist','plan d’entrée','critères','pré-trade'], cat:'strat', tags:['discipline','process','filtre'],
+    def:"Liste de critères à valider AVANT chaque entrée : biais HTF, zone d'intérêt, confirmation, RR ≥ objectif, taille calculée, événement macro à venir ?",
+    usage:"Passe-plat anti-impulsivité : si un critère manque, pas de trade. Transforme le trading en process reproductible.",
+    biais:'stratégie — discipline' });
+
   // ---------------------------------------------------------------------------
   // MOTEUR DE RECHERCHE + API
   // ---------------------------------------------------------------------------
@@ -1267,6 +1582,25 @@
     return { total: C.length, parCategorie: parCat };
   }
 
+  // Digest COMPLET et compact de TOUTE la base, groupé par catégorie.
+  // Sert à donner à l'IA l'intégralité du vocabulaire du site en un bloc
+  // dense (nom : définition + signal), sans exploser le nombre de tokens.
+  function digest() {
+    var out = "BASE DE CONNAISSANCES COMPLÈTE DU SITE (" + C.length +
+      " concepts). Utilise ce vocabulaire et ces définitions comme référence " +
+      "pour toute ton analyse — c'est la méthode maison du site.\n";
+    CATEGORIES.forEach(function (cat) {
+      var items = byCat(cat.id);
+      if (!items.length) return;
+      out += "\n## " + cat.emoji + " " + cat.nom + "\n";
+      items.forEach(function (it) {
+        out += "- " + it.nom + " : " + it.def +
+          " (Signal : " + it.biais + ")\n";
+      });
+    });
+    return out;
+  }
+
   root.KB = {
     CATEGORIES: CATEGORIES,
     all: C,
@@ -1274,6 +1608,7 @@
     byCat: byCat,
     search: search,
     contextFor: contextFor,
+    digest: digest,
     stats: stats
   };
 })(typeof window !== 'undefined' ? window : this);
@@ -1335,17 +1670,13 @@
       txt += "\n\nDONNÉES MULTI-UNITÉS (D1 → H4 → H1) pour l'alignement top-down :\n" + JSON.stringify(mtf, null, 2);
     }
     txt += "\n\nRÉSUMÉ par paire (toutes paires, dont DXY/forex) :\n" + JSON.stringify(snap, null, 2);
-    // Base de connaissances : on injecte les concepts pertinents pour que
-    // l'IA raisonne sur des définitions cohérentes avec le site (RAG léger).
+    // Base de connaissances : on injecte TOUTE la base (digest complet) pour
+    // que l'IA raisonne sur les définitions et la méthode maison du site.
     var kb = root.KB;
-    if (kb && typeof kb.contextFor === 'function') {
-      var ref = kb.contextFor(
-        'structure BOS CHoCH MSS FVG order block breaker OTE liquidité balayage ' +
-        'premium discount inducement DXY risque RR stop objectif sessions killzone',
-        18
-      );
-      txt += "\n\nRéfère-toi à cette base de connaissances du site pour rester cohérent " +
-        "dans tes définitions et ton raisonnement :\n" + ref;
+    if (kb && typeof kb.digest === 'function') {
+      txt += "\n\n" + kb.digest();
+    } else if (kb && typeof kb.contextFor === 'function') {
+      txt += "\n\n" + kb.contextFor('ICT SMC structure liquidité risque', 20);
     }
     return txt;
   }
