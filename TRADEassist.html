@@ -1238,6 +1238,43 @@
     usage:"Micro-cible de rééquilibrage, utile pour affiner entrées/stops en bas timeframe.",
     biais:'micro-aimant' });
 
+  add({ id:'displacement', nom:'Displacement (Déplacement)', alias:['displacement','déplacement','impulsion','expansion énergique'], cat:'ict', tags:['impulsion','fvg','intention'],
+    def:"Mouvement impulsif, énergique et vertical qui révèle l'intention institutionnelle. Un vrai displacement laisse presque toujours un Fair Value Gap dans son sillage et casse la structure.",
+    usage:"C'est le déclencheur clé : on ne valide un MSS/BOS que s'il est accompagné d'un displacement (sinon la cassure est suspecte). Le FVG qu'il crée devient la zone d'entrée.",
+    biais:'confirmation — révèle l’intention directionnelle' });
+  add({ id:'dol', nom:'Draw on Liquidity (DOL)', alias:['dol','draw on liquidity','aimant de liquidité','cible'], cat:'ict', tags:['cible','liquidité','objectif'],
+    def:"La cible vers laquelle le prix est « aspiré » : le pool de liquidité le plus probable que le marché cherche à atteindre (un plus-haut/bas évident, des equal highs/lows, un FVG à combler).",
+    usage:"On définit le DOL AVANT d'entrer : c'est l'objectif logique du trade. Tout setup doit pointer vers un DOL clair, sinon on s'abstient.",
+    biais:'directionnel — indique la cible' });
+  add({ id:'model-2022', nom:'Modèle ICT 2022', alias:['2022 model','modèle 2022','mentorship 2022','ict 2022'], cat:'ict', tags:['modèle','setup complet','journalier'],
+    def:"Modèle phare d'ICT : biais journalier HTF → balayage de liquidité dans une killzone (Londres ou New York) → displacement qui laisse un FVG → entrée sur le retour au FVG → objectif au pool de liquidité opposé.",
+    usage:"Cadre d'exécution clé en main : biais, timing (killzone), déclencheur (sweep + FVG), entrée, cible. Le squelette de la plupart des trades ICT modernes.",
+    biais:'modèle — setup directionnel complet' });
+  add({ id:'mmxm', nom:'Market Maker Model (achat/vente)', alias:['mmxm','mmbm','mmsm','market maker buy model','market maker sell model','modèle teneur de marché'], cat:'ict', tags:['cycle','institutionnel','profil'],
+    def:"Profil complet d'un cycle de teneur de marché : consolidation, phase de contrat (accumulation d'un côté), retournement (smart money reversal), puis phase d'expansion (redistribution) vers la liquidité opposée. MMBM = version haussière, MMSM = baissière.",
+    usage:"Grille de lecture d'un swing entier : repérer où l'on est dans le cycle du teneur de marché pour anticiper le retournement et la cible.",
+    biais:'cadre — cycle directionnel complet' });
+  add({ id:'smr', nom:'Smart Money Reversal (SMR)', alias:['smr','smart money reversal','retournement smart money'], cat:'ict', tags:['retournement','sweep','mss'],
+    def:"Point de bascule du market maker model : un balayage de liquidité à un extrême suivi d'un displacement qui casse la structure (MSS) — le moment précis où le smart money inverse le marché.",
+    usage:"Signal de retournement majeur : on entre après le sweep + MSS, en visant le DOL opposé.",
+    biais:'retournement — bascule majeure' });
+  add({ id:'ref-levels', nom:'Niveaux de référence (PDH/PDL, PWH/PWL)', alias:['pdh','pdl','pwh','pwl','previous day high low','previous week high low','plus-haut de la veille'], cat:'ict', tags:['liquidité','niveau','référence'],
+    def:"Plus-haut/plus-bas de la veille (PDH/PDL), de la semaine (PWH/PWL) ou du mois (PMH/PML). Ce sont des pools de liquidité évidents et très surveillés que le marché va souvent chercher.",
+    usage:"Cibles de balayage et niveaux pivots : au-dessus du PDH = liquidité côté achat, sous le PDL = liquidité côté vente. Servent de DOL naturels.",
+    biais:'niveau — liquidité de référence' });
+  add({ id:'weekly-profiles', nom:'Profils hebdomadaires ICT', alias:['weekly profiles','profils hebdo','seek and destroy','classic buy day','wednesday low'], cat:'ict', tags:['temps','semaine','template'],
+    def:"Modèles récurrents de la semaine : le plus-bas (marché haussier) ou plus-haut (baissier) hebdo se forme souvent en début de semaine (mardi/mercredi de Londres), avant l'expansion. « Seek & destroy » = semaine sans direction qui chasse les deux côtés.",
+    usage:"Anticiper le jour probable du point d'extrême hebdomadaire pour timer les entrées de swing.",
+    biais:'cadre — timing hebdomadaire' });
+  add({ id:'institutional-orderflow', nom:'Flux d’ordres institutionnel', alias:['institutional order flow','order flow institutionnel','biais de flux'], cat:'ict', tags:['biais','htf','direction'],
+    def:"Direction sous-jacente imposée par les gros acteurs, lisible via la séquence FVG/OB respectés et la structure HTF. Tant que les FVG haussiers tiennent, le flux est haussier (et inversement).",
+    usage:"Filtre directionnel : on ne trade que dans le sens du flux institutionnel tant qu'il n'est pas invalidé par un displacement opposé.",
+    biais:'directionnel — biais de fond' });
+  add({ id:'gap-types', nom:'Types de gaps (breakaway/runaway/exhaustion)', alias:['breakaway gap','runaway gap','exhaustion gap','common gap','gaps chartistes'], cat:'figures', tags:['gap','tendance','signal'],
+    def:"Breakaway (cassure d'une zone, début de tendance, tient), Runaway/measuring (au milieu d'une tendance, la confirme), Exhaustion (en fin de tendance, signale l'essoufflement et se comble vite), Common (dans le bruit, sans signification).",
+    usage:"Identifier le type de gap situe où l'on est dans la tendance : breakaway = suivre, exhaustion = se méfier/fader.",
+    biais:'contexte — position dans la tendance' });
+
   /* ===================== Wyckoff ===================== */
   add({ id:'wyckoff-cycle', nom:'Cycle de Wyckoff', alias:['wyckoff','accumulation distribution','cycle wyckoff'], cat:'wyckoff', tags:['cycle','phases','institutionnel'],
     def:"Le marché évolue en 4 phases : Accumulation (les mains fortes achètent en range), Hausse (markup), Distribution (elles revendent en range), Baisse (markdown). Base historique du smart money.",
