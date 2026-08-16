@@ -218,6 +218,30 @@
   .how-step b{color:var(--ink)}
   .how-n{flex:none;width:28px;height:28px;border-radius:99px;background:var(--grad);color:#0a0a12;
     font-weight:700;font-size:.9rem;display:flex;align-items:center;justify-content:center;margin-top:1px}
+  /* Badges d'identité des 2 IA */
+  .vs-tag{font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;
+    padding:1px 6px;border-radius:99px;margin-left:5px;vertical-align:middle}
+  .vs-tag.ext{background:color-mix(in srgb,var(--iris,#7c6cff) 26%,transparent);color:#c9c2ff}
+  .vs-tag.local{background:var(--long-dim);color:var(--long)}
+  .vs.on .vs-tag.local{background:rgba(10,10,18,.16);color:#0a0a12}
+  /* Comparatif des 2 IA (fenêtre d'accueil) */
+  .duo{margin:4px 0 16px;padding:13px 14px;border:1px solid var(--border);border-radius:14px;background:var(--surface-2)}
+  .duo-head{font-weight:700;font-size:.9rem;margin-bottom:11px}
+  .duo-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+  .duo-card{border:1px solid var(--border);border-radius:12px;padding:11px 12px;background:var(--surface)}
+  .duo-card.ext{border-color:color-mix(in srgb,var(--iris,#7c6cff) 40%,var(--border))}
+  .duo-card.local{border-color:color-mix(in srgb,var(--long) 38%,var(--border))}
+  .duo-title{font-weight:700;font-size:.9rem;margin-bottom:8px;display:flex;align-items:center;flex-wrap:wrap}
+  .duo-card ul{margin:0;padding-left:16px;display:flex;flex-direction:column;gap:5px}
+  .duo-card li{font-size:.79rem;line-height:1.4;color:var(--muted)}
+  .duo-card li b{color:var(--ink)}
+  /* Bandeau d'identité en haut d'une vue IA */
+  .ident{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 14px;font-size:.8rem}
+  .ident-badge{font-weight:700;padding:4px 11px;border-radius:99px;white-space:nowrap}
+  .ident.ext .ident-badge{background:color-mix(in srgb,var(--iris,#7c6cff) 22%,transparent);color:#c9c2ff}
+  .ident.local .ident-badge{background:var(--long-dim);color:var(--long)}
+  .ident-vs{color:var(--faint)}
+  @media(max-width:560px){ .duo-grid{grid-template-columns:1fr} }
   .pro-strat{border:1px solid var(--border);border-radius:16px;background:var(--surface);padding:18px 18px 20px;margin-bottom:16px}
   .pro-strat h3{font-family:var(--display);font-weight:600;font-size:1.05rem;margin:0 0 4px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
   .pro-strat .stag{font-family:var(--mono);font-size:.64rem;text-transform:uppercase;letter-spacing:.05em;
@@ -436,7 +460,7 @@
       <span class="clock" id="clock">--:--:--</span>
       <button class="ai-btn ghost" id="tools-open">⚙️&nbsp;Mes&nbsp;outils</button>
       <button class="ai-btn ghost" id="hist-open">Historique</button>
-      <button class="ai-btn" id="ai-open">Bot&nbsp;IA</button>
+      <button class="ai-btn" id="ai-open">🤖&nbsp;Bot&nbsp;IA <span class="vs-tag ext">Claude</span></button>
     </div>
   </div>
 </header>
@@ -470,10 +494,10 @@
   </section>
 
   <div class="viewswitch">
-    <button class="vs on" data-v="ict">Signaux ICT / SMC</button>
-    <button class="vs" data-v="pro">Stratégies Pro</button>
-    <button class="vs" data-v="ia">IA maison</button>
-    <button class="vs" data-v="quant">Quant / Institutionnel</button>
+    <button class="vs on" data-v="ict">🎯 Signaux ICT / SMC</button>
+    <button class="vs" data-v="pro">♟️ Stratégies Pro</button>
+    <button class="vs" data-v="ia">🧠 IA maison <span class="vs-tag local">locale</span></button>
+    <button class="vs" data-v="quant">🏛️ Quant</button>
     <button class="vs" data-v="kb">📚 Bibliothèque</button>
   </div>
 
@@ -497,6 +521,7 @@
   </div>
 
   <div id="view-ia" style="display:none">
+    <div class="ident local"><span class="ident-badge">🧠 IA maison · locale &amp; gratuite</span> <span class="ident-vs">≠ le 🤖 Bot IA (Claude), qui est une intelligence externe payante</span></div>
     <p class="pro-intro">Un <b>vrai modèle de machine learning qui tourne chez toi</b>, dans cette page — pas une IA externe. Plutôt que de deviner « ça va monter » (pile ou face), il apprend une question <b>réellement exploitable</b> : <b>quels actifs vont être plus forts que le panier</b> (momentum relatif). <span class="pro-warn">Il s'entraîne tout seul à chaque ouverture sur 14 actifs, se souvient d'une fois sur l'autre, et note ses propres prédictions passées.</span></p>
     <div id="ia-body"><div class="hist-empty">⏳ L'IA maison récupère les vraies bougies et s'entraîne…</div></div>
   </div>
@@ -524,6 +549,7 @@
   <div class="modal">
     <button class="modal-close" id="ai-close" aria-label="Fermer">×</button>
     <h2>Bot IA <span style="color:var(--faint);font-weight:400">— propulsé par Claude</span></h2>
+    <div class="ident ext"><span class="ident-badge">🤖 Bot IA · intelligence externe (Claude)</span> <span class="ident-vs">≠ l'🧠 IA maison locale &amp; gratuite de l'onglet dédié</span></div>
     <p class="sub">Claude analyse les vraies bougies <b>H1/H4/D1</b> en s'appuyant sur <b>toute la bibliothèque du site (214 concepts ICT/SMC & co)</b>, puis envoie ses meilleures idées de trade. Ta clé reste <b>sur ton ordinateur</b>.</p>
     <div class="ai-steps">
       <span class="ai-step"><b>1</b> Crée une clé sur <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com&nbsp;↗</a> (+ un peu de crédit)</span>
@@ -562,6 +588,29 @@
       <div class="how-step"><span class="how-n">2</span><div><b>Explore les autres angles</b> — <b>Stratégies Pro</b>, <b>IA maison</b> (un modèle entraîné dans ton navigateur) et <b>Quant</b> (panier market-neutral) donnent chacun un avis indépendant.</div></div>
       <div class="how-step"><span class="how-n">3</span><div><b>Apprends dans la 📚 Bibliothèque</b> — 214 concepts de trading (ICT, SMC, chandeliers, risque, psycho…) expliqués simplement. Cherche n'importe quel terme.</div></div>
       <div class="how-step"><span class="how-n">4</span><div><b>Active le Bot IA (Claude)</b> — le plus puissant : il analyse les vraies bougies <b>avec toute la bibliothèque</b> et propose ses meilleurs trades. Il te faut une clé API (2 min à créer).</div></div>
+    </div>
+    <div class="duo">
+      <div class="duo-head">🤝 Deux IA différentes — ne les confonds pas</div>
+      <div class="duo-grid">
+        <div class="duo-card ext">
+          <div class="duo-title">🤖 Bot IA <span class="vs-tag ext">Claude</span></div>
+          <ul>
+            <li>Cerveau <b>expert externe</b> (cloud Anthropic)</li>
+            <li>Raisonne avec <b>toute la bibliothèque (214 concepts)</b></li>
+            <li>Rédige de <b>vraies idées de trade</b> (entrée/stop/objectif)</li>
+            <li>Besoin d'une <b>clé API</b> · payant à l'usage</li>
+          </ul>
+        </div>
+        <div class="duo-card local">
+          <div class="duo-title">🧠 IA maison <span class="vs-tag local">locale</span></div>
+          <ul>
+            <li>Vrai modèle <b>qui tourne dans ton navigateur</b></li>
+            <li><b>100 % gratuit</b>, aucune clé, rien n'est envoyé</li>
+            <li><b>S'entraîne seul</b> &amp; apprend de ses erreurs (momentum relatif)</li>
+            <li>Donne une <b>tendance statistique</b>, pas un trade rédigé</li>
+          </ul>
+        </div>
+      </div>
     </div>
     <div class="modal-actions" style="margin-top:4px">
       <button class="btn btn-primary" id="how-signals">Voir les signaux</button>
@@ -1159,12 +1208,12 @@ function loadQuant(force){
 
 /* ---------- Sélecteur d'outils (« Mes outils ») ---------- */
 const TOOLS = [
-  { id:'ict',   name:'Signaux ICT / SMC',   desc:'Le bot à règles : structure, FVG, Order Blocks, liquidité, confluence.', kind:'Onglet', type:'view' },
-  { id:'ia',    name:'IA maison',            desc:'Machine learning « force relative » entraîné dans ton navigateur.',      kind:'Onglet', type:'view' },
-  { id:'quant', name:'Quant / Institutionnel', desc:'Panier market-neutral factoriel, à la manière des grands fonds.',      kind:'Onglet', type:'view' },
-  { id:'pro',   name:'Stratégies Pro',       desc:'Méthodes systématiques des fonds (tendance, cassure…) + backtest.',      kind:'Onglet', type:'view' },
-  { id:'kb',    name:'Bibliothèque',         desc:'Base de connaissances : tous les concepts trading (ICT, SMC, AT, risque…).', kind:'Onglet', type:'view' },
-  { id:'botia', name:'Bot IA (Claude)',      desc:'Analyse par l\'API Anthropic — nécessite ta clé (reste en local).',      kind:'Bouton', type:'btn', sel:'#ai-open' },
+  { id:'ict',   name:'🎯 Signaux ICT / SMC',   desc:'Le bot à règles : structure, FVG, Order Blocks, liquidité, confluence.', kind:'Onglet', type:'view' },
+  { id:'ia',    name:'🧠 IA maison (locale)',   desc:'Modèle ML gratuit entraîné dans ton navigateur — s\'améliore tout seul.',  kind:'Onglet', type:'view' },
+  { id:'quant', name:'🏛️ Quant / Institutionnel', desc:'Panier market-neutral factoriel, à la manière des grands fonds.',      kind:'Onglet', type:'view' },
+  { id:'pro',   name:'♟️ Stratégies Pro',       desc:'Méthodes systématiques des fonds (tendance, cassure…) + backtest.',      kind:'Onglet', type:'view' },
+  { id:'kb',    name:'📚 Bibliothèque',         desc:'Base de connaissances : tous les concepts trading (ICT, SMC, AT, risque…).', kind:'Onglet', type:'view' },
+  { id:'botia', name:'🤖 Bot IA (Claude, externe)', desc:'Intelligence externe via l\'API Anthropic — nécessite ta clé (reste en local).', kind:'Bouton', type:'btn', sel:'#ai-open' },
   { id:'hist',  name:'Historique',           desc:'Journal des trades proposés par les bots (gagné / perdu).',              kind:'Bouton', type:'btn', sel:'#hist-open' }
 ];
 const TOOLS_KEY='tradeassist.tools.v1';
