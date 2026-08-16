@@ -1186,6 +1186,30 @@
   }
   function predictOne(x, w, s) { var xs = applyStd(x, s), z = w.b || 0; for (var j = 0; j < NF; j++) z += w[j] * xs[j]; return sigmoid(z); }
 
+  // ---- Calibration (Platt scaling) : que "64 %" veuille VRAIMENT dire 64 % ------
+  // On ajuste p_calibrée = sigmoid(a·logit(p) + b) sur les prédictions d'entraînement, pour que
+  // la probabilité affichée colle à la fréquence réelle. Ne change pas le classement, juste l'échelle.
+  function logit(p) { p = Math.min(0.9999, Math.max(0.0001, p)); return Math.log(p / (1 - p)); }
+  function fitPlatt(ps, ys) {
+    var a = 1, b = 0, lr = 0.3, n = ps.length; if (n < 30) return { a: 1, b: 0 };
+    for (var ep = 0; ep < 400; ep++) {
+      var ga = 0, gb = 0;
+      for (var i = 0; i < n; i++) { var L = logit(ps[i]), q = sigmoid(a * L + b), e = q - ys[i]; ga += e * L; gb += e; }
+      a -= lr * ga / n; b -= lr * gb / n;
+    }
+    return { a: a, b: b };
+  }
+  function applyCal(p, cal) { return cal ? sigmoid(cal.a * logit(p) + cal.b) : p; }
+  // Erreur de calibration attendue (ECE) : écart moyen entre proba prédite et fréquence réelle,
+  // par tranches de 10 %. 0 % = parfaitement calibré. Sert d'indicateur de fiabilité honnête.
+  function ece(pairs) {
+    var bins = []; for (var k = 0; k < 10; k++) bins.push({ sp: 0, sy: 0, n: 0 });
+    pairs.forEach(function (pr) { var b = Math.min(9, Math.floor(pr.p * 10)); bins[b].sp += pr.p; bins[b].sy += pr.y; bins[b].n++; });
+    var N = pairs.length, e = 0;
+    bins.forEach(function (b) { if (b.n) e += b.n / N * Math.abs(b.sp / b.n - b.sy / b.n); });
+    return Math.round(e * 100);
+  }
+
   // Walk-forward STRICT PAR ACTIF (zéro fuite temporelle) : à chaque coupe, on entraîne sur
   // le PASSÉ de tous les actifs, puis on teste sur le FUTUR de chaque actif. C'est le test le
   // plus honnête possible — il révèle le vrai niveau (souvent proche du pile ou face, 50 %).
@@ -1196,6 +1220,7 @@
     var assets = perAsset.filter(function (a) { return a.X.length >= 200; });
     if (assets.length < 3) return null;
     var folds = 4, margin = 0.07, correct = 0, tested = 0, base = 0, corrC = 0, cov = 0;
+    var calPairsRaw = [], calPairsCal = [];
     for (var f = 1; f <= folds; f++) {
       var frac = f / (folds + 1), nextFrac = (f + 1) / (folds + 1);
       var Xtr = [], ytr = [];
@@ -1206,14 +1231,18 @@
       if (Xtr.length < 300) continue;
       var s = standardize(Xtr), Xs = Xtr.map(function (x) { return applyStd(x, s); });
       var w = train(Xs, ytr, null, 180);
+      // Calibration ajustée sur le TRAIN (jamais sur le test) puis appliquée au test.
+      var trProbs = Xs.map(function (x) { var z = w.b; for (var j = 0; j < NF; j++) z += w[j] * x[j]; return sigmoid(z); });
+      var cal = fitPlatt(trProbs, ytr);
       var ones = ytr.reduce(function (a, b) { return a + b; }, 0), maj = ones >= ytr.length / 2 ? 1 : 0;
       assets.forEach(function (a) {
         var lo = Math.floor(a.X.length * frac), hi = Math.floor(a.X.length * nextFrac);
         for (var t = lo; t < hi; t++) {
-          var p = predictOne(a.X[t], w, s), pred = p >= 0.5 ? 1 : 0;
+          var praw = predictOne(a.X[t], w, s), p = applyCal(praw, cal), pred = p >= 0.5 ? 1 : 0;
           if (pred === a.y[t]) correct++;
           if (maj === a.y[t]) base++;
           tested++;
+          calPairsRaw.push({ p: praw, y: a.y[t] }); calPairsCal.push({ p: p, y: a.y[t] });
           if (Math.abs(p - 0.5) >= margin) { cov++; if (pred === a.y[t]) corrC++; }
         }
       });
@@ -1221,7 +1250,8 @@
     if (!tested) return null;
     return { acc: Math.round(correct / tested * 100), baseline: Math.round(base / tested * 100),
       accEngaged: cov ? Math.round(corrC / cov * 100) : null,
-      coverage: Math.round(cov / tested * 100), tested: tested };
+      coverage: Math.round(cov / tested * 100), tested: tested,
+      eceRaw: ece(calPairsRaw), ece: ece(calPairsCal) };
   }
 
   // ---- Persistance : IndexedDB (auto) — la mémoire qui ne se perd pas --------
@@ -1373,12 +1403,15 @@
         var std = standardize(poolX);
         var Xs = poolX.map(function (x) { return applyStd(x, std); });
         var w = train(Xs, poolY, warm, brain.sessions > 0 ? 120 : 250);
+        // Calibration (Platt) ajustée sur les prédictions d'entraînement → probas affichées fiables.
+        var trProbs = Xs.map(function (x) { var z = w.b; for (var j = 0; j < NF; j++) z += w[j] * x[j]; return sigmoid(z); });
+        var cal = fitPlatt(trProbs, poolY);
 
         // 6) Prédictions "live" : proba que CHAQUE actif surperforme le panier (force relative)
         var priceBySym = {};
         var signals = perAsset.map(function (pa) {
           var full = pa.f.live.x.concat(liveRel[pa.a.sym] || ZERO7);
-          var prob = predictOne(full, w, std);
+          var prob = applyCal(predictOne(full, w, std), cal); // proba calibrée
           priceBySym[pa.a.sym] = pa.f.price;
           var dir = prob >= 0.56 ? 'up' : prob <= 0.44 ? 'down' : 'neutre'; // up = fort, down = faible
           var conf = Math.round(Math.abs(prob - 0.5) * 200); // 0..100
@@ -2529,6 +2562,7 @@ function renderIA(d){
       <div class="ia-kpi"><div class="k">Exemples appris</div><div class="v" style="font-size:1.1rem">${(d.samples||0).toLocaleString('fr-FR')}</div><div class="s">${d.assets||0} actifs · ${d.sessions||1} entraînements</div></div>
     </div>
     ${verdict}
+    ${wf&&wf.ece!=null?`<div class="ia-verdict" style="border-color:color-mix(in srgb,var(--long) 25%,transparent)">🎯 <b>Probabilités calibrées</b> : l'écart moyen entre le « % » affiché et la fréquence réelle est de <b>±${wf.ece}%</b> (mesuré hors échantillon). Autrement dit, quand l'IA affiche 63 %, c'est fiable à ~${wf.ece} points près. Plus c'est bas, mieux c'est.</div>`:''}
     <div class="ia-mem">
       <span class="grow">💾 Mémoire sauvegardée automatiquement (IndexedDB). Filet de sécurité : garde une copie de son cerveau.</span>
       <button class="ai-btn ghost" id="ia-export">⬇️ Exporter le cerveau</button>

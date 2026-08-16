@@ -1126,6 +1126,7 @@ function renderIA(d){
       <div class="ia-kpi"><div class="k">Exemples appris</div><div class="v" style="font-size:1.1rem">${(d.samples||0).toLocaleString('fr-FR')}</div><div class="s">${d.assets||0} actifs · ${d.sessions||1} entraînements</div></div>
     </div>
     ${verdict}
+    ${wf&&wf.ece!=null?`<div class="ia-verdict" style="border-color:color-mix(in srgb,var(--long) 25%,transparent)">🎯 <b>Probabilités calibrées</b> : l'écart moyen entre le « % » affiché et la fréquence réelle est de <b>±${wf.ece}%</b> (mesuré hors échantillon). Autrement dit, quand l'IA affiche 63 %, c'est fiable à ~${wf.ece} points près. Plus c'est bas, mieux c'est.</div>`:''}
     <div class="ia-mem">
       <span class="grow">💾 Mémoire sauvegardée automatiquement (IndexedDB). Filet de sécurité : garde une copie de son cerveau.</span>
       <button class="ai-btn ghost" id="ia-export">⬇️ Exporter le cerveau</button>

@@ -41,7 +41,9 @@ entrée, stop, objectif, ratio (RR) et gain estimé sur un compte de 10 000 € 
    mesurée **strictement par actif (zéro fuite temporelle)**. Résultat honnête : **~64 % quand
    elle s'engage** (précision globale ~61 %) pour repérer les plus forts, nettement au-dessus
    d'un choix naïf. Les signaux sont présentés en **boussole de rotation** (les plus forts / les
-   plus faibles du panier). Le site affiche le vrai chiffre, sans le gonfler. Sa mémoire
+   plus faibles du panier). Le site affiche le vrai chiffre, sans le gonfler. Les probabilités
+   sont **calibrées (Platt)** et le site affiche l'**erreur de calibration (ECE ~4 %)** : quand
+   l'IA dit « 63 % », c'est fiable à quelques points près — vérifiable, pas décoratif. Sa mémoire
    est **sauvegardée automatiquement** (IndexedDB) et **exportable/importable** (`ia-cerveau.json`).
    Une **boussole de rotation** pédagogique — pas une machine à gagner, pas un conseil financier.
 
