@@ -16,7 +16,7 @@
 
   function getKey() { try { return localStorage.getItem(KEY_STORE) || ''; } catch (e) { return ''; } }
   function setKey(k) { try { localStorage.setItem(KEY_STORE, (k || '').trim()); } catch (e) {} }
-  function getModel() { try { return localStorage.getItem(MODEL_STORE) || 'claude-opus-5'; } catch (e) { return 'claude-opus-5'; } }
+  function getModel() { try { return localStorage.getItem(MODEL_STORE) || 'claude-haiku-4-5'; } catch (e) { return 'claude-haiku-4-5'; } }
   function setModel(m) { try { localStorage.setItem(MODEL_STORE, m); } catch (e) {} }
 
   var SYSTEM =

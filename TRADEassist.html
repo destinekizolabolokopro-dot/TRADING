@@ -205,6 +205,19 @@
   .kb-alias{display:flex;flex-wrap:wrap;gap:5px;margin-top:2px}
   .kb-tag{font-size:.68rem;color:var(--faint);background:var(--surface-3);border-radius:6px;padding:2px 7px}
   .kb-empty{color:var(--muted);font-size:.9rem;padding:20px 0}
+  /* Étapes dans la fenêtre Bot IA */
+  .ai-steps{display:flex;flex-direction:column;gap:7px;margin:2px 0 16px;padding:12px 14px;
+    background:var(--surface-2);border:1px solid var(--border);border-radius:12px}
+  .ai-step{font-size:.83rem;color:var(--muted);line-height:1.45}
+  .ai-step b{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;margin-right:7px;
+    border-radius:99px;background:var(--grad);color:#0a0a12;font-size:.72rem;font-weight:700}
+  .ai-step a{color:var(--ink);font-weight:600;text-decoration:underline;text-underline-offset:2px}
+  /* Fenêtre « Comment ça marche » */
+  .how-steps{display:flex;flex-direction:column;gap:12px;margin:6px 0 18px}
+  .how-step{display:flex;gap:13px;align-items:flex-start;font-size:.9rem;line-height:1.5;color:var(--muted)}
+  .how-step b{color:var(--ink)}
+  .how-n{flex:none;width:28px;height:28px;border-radius:99px;background:var(--grad);color:#0a0a12;
+    font-weight:700;font-size:.9rem;display:flex;align-items:center;justify-content:center;margin-top:1px}
   .pro-strat{border:1px solid var(--border);border-radius:16px;background:var(--surface);padding:18px 18px 20px;margin-bottom:16px}
   .pro-strat h3{font-family:var(--display);font-weight:600;font-size:1.05rem;margin:0 0 4px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
   .pro-strat .stag{font-family:var(--mono);font-size:.64rem;text-transform:uppercase;letter-spacing:.05em;
@@ -511,17 +524,22 @@
   <div class="modal">
     <button class="modal-close" id="ai-close" aria-label="Fermer">×</button>
     <h2>Bot IA <span style="color:var(--faint);font-weight:400">— propulsé par Claude</span></h2>
-    <p class="sub">Un 2ᵉ bot propulsé par Claude : il raisonne sur H1/H4/D1, base ses trades sur l'ICT/SMC (+ toute technique intelligente) et envoie ses meilleures idées. Ta clé reste sur ton ordinateur.</p>
+    <p class="sub">Claude analyse les vraies bougies <b>H1/H4/D1</b> en s'appuyant sur <b>toute la bibliothèque du site (214 concepts ICT/SMC & co)</b>, puis envoie ses meilleures idées de trade. Ta clé reste <b>sur ton ordinateur</b>.</p>
+    <div class="ai-steps">
+      <span class="ai-step"><b>1</b> Crée une clé sur <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com&nbsp;↗</a> (+ un peu de crédit)</span>
+      <span class="ai-step"><b>2</b> Colle-la ci-dessous &amp; enregistre</span>
+      <span class="ai-step"><b>3</b> Clique « Analyser le marché »</span>
+    </div>
     <div class="field">
-      <label>Clé API Anthropic (console.anthropic.com)</label>
+      <label>Clé API Anthropic <span style="color:var(--faint);font-weight:400">— commence par sk-ant-…</span></label>
       <input type="password" id="ai-key" placeholder="sk-ant-..." autocomplete="off">
     </div>
     <div class="field">
-      <label>Modèle (le moins cher = Haiku)</label>
+      <label>Modèle <span style="color:var(--faint);font-weight:400">— commence par Haiku (le moins cher)</span></label>
       <select id="ai-model">
-        <option value="claude-opus-5">Opus 5 — le plus intelligent (le plus cher)</option>
+        <option value="claude-haiku-4-5">Haiku 4.5 — rapide &amp; économique (conseillé pour débuter)</option>
         <option value="claude-sonnet-5">Sonnet 5 — équilibré</option>
-        <option value="claude-haiku-4-5">Haiku 4.5 — rapide &amp; économique</option>
+        <option value="claude-opus-5">Opus 5 — le plus intelligent (le plus cher)</option>
       </select>
     </div>
     <div class="modal-actions">
@@ -530,7 +548,26 @@
     </div>
     <div class="ai-status" id="ai-status"></div>
     <div class="ai-out" id="ai-out"></div>
-    <p class="ai-note">⚠️ Idées pédagogiques générées par une IA — pas un conseil financier, aucune garantie. Chaque analyse consomme des tokens (payants) sur ta clé.</p>
+    <p class="ai-note">🔒 Ne partage jamais ta clé. ⚠️ Idées pédagogiques générées par une IA — pas un conseil financier, aucune garantie. Chaque analyse consomme un peu de crédit sur ta clé.</p>
+  </div>
+</div>
+
+<div class="overlay" id="how-overlay">
+  <div class="modal" style="max-width:720px">
+    <button class="modal-close" id="how-close" aria-label="Fermer">×</button>
+    <h2>👋 Bienvenue — comment ça marche</h2>
+    <p class="sub">Ce site lit le marché en temps réel (crypto, or, forex) et t'aide à décider. Voici les 4 réflexes, du plus simple au plus poussé.</p>
+    <div class="how-steps">
+      <div class="how-step"><span class="how-n">1</span><div><b>Regarde les signaux</b> — l'onglet <b>Signaux ICT/SMC</b> te montre, pour chaque actif, le sens (long/short), la confluence et un trade prêt (entrée, stop, objectif). Rien à installer.</div></div>
+      <div class="how-step"><span class="how-n">2</span><div><b>Explore les autres angles</b> — <b>Stratégies Pro</b>, <b>IA maison</b> (un modèle entraîné dans ton navigateur) et <b>Quant</b> (panier market-neutral) donnent chacun un avis indépendant.</div></div>
+      <div class="how-step"><span class="how-n">3</span><div><b>Apprends dans la 📚 Bibliothèque</b> — 214 concepts de trading (ICT, SMC, chandeliers, risque, psycho…) expliqués simplement. Cherche n'importe quel terme.</div></div>
+      <div class="how-step"><span class="how-n">4</span><div><b>Active le Bot IA (Claude)</b> — le plus puissant : il analyse les vraies bougies <b>avec toute la bibliothèque</b> et propose ses meilleurs trades. Il te faut une clé API (2 min à créer).</div></div>
+    </div>
+    <div class="modal-actions" style="margin-top:4px">
+      <button class="btn btn-primary" id="how-signals">Voir les signaux</button>
+      <button class="btn ai-run" id="how-ia">Activer le Bot IA</button>
+    </div>
+    <p class="ai-note">🔒 Tout reste sur ton appareil (clé, réglages, historique). 📊 Données réelles · <b>pédagogique, pas un conseil financier</b> · risque max 1 % par trade.</p>
   </div>
 </div>
 
@@ -1732,7 +1769,7 @@
 
   function getKey() { try { return localStorage.getItem(KEY_STORE) || ''; } catch (e) { return ''; } }
   function setKey(k) { try { localStorage.setItem(KEY_STORE, (k || '').trim()); } catch (e) {} }
-  function getModel() { try { return localStorage.getItem(MODEL_STORE) || 'claude-opus-5'; } catch (e) { return 'claude-opus-5'; } }
+  function getModel() { try { return localStorage.getItem(MODEL_STORE) || 'claude-haiku-4-5'; } catch (e) { return 'claude-haiku-4-5'; } }
   function setModel(m) { try { localStorage.setItem(MODEL_STORE, m); } catch (e) {} }
 
   var SYSTEM =
@@ -3284,6 +3321,23 @@ $('#tabs').addEventListener('click', e=>{
 });
 
 $('#cta-signals').addEventListener('click', ()=> $('#grid').scrollIntoView({behavior:'smooth',block:'start'}));
+
+/* ---------- Fenêtre « Comment ça marche » ---------- */
+const howOverlay=$('#how-overlay');
+function openHow(){ howOverlay.classList.add('open'); }
+function closeHow(){ howOverlay.classList.remove('open'); }
+$('#cta-how').addEventListener('click', openHow);
+$('#how-close').addEventListener('click', closeHow);
+howOverlay.addEventListener('click', e=>{ if(e.target===howOverlay) closeHow(); });
+$('#how-signals').addEventListener('click', ()=>{ closeHow(); $('#grid').scrollIntoView({behavior:'smooth',block:'start'}); });
+$('#how-ia').addEventListener('click', ()=>{ closeHow(); openAI(); });
+// Première visite : on ouvre le guide une seule fois pour orienter l'utilisateur.
+try{
+  if(!localStorage.getItem('tradeassist.seen.v1')){
+    localStorage.setItem('tradeassist.seen.v1','1');
+    setTimeout(openHow, 700);
+  }
+}catch(e){}
 
 function setSource(live){
   const s=$('#src');
