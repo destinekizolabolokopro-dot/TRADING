@@ -35,7 +35,7 @@
     "Sois HONNÊTE : si aucun setup n'est net, renvoie une liste vide plutôt que de forcer un trade. " +
     "Tu n'es pas un conseiller financier ; règle de gestion : risque max 1 % du compte par trade.";
 
-  function buildUser(pairs, mtf) {
+  function buildUser(pairs, mtf, collab) {
     var snap = pairs.map(function (p) {
       return {
         paire: p.sym, prix: p.price, sens_calcule: p.dir, cycle: p.cycle,
@@ -53,6 +53,14 @@
       txt += "\n\nDONNÉES MULTI-UNITÉS (D1 → H4 → H1) pour l'alignement top-down :\n" + JSON.stringify(mtf, null, 2);
     }
     txt += "\n\nRÉSUMÉ par paire (toutes paires, dont DXY/forex) :\n" + JSON.stringify(snap, null, 2);
+    // Liaison des IA : on donne à Claude l'avis des autres moteurs du site
+    // (IA maison ML + Quant market-neutral) comme confluence supplémentaire.
+    if (collab) {
+      txt += "\n\nAVIS DES AUTRES MOTEURS DU SITE (confluence — à confronter, PAS à suivre aveuglément) :\n" +
+        JSON.stringify(collab, null, 2) +
+        "\nSi tes idées vont dans le sens de l'IA maison et/ou du Quant, c'est un signal renforcé ; " +
+        "en cas de désaccord net, sois plus prudent ou explique pourquoi tu diverges.";
+    }
     // Base de connaissances : on injecte TOUTE la base (digest complet) pour
     // que l'IA raisonne sur les définitions et la méthode maison du site.
     var kb = root.KB;
@@ -64,7 +72,7 @@
     return txt;
   }
 
-  function analyze(pairs, mtf) {
+  function analyze(pairs, mtf, collab) {
     var key = getKey();
     if (!key) return Promise.reject(new Error('Aucune clé API. Colle ta clé Anthropic dans les réglages.'));
     var model = getModel();
@@ -73,7 +81,7 @@
       max_tokens: 4000, // marge pour la réflexion + le JSON (sinon risque de réponse coupée)
       output_config: { effort: 'low' }, // rapide & économique pour une analyse structurée
       system: SYSTEM,
-      messages: [{ role: 'user', content: buildUser(pairs, mtf) }]
+      messages: [{ role: 'user', content: buildUser(pairs, mtf, collab) }]
     };
     return fetch(ENDPOINT, {
       method: 'POST',

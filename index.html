@@ -212,6 +212,11 @@
   .ai-step b{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;margin-right:7px;
     border-radius:99px;background:var(--grad);color:#0a0a12;font-size:.72rem;font-weight:700}
   .ai-step a{color:var(--ink);font-weight:600;text-decoration:underline;text-underline-offset:2px}
+  .ai-link{display:flex;gap:10px;align-items:flex-start;margin:2px 0 14px;padding:11px 13px;cursor:pointer;
+    background:color-mix(in srgb,var(--iris,#7c6cff) 10%,var(--surface-2));border:1px solid color-mix(in srgb,var(--iris,#7c6cff) 30%,var(--border));border-radius:12px;
+    font-size:.83rem;line-height:1.45;color:var(--muted)}
+  .ai-link input{margin-top:2px;width:16px;height:16px;accent-color:#7c6cff;flex:none;cursor:pointer}
+  .ai-link b{color:var(--ink)}
   /* Fenêtre « Comment ça marche » */
   .how-steps{display:flex;flex-direction:column;gap:12px;margin:6px 0 18px}
   .how-step{display:flex;gap:13px;align-items:flex-start;font-size:.9rem;line-height:1.5;color:var(--muted)}
@@ -428,6 +433,21 @@
   .bilan .b .k{font-size:.66rem;text-transform:uppercase;letter-spacing:.06em;color:var(--faint)}
   .bilan .b .v{font-family:var(--display);font-weight:600;font-size:1.2rem}
   .bilan .b .v.pos{color:var(--long)} .bilan .b .v.neg{color:var(--short)}
+  .bilan .b{flex:1 1 92px}
+  .bilan .b .ksub{font-size:.64rem;color:var(--faint);margin-top:1px}
+  /* Historique enrichi : filtres, courbe d'équité, comparatif */
+  .hfilters{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px}
+  .hfilters:empty{display:none}
+  .hfilter{font:inherit;font-size:.76rem;font-weight:600;padding:5px 11px;border-radius:99px;cursor:pointer;
+    border:1px solid var(--border);background:var(--surface-2);color:var(--muted);transition:.15s}
+  .hfilter:hover{color:var(--ink)}
+  .hfilter.on{background:var(--grad);color:#0a0a12;border-color:transparent}
+  .hist-block{margin:0 0 16px}
+  .hist-block:empty{display:none}
+  .eq-head{font-weight:700;font-size:.86rem;margin:2px 0 8px;display:flex;align-items:baseline;gap:8px}
+  .eq-sub{font-family:var(--mono);font-size:.68rem;color:var(--faint);font-weight:400}
+  .eq-svg{width:100%;height:120px;display:block;background:var(--surface-2);border:1px solid var(--border);border-radius:12px}
+  .eq-empty{color:var(--muted);font-size:.82rem;padding:14px;background:var(--surface-2);border:1px solid var(--border);border-radius:12px}
   .htable{width:100%;border-collapse:collapse;font-size:.82rem}
   .htable th{text-align:left;color:var(--faint);font-weight:600;font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;padding:8px 8px;border-bottom:1px solid var(--border)}
   .htable td{padding:9px 8px;border-bottom:1px solid var(--border);font-family:var(--mono);font-variant-numeric:tabular-nums}
@@ -568,6 +588,10 @@
         <option value="claude-opus-5">Opus 5 — le plus intelligent (le plus cher)</option>
       </select>
     </div>
+    <label class="ai-link" for="ai-link">
+      <input type="checkbox" id="ai-link" checked>
+      <span><b>🔗 Lier l'🧠 IA maison + le 🏛️ Quant</b> — Claude confronte son analyse à leurs classements (confluence). <span style="color:var(--faint)">Recommandé.</span></span>
+    </label>
     <div class="modal-actions">
       <button class="btn ai-run" id="ai-run">Analyser le marché</button>
       <button class="btn" id="ai-save">Enregistrer la clé</button>
@@ -637,9 +661,12 @@
 <div class="overlay" id="hist-overlay">
   <div class="modal" style="max-width:820px">
     <button class="modal-close" id="hist-close" aria-label="Fermer">×</button>
-    <h2>Historique des trades</h2>
-    <p class="sub">Chaque trade proposé est enregistré avec le bot qui l'a envoyé, puis clôturé au TP (gagné) ou au SL (perdu). Journal stocké sur ton ordinateur.</p>
+    <h2>📒 Historique &amp; performance</h2>
+    <p class="sub">Chaque trade proposé est enregistré avec le bot qui l'a envoyé, puis clôturé au TP (gagné) ou au SL (perdu). Tout est calculé sur ton ordinateur. <b>R</b> = multiple de risque (1 R ≈ 1 % du capital).</p>
+    <div class="hfilters" id="hist-filter"></div>
     <div class="bilan" id="hist-bilan"></div>
+    <div class="hist-block" id="hist-equity"></div>
+    <div class="hist-block" id="hist-compare"></div>
     <div class="htable-wrap" id="hist-table"></div>
     <div class="modal-actions" style="margin-top:16px">
       <button class="btn" id="hist-reset">Réinitialiser l'historique</button>
@@ -901,9 +928,39 @@ boot();
 
 /* ---------- Analyse IA (Claude) ---------- */
 const aiOverlay=$('#ai-overlay');
+let lastIA=null, lastQuant=null; // caches partagés : avis de l'IA maison + du Quant
+
+// Construit « l'avis des autres moteurs du site » pour le donner à Claude (liaison des IA).
+function buildCollab(){
+  const out={};
+  try{
+    if(lastIA && lastIA.signals && lastIA.signals.length){
+      const sig=lastIA.signals.slice().sort((a,b)=>(b.prob||0)-(a.prob||0));
+      out.ia_maison={
+        note:"Modèle ML local (momentum relatif) — probabilité que l'actif SURPERFORME le panier.",
+        plus_forts: sig.slice(0,6).map(s=>({actif:s.sym, prob_surperformance_pct:Math.round((s.prob||0)*100)})),
+        plus_faibles: sig.slice(-4).map(s=>({actif:s.sym, prob_surperformance_pct:Math.round((s.prob||0)*100)})),
+        avantage_mesure: (lastIA.wf&&lastIA.wf.acc!=null)?{precision_pct:lastIA.wf.acc, hasard_pct:lastIA.wf.baseline}:null
+      };
+    }
+  }catch(e){}
+  try{
+    if(lastQuant && lastQuant.longs){
+      out.quant_market_neutral={
+        note:"Panier factoriel long/short — score composite (momentum, tendance, faible vol).",
+        jambe_longue: lastQuant.longs.map(g=>({actif:g.sym, score:g.score})),
+        jambe_courte: (lastQuant.shorts||[]).map(g=>({actif:g.sym, score:g.score})),
+        sharpe_backtest: lastQuant.perf?lastQuant.perf.sharpe:null
+      };
+    }
+  }catch(e){}
+  return Object.keys(out).length? out : null;
+}
 function openAI(){
   if(window.AI){ $('#ai-key').value=AI.getKey(); $('#ai-model').value=AI.getModel(); }
   aiOverlay.classList.add('open');
+  // Préchauffe les avis de l'IA maison + Quant en arrière-plan pour la liaison.
+  try{ if($('#ai-link')&&$('#ai-link').checked){ loadIA&&loadIA(); loadQuant&&loadQuant(); } }catch(e){}
 }
 function closeAI(){ aiOverlay.classList.remove('open'); }
 $('#ai-open').addEventListener('click', openAI);
@@ -924,8 +981,11 @@ $('#ai-run').addEventListener('click', async ()=>{
   try{
     let mtf=null;
     try{ if(window.LIVE&&LIVE.mtf) mtf=await LIVE.mtf(); }catch(e){}
-    const r = await AI.analyze(PAIRS, mtf);
-    st.textContent = '✅ Analyse terminée · modèle ' + r.model + (r.usage&&r.usage.output_tokens?(' · '+r.usage.output_tokens+' tokens'):'');
+    const linkOn = $('#ai-link') && $('#ai-link').checked;
+    const collab = linkOn ? buildCollab() : null;
+    const r = await AI.analyze(PAIRS, mtf, collab);
+    const linkTxt = linkOn ? (collab ? ' · 🔗 IA maison'+(collab.quant_market_neutral?'+Quant':'')+' liées' : ' · 🔗 (avis des autres IA pas encore prêts)') : '';
+    st.textContent = '✅ Analyse terminée · modèle ' + r.model + (r.usage&&r.usage.output_tokens?(' · '+r.usage.output_tokens+' tokens'):'') + linkTxt;
     if(!r.parsed){ out.innerHTML='<div class="ai-summary">'+(r.raw||'Réponse vide.').slice(0,1200)+'</div>'; out.classList.add('show'); return; }
     let html='';
     if(r.parsed.marche) html+='<div class="ai-summary">'+r.parsed.marche+'</div>';
@@ -950,23 +1010,75 @@ $('#ai-run').addEventListener('click', async ()=>{
 
 /* ---------- Historique des trades ---------- */
 const histOverlay=$('#hist-overlay');
+let histSource=''; // '' = toutes
 function frDate(ts){ return new Date(ts).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}); }
+function srcClass(s){ return (s||'').indexOf('IA')>=0?'ia':'regles'; }
+// Petite courbe d'équité (R cumulés) en SVG inline.
+function equitySVG(eq){
+  if(!eq||eq.length<2) return '<div class="eq-empty">Pas encore assez de trades clôturés pour tracer la courbe d’équité.</div>';
+  const W=680,H=120,pad=6;
+  const min=Math.min(0,...eq), max=Math.max(0,...eq), span=(max-min)||1;
+  const x=i=>pad+i*(W-2*pad)/(eq.length-1);
+  const y=v=>pad+(1-(v-min)/span)*(H-2*pad);
+  const pts=eq.map((v,i)=>x(i)+','+y(v).toFixed(1)).join(' ');
+  const last=eq[eq.length-1], up=last>=0;
+  const col=up?'var(--long)':'var(--short)';
+  const zero=y(0).toFixed(1);
+  const area=`${pad},${zero} `+pts+` ${x(eq.length-1)},${zero}`;
+  return `<svg class="eq-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Courbe d'équité">
+    <line x1="${pad}" x2="${W-pad}" y1="${zero}" y2="${zero}" stroke="var(--border-strong)" stroke-dasharray="3 3"/>
+    <polygon points="${area}" fill="${col}" opacity="0.10"/>
+    <polyline points="${pts}" fill="none" stroke="${col}" stroke-width="2" stroke-linejoin="round"/>
+  </svg>`;
+}
+function kpi(k,v,cls,sub){ return '<div class="b"><div class="k">'+k+'</div><div class="v '+(cls||'')+'">'+v+'</div>'+(sub?'<div class="ksub">'+sub+'</div>':'')+'</div>'; }
 function renderHist(){
   if(!window.History) return;
-  const b=History.bilan();
-  $('#hist-bilan').innerHTML =
-    '<div class="b"><div class="k">Trades</div><div class="v">'+b.total+'</div></div>'+
-    '<div class="b"><div class="k">Gagnés</div><div class="v pos">'+b.wins+'</div></div>'+
-    '<div class="b"><div class="k">Perdus</div><div class="v neg">'+b.loss+'</div></div>'+
-    '<div class="b"><div class="k">Réussite</div><div class="v">'+(b.rate!=null?b.rate+'%':'—')+'</div></div>'+
-    '<div class="b"><div class="k">Résultat</div><div class="v '+(b.rsum>0?'pos':(b.rsum<0?'neg':''))+'">'+(b.rsum>=0?'+':'')+b.rsum+' R</div></div>'+
-    '<div class="b"><div class="k">En cours</div><div class="v">'+b.open+'</div></div>';
-  const all=History.load().slice().sort((a,b)=>b.ts-a.ts);
+  const all=History.load().slice();
   const wrap=$('#hist-table');
+  // Filtre par bot
+  const srcs=History.sources();
+  let chips='<button class="hfilter'+(histSource===''?' on':'')+'" data-s="">Toutes</button>';
+  srcs.forEach(s=>{ chips+='<button class="hfilter '+srcClass(s)+(histSource===s?' on':'')+'" data-s="'+s.replace(/"/g,'')+'">'+s+'</button>'; });
+  const filterBar=$('#hist-filter'); if(filterBar) filterBar.innerHTML = srcs.length>1 ? chips : '';
+
+  const s=History.stats(histSource||undefined);
+  const pfTxt = s.pf==null ? '∞' : s.pf;
+  const streakTxt = s.streak? (s.streakType==='win'? s.streak+' ✅ d’affilée' : s.streak+' ❌ d’affilée') : '—';
+  $('#hist-bilan').innerHTML =
+    kpi('Trades', s.total, '', s.open+' en cours')+
+    kpi('Réussite', (s.rate!=null?s.rate+'%':'—'), '', s.wins+'✅ / '+s.loss+'❌')+
+    kpi('Résultat', (s.rsum>=0?'+':'')+s.rsum+' R', (s.rsum>0?'pos':(s.rsum<0?'neg':'')), 'gain net')+
+    kpi('Sur 10 000 €', (s.eur>=0?'+':'')+s.eur.toLocaleString('fr-FR')+' €', (s.eur>0?'pos':(s.eur<0?'neg':'')), 'risque 1 %/trade')+
+    kpi('Profit factor', pfTxt, ((s.pf==null||s.pf>=1)?'pos':'neg'), 'gains ÷ pertes')+
+    kpi('RR moyen visé', (s.rrPlanned!=null?s.rrPlanned:'—'), '', 'par trade')+
+    kpi('Pire creux (DD)', '−'+s.maxdd+' R', (s.maxdd>0?'neg':''), 'max drawdown')+
+    kpi('Série', streakTxt, (s.streakType==='win'?'pos':(s.streakType==='loss'?'neg':'')), '');
+
+  // Courbe d'équité
+  const eqWrap=$('#hist-equity');
+  if(eqWrap){ eqWrap.innerHTML = '<div class="eq-head">Courbe d’équité <span class="eq-sub">'+(histSource||'tous les bots')+' · R cumulés</span></div>'+equitySVG(s.equity); }
+
+  // Comparatif par bot (seulement en vue "Toutes")
+  const cmpWrap=$('#hist-compare');
+  if(cmpWrap){
+    if(!histSource && srcs.length>1){
+      let rows=srcs.map(src=>{const st=History.stats(src); return {src,st};})
+        .sort((a,b)=>b.st.rsum-a.st.rsum);
+      let h='<div class="eq-head">Comparatif des bots</div><div class="htable-wrap"><table class="htable"><thead><tr><th>Bot</th><th>Trades</th><th>Réussite</th><th>Résultat</th><th>Profit factor</th></tr></thead><tbody>';
+      rows.forEach(r=>{ h+='<tr><td><span class="src '+srcClass(r.src)+'">'+r.src+'</span></td>'+
+        '<td>'+r.st.total+'</td><td>'+(r.st.rate!=null?r.st.rate+'%':'—')+'</td>'+
+        '<td class="'+(r.st.rsum>0?'hd-long':(r.st.rsum<0?'hd-short':''))+'">'+(r.st.rsum>=0?'+':'')+r.st.rsum+' R</td>'+
+        '<td>'+(r.st.pf==null?'∞':r.st.pf)+'</td></tr>'; });
+      cmpWrap.innerHTML=h+'</tbody></table></div>';
+    } else cmpWrap.innerHTML='';
+  }
+
   if(!all.length){ wrap.innerHTML='<div class="hist-empty">Aucun trade enregistré pour l’instant. Chaque idée réelle proposée par un bot (données en direct) s’ajoutera ici automatiquement.</div>'; return; }
   const esc=s=>(s||'').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  const open=all.filter(t=>t.status==='open');
-  const closed=all.filter(t=>t.status!=='open');
+  const filt = histSource ? all.filter(t=>t.source===histSource) : all;
+  const open=filt.filter(t=>t.status==='open').sort((a,b)=>b.ts-a.ts);
+  const closed=filt.filter(t=>t.status!=='open').sort((a,b)=>b.ts-a.ts);
 
   function tableFor(rows){
     let h='<table class="htable"><thead><tr><th>Envoyé par</th><th>Paire</th><th>Sens</th><th>Entrée</th><th>SL</th><th>TP</th><th>RR</th><th>Résultat</th><th>Motif</th><th>Date</th></tr></thead><tbody>';
@@ -996,6 +1108,7 @@ function renderHist(){
   wrap.innerHTML=h;
 }
 $('#hist-open').addEventListener('click', ()=>{ renderHist(); histOverlay.classList.add('open'); });
+$('#hist-filter').addEventListener('click', e=>{ const b=e.target.closest('.hfilter'); if(!b) return; histSource=b.dataset.s||''; renderHist(); });
 $('#hist-close').addEventListener('click', ()=> histOverlay.classList.remove('open'));
 histOverlay.addEventListener('click', e=>{ if(e.target===histOverlay) histOverlay.classList.remove('open'); });
 $('#hist-reset').addEventListener('click', ()=>{ if(window.History && confirm('Effacer tout l’historique des trades ?')){ History.reset(); renderHist(); } });
@@ -1202,7 +1315,7 @@ function renderQuant(d){
 function loadQuant(force){
   if((quantLoaded&&!force)||quantLoading||!window.QUANT) return;
   quantLoading=true;
-  QUANT.load().then(d=>{ quantLoaded=true; quantLoading=false; renderQuant(d); })
+  QUANT.load().then(d=>{ quantLoaded=true; quantLoading=false; lastQuant=d; renderQuant(d); })
              .catch(()=>{ quantLoading=false; renderQuant(null); });
 }
 
@@ -1350,7 +1463,7 @@ function loadIA(force){
   iaLoading=true;
   const body=$('#ia-body');
   if(force) body.innerHTML='<div class="hist-empty">⏳ Ré-entraînement…</div>';
-  IA.load().then(d=>{ iaLoaded=true; iaLoading=false; renderIA(d); })
+  IA.load().then(d=>{ iaLoaded=true; iaLoading=false; lastIA=d; renderIA(d); })
            .catch(()=>{ iaLoading=false; renderIA(null); });
 }
 $('#ia-import-file').addEventListener('change', e=>{
