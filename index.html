@@ -964,7 +964,7 @@ function renderQuant(d){
       <div class="q-stat ${(p.ann||0)>0?'hi':'lo'}"><div class="k">Rendement annualisé</div><div class="v">${p.ann!=null?(p.ann>0?'+':'')+p.ann+'%':'—'}</div><div class="s">spread long−short</div></div>
       <div class="q-stat lo"><div class="k">Pire perte (DD)</div><div class="v">−${p.dd!=null?p.dd:'—'}%</div><div class="s">sur ${p.n||'—'} périodes</div></div>
     </div>
-    <p class="bt-caveat">📊 Backtest walk-forward du panier long/short (rebalance ~${d.H} j, quintiles). <b>Échantillon court (${p.n||'—'} périodes), SANS frais ni coût de vente à découvert, sur un marché majoritairement haussier — INDICATIF, pas une promesse.</b> Le Sharpe idéal (celui des grands fonds) est &gt; 1 ; en dessous, l'edge est faible.</p>
+    <p class="bt-caveat">📊 Backtest walk-forward du panier long/short (rebalance ~${d.H} j, quintiles). <b>⚠️ Sur seulement ~${p.n||'—'} périodes, ce Sharpe est TRÈS INSTABLE</b> — selon la fenêtre exacte, on l'a mesuré entre ~0,2 et ~1,2 pour la même méthode. J'ai d'ailleurs volontairement gardé <b>3 facteurs</b> : en ajouter gonflait le backtest mais s'effondrait en live (sur-apprentissage). <b>Sans frais ni coût de short, marché haussier — INDICATIF, pas une promesse.</b> Le Sharpe des grands fonds est &gt; 1 durablement ; ici, ne le prends pas au pied de la lettre.</p>
     <div class="q-pillars">
       <div class="q-pill"><h4>🎯 Facteurs</h4><p>On note chaque actif sur des primes documentées : momentum, tendance, faible volatilité.</p></div>
       <div class="q-pill"><h4>🧩 Ensemble</h4><p>On combine ces facteurs (z-scores) en un seul score composite — comme les quants.</p></div>

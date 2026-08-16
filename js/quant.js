@@ -4,9 +4,11 @@
  * (pile ou face) : il construit un panier MARKET-NEUTRAL long/short par FACTEURS.
  *
  * Les 4 piliers repris des pros :
- *  1. FACTEURS : on note chaque actif sur des primes de risque documentées —
- *     Momentum (90 j), Tendance (prix vs EMA200), Faible volatilité (low-vol anomaly).
- *     (Le facteur "reversal court terme" a été mesuré NÉGATIF sur ces actifs → exclu.)
+ *  1. FACTEURS : on note chaque actif sur des primes de risque documentées — Momentum (90 j),
+ *     Tendance (prix vs EMA200), Faible volatilité (low-vol anomaly).
+ *     (Volontairement SIMPLE : en labo, ajouter des facteurs gonflait le Sharpe backtest à ~1,2
+ *      mais il s'effondrait à ~0,16 en live = sur-apprentissage. 3 facteurs = bien plus stable.
+ *      Le facteur "reversal court terme" a été mesuré NÉGATIF sur ces actifs → exclu.)
  *  2. ENSEMBLE : on combine ces facteurs (z-scores) en un score composite unique.
  *  3. CLASSEMENT CROSS-SECTIONNEL : on va LONG le haut du panier, SHORT le bas.
  *  4. MARKET-NEUTRAL : long + short en même temps → on gagne sur l'ÉCART, peu importe
@@ -33,7 +35,9 @@
     { sym: 'XAU/USD', src: 'PAXGUSDT' }
   ];
   var H = 20;                    // horizon / période de rebalance (jours)
-  var W = { mom: 1, trend: 1, lowvol: 0.5 }; // poids de l'ensemble de facteurs
+  // Poids de l'ensemble de facteurs (equal-weight des jambes ; l'inverse-vol a été mesuré nuisible).
+  // Volontairement 3 facteurs seulement : plus robuste hors échantillon (voir en-tête).
+  var W = { mom: 1, trend: 1, lowvol: 0.5 };
   var fresh = function (c) { return c && c.length && (Date.now() - c[c.length - 1].t) < 3 * 864e5; };
 
   function ema(v, p) { var k = 2 / (p + 1), e = v[0], o = [e]; for (var i = 1; i < v.length; i++) { e = v[i] * k + e * (1 - k); o.push(e); } return o; }
@@ -43,18 +47,18 @@
     mu = a.reduce(function (p, q) { return p + q; }, 0) / n, sd = Math.sqrt(a.reduce(function (p, q) { return p + (q - mu) * (q - mu); }, 0) / n) || 1, o = {};
     s.forEach(function (x) { o[x] = (map[x] - mu) / sd; }); return o; }
 
-  // Facteurs bruts d'un actif à l'indice i
+  // Facteurs bruts d'un actif à l'indice i (3 facteurs documentés : momentum, tendance, faible vol.)
   function factorsAt(a, i) {
     var cl = a.cl;
     return { mom: ret(cl, i, 90), trend: a.e200[i] ? cl[i] / a.e200[i] - 1 : 0, lowvol: -vol(cl, i, 30) };
   }
-  // Score composite cross-sectionnel à un instant : z-score chaque facteur puis pondère
+  // Score composite cross-sectionnel : z-score chaque facteur (vs le panier) puis pondère (ensemble).
   function compositeAt(assets, idxByT, t) {
-    var mom = {}, tr = {}, lv = {}, present = [];
+    var raw = { mom: {}, trend: {}, lowvol: {} }, present = [];
     assets.forEach(function (a) { var i = idxByT[a.sym][t]; if (i == null || i < 205) return;
-      var f = factorsAt(a, i); mom[a.sym] = f.mom; tr[a.sym] = f.trend; lv[a.sym] = f.lowvol; present.push(a.sym); });
+      var f = factorsAt(a, i); raw.mom[a.sym] = f.mom; raw.trend[a.sym] = f.trend; raw.lowvol[a.sym] = f.lowvol; present.push(a.sym); });
     if (present.length < 8) return null;
-    var zM = zmap(mom), zT = zmap(tr), zL = zmap(lv), comp = {}, sub = {};
+    var zM = zmap(raw.mom), zT = zmap(raw.trend), zL = zmap(raw.lowvol), comp = {}, sub = {};
     present.forEach(function (s) { comp[s] = W.mom * zM[s] + W.trend * zT[s] + W.lowvol * zL[s];
       sub[s] = { mom: zM[s], trend: zT[s], lowvol: zL[s] }; });
     return { comp: comp, sub: sub };
