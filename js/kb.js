@@ -907,6 +907,68 @@
     usage:"Passe-plat anti-impulsivité : si un critère manque, pas de trade. Transforme le trading en process reproductible.",
     biais:'stratégie — discipline' });
 
+  /* ===================== Tracés & lignes (compléments AT) ===================== */
+  add({ id:'trendline-break', nom:'Cassure & retest de trendline', alias:['trendline break','cassure de ligne','retest','throwback','pullback'], cat:'at', tags:['cassure','confirmation','entrée'],
+    def:"Quand le prix casse une ligne de tendance, il revient souvent la retester (throwback/pullback) : l'ancien support devient résistance (ou l'inverse). Un retest qui tient valide la cassure.",
+    usage:"Plutôt que de chasser la première cassure (souvent piégeuse), on attend le retest de la ligne pour une entrée plus sûre, stop de l'autre côté.",
+    biais:'confirmation — valide la cassure' });
+  add({ id:'trendline-validation', nom:'Validation d’une trendline', alias:['validation trendline','3 touches','angle de tendance','pente'], cat:'at', tags:['tracé','fiabilité','pente'],
+    def:"Une ligne de tendance gagne en fiabilité avec le nombre de touches (2 pour la tracer, 3+ pour la confirmer) et un angle raisonnable (~30-45°). Trop pentue = insoutenable, trop plate = peu significative.",
+    usage:"On privilégie les lignes touchées plusieurs fois et d'angle modéré ; on ignore les tracés forcés à travers les mèches.",
+    biais:'fiabilité — qualité du tracé' });
+  add({ id:'fakeout', nom:'Faux breakout (Fakeout)', alias:['fakeout','faux signal','fausse cassure','bull trap','bear trap'], cat:'at', tags:['piège','liquidité','retournement'],
+    def:"Cassure d'un niveau qui échoue et se retourne aussitôt, piégeant ceux qui ont suivi (bull trap au-dessus d'une résistance, bear trap sous un support). Souvent une chasse aux stops.",
+    usage:"On filtre par le volume et l'attente d'une clôture ; un fakeout confirmé (retour dans le range) devient un signal de retournement à fader.",
+    biais:'retournement — piège classique' });
+  add({ id:'sfp', nom:'Swing Failure Pattern (SFP)', alias:['sfp','swing failure','échec de swing','faux plus-haut'], cat:'at', tags:['liquidité','retournement','mèche'],
+    def:"Le prix dépasse brièvement un sommet/creux précédent (prise de liquidité) puis clôture de nouveau à l'intérieur : échec à tenir le nouvel extrême = signal de retournement.",
+    usage:"Entrée contre le faux dépassement, stop au-delà de la mèche. Équivalent AT du liquidity sweep / turtle soup.",
+    biais:'retournement' });
+  add({ id:'measured-move', nom:'Mouvement mesuré', alias:['measured move','objectif mesuré','projection de figure','hauteur'], cat:'at', tags:['objectif','projection','figure'],
+    def:"Méthode d'objectif : projeter la hauteur d'une figure (range, triangle, drapeau, tête-épaules) depuis le point de cassure pour estimer la cible du mouvement.",
+    usage:"Fixe un take-profit logique basé sur la géométrie de la figure plutôt qu'au hasard.",
+    biais:'objectif — cible mesurée' });
+  add({ id:'psychological-levels', nom:'Niveaux psychologiques (nombres ronds)', alias:['round numbers','nombres ronds','niveaux psychologiques','00 level'], cat:'at', tags:['niveau','ordres','aimant'],
+    def:"Les prix ronds (100, 1 000, 50 000…) attirent une concentration d'ordres (stops, limites) : ils agissent comme support/résistance et zones de liquidité naturelles.",
+    usage:"On surveille les réactions du prix aux nombres ronds ; ils servent souvent d'objectifs ou de zones de balayage.",
+    biais:'niveau — aimant psychologique' });
+  add({ id:'pitchfork', nom:'Fourche d’Andrews (Pitchfork)', alias:['andrews pitchfork','fourche d’andrews','median line','pitchfork'], cat:'at', tags:['canal','médiane','tracé'],
+    def:"Outil en 3 lignes parallèles tracé à partir de 3 points (creux-sommet-creux) : la ligne médiane attire le prix, les deux lignes externes servent de support/résistance dynamiques.",
+    usage:"On trade les rebonds sur les lignes et les retours vers la médiane ; utile pour encadrer une tendance saine.",
+    biais:'dynamique — canal statistique' });
+  add({ id:'regression-channel', nom:'Canal de régression linéaire', alias:['regression channel','canal de régression','déviation standard','raff channel'], cat:'at', tags:['statistique','canal','moyenne'],
+    def:"Canal construit par régression linéaire (droite qui minimise l'écart au prix) encadrée d'écarts-types. Montre la tendance moyenne et ses extrêmes statistiques.",
+    usage:"On achète le bas / vend le haut du canal en tendance ; la sortie des bandes signale un excès ou un changement de régime.",
+    biais:'dynamique — tendance statistique' });
+  add({ id:'fibonacci-fan', nom:'Éventail & arcs de Fibonacci', alias:['fibonacci fan','éventail de fibonacci','arcs','fibonacci time zones'], cat:'at', tags:['fibonacci','dynamique','tracé'],
+    def:"Déclinaisons du Fibonacci : l'éventail (obliques depuis un extrême) donne des supports/résistances diagonaux ; les arcs ajoutent une dimension temps ; les time zones marquent des dates de retournement potentielles.",
+    usage:"Compléments dynamiques aux retracements horizontaux, pour situer support/résistance dans le temps.",
+    biais:'contexte — support/résistance dynamique' });
+  add({ id:'gann', nom:'Angles & éventail de Gann', alias:['gann fan','angles de gann','1x1','gann box','w.d. gann'], cat:'at', tags:['géométrie','temps-prix','tracé'],
+    def:"Système de W.D. Gann reliant temps et prix par des angles géométriques (le 1×1 / 45° étant l'angle d'équilibre). Les prix respecteraient certaines pentes et divisions.",
+    usage:"On utilise l'angle 1×1 comme tendance de fond ; approche controversée et subjective, à croiser avec d'autres outils.",
+    biais:'contexte — géométrie temps/prix' });
+  add({ id:'dow-theory', nom:'Théorie de Dow', alias:['dow theory','théorie de dow','charles dow','3 mouvements'], cat:'at', tags:['théorie','tendance','fondement'],
+    def:"Fondement de l'AT (Charles Dow) : le marché escompte tout, évolue en 3 tendances (primaire, secondaire, mineure) et 3 phases (accumulation, participation, distribution) ; une tendance persiste jusqu'à signal clair de retournement, confirmé par le volume.",
+    usage:"Cadre de fond pour définir la tendance primaire et exiger la confirmation (indices/volume) avant de conclure à un retournement.",
+    biais:'cadre — fondement de la tendance' });
+  add({ id:'elliott-wave', nom:'Vagues d’Elliott', alias:['elliott wave','vagues d’elliott','5-3','impulsion correction','ondes'], cat:'at', tags:['théorie','cycles','fractal'],
+    def:"Théorie fractale : le marché progresse en 5 vagues dans le sens de la tendance (impulsion 1-2-3-4-5) puis corrige en 3 vagues (A-B-C), reflet de la psychologie de foule. Guidé par des ratios de Fibonacci.",
+    usage:"Situer la phase du cycle (ex. vague 3 = la plus puissante) pour anticiper la suite. Puissant mais très subjectif — plusieurs comptages possibles.",
+    biais:'cadre — cycles de sentiment' });
+  add({ id:'wolfe-waves', nom:'Vagues de Wolfe', alias:['wolfe waves','vagues de wolfe','5 points'], cat:'at', tags:['figure','retournement','projection'],
+    def:"Figure en 5 points qui, correctement identifiée, projette une ligne cible (1→4) et un timing de retournement. Cherche l'équilibre « naturel » du prix.",
+    usage:"On entre au point 5 avec objectif sur la ligne 1-4 ; exige une identification stricte pour éviter les faux comptages.",
+    biais:'retournement — avec cible projetée' });
+  add({ id:'ma-ribbon', nom:'Ruban de moyennes mobiles', alias:['ma ribbon','ruban de moyennes','guppy','gmma','ema stack'], cat:'indic', tags:['tendance','empilement','visuel'],
+    def:"Plusieurs moyennes mobiles de périodes croissantes affichées ensemble. Quand elles sont bien empilées et écartées dans l'ordre = tendance forte ; quand elles s'entrelacent = absence de tendance.",
+    usage:"Lecture visuelle rapide de la force et de la santé d'une tendance ; le resserrement annonce souvent un tournant.",
+    biais:'directionnel — force de tendance' });
+  add({ id:'log-scale', nom:'Échelle log vs linéaire', alias:['log scale','échelle logarithmique','semi-log','linéaire'], cat:'at', tags:['graphique','pourcentage','long terme'],
+    def:"L'échelle logarithmique représente les variations en pourcentage (une même distance = même % de hausse), l'échelle linéaire en valeur absolue. Sur le long terme et les gros mouvements (crypto), le log est plus fidèle.",
+    usage:"On trace les trendlines de fond en échelle log pour les grands mouvements ; les niveaux et angles diffèrent nettement de l'échelle linéaire.",
+    biais:'méthode — lecture correcte du graphe' });
+
   // ---------------------------------------------------------------------------
   // MOTEUR DE RECHERCHE + API
   // ---------------------------------------------------------------------------
