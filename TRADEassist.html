@@ -1963,10 +1963,15 @@
     var body = {
       model: model,
       max_tokens: 4000, // marge pour la réflexion + le JSON (sinon risque de réponse coupée)
-      output_config: { effort: 'low' }, // rapide & économique pour une analyse structurée
       system: SYSTEM,
       messages: [{ role: 'user', content: buildUser(pairs, mtf, collab) }]
     };
+    // Le paramètre `effort` n'est supporté que par certains modèles (Opus/Sonnet
+    // récents). Haiku 4.5 le refuse (erreur 400) — on ne l'envoie que si le
+    // modèle le connaît, sinon on l'omet.
+    if (/opus|sonnet/i.test(model)) {
+      body.output_config = { effort: 'low' }; // rapide & économique pour une analyse structurée
+    }
     return fetch(ENDPOINT, {
       method: 'POST',
       headers: {
