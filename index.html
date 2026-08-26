@@ -1340,8 +1340,9 @@ function quantBuildTrades(longs, shorts){
     return { sym:g.sym, dir:long?'LONG':'SHORT', entry, sl, tp, rr:2, score:g.score,
       note:`Quant — panier factoriel (score ${g.score>=0?'+':''}${g.score})` };
   }
-  return (longs||[]).slice(0,3).map(g=>mk(g,true)).filter(Boolean)
-    .concat((shorts||[]).slice(0,3).map(g=>mk(g,false)).filter(Boolean));
+  // Tout le panier : les 5 longs et les 5 shorts (pas seulement 3).
+  return (longs||[]).map(g=>mk(g,true)).filter(Boolean)
+    .concat((shorts||[]).map(g=>mk(g,false)).filter(Boolean));
 }
 function quantTradeCard(t){
   const long=t.dir==='LONG';
@@ -1444,8 +1445,11 @@ let IA_HORIZON=4;
 // les plus forts (▲) => LONG, les plus faibles (▼) => SHORT. Le stop est
 // calibré sur la volatilité (ATR) de l'actif, l'objectif à RR 2.
 function iaBuildTrades(sigs){
-  const ups = sigs.filter(s=>s.dir==='up').slice(0,3);          // 3 plus forts
-  const downs = sigs.filter(s=>s.dir==='down').slice(-3).reverse(); // 3 plus faibles
+  // On prend les 5 plus forts (LONG) et les 5 plus faibles (SHORT) du classement,
+  // même si le signal n'est pas ultra-marqué — pour donner plus de positions.
+  const N = sigs.length, K = Math.min(5, Math.floor(N/2));
+  const ups = sigs.slice(0, K);           // 5 plus forts
+  const downs = sigs.slice(N-K).reverse(); // 5 plus faibles
   function mk(s, long){
     const vol = Math.max(0.005, s.vol||0.02);
     const k = Math.min(0.15, Math.max(0.03, vol*2.5)); // distance de stop (3 %..15 %)
