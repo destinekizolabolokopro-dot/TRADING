@@ -448,7 +448,8 @@
           contrib.sort(function (a, b) { return Math.abs(b.v) - Math.abs(a.v); });
           var drivers = contrib.slice(0, 3).map(function (cc) { return { n: cc.n, d: cc.v >= 0 ? 'haussier' : 'baissier' }; });
           return { sym: pa.a.sym, cls: pa.a.cls, price: pa.f.price, prob: +prob.toFixed(3),
-            dir: dir, conf: conf, drivers: drivers };
+            dir: dir, conf: conf, drivers: drivers,
+            vol: +((pa.f.live.raw[5] || 0.02)).toFixed(4) }; // ATR/prix (~volatilité journalière)
         }).sort(function (a, b) { return b.prob - a.prob; }); // classement par force relative décroissante
 
         // 7) Apprendre de ses erreurs : noter les anciennes prédictions, puis logger celles du jour

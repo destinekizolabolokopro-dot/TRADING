@@ -631,7 +631,7 @@
             <li>Vrai modèle <b>qui tourne dans ton navigateur</b></li>
             <li><b>100 % gratuit</b>, aucune clé, rien n'est envoyé</li>
             <li><b>S'entraîne seul</b> &amp; apprend de ses erreurs (momentum relatif)</li>
-            <li>Donne une <b>tendance statistique</b>, pas un trade rédigé</li>
+            <li>Propose ses <b>positions</b> (LONG/SHORT) déduites de son classement</li>
           </ul>
         </div>
       </div>
@@ -1399,6 +1399,34 @@ function iaSigCard(s){
   </div>`;
 }
 let IA_HORIZON=4;
+// Transforme les prédictions de force relative en VRAIES positions :
+// les plus forts (▲) => LONG, les plus faibles (▼) => SHORT. Le stop est
+// calibré sur la volatilité (ATR) de l'actif, l'objectif à RR 2.
+function iaBuildTrades(sigs){
+  const ups = sigs.filter(s=>s.dir==='up').slice(0,3);          // 3 plus forts
+  const downs = sigs.filter(s=>s.dir==='down').slice(-3).reverse(); // 3 plus faibles
+  function mk(s, long){
+    const vol = Math.max(0.005, s.vol||0.02);
+    const k = Math.min(0.15, Math.max(0.03, vol*2.5)); // distance de stop (3 %..15 %)
+    const entry = s.price;
+    const sl = long ? entry*(1-k) : entry*(1+k);
+    const tp = long ? entry*(1+2*k) : entry*(1-2*k);   // RR 2
+    return { sym:s.sym, dir: long?'LONG':'SHORT', entry, sl, tp, rr:2,
+      conf:s.conf, prob:Math.round(s.prob*100),
+      note:`IA maison — momentum relatif (${Math.round(s.prob*100)}% de surperformance à ~${IA_HORIZON} j)` };
+  }
+  return ups.map(s=>mk(s,true)).concat(downs.map(s=>mk(s,false)));
+}
+function iaTradeCard(t){
+  const long=t.dir==='LONG';
+  return `<div class="ai-idea ${long?'long':'short'}">
+    <div class="ihead"><span class="isym">${t.sym}</span>
+      <span class="ilvl">${long?'▲ LONG':'▼ SHORT'} · ~${IA_HORIZON} j · ${t.prob}% · confiance ${t.conf}%</span></div>
+    <div class="inums"><span>Entrée ${fmtN(t.entry)}</span><span class="lo">Stop ${fmtN(t.sl)}</span>
+      <span class="tp">Objectif ${fmtN(t.tp)}</span><span>RR ${t.rr}</span></div>
+    <div class="inums"><span class="tp">Sur 10 000 € (risque 1 %) : +${Math.round(100*t.rr)} € si TP</span><span class="lo">−100 € si SL</span></div>
+  </div>`;
+}
 function renderIA(d){
   const body=$('#ia-body');
   if(!d){ body.innerHTML='<div class="hist-empty">Impossible de charger les vraies données (réseau restreint côté aperçu en ligne). <b>Ouvre le fichier depuis ton PC</b> (double-clic) pour que l\'IA s\'entraîne sur les vraies bougies.</div>'; return; }
@@ -1444,7 +1472,18 @@ function renderIA(d){
   html += `<div class="ia-h">🔴 Les plus faibles du panier <span class="stag" style="font-weight:400">candidats à sous-performer</span></div>`;
   html += `<div class="ia-sigs">${weak.map(iaSigCard).join('')}</div>`;
   if(mid.length) html += `<details style="margin-top:14px"><summary style="cursor:pointer;color:var(--muted);font-size:.86rem">Voir le milieu du classement (${mid.length} actifs, signal indécis)</summary><div class="ia-sigs" style="margin-top:12px">${mid.map(iaSigCard).join('')}</div></details>`;
-  html += `<p class="bt-caveat" style="margin-top:16px">🔎 L'IA ne prédit <b>pas</b> « ça va monter » (c'est du pile ou face), mais <b>quels actifs devraient être plus forts que le panier</b> sur ~${IA_HORIZON} j (momentum relatif). « ▲ Fort » = candidat à surperformer ; « ▼ Faible » = à sous-performer. Elle ne place ni stop ni objectif — sers-t'en comme d'une <b>boussole de rotation</b>, à croiser avec l'onglet ICT/SMC. Pédagogique, pas un conseil financier.</p>`;
+  // Positions concrètes déduites du classement (forts => LONG, faibles => SHORT)
+  const iaTrades = iaBuildTrades(d.signals);
+  html += `<div class="ia-h" style="margin-top:22px">🎯 Positions proposées par l'IA maison <span class="stag" style="font-weight:400">déduites du classement · stop sur volatilité · RR 2</span></div>`;
+  html += iaTrades.length
+    ? `<div class="ai-out show" style="margin-top:4px">${iaTrades.map(iaTradeCard).join('')}</div>`
+    : `<div class="hist-empty">Aucun signal assez marqué pour proposer une position (le panier est indécis en ce moment).</div>`;
+  html += `<p class="bt-caveat" style="margin-top:14px">🔎 Ces positions traduisent le classement de force relative en trades : les plus forts en <b>LONG</b>, les plus faibles en <b>SHORT</b>, entrée au prix actuel, stop calé sur la volatilité (ATR) et objectif à RR 2 sur ~${IA_HORIZON} j. Elles s'ajoutent à ton <b>historique</b> (bot « IA maison ») et sont notées au TP/SL. <b>Avantage statistique modeste — pédagogique, pas un conseil financier.</b></p>`;
+  // Enregistre les positions dans l'historique (source « IA maison »)
+  if(window.History && iaTrades.length){
+    History.record(iaTrades.map(t=>({sym:t.sym,dir:t.dir,entry:t.entry,sl:t.sl,tp:t.tp,rr:t.rr,note:t.note,price:t.entry})),'IA maison');
+    const pm=priceMap(); if(Object.keys(pm).length) History.evaluate(pm);
+  }
   body.innerHTML = html;
   // Câblage mémoire (export / import / reset)
   $('#ia-export').addEventListener('click', ()=>{
