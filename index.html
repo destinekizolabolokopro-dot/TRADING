@@ -1187,6 +1187,15 @@ function renderPro(data){
     }).join('');
   }
   body.innerHTML = html;
+  // Enregistre dans l'historique les signaux Pro concrets (non-WAIT, avec objectif)
+  if(window.History){
+    const trades=[];
+    (data.strategies||[]).forEach(s=>{ (s.signals||[]).forEach(g=>{
+      if(g && g.dir && g.dir!=='WAIT' && g.rr && g.entry!=null && g.sl!=null && g.tp!=null)
+        trades.push({sym:g.sym,dir:g.dir,entry:+g.entry,sl:+g.sl,tp:+g.tp,rr:+g.rr,note:(s.name+' — '+(g.note||'')).slice(0,180),price:+g.entry});
+    }); });
+    if(trades.length){ History.record(trades,'Stratégies Pro'); const pm=priceMap(); if(Object.keys(pm).length) History.evaluate(pm); }
+  }
 }
 function perfBadge(p){
   if(!p || !p.trades) return '';
@@ -1309,8 +1318,40 @@ function renderQuant(d){
   html += `<div class="q-side"><h3>🔴 Jambe COURTE <span class="stag" style="font-weight:400">bottom ${d.shorts.length} · à éviter / short</span></h3>
     <p class="sub">Les plus faibles du panier. En market-neutral, on les vend à découvert (coût de short réel à prévoir).</p>
     <div class="q-basket">${d.shorts.map(g=>qCard(g,'short')).join('')}</div></div>`;
-  html += `<p class="bt-caveat" style="margin-top:18px">🔎 Chaque barre montre la force du facteur (z-score vs le panier) : à droite = fort, à gauche = faible. C'est la logique des grands fonds — un panier diversifié de paris relatifs, jugé au Sharpe. <b>Pédagogique, market-neutral ≠ sans risque, pas un conseil financier.</b></p>`;
+  // Positions concrètes du panier : jambe longue => LONG, jambe courte => SHORT.
+  const qTrades = quantBuildTrades(d.longs, d.shorts);
+  html += `<div class="ia-h" style="margin-top:22px">🎯 Positions du panier <span class="stag" style="font-weight:400">long les forts · short les faibles · stop sur volatilité · RR 2</span></div>`;
+  html += qTrades.length
+    ? `<div class="ai-out show" style="margin-top:4px">${qTrades.map(quantTradeCard).join('')}</div>`
+    : `<div class="hist-empty">Données insuffisantes pour proposer des positions.</div>`;
+  html += `<p class="bt-caveat" style="margin-top:14px">🔎 Chaque barre montre la force du facteur (z-score vs le panier). Les <b>positions</b> ci-dessus traduisent le panier en trades (long les plus forts, short les plus faibles, stop sur la volatilité, RR 2). Elles s'ajoutent à ton <b>historique</b> (bot « Quant »). <b>Market-neutral ≠ sans risque — pédagogique, pas un conseil financier.</b></p>`;
+  if(window.History && qTrades.length){
+    History.record(qTrades.map(t=>({sym:t.sym,dir:t.dir,entry:t.entry,sl:t.sl,tp:t.tp,rr:t.rr,note:t.note,price:t.entry})),'Quant');
+    const pm=priceMap(); if(Object.keys(pm).length) History.evaluate(pm);
+  }
   body.innerHTML = html;
+}
+// Construit des positions à partir du panier Quant (mêmes règles que l'IA maison).
+function quantBuildTrades(longs, shorts){
+  function mk(g, long){
+    if(g.price==null) return null;
+    const vol=Math.max(0.005, g.vol||0.02), k=Math.min(0.15, Math.max(0.03, vol*2.5));
+    const entry=g.price, sl=long?entry*(1-k):entry*(1+k), tp=long?entry*(1+2*k):entry*(1-2*k);
+    return { sym:g.sym, dir:long?'LONG':'SHORT', entry, sl, tp, rr:2, score:g.score,
+      note:`Quant — panier factoriel (score ${g.score>=0?'+':''}${g.score})` };
+  }
+  return (longs||[]).slice(0,3).map(g=>mk(g,true)).filter(Boolean)
+    .concat((shorts||[]).slice(0,3).map(g=>mk(g,false)).filter(Boolean));
+}
+function quantTradeCard(t){
+  const long=t.dir==='LONG';
+  return `<div class="ai-idea ${long?'long':'short'}">
+    <div class="ihead"><span class="isym">${t.sym}</span>
+      <span class="ilvl">${long?'▲ LONG':'▼ SHORT'} · score ${t.score>=0?'+':''}${t.score}</span></div>
+    <div class="inums"><span>Entrée ${fmtN(t.entry)}</span><span class="lo">Stop ${fmtN(t.sl)}</span>
+      <span class="tp">Objectif ${fmtN(t.tp)}</span><span>RR ${t.rr}</span></div>
+    <div class="inums"><span class="tp">Sur 10 000 € (risque 1 %) : +${Math.round(100*t.rr)} € si TP</span><span class="lo">−100 € si SL</span></div>
+  </div>`;
 }
 function loadQuant(force){
   if((quantLoaded&&!force)||quantLoading||!window.QUANT) return;

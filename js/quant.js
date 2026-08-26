@@ -126,7 +126,8 @@
       var c = compositeAt(assets, idxByT, tLive) || compositeAt(assets, idxByT, times[times.length - 2]);
       var ranked = c ? Object.keys(c.comp).sort(function (x, y) { return c.comp[y] - c.comp[x]; }) : [];
       function pack(s) { var a = assets.find(function (x) { return x.sym === s; }); return { sym: s, score: +c.comp[s].toFixed(2), sub: c.sub[s],
-        price: a ? a.cl[a.cl.length - 1] : null }; }
+        price: a ? a.cl[a.cl.length - 1] : null,
+        vol: a ? +(vol(a.cl, a.cl.length - 1, 30)).toFixed(4) : 0.02 }; }
       var longs = ranked.slice(0, K).map(pack), shorts = ranked.slice(-K).map(pack).reverse();
       var mids = ranked.slice(K, ranked.length - K).map(pack);
 
