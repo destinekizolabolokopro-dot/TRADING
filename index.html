@@ -515,10 +515,17 @@
 
   <div class="viewswitch">
     <button class="vs on" data-v="ict">🎯 Signaux ICT / SMC</button>
+    <button class="vs" data-v="cons">🤝 Consensus</button>
     <button class="vs" data-v="pro">♟️ Stratégies Pro</button>
     <button class="vs" data-v="ia">🧠 IA maison <span class="vs-tag local">locale</span></button>
     <button class="vs" data-v="quant">🏛️ Quant</button>
     <button class="vs" data-v="kb">📚 Bibliothèque</button>
+  </div>
+
+  <div id="view-cons" style="display:none">
+    <p class="pro-intro">Le <b>consensus des 5 bots</b> : pour chaque actif, on regarde ce que disent l'ICT, les Stratégies Pro, le Quant, l'IA maison et le Bot IA (Claude), et on compte les votes. <span class="pro-warn">Quand plusieurs bots sont d'accord (ex. « 4 sur 5 disent ACHETER »), le signal est bien plus solide qu'un seul bot isolé. Pédagogique, pas un conseil financier.</span></p>
+    <div class="modal-actions" style="margin:0 0 14px"><button class="btn" id="cons-refresh">🔄 Rafraîchir les avis</button></div>
+    <div id="cons-body"><div class="hist-empty">Ouvre une fois les onglets IA maison, Quant et Stratégies Pro pour que leurs avis se chargent, puis reviens ici (ou clique « Rafraîchir »).</div></div>
   </div>
 
   <div id="view-ict">
@@ -928,7 +935,8 @@ boot();
 
 /* ---------- Analyse IA (Claude) ---------- */
 const aiOverlay=$('#ai-overlay');
-let lastIA=null, lastQuant=null; // caches partagés : avis de l'IA maison + du Quant
+let lastIA=null, lastQuant=null, lastPro=null, lastAI=null; // caches partagés des bots (pour le Consensus)
+function refreshConsensusIfVisible(){ const el=$('#view-cons'); if(el && el.style.display!=='none' && typeof renderConsensus==='function') renderConsensus(); }
 
 // Construit « l'avis des autres moteurs du site » pour le donner à Claude (liaison des IA).
 function buildCollab(){
@@ -992,6 +1000,7 @@ $('#ai-run').addEventListener('click', async ()=>{
     // Sécurité : on n'affiche que les trades >= 1 RR, meilleurs ratios d'abord
     let idees=(r.parsed.idees||[]).filter(i=> i.rr==null || +i.rr>=1);
     idees.sort((a,b)=> (+b.rr||0)-(+a.rr||0));
+    lastAI=idees; refreshConsensusIfVisible(); // pour l'onglet Consensus
     if(window.History){ const pm=priceMap(); History.record(idees.map(i=>({sym:i.paire,dir:(i.sens||'').toUpperCase(),entry:+i.entree,sl:+i.stop,tp:+i.objectif,rr:+i.rr,note:i.pourquoi||'',price:(pm[i.paire]!=null?pm[i.paire]:null)})),'Bot IA'); History.evaluate(pm); }
     if(!idees.length) html+='<div class="ai-summary">Aucune idée ≥ 1 RR pour l’instant — le Bot IA préfère attendre.</div>';
     idees.forEach(i=>{
@@ -1210,7 +1219,7 @@ function perfBadge(p){
 function loadPro(){
   if(proLoaded||proLoading||!window.PRO) return;
   proLoading=true;
-  PRO.load().then(d=>{ proLoaded=true; proLoading=false; renderPro(d); })
+  PRO.load().then(d=>{ proLoaded=true; proLoading=false; lastPro=d; renderPro(d); refreshConsensusIfVisible(); })
             .catch(()=>{ proLoading=false; renderPro(null); });
 }
 $('.viewswitch').addEventListener('click', e=>{
@@ -1218,6 +1227,7 @@ $('.viewswitch').addEventListener('click', e=>{
   $('.viewswitch .on').classList.remove('on'); b.classList.add('on');
   const v=b.dataset.v;
   $('#view-ict').style.display   = v==='ict'?'':'none';
+  $('#view-cons').style.display  = v==='cons'?'':'none';
   $('#view-pro').style.display   = v==='pro'?'':'none';
   $('#view-ia').style.display    = v==='ia' ?'':'none';
   $('#view-quant').style.display = v==='quant'?'':'none';
@@ -1226,7 +1236,61 @@ $('.viewswitch').addEventListener('click', e=>{
   if(v==='ia')  loadIA();
   if(v==='quant') loadQuant();
   if(v==='kb')  loadKB();
+  if(v==='cons') loadConsensus();
 });
+
+/* ---------- Consensus des bots (coordination) ---------- */
+function consVotes(sym){
+  const v={ict:null,pro:null,quant:null,ia:null,botia:null};
+  const p=(typeof PAIRS!=='undefined'?PAIRS:[]).find(x=>x.sym===sym);
+  if(p && p.dir && p.dir!=='WAIT') v.ict=p.dir;
+  if(lastPro && lastPro.synthese){ const s=lastPro.synthese.find(x=>x.sym===sym);
+    if(s){ if(s.verdict==='haussier') v.pro='LONG'; else if(s.verdict==='baissier') v.pro='SHORT'; } }
+  if(lastQuant){ if((lastQuant.longs||[]).some(g=>g.sym===sym)) v.quant='LONG';
+    else if((lastQuant.shorts||[]).some(g=>g.sym===sym)) v.quant='SHORT'; }
+  if(lastIA && lastIA.signals){ const s=lastIA.signals.find(x=>x.sym===sym);
+    if(s){ if(s.dir==='up') v.ia='LONG'; else if(s.dir==='down') v.ia='SHORT'; } }
+  if(lastAI){ const i=lastAI.find(x=>(x.paire||'').toUpperCase()===sym.toUpperCase());
+    if(i){ const d=(i.sens||'').toUpperCase(); if(d==='LONG'||d==='SHORT') v.botia=d; } }
+  return v;
+}
+function consCell(x){ return x==='LONG'?'<td class="hd-long" style="text-align:center">▲</td>'
+  : x==='SHORT'?'<td class="hd-short" style="text-align:center">▼</td>'
+  : '<td style="text-align:center;color:var(--faint)">—</td>'; }
+function renderConsensus(){
+  const body=$('#cons-body'); if(!body) return;
+  const set={};
+  (typeof PAIRS!=='undefined'?PAIRS:[]).forEach(p=>set[p.sym]=1);
+  if(lastPro&&lastPro.synthese) lastPro.synthese.forEach(s=>set[s.sym]=1);
+  if(lastQuant){ (lastQuant.longs||[]).concat(lastQuant.shorts||[],lastQuant.mids||[]).forEach(g=>set[g.sym]=1); }
+  if(lastIA&&lastIA.signals) lastIA.signals.forEach(s=>set[s.sym]=1);
+  if(lastAI) lastAI.forEach(i=>{ if(i.paire) set[i.paire]=1; });
+  const syms=Object.keys(set);
+  const ready=[lastPro?1:0,lastQuant?1:0,lastIA?1:0,lastAI?1:0].reduce((a,b)=>a+b,0)+1; // +1 = ICT toujours là
+  let rows=syms.map(sym=>{ const v=consVotes(sym);
+    const votes=[v.ict,v.pro,v.quant,v.ia,v.botia];
+    const nL=votes.filter(x=>x==='LONG').length, nS=votes.filter(x=>x==='SHORT').length;
+    return {sym,v,nL,nS,n:nL+nS,score:nL-nS};
+  }).filter(r=>r.n>0).sort((a,b)=> Math.abs(b.score)-Math.abs(a.score) || b.n-a.n);
+  if(!rows.length){ body.innerHTML='<div class="hist-empty">Aucun avis chargé. Ouvre les onglets 🧠 IA maison, 🏛️ Quant et ♟️ Stratégies Pro (et lance le 🤖 Bot IA) — puis reviens ici ou clique « Rafraîchir ».</div>'; return; }
+  const strong=rows.filter(r=>Math.abs(r.score)>=3).length;
+  let h=`<p class="kb-count">${ready} bot${ready>1?'s':''} avec un avis chargé · ${rows.length} actifs · <b>${strong}</b> à consensus fort (≥3 bots d'accord)</p>`;
+  h+='<div class="htable-wrap"><table class="htable"><thead><tr>'
+    +'<th>Actif</th><th style="text-align:center">🎯 ICT</th><th style="text-align:center">♟️ Pro</th><th style="text-align:center">🏛️ Quant</th><th style="text-align:center">🧠 IA maison</th><th style="text-align:center">🤖 Bot IA</th><th>Verdict</th></tr></thead><tbody>';
+  rows.forEach(r=>{
+    let verdict, vc;
+    if(r.nL>=2 && r.nL>r.nS){ verdict=(r.nL===r.n?'ACHAT net':'Achat')+' '+r.nL+'/'+r.n; vc='win'; }
+    else if(r.nS>=2 && r.nS>r.nL){ verdict=(r.nS===r.n?'VENTE nette':'Vente')+' '+r.nS+'/'+r.n; vc='loss'; }
+    else { verdict='partagé'; vc='open'; }
+    h+='<tr><td><b>'+r.sym+'</b></td>'+consCell(r.v.ict)+consCell(r.v.pro)+consCell(r.v.quant)+consCell(r.v.ia)+consCell(r.v.botia)
+      +'<td><span class="rc '+vc+'">'+verdict+'</span></td></tr>';
+  });
+  h+='</tbody></table></div>';
+  h+='<p class="bt-caveat" style="margin-top:14px">▲ = ce bot dit ACHETER · ▼ = VENDRE · — = neutre/pas d\'avis. Plus il y a de bots d\'accord, plus l\'idée est solide — mais <b>ce n\'est pas une garantie</b>. Certains bots couvrent peu d\'actifs (ICT 8 paires, Pro 7) ; le Quant et l\'IA maison en couvrent ~26. <b>Pédagogique, pas un conseil financier.</b></p>';
+  body.innerHTML=h;
+}
+function loadConsensus(){ if(window.PRO)loadPro(); if(window.IA)loadIA(); if(window.QUANT)loadQuant(); renderConsensus(); }
+$('#cons-refresh').addEventListener('click', ()=>{ if(window.PRO)loadPro(); if(window.IA)loadIA(); if(window.QUANT)loadQuant(); renderConsensus(); });
 
 /* ---------- Bibliothèque (base de connaissances) ---------- */
 let kbInit=false, kbCat='all', kbQuery='';
@@ -1357,13 +1421,14 @@ function quantTradeCard(t){
 function loadQuant(force){
   if((quantLoaded&&!force)||quantLoading||!window.QUANT) return;
   quantLoading=true;
-  QUANT.load().then(d=>{ quantLoaded=true; quantLoading=false; lastQuant=d; renderQuant(d); })
+  QUANT.load().then(d=>{ quantLoaded=true; quantLoading=false; lastQuant=d; renderQuant(d); refreshConsensusIfVisible(); })
              .catch(()=>{ quantLoading=false; renderQuant(null); });
 }
 
 /* ---------- Sélecteur d'outils (« Mes outils ») ---------- */
 const TOOLS = [
   { id:'ict',   name:'🎯 Signaux ICT / SMC',   desc:'Le bot à règles : structure, FVG, Order Blocks, liquidité, confluence.', kind:'Onglet', type:'view' },
+  { id:'cons',  name:'🤝 Consensus',           desc:'Coordination : le vote des 5 bots par actif (plusieurs d\'accord = signal plus solide).', kind:'Onglet', type:'view' },
   { id:'ia',    name:'🧠 IA maison (locale)',   desc:'Modèle ML gratuit entraîné dans ton navigateur — s\'améliore tout seul.',  kind:'Onglet', type:'view' },
   { id:'quant', name:'🏛️ Quant / Institutionnel', desc:'Panier market-neutral factoriel, à la manière des grands fonds.',      kind:'Onglet', type:'view' },
   { id:'pro',   name:'♟️ Stratégies Pro',       desc:'Méthodes systématiques des fonds (tendance, cassure…) + backtest.',      kind:'Onglet', type:'view' },
@@ -1472,6 +1537,20 @@ function iaTradeCard(t){
     <div class="inums"><span class="tp">Sur 10 000 € (risque 1 %) : +${Math.round(100*t.rr)} € si TP</span><span class="lo">−100 € si SL</span></div>
   </div>`;
 }
+// Courbe de progression : précision (walk-forward) au fil des entraînements.
+function iaProgressSVG(prog){
+  const pts=(prog||[]).filter(p=>p.acc!=null);
+  if(pts.length<2) return '<div class="eq-empty">Pas encore assez d’entraînements pour tracer la progression — reviens après quelques ouvertures.</div>';
+  const W=680,H=120,pad=8, ys=pts.map(p=>p.acc);
+  const min=Math.min(45,...ys), max=Math.max(60,...ys), span=(max-min)||1;
+  const x=i=>pad+i*(W-2*pad)/(pts.length-1);
+  const y=v=>pad+(1-(v-min)/span)*(H-2*pad);
+  const poly=pts.map((p,i)=>x(i)+','+y(p.acc).toFixed(1)).join(' ');
+  const y50=y(50).toFixed(1);
+  return `<svg class="eq-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Progression de la précision">
+    <line x1="${pad}" x2="${W-pad}" y1="${y50}" y2="${y50}" stroke="var(--border-strong)" stroke-dasharray="3 3"/>
+    <polyline points="${poly}" fill="none" stroke="var(--long)" stroke-width="2" stroke-linejoin="round"/></svg>`;
+}
 function renderIA(d){
   const body=$('#ia-body');
   if(!d){ body.innerHTML='<div class="hist-empty">Impossible de charger les vraies données (réseau restreint côté aperçu en ligne). <b>Ouvre le fichier depuis ton PC</b> (double-clic) pour que l\'IA s\'entraîne sur les vraies bougies.</div>'; return; }
@@ -1507,6 +1586,8 @@ function renderIA(d){
       <button class="ai-btn ghost" id="ia-reset">Réinitialiser</button>
     </div>
   </section>`;
+  // Progression au fil des entraînements
+  html += `<div class="hist-block" style="margin-top:4px"><div class="eq-head">📈 Progression de l'IA <span class="eq-sub">précision (jamais-vu) sur ${d.sessions||1} entraînement${(d.sessions||1)>1?'s':''} · ligne pointillée = 50 %</span></div>${iaProgressSVG(d.progress)}</div>`;
   // Boussole de rotation : on met en avant les plus FORTS et les plus FAIBLES du panier
   // (le milieu, indécis, est regroupé). d.signals est déjà trié par force décroissante.
   const sigs = d.signals, N = sigs.length, K = Math.min(8, Math.floor(N/2));
@@ -1547,7 +1628,7 @@ function loadIA(force){
   iaLoading=true;
   const body=$('#ia-body');
   if(force) body.innerHTML='<div class="hist-empty">⏳ Ré-entraînement…</div>';
-  IA.load().then(d=>{ iaLoaded=true; iaLoading=false; lastIA=d; renderIA(d); })
+  IA.load().then(d=>{ iaLoaded=true; iaLoading=false; lastIA=d; renderIA(d); refreshConsensusIfVisible(); })
            .catch(()=>{ iaLoading=false; renderIA(null); });
 }
 $('#ia-import-file').addEventListener('change', e=>{

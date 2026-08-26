@@ -461,11 +461,21 @@
         brain.mu = std.mu; brain.sg = std.sg;
         brain.wf = wf; brain.samples = poolX.length; brain.assets = perAsset.length;
         brain.sessions = (brain.sessions || 0) + 1; brain.updated = Date.now();
+        // Historique de progression : on garde une trace à chaque entraînement
+        // (précision walk-forward, track record réel, nb d'exemples) pour tracer une courbe.
+        brain.progress = (brain.progress || []).concat([{
+          t: brain.updated,
+          acc: wf ? wf.acc : null,
+          edge: (wf && wf.accEngaged != null && wf.baseline != null) ? (wf.accEngaged - wf.baseline) : null,
+          rate: (brain.track && brain.track.rate != null) ? brain.track.rate : null,
+          samples: poolX.length, sessions: brain.sessions
+        }]);
+        if (brain.progress.length > 300) brain.progress = brain.progress.slice(-300);
         idbPut(brain);
 
         return { signals: signals, wf: wf, track: brain.track, sessions: brain.sessions,
           samples: poolX.length, assets: perAsset.length, horizon: HORIZON, updated: brain.updated,
-          featureNames: FEATURE_NAMES };
+          featureNames: FEATURE_NAMES, progress: brain.progress };
       });
     });
   }
