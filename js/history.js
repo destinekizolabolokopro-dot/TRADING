@@ -114,7 +114,9 @@
       rrPlanned: closed.length ? +(closed.reduce(function (a, x) { return a + (x.rr || 0); }, 0) / closed.length).toFixed(2) : null,
       best: best ? { sym: best.symbol, r: best.r } : null,
       worst: worst ? { sym: worst.symbol, r: worst.r } : null,
-      streak: streak, streakType: streakType, equity: eq
+      streak: streak, streakType: streakType, equity: eq,
+      avgR: closed.length ? +(rsum / closed.length).toFixed(2) : null, // gain moyen par trade (R)
+      avgDurMs: closed.length ? Math.round(closed.reduce(function (a, x) { return a + ((x.closedTs || x.ts) - x.ts); }, 0) / closed.length) : null
     };
   }
 

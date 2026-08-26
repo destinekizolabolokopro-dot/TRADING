@@ -1010,6 +1010,7 @@ $('#ai-run').addEventListener('click', async ()=>{
         '<span class="ilvl">'+(long?'▲ LONG':'▼ SHORT')+(i.tf?' · '+i.tf:'')+' · '+(i.confiance!=null?i.confiance+'%':'')+'</span></div>'+
         '<div class="inums"><span>Entrée '+fmtN(i.entree)+'</span><span class="lo">Stop '+fmtN(i.stop)+'</span>'+
         '<span class="tp">Objectif '+fmtN(i.objectif)+'</span><span>RR '+(i.rr!=null?i.rr:'—')+'</span></div>'+
+        ((i.entree&&i.objectif&&i.stop)?'<div class="inums"><span class="tp">Objectif +'+(pctMove(+i.entree,+i.objectif,long)||0).toFixed(1)+'%</span><span class="lo">Risque '+(pctMove(+i.entree,+i.stop,long)||0).toFixed(1)+'% au stop</span>'+(i.tf?'<span>unité '+i.tf+'</span>':'')+'</div>':'')+
         (i.rr!=null?'<div class="inums"><span class="tp">Sur 10 000 € (risque 1 %) : +'+Math.round(100*(+i.rr))+' € si TP</span><span class="lo">−100 € si SL</span></div>':'')+
         '<div class="why">'+(i.pourquoi||'')+'</div></div>';
     });
@@ -1021,6 +1022,9 @@ $('#ai-run').addEventListener('click', async ()=>{
 const histOverlay=$('#hist-overlay');
 let histSource=''; // '' = toutes
 function frDate(ts){ return new Date(ts).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}); }
+function fmtDur(ms){ if(ms==null) return '—'; const m=ms/60000; if(m<60) return Math.round(m)+' min'; const h=m/60; if(h<24) return (h<10?h.toFixed(1):Math.round(h))+' h'; const j=Math.floor(h/24), rh=Math.round(h%24); return j+' j'+(rh?' '+rh+' h':''); }
+// Écart en % entre l'entrée et un niveau, dans le sens du trade (positif = favorable).
+function pctMove(entry, level, long){ if(entry==null||level==null||!entry) return null; return (long ? (level/entry-1) : (entry/level-1))*100; }
 function srcClass(s){ return (s||'').indexOf('IA')>=0?'ia':'regles'; }
 // Petite courbe d'équité (R cumulés) en SVG inline.
 function equitySVG(eq){
@@ -1062,6 +1066,8 @@ function renderHist(){
     kpi('Profit factor', pfTxt, ((s.pf==null||s.pf>=1)?'pos':'neg'), 'gains ÷ pertes')+
     kpi('RR moyen visé', (s.rrPlanned!=null?s.rrPlanned:'—'), '', 'par trade')+
     kpi('Pire creux (DD)', '−'+s.maxdd+' R', (s.maxdd>0?'neg':''), 'max drawdown')+
+    kpi('Gain moyen/trade', (s.avgR!=null?(s.avgR>=0?'+':'')+s.avgR+' R':'—'), (s.avgR>0?'pos':(s.avgR<0?'neg':'')), (s.avgR!=null?(s.avgR>=0?'+':'')+Math.round(s.avgR*100)+' €':''))+
+    kpi('Durée moyenne', (s.avgDurMs!=null?fmtDur(s.avgDurMs):'—'), '', 'ouvert → clôturé')+
     kpi('Série', streakTxt, (s.streakType==='win'?'pos':(s.streakType==='loss'?'neg':'')), '');
 
   // Courbe d'équité
@@ -1089,20 +1095,38 @@ function renderHist(){
   const open=filt.filter(t=>t.status==='open').sort((a,b)=>b.ts-a.ts);
   const closed=filt.filter(t=>t.status!=='open').sort((a,b)=>b.ts-a.ts);
 
+  const nowTs=Date.now();
   function tableFor(rows){
-    let h='<table class="htable"><thead><tr><th>Envoyé par</th><th>Paire</th><th>Sens</th><th>Entrée</th><th>SL</th><th>TP</th><th>RR</th><th>Résultat</th><th>Motif</th><th>Date</th></tr></thead><tbody>';
+    let h='<table class="htable"><thead><tr><th>Envoyé par</th><th>Paire</th><th>Sens</th><th>Entrée</th><th>SL</th><th>TP</th><th>RR</th><th>Résultat</th><th>Gain</th><th>Var.&nbsp;%</th><th>Durée</th><th>Clôturé</th><th>Motif</th><th>Date</th></tr></thead><tbody>';
     rows.forEach(t=>{
       const long=t.direction==='LONG';
       const src=(t.source||'').indexOf('IA')>=0?'ia':'regles';
       const rc=t.status==='open'?'open':t.result;
       const rlbl=t.status==='open'?'En cours':(t.result==='win'?('Gagné +'+t.rr+' R'):'Perdu −1 R');
       const motif=t.motif||'—';
+      // Gain (R et €), variation %, durée, date de clôture
+      const gainR = t.status==='open'? null : (t.result==='win'? t.rr : -1);
+      const gainCell = gainR==null
+        ? '<td style="color:var(--faint)">—</td>'
+        : '<td class="'+(gainR>=0?'hd-long':'hd-short')+'">'+(gainR>=0?'+':'')+gainR+' R<span style="color:var(--faint)"> · '+(gainR>=0?'+':'')+Math.round(gainR*100)+' €</span></td>';
+      let varCell;
+      if(t.status!=='open'){
+        const lvl=t.result==='win'? t.tp : t.sl; const mv=pctMove(t.entry,lvl,long);
+        varCell = mv==null? '<td>—</td>' : '<td class="'+(mv>=0?'hd-long':'hd-short')+'">'+(mv>=0?'+':'')+mv.toFixed(1)+'%</td>';
+      } else {
+        const tgt=pctMove(t.entry,t.tp,long), rk=pctMove(t.entry,t.sl,long);
+        varCell = '<td style="white-space:nowrap"><span class="hd-long">+'+(tgt!=null?tgt.toFixed(1):'—')+'%</span> / <span class="hd-short">'+(rk!=null?rk.toFixed(1):'—')+'%</span></td>';
+      }
+      const durMs = (t.status==='open'? nowTs : (t.closedTs||nowTs)) - t.ts;
+      const durCell = '<td>'+fmtDur(durMs)+'</td>';
+      const closedCell = '<td>'+(t.status==='open'? '<span style="color:var(--faint)">en cours</span>' : (t.closedTs? frDate(t.closedTs) : '—'))+'</td>';
       h+='<tr>'+
         '<td><span class="src '+src+'">'+(t.source||'—')+'</span></td>'+
         '<td>'+t.symbol+'</td>'+
         '<td class="'+(long?'hd-long':'hd-short')+'">'+(long?'▲ LONG':'▼ SHORT')+'</td>'+
         '<td>'+fmtN(t.entry)+'</td><td>'+fmtN(t.sl)+'</td><td>'+fmtN(t.tp)+'</td><td>'+t.rr+'</td>'+
         '<td><span class="rc '+rc+'">'+rlbl+'</span></td>'+
+        gainCell+varCell+durCell+closedCell+
         '<td class="motif" title="'+esc(motif)+'">'+esc(motif)+'</td>'+
         '<td>'+frDate(t.ts)+'</td></tr>';
     });
@@ -1415,6 +1439,7 @@ function quantTradeCard(t){
       <span class="ilvl">${long?'▲ LONG':'▼ SHORT'} · score ${t.score>=0?'+':''}${t.score}</span></div>
     <div class="inums"><span>Entrée ${fmtN(t.entry)}</span><span class="lo">Stop ${fmtN(t.sl)}</span>
       <span class="tp">Objectif ${fmtN(t.tp)}</span><span>RR ${t.rr}</span></div>
+    <div class="inums"><span class="tp">Objectif +${(pctMove(t.entry,t.tp,long)||0).toFixed(1)}%</span><span class="lo">Risque ${(pctMove(t.entry,t.sl,long)||0).toFixed(1)}% au stop</span></div>
     <div class="inums"><span class="tp">Sur 10 000 € (risque 1 %) : +${Math.round(100*t.rr)} € si TP</span><span class="lo">−100 € si SL</span></div>
   </div>`;
 }
@@ -1534,6 +1559,7 @@ function iaTradeCard(t){
       <span class="ilvl">${long?'▲ LONG':'▼ SHORT'} · ~${IA_HORIZON} j · ${t.prob}% · confiance ${t.conf}%</span></div>
     <div class="inums"><span>Entrée ${fmtN(t.entry)}</span><span class="lo">Stop ${fmtN(t.sl)}</span>
       <span class="tp">Objectif ${fmtN(t.tp)}</span><span>RR ${t.rr}</span></div>
+    <div class="inums"><span class="tp">Objectif +${(pctMove(t.entry,t.tp,long)||0).toFixed(1)}%</span><span class="lo">Risque ${(pctMove(t.entry,t.sl,long)||0).toFixed(1)}% au stop</span><span>durée cible ~${IA_HORIZON} j</span></div>
     <div class="inums"><span class="tp">Sur 10 000 € (risque 1 %) : +${Math.round(100*t.rr)} € si TP</span><span class="lo">−100 € si SL</span></div>
   </div>`;
 }
