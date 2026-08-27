@@ -1930,6 +1930,60 @@
     usage:"On définit d'abord l'invalidation (au-delà du sweep/OB), puis on dimensionne la position pour que cette distance = 1 % du capital. Jamais l'inverse.",
     biais:'gestion — stop au point d’invalidation' });
 
+  /* ===================== ICT / SMC — compléments avancés (v3, finesse d’exécution) ===================== */
+  add({ id:'reh-rel', nom:'Relative Equal Highs / Lows (REH/REL)', alias:['reh','rel','relative equal highs','relative equal lows','sommets quasi égaux'], cat:'ict', tags:['liquidité','equal','nuance'],
+    def:"Sommets/creux QUASI égaux (à quelques points près), par opposition aux equal highs/lows parfaits. Concentrent une liquidité un peu plus diffuse mais tout aussi ciblée par le smart money.",
+    usage:"On les traite comme des pools de liquidité (cibles/sweeps) au même titre que les equal parfaits ; ne pas exiger une égalité au tick près pour valider une zone de liquidité.",
+    biais:'aimant — liquidité (tolérance)' });
+  add({ id:'liquidity-tiers', nom:'Hiérarchie de liquidité (mineure → majeure)', alias:['liquidity tiers','niveaux de liquidité','short term high','intermediate high','long term high'], cat:'ict', tags:['fractal','structure','dol'],
+    def:"La liquidité est fractale : swings de court terme (STH/STL) < intermédiaires (ITH/ITL) < long terme (LTH/LTL). Les plus gros pools (LTH/LTL, PWH/PWL, PMH/PML) sont les aimants les plus puissants.",
+    usage:"On choisit le DOL selon l'horizon du trade : pour un swing on vise la liquidité intermédiaire/long terme ; pour un intraday, court terme. On ne confond pas un petit sweep avec une cible majeure.",
+    biais:'cadre — calibre la cible' });
+  add({ id:'old-high-low', nom:'Anciens plus-hauts / plus-bas (Old High/Low)', alias:['old high','old low','anciens extrêmes','untested high','niveau non testé'], cat:'ict', tags:['liquidité','niveau','cible'],
+    def:"Extrêmes de prix anciens jamais retestés : ils gardent une liquidité « oubliée » (stops laissés en place) et agissent comme des aimants de long terme lorsque le marché s'en approche.",
+    usage:"On les note comme cibles latentes : un marché sans DOL proche évident se dirige souvent vers l'ancien plus-haut/bas non testé le plus proche.",
+    biais:'aimant — liquidité résiduelle' });
+  add({ id:'open-price-theory', nom:'Théorie du prix d’ouverture (Midnight/True Open)', alias:['open price theory','midnight open','true day open','prix d’ouverture','00h ny'], cat:'ict', tags:['niveau','premium','discount'],
+    def:"L'ouverture de référence (minuit NY pour le jour, ou « true open » à 08h30 NY) sépare la journée en premium (au-dessus) et discount (en dessous). Le smart money vend le premium, achète le discount par rapport à cette ligne.",
+    usage:"On trace l'open du jour : ne chercher des longs que sous l'open (discount) et des shorts qu'au-dessus (premium). Filtre directionnel intraday simple et puissant.",
+    biais:'niveau — équilibre du jour' });
+  add({ id:'breaker-mitigation-ob', nom:'OB vs Breaker vs Mitigation (à ne pas confondre)', alias:['breaker vs mitigation','différence order block breaker','disambiguation ob'], cat:'ict', tags:['clarification','zones','structure'],
+    def:"Order Block = dernière bougie opposée AVANT l'impulsion (structure intacte). Breaker = OB qui a ÉCHOUÉ puis été cassé, il joue le rôle inverse. Mitigation = OB retesté pour équilibrer des positions, dans le sens de la tendance. Trois zones proches mais de contextes différents.",
+    usage:"On identifie le bon type selon ce qui vient de se passer : après une cassure de structure → breaker (rejet) ; en pullback de tendance → OB/mitigation (continuation). Se tromper de type = se tromper de sens.",
+    biais:'clarification — évite les erreurs de sens' });
+  add({ id:'smt-pairs', nom:'Paires de corrélation pour la SMT', alias:['smt pairs','paires smt','corrélations divergence','btc eth es nq'], cat:'ict', tags:['smt','corrélation','confirmation'],
+    def:"Couples d'actifs corrélés servant à repérer une divergence SMT : BTC↔ETH (et vs total crypto), ES↔NQ (indices US), EUR↔GBP, or↔argent, et l'inverse DXY↔actifs risqués. Si l'un fait un nouvel extrême et l'autre non, le mouvement manque de conviction.",
+    usage:"Au moment d'un sweep, on vérifie le corrélé : une divergence (un actif balaye son extrême, l'autre non) confirme le retournement. Confluence forte à ajouter au setup.",
+    biais:'confirmation — force du retournement' });
+  add({ id:'liquidity-grab-vs-break', nom:'Prise de liquidité vs vraie cassure', alias:['liquidity grab','vraie cassure','grab vs break','mèche vs clôture'], cat:'structure', tags:['filtre','clôture','fakeout'],
+    def:"Une PRISE de liquidité = le prix dépasse un niveau par une MÈCHE puis clôture de l'autre côté (rejet, retournement probable). Une VRAIE cassure = clôture franche AU-DELÀ du niveau avec displacement (continuation). Distinguer les deux évite de confondre piège et signal.",
+    usage:"On attend la CLÔTURE de bougie : mèche qui dépasse puis rejette = on fade (turtle soup/SFP) ; corps qui clôture au-delà + FVG = on suit. Ne jamais réagir au dépassement en temps réel avant la clôture.",
+    biais:'filtre — piège ou continuation' });
+  add({ id:'candle-close-confirmation', nom:'Confirmation par clôture de bougie', alias:['candle close','confirmation clôture','body close','attendre la clôture'], cat:'structure', tags:['confirmation','discipline','filtre'],
+    def:"Un niveau n'est considéré cassé/validé que sur CLÔTURE de bougie de l'unité concernée, pas sur un simple débordement de mèche intra-bougie. Réduit drastiquement les faux signaux.",
+    usage:"On valide BOS/CHoCH/cassures de niveau uniquement à la clôture H1/H4/D1. Une entrée basée sur un dépassement non clôturé est une entrée sur du bruit.",
+    biais:'discipline — filtre anti-bruit' });
+  add({ id:'stop-run-continuation', nom:'Sweep de continuation (piège inversé)', alias:['stop run continuation','sweep continuation','tous les sweeps ne retournent pas'], cat:'ict', tags:['nuance','honnêteté','tendance'],
+    def:"Nuance essentielle : un balayage de liquidité ne mène PAS toujours à un retournement. En tendance forte, le prix prend la liquidité puis CONTINUE dans le même sens (le sweep alimente la poursuite). Le contexte HTF tranche.",
+    usage:"On ne fade un sweep que s'il est CONTRE une tendance affaiblie / à un extrême HTF avec MSS. En pleine tendance saine, un sweep dans le sens du flux = signal de CONTINUATION, pas de retournement.",
+    biais:'nuance — le contexte décide' });
+  add({ id:'anchored-vwap', nom:'VWAP ancré (Anchored VWAP)', alias:['anchored vwap','vwap ancré','avwap','vwap événement'], cat:'indic', tags:['institutionnel','moyenne','niveau'],
+    def:"VWAP calculé depuis un événement clé précis (un sommet/creux majeur, une news, un halving) plutôt que depuis l'ouverture de session. Montre le prix moyen payé par tous les acteurs depuis cet ancrage.",
+    usage:"Support/résistance dynamique institutionnel : le prix au-dessus de l'AVWAP d'un creux majeur = acheteurs en contrôle depuis le bas. Sert de niveau de confluence et de cible.",
+    biais:'niveau — moyenne institutionnelle' });
+  add({ id:'adr', nom:'ADR — Plage journalière moyenne', alias:['adr','average daily range','plage journalière','amplitude moyenne','atr journalier'], cat:'indic', tags:['volatilité','objectif','réalisme'],
+    def:"Amplitude moyenne (haut-bas) d'une journée sur les N derniers jours. Indique combien un actif « bouge » typiquement par jour.",
+    usage:"Jauge de réalisme des objectifs : si l'actif a déjà parcouru ~100 % de son ADR, un gros mouvement supplémentaire est peu probable (on évite d'entrer tard / on réduit la cible). Reste d'ADR disponible = potentiel restant du jour.",
+    biais:'contexte — potentiel restant' });
+  add({ id:'news-window', nom:'Fenêtre de news (embargo)', alias:['news window','fenêtre de news','embargo','high impact news','fomc cpi nfp'], cat:'risque', tags:['volatilité','discipline','protection'],
+    def:"Période autour d'une publication à fort impact (FOMC, CPI, NFP) où le prix devient erratique : spreads larges, faux mouvements, slippage. Les setups techniques y perdent leur fiabilité.",
+    usage:"On évite d'ouvrir un trade juste avant/pendant ces fenêtres, ou on réduit fortement la taille. On laisse le marché « digérer » avant de reprendre la lecture ICT/SMC.",
+    biais:'gestion — éviter le chaos' });
+  add({ id:'setup-grade', nom:'Notation des setups (A+ / A / B)', alias:['setup grade','notation','a+ setup','qualité de setup','grade'], cat:'strat', tags:['sélection','confluence','discipline'],
+    def:"Classement d'un setup par sa confluence : A+ (biais HTF + sweep + displacement/MSS + POI en discount/premium + DOL clair + RR ≥ 3) ; A (la plupart des critères, RR ≥ 2) ; B (partiel, RR ~1,5) ; en dessous = pas de trade.",
+    usage:"On ne prend QUE du A+/A. Le grade détermine aussi la conviction (et donc la taille dans la limite du 1 %). Filtre de qualité central : peu de trades, mais les bons.",
+    biais:'sélection — ne garder que le haut du panier' });
+
   // ---------------------------------------------------------------------------
   // MOTEUR DE RECHERCHE + API
   // ---------------------------------------------------------------------------
@@ -2028,7 +2082,7 @@
         out += " (Signal : " + it.biais + ")\n";
       });
     });
-    out += PLAYBOOK;
+    out += PLAYBOOK + SCORECARD + ANTIPATTERNS + DATAREAD + EXAMPLE;
     return out;
   }
 
@@ -2054,6 +2108,56 @@
     "8) CONFLUENCE : renforce si killzone (Londres/NY), SMT divergence, alignement DXY (inversé pour crypto/or), " +
     "premium/discount correct, et accord de l'IA maison / du Quant. Plus de confluence = plus de confiance.\n" +
     "RÈGLE D'OR : mieux vaut 0 trade qu'un trade sans sweep, sans displacement, sans DOL clair, ou sous 1 RR.\n";
+
+  // Barème de notation : force le bot à évaluer chaque idée de façon homogène.
+  var SCORECARD =
+    "\n## 🎯 BARÈME DE CONFLUENCE (note chaque idée sur 100, remplis le champ \"confiance\")\n" +
+    "Additionne les points présents, puis n'envoie que les idées ≥ 60 :\n" +
+    "+25 Biais HTF (D1) aligné avec le sens du trade\n" +
+    "+20 Balayage de liquidité (sweep/inducement) réalisé juste avant l'entrée\n" +
+    "+20 Displacement qui casse la structure (MSS/CHoCH) et laisse un FVG\n" +
+    "+15 Entrée sur un POI de qualité (OB valide / FVG / breaker) du bon côté de l'équilibre (discount long / premium short)\n" +
+    "+10 DOL clair (equal highs-lows, PDH/PDL, FVG opposé) laissant un RR ≥ 2\n" +
+    "+10 Confluence supplémentaire (killzone, SMT, DXY aligné, accord IA maison/Quant, niveau psychologique)\n" +
+    "Interprétation : ≥ 85 = A+ (pleine conviction) · 70-84 = A · 60-69 = B (prudent) · < 60 = NE PAS ENVOYER.\n" +
+    "Reporte cette note (0-100) dans \"confiance\". Ne gonfle jamais la note pour justifier un trade.\n";
+
+  // Anti-patterns : raisons EXPLICITES de refuser/ne pas envoyer un trade.
+  var ANTIPATTERNS =
+    "\n## 🚫 ANTI-PATTERNS — refuse le trade si l'un de ces points est vrai\n" +
+    "- Pas de balayage de liquidité avant l'entrée (tu entres sur du vide).\n" +
+    "- Pas de displacement / cassure de structure : la « cassure » n'est qu'une mèche non clôturée.\n" +
+    "- Trade CONTRE le biais D1 sans MSS de retournement confirmé à un extrême HTF.\n" +
+    "- Achat en premium / vente en discount (mauvais côté de l'équilibre) : RR pourri.\n" +
+    "- Pas de DOL clair : aucune cible logique = pas de trade.\n" +
+    "- Le stop logique (au-delà du sweep/OB) ne laisse pas au moins 1 RR jusqu'au DOL.\n" +
+    "- Entrée tardive : l'actif a déjà parcouru l'essentiel de son ADR ou le mouvement est déjà étendu (FOMO).\n" +
+    "- Zone déjà mitigée (POI non frais, déjà retesté et vidé de sa réaction).\n" +
+    "- Fenêtre de news imminente (FOMC/CPI/NFP) : le technique n'est pas fiable.\n" +
+    "- Signaux qui se contredisent sans confluence nette : mieux vaut s'abstenir.\n" +
+    "Dans le doute, renvoie une liste vide. La discipline prime sur l'activité.\n";
+
+  // Guide de lecture des données réelles fournies dans le message.
+  var DATAREAD =
+    "\n## 📥 COMMENT LIRE LES DONNÉES FOURNIES\n" +
+    "- DONNÉES MULTI-UNITÉS (D1→H4→H1) : sers-t'en pour l'alignement top-down. D1 = biais, H4 = zone/POI, H1 = déclencheur/entrée. N'entre que si les trois racontent la même histoire.\n" +
+    "- RÉSUMÉ par paire : prix, sens calculé, cycle (phase AMD), confluence %, et niveaux entrée/stop/objectif proposés par le site. Traite-les comme une base à VALIDER avec la méthode, pas comme une vérité.\n" +
+    "- AVIS DES AUTRES MOTEURS (IA maison ML + Quant) : confluence. Accord = renforce ta confiance ; désaccord net = sois prudent ou explique ta divergence. Ne suis jamais aveuglément.\n" +
+    "- DXY / forex dans le résumé : le DXY est INVERSÉ pour crypto/or (DXY baissier = favorable au risque).\n";
+
+  // Exemple type (schématique, chiffres illustratifs) pour ancrer le raisonnement.
+  var EXAMPLE =
+    "\n## 🧩 EXEMPLE TYPE (schéma de raisonnement, chiffres illustratifs)\n" +
+    "Contexte : D1 haussier (HH/HL), prix en discount du dealing range, un FVG D1 haussier ouvert plus bas ; " +
+    "au-dessus, des equal highs = DOL (liquidité côté achat).\n" +
+    "Séquence : en H1 dans la killzone NY, le prix balaye un plus-bas mineur (sweep de la sell-side) → " +
+    "displacement haussier qui casse la microstructure (MSS) et laisse un FVG H1. On attend le retour au CE (50 %) de ce FVG, " +
+    "qui coïncide avec un OB haussier valide en discount.\n" +
+    "Trade : entrée au CE du FVG ; stop quelques points sous la mèche du sweep (invalidation) ; objectif sur les equal highs (DOL). " +
+    "Si distance stop = 1 % du capital et distance objectif = 3 %, RR = 3 → setup A+. Confluence : killzone + discount + biais D1 + " +
+    "sweep + displacement. Note ≈ 90/100.\n" +
+    "Contre-exemple à REFUSER : le prix touche le FVG SANS avoir balayé de liquidité et SANS displacement, en premium, " +
+    "objectif flou → aucune confluence, note < 60 → on n'envoie pas.\n";
 
   root.KB = {
     CATEGORIES: CATEGORIES,
