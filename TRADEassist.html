@@ -1984,6 +1984,28 @@
     usage:"On ne prend QUE du A+/A. Le grade détermine aussi la conviction (et donc la taille dans la limite du 1 %). Filtre de qualité central : peu de trades, mais les bons.",
     biais:'sélection — ne garder que le haut du panier' });
 
+  /* ===================== ICT — modèles & culture des forums/communautés ===================== */
+  add({ id:'venom-model', nom:'Modèle Venom (ICT 2025)', alias:['venom model','venom box','modèle venom','ict venom','venom 2025'], cat:'ict', tags:['modèle','new york','opening range','récent'],
+    def:"Modèle ICT récent très discuté en communauté : une « Venom Box » se forme entre 08h00 et 09h30 NY (range pré-ouverture serré, un piège à retail). À l'open de 09h30, le prix balaye le haut OU le bas de cette box pour prendre la liquidité, puis se retourne. Déclencheur : retest d'un Balanced Price Range (BPR) ou bougie « Venom Breakout » englobante.",
+    usage:"On marque le haut/bas de la box 08h-09h30 NY ; après le sweep à l'open, on attend le retest du BPR / la bougie de déplacement pour entrer dans le sens du rejet, cible sur la liquidité opposée. Version plus mécanique et rapide du modèle 2022.",
+    biais:'modèle — sweep d’ouverture NY puis expansion' });
+  add({ id:'bread-butter', nom:'Setup Bread and Butter (ICT)', alias:['bread and butter','pain et beurre','bread butter setup','modèle intraday ict'], cat:'ict', tags:['modèle','intraday','daily bias','sessions'],
+    def:"Modèle intraday « quotidien » d'ICT calé sur les sessions : quand le biais journalier HTF est haussier, on cherche des achats de court terme alignés (et l'inverse en biais baissier), en s'appuyant sur la liquidité et les FVG de chaque session (Asie → Londres → NY).",
+    usage:"Setup « de tous les jours » : on suit le biais du jour et on entre sur les pullbacks de session vers un POI, sans chercher le coup exotique. Discipline et répétition plutôt que perfection.",
+    biais:'modèle — continuation du biais du jour' });
+  add({ id:'vacuum-block', nom:'Vacuum Block (gaps d’ouverture)', alias:['vacuum block','bloc de vide','opening gap void','gap de session'], cat:'ict', tags:['gap','vide','rééquilibrage','ouverture'],
+    def:"Vide de prix créé par un gap d'ouverture (week-end, ouverture 18h EST, spike de news FOMC/NFP) : une plage où le « fair value » n'a pas été offert aux deux camps. Différent du FVG classique (qui naît d'un déplacement intra-séance) — ici c'est une discontinuité d'ouverture.",
+    usage:"Le prix retrace souvent vers le vacuum block pour le rééquilibrer : on l'utilise comme cible de comblement et comme zone de rejet/entrée quand le prix y revient.",
+    biais:'aimant — comblement du vide' });
+  add({ id:'smc-vs-ict', nom:'SMC vs ICT (mise au point)', alias:['smc vs ict','différence smc ict','origines','rebrand'], cat:'ict', tags:['culture','clarification','vocabulaire'],
+    def:"Les « Smart Money Concepts » (SMC) sont en grande partie une reformulation/simplification des enseignements d'ICT (order blocks, FVG, liquidité, BOS/CHoCH). Les forums débattent des crédits, mais l'essentiel du vocabulaire est commun ; SMC insiste plus sur BOS/CHoCH et POI, ICT sur le temps (killzones, macros) et la livraison algorithmique.",
+    usage:"Ne pas se perdre dans les querelles de noms : un OB reste un OB. On prend le meilleur des deux — la rigueur structurelle SMC + le timing et la logique de liquidité ICT.",
+    biais:'culture — vocabulaire commun' });
+  add({ id:'ict-caution', nom:'Limites & pièges de l’ICT (regard critique)', alias:['critique ict','limites ict','biais rétrospectif','subjectivité','hindsight'], cat:'psycho', tags:['honnêteté','biais','discipline'],
+    def:"Critiques récurrentes en communauté : l'ICT s'explique très bien A POSTERIORI (biais rétrospectif) mais reste discrétionnaire — on peut toujours « trouver » un OB ou un FVG après coup. Trop de concepts = risque de sur-narration et de curve-fitting mental.",
+    usage:"Antidotes : n'utiliser que quelques concepts robustes en confluence, décider AVANT le mouvement (pas après), journaliser, et exiger sweep + displacement + DOL objectifs plutôt qu'une belle histoire. La discipline prime sur l'élégance de l'analyse.",
+    biais:'garde-fou — rester objectif' });
+
   // ---------------------------------------------------------------------------
   // MOTEUR DE RECHERCHE + API
   // ---------------------------------------------------------------------------
