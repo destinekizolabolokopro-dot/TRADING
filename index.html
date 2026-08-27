@@ -448,6 +448,42 @@
   .eq-sub{font-family:var(--mono);font-size:.68rem;color:var(--faint);font-weight:400}
   .eq-svg{width:100%;height:120px;display:block;background:var(--surface-2);border:1px solid var(--border);border-radius:12px}
   .eq-empty{color:var(--muted);font-size:.82rem;padding:14px;background:var(--surface-2);border:1px solid var(--border);border-radius:12px}
+  /* Calculateur de position */
+  .calc-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;margin:4px 0 14px}
+  .calc-grid input{width:100%;font:inherit;font-size:.95rem;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface);color:var(--ink);outline:none}
+  .calc-grid input:focus{border-color:color-mix(in srgb,var(--long) 45%,var(--border))}
+  .calc-out{min-height:20px}
+  .calc-res{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px}
+  .calc-res .b{flex:1 1 120px;background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:11px 14px}
+  .calc-res .b .k{font-size:.66rem;text-transform:uppercase;letter-spacing:.06em;color:var(--faint)}
+  .calc-res .b .v{font-family:var(--display);font-weight:600;font-size:1.25rem;margin-top:2px}
+  .calc-res .b .v.pos{color:var(--long)} .calc-res .b .v.neg{color:var(--short)}
+  .calc-res .b .s{font-size:.68rem;color:var(--faint);margin-top:1px}
+  .calc-warn{color:var(--wait);font-size:.85rem;padding:10px 12px;background:var(--wait-dim);border-radius:10px}
+  @media(max-width:520px){ .calc-grid{grid-template-columns:1fr} }
+  /* Réglages compte simulé */
+  .sim-cfg{font-size:.85rem;color:var(--muted);display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:2px 0}
+  .sim-cfg input{width:90px;font:inherit;font-size:.9rem;padding:6px 9px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--ink);outline:none}
+  /* Alertes de consensus */
+  .cons-alerts{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 16px;padding:12px 14px;
+    background:var(--surface-2);border:1px solid var(--border-strong);border-radius:14px}
+  .cons-alerts .ca-h{font-weight:700;font-size:.88rem;margin-right:4px}
+  .cons-alert{font:inherit;font-size:.8rem;font-weight:700;padding:5px 11px;border-radius:99px;cursor:pointer;border:1px solid transparent}
+  .cons-alert.buy{background:var(--long-dim);color:var(--long)}
+  .cons-alert.sell{background:var(--short-dim);color:var(--short)}
+  .cons-alert:hover{filter:brightness(1.15)}
+  .htable tr[data-sym]{cursor:pointer}
+  .htable tr[data-sym]:hover td{background:var(--surface-2)}
+  /* Fiche actif détaillée */
+  .af-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:4px}
+  .af-verdict{font-weight:700;padding:4px 12px;border-radius:99px;font-size:.9rem}
+  .af-verdict.buy{background:var(--long-dim);color:var(--long)} .af-verdict.sell{background:var(--short-dim);color:var(--short)} .af-verdict.mix{background:var(--surface-3);color:var(--muted)}
+  .af-bots{display:flex;flex-direction:column;gap:8px;margin:14px 0}
+  .af-bot{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:var(--surface-2);font-size:.88rem}
+  .af-bot .nm{font-weight:600;flex:1}
+  .af-bot .vd{font-weight:700}
+  .af-bot .vd.up{color:var(--long)} .af-bot .vd.down{color:var(--short)} .af-bot .vd.neu{color:var(--faint)}
+  .af-bot .dt{color:var(--muted);font-size:.8rem}
   .htable{width:100%;border-collapse:collapse;font-size:.82rem}
   .htable th{text-align:left;color:var(--faint);font-weight:600;font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;padding:8px 8px;border-bottom:1px solid var(--border)}
   .htable td{padding:9px 8px;border-bottom:1px solid var(--border);font-family:var(--mono);font-variant-numeric:tabular-nums}
@@ -478,6 +514,7 @@
     <div class="status">
       <span class="live"><span class="dot" id="live-dot"></span><span id="live-txt">Connexion…</span></span>
       <span class="clock" id="clock">--:--:--</span>
+      <button class="ai-btn ghost" id="calc-open">🧮&nbsp;Calc</button>
       <button class="ai-btn ghost" id="tools-open">⚙️&nbsp;Mes&nbsp;outils</button>
       <button class="ai-btn ghost" id="hist-open">Historique</button>
       <button class="ai-btn" id="ai-open">🤖&nbsp;Bot&nbsp;IA <span class="vs-tag ext">Claude</span></button>
@@ -665,6 +702,32 @@
   </div>
 </div>
 
+<div class="overlay" id="calc-overlay">
+  <div class="modal" style="max-width:560px">
+    <button class="modal-close" id="calc-close" aria-label="Fermer">×</button>
+    <h2>🧮 Calculateur de position</h2>
+    <p class="sub">Combien acheter pour ne risquer qu'un petit % de ton capital ? Entre tes chiffres — tout se calcule tout seul, rien n'est envoyé nulle part.</p>
+    <div class="calc-grid">
+      <div class="field"><label>Capital total</label><input type="number" id="calc-cap" inputmode="decimal" placeholder="ex. 1000"></div>
+      <div class="field"><label>Risque par trade (%)</label><input type="number" id="calc-risk" inputmode="decimal" placeholder="ex. 1" value="1"></div>
+      <div class="field"><label>Prix d'entrée</label><input type="number" id="calc-entry" inputmode="decimal" placeholder="ex. 60000"></div>
+      <div class="field"><label>Prix du stop</label><input type="number" id="calc-stop" inputmode="decimal" placeholder="ex. 58500"></div>
+      <div class="field"><label>Objectif (optionnel)</label><input type="number" id="calc-tp" inputmode="decimal" placeholder="ex. 63000"></div>
+      <div class="field"><label>Levier (optionnel)</label><input type="number" id="calc-lev" inputmode="decimal" placeholder="ex. 1" value="1"></div>
+    </div>
+    <div id="calc-out" class="calc-out"></div>
+    <p class="ai-note">🛡️ Règle d'or : ne jamais risquer plus de 1 % du capital par trade. Le calcul te donne la <b>taille</b> à prendre pour respecter ça. Pédagogique, pas un conseil financier.</p>
+  </div>
+</div>
+
+<div class="overlay" id="asset-overlay">
+  <div class="modal" style="max-width:600px">
+    <button class="modal-close" id="asset-close" aria-label="Fermer">×</button>
+    <div id="asset-body"></div>
+    <p class="ai-note">Vue d'ensemble des avis pour cet actif. Plus les bots sont d'accord, plus l'idée est solide — mais rien n'est garanti. Pédagogique, pas un conseil financier.</p>
+  </div>
+</div>
+
 <div class="overlay" id="hist-overlay">
   <div class="modal" style="max-width:820px">
     <button class="modal-close" id="hist-close" aria-label="Fermer">×</button>
@@ -673,6 +736,7 @@
     <div class="hfilters" id="hist-filter"></div>
     <div class="bilan" id="hist-bilan"></div>
     <div class="hist-block" id="hist-equity"></div>
+    <div class="hist-block" id="hist-sim"></div>
     <div class="hist-block" id="hist-compare"></div>
     <div class="htable-wrap" id="hist-table"></div>
     <div class="modal-actions" style="margin-top:16px">
@@ -1045,6 +1109,23 @@ function equitySVG(eq){
   </svg>`;
 }
 function kpi(k,v,cls,sub){ return '<div class="b"><div class="k">'+k+'</div><div class="v '+(cls||'')+'">'+v+'</div>'+(sub?'<div class="ksub">'+sub+'</div>':'')+'</div>'; }
+// Réglages du compte simulé (capital de départ + risque %)
+const SIM_KEY='tradeassist.sim.v1';
+function simGet(){ let d={}; try{ d=JSON.parse(localStorage.getItem(SIM_KEY)||'{}'); }catch(e){} return { start:(d.start>0?d.start:1000), risk:(d.risk!=null&&d.risk!==''?+d.risk:1) }; }
+function simSave(o){ try{ localStorage.setItem(SIM_KEY, JSON.stringify(o)); }catch(e){} }
+// Courbe en euros (compte simulé) avec ligne de départ.
+function eqEurSVG(curve, start){
+  if(!curve||curve.length<2) return '<div class="eq-empty">Pas encore de trade clôturé — le compte simulé démarre à '+start.toLocaleString('fr-FR')+' €.</div>';
+  const W=680,H=120,pad=8, min=Math.min(start,...curve), max=Math.max(start,...curve), span=(max-min)||1;
+  const x=i=>pad+i*(W-2*pad)/(curve.length-1), y=v=>pad+(1-(v-min)/span)*(H-2*pad);
+  const pts=curve.map((v,i)=>x(i)+','+y(v).toFixed(1)).join(' ');
+  const up=curve[curve.length-1]>=start, col=up?'var(--long)':'var(--short)', y0=y(start).toFixed(1);
+  const area=pad+','+y0+' '+pts+' '+x(curve.length-1)+','+y0;
+  return '<svg class="eq-svg" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" role="img" aria-label="Compte simulé">'+
+    '<line x1="'+pad+'" x2="'+(W-pad)+'" y1="'+y0+'" y2="'+y0+'" stroke="var(--border-strong)" stroke-dasharray="3 3"/>'+
+    '<polygon points="'+area+'" fill="'+col+'" opacity="0.10"/>'+
+    '<polyline points="'+pts+'" fill="none" stroke="'+col+'" stroke-width="2" stroke-linejoin="round"/></svg>';
+}
 function renderHist(){
   if(!window.History) return;
   const all=History.load().slice();
@@ -1073,6 +1154,31 @@ function renderHist(){
   // Courbe d'équité
   const eqWrap=$('#hist-equity');
   if(eqWrap){ eqWrap.innerHTML = '<div class="eq-head">Courbe d’équité <span class="eq-sub">'+(histSource||'tous les bots')+' · R cumulés</span></div>'+equitySVG(s.equity); }
+
+  // Compte simulé (paper trading) : un capital virtuel qui suit les trades clôturés
+  const simWrap=$('#hist-sim');
+  if(simWrap){
+    const cfg=simGet();
+    const closedChrono=(histSource?all.filter(t=>t.source===histSource):all)
+      .filter(t=>t.status==='closed').sort((a,b)=>(a.closedTs||a.ts)-(b.closedTs||b.ts));
+    const rf=Math.max(0, Math.min(100, cfg.risk))/100;
+    let bal=cfg.start, curve=[cfg.start], peak=cfg.start, maxdd=0;
+    closedChrono.forEach(t=>{ const r=(t.result==='win'?t.rr:-1); bal=bal*(1+r*rf); curve.push(bal);
+      if(bal>peak)peak=bal; const dd=(peak-bal)/peak*100; if(dd>maxdd)maxdd=dd; });
+    const pnl=bal-cfg.start, pnlPct=cfg.start>0?(pnl/cfg.start*100):0;
+    simWrap.innerHTML=
+      '<div class="eq-head">💼 Compte simulé (paper trading) <span class="eq-sub">capital virtuel · '+closedChrono.length+' trades clôturés</span></div>'+
+      '<div class="sim-cfg">Capital de départ <input type="number" id="sim-start" value="'+cfg.start+'" inputmode="decimal"> € · '+
+      'Risque/trade <input type="number" id="sim-risk" value="'+cfg.risk+'" inputmode="decimal"> %</div>'+
+      '<div class="bilan" style="margin:10px 0 6px">'+
+        kpi('Solde actuel', Math.round(bal).toLocaleString('fr-FR')+' €', (bal>=cfg.start?'pos':'neg'), 'départ '+cfg.start.toLocaleString('fr-FR')+' €')+
+        kpi('Gain / perte', (pnl>=0?'+':'')+Math.round(pnl).toLocaleString('fr-FR')+' €', (pnl>=0?'pos':'neg'), (pnlPct>=0?'+':'')+pnlPct.toFixed(1)+'%')+
+        kpi('Pire creux', '−'+maxdd.toFixed(1)+'%', (maxdd>0?'neg':''), 'du compte simulé')+
+      '</div>'+ eqEurSVG(curve, cfg.start);
+    const bindSim=()=>{ const st=parseFloat($('#sim-start').value)||0, rk=parseFloat($('#sim-risk').value); simSave({start:st>0?st:1000, risk:(rk>=0?rk:1)}); renderHist(); };
+    $('#sim-start').addEventListener('change', bindSim);
+    $('#sim-risk').addEventListener('change', bindSim);
+  }
 
   // Comparatif par bot (seulement en vue "Toutes")
   const cmpWrap=$('#hist-compare');
@@ -1297,8 +1403,13 @@ function renderConsensus(){
     return {sym,v,nL,nS,n:nL+nS,score:nL-nS};
   }).filter(r=>r.n>0).sort((a,b)=> Math.abs(b.score)-Math.abs(a.score) || b.n-a.n);
   if(!rows.length){ body.innerHTML='<div class="hist-empty">Aucun avis chargé. Ouvre les onglets 🧠 IA maison, 🏛️ Quant et ♟️ Stratégies Pro (et lance le 🤖 Bot IA) — puis reviens ici ou clique « Rafraîchir ».</div>'; return; }
-  const strong=rows.filter(r=>Math.abs(r.score)>=3).length;
-  let h=`<p class="kb-count">${ready} bot${ready>1?'s':''} avec un avis chargé · ${rows.length} actifs · <b>${strong}</b> à consensus fort (≥3 bots d'accord)</p>`;
+  const alerts=rows.filter(r=>Math.abs(r.score)>=3);
+  let h=`<p class="kb-count">${ready} bot${ready>1?'s':''} avec un avis chargé · ${rows.length} actifs · <b>${alerts.length}</b> à consensus fort (≥3 bots d'accord)</p>`;
+  if(alerts.length){
+    h+='<div class="cons-alerts"><span class="ca-h">🔔 Signaux forts</span>'+
+      alerts.map(r=>{ const buy=r.score>0; return '<button class="cons-alert '+(buy?'buy':'sell')+'" data-sym="'+r.sym+'">'+r.sym+' '+(buy?'▲ ACHAT '+r.nL:'▼ VENTE '+r.nS)+'/'+r.n+'</button>'; }).join('')+
+      '</div>';
+  }
   h+='<div class="htable-wrap"><table class="htable"><thead><tr>'
     +'<th>Actif</th><th style="text-align:center">🎯 ICT</th><th style="text-align:center">♟️ Pro</th><th style="text-align:center">🏛️ Quant</th><th style="text-align:center">🧠 IA maison</th><th style="text-align:center">🤖 Bot IA</th><th>Verdict</th></tr></thead><tbody>';
   rows.forEach(r=>{
@@ -1306,7 +1417,7 @@ function renderConsensus(){
     if(r.nL>=2 && r.nL>r.nS){ verdict=(r.nL===r.n?'ACHAT net':'Achat')+' '+r.nL+'/'+r.n; vc='win'; }
     else if(r.nS>=2 && r.nS>r.nL){ verdict=(r.nS===r.n?'VENTE nette':'Vente')+' '+r.nS+'/'+r.n; vc='loss'; }
     else { verdict='partagé'; vc='open'; }
-    h+='<tr><td><b>'+r.sym+'</b></td>'+consCell(r.v.ict)+consCell(r.v.pro)+consCell(r.v.quant)+consCell(r.v.ia)+consCell(r.v.botia)
+    h+='<tr data-sym="'+r.sym+'"><td><b>'+r.sym+'</b></td>'+consCell(r.v.ict)+consCell(r.v.pro)+consCell(r.v.quant)+consCell(r.v.ia)+consCell(r.v.botia)
       +'<td><span class="rc '+vc+'">'+verdict+'</span></td></tr>';
   });
   h+='</tbody></table></div>';
@@ -1315,6 +1426,53 @@ function renderConsensus(){
 }
 function loadConsensus(){ if(window.PRO)loadPro(); if(window.IA)loadIA(); if(window.QUANT)loadQuant(); renderConsensus(); }
 $('#cons-refresh').addEventListener('click', ()=>{ if(window.PRO)loadPro(); if(window.IA)loadIA(); if(window.QUANT)loadQuant(); renderConsensus(); });
+// Clic sur une alerte ou une ligne du consensus → fiche actif détaillée
+$('#cons-body').addEventListener('click', e=>{
+  const b=e.target.closest('.cons-alert'); if(b){ openAsset(b.dataset.sym); return; }
+  const tr=e.target.closest('tr[data-sym]'); if(tr) openAsset(tr.dataset.sym);
+});
+
+/* ---------- Fiche actif détaillée ---------- */
+const assetOverlay=$('#asset-overlay');
+function afRow(bot, dir, detail){
+  const cls = dir==='LONG'?'up':dir==='SHORT'?'down':'neu';
+  const lbl = dir==='LONG'?'▲ Acheter':dir==='SHORT'?'▼ Vendre':'— pas d\'avis';
+  return '<div class="af-bot"><span class="nm">'+bot+'</span>'+(detail?'<span class="dt">'+detail+'</span>':'')+'<span class="vd '+cls+'">'+lbl+'</span></div>';
+}
+function openAsset(sym){
+  if(!sym) return;
+  const v=(typeof consVotes==='function')?consVotes(sym):{};
+  const votes=[v.ict,v.pro,v.quant,v.ia,v.botia];
+  const nL=votes.filter(x=>x==='LONG').length, nS=votes.filter(x=>x==='SHORT').length, n=nL+nS;
+  let vtxt,vc;
+  if(nL>=2&&nL>nS){ vtxt=(nL===n?'ACHAT net':'Achat')+' — '+nL+'/'+n+' bots'; vc='buy'; }
+  else if(nS>=2&&nS>nL){ vtxt=(nS===n?'VENTE nette':'Vente')+' — '+nS+'/'+n+' bots'; vc='sell'; }
+  else { vtxt = n? 'Avis partagés ('+nL+'▲ / '+nS+'▼)' : 'Aucun avis chargé'; vc='mix'; }
+  // Détails par bot
+  const p=(typeof PAIRS!=='undefined'?PAIRS:[]).find(x=>x.sym===sym);
+  const ictDetail = (p&&p.dir&&p.dir!=='WAIT'&&p.entry!=null)? ('entrée '+fmtN(p.entry)+' · stop '+fmtN(p.sl)+' · obj '+fmtN(p.tp)+(p.rr?' · RR '+p.rr:'')) : '';
+  const iaSig = (lastIA&&lastIA.signals)? lastIA.signals.find(x=>x.sym===sym):null;
+  const iaDetail = iaSig? (Math.round(iaSig.prob*100)+'% de surperformance · confiance '+iaSig.conf+'%'):'';
+  let quantDetail=''; if(lastQuant){ const g=(lastQuant.longs||[]).concat(lastQuant.shorts||[]).find(x=>x.sym===sym); if(g) quantDetail='score '+(g.score>=0?'+':'')+g.score; }
+  const proSyn = (lastPro&&lastPro.synthese)? lastPro.synthese.find(x=>x.sym===sym):null;
+  const proDetail = proSyn? (proSyn.up+'▲ / '+proSyn.down+'▼ méthodes'+(proSyn.conviction?' · conviction '+proSyn.conviction:'')):'';
+  const aiIdea = lastAI? lastAI.find(x=>(x.paire||'').toUpperCase()===sym.toUpperCase()):null;
+  const aiDetail = aiIdea? ('entrée '+fmtN(+aiIdea.entree)+' · stop '+fmtN(+aiIdea.stop)+' · obj '+fmtN(+aiIdea.objectif)+(aiIdea.rr?' · RR '+aiIdea.rr:'')):'';
+  let html='<div class="af-head"><h2 style="margin:0">'+sym+'</h2><span class="af-verdict '+vc+'">'+vtxt+'</span></div>';
+  html+='<div class="af-bots">'+
+    afRow('🎯 ICT / SMC', v.ict, ictDetail)+
+    afRow('♟️ Stratégies Pro', v.pro, proDetail)+
+    afRow('🏛️ Quant', v.quant, quantDetail)+
+    afRow('🧠 IA maison', v.ia, iaDetail)+
+    afRow('🤖 Bot IA (Claude)', v.botia, aiDetail)+
+    '</div>';
+  if(aiIdea && aiIdea.pourquoi) html+='<div class="why" style="margin-bottom:6px"><b>Claude :</b> '+aiIdea.pourquoi+'</div>';
+  html+='<p class="ai-note" style="margin-top:0">Astuce : ouvre les onglets 🧠 IA maison, 🏛️ Quant, ♟️ Pro (et lance le 🤖 Bot IA) pour que tous les avis soient disponibles ici.</p>';
+  $('#asset-body').innerHTML=html;
+  assetOverlay.classList.add('open');
+}
+$('#asset-close').addEventListener('click', ()=> assetOverlay.classList.remove('open'));
+assetOverlay.addEventListener('click', e=>{ if(e.target===assetOverlay) assetOverlay.classList.remove('open'); });
 
 /* ---------- Bibliothèque (base de connaissances) ---------- */
 let kbInit=false, kbCat='all', kbQuery='';
@@ -1459,6 +1617,7 @@ const TOOLS = [
   { id:'pro',   name:'♟️ Stratégies Pro',       desc:'Méthodes systématiques des fonds (tendance, cassure…) + backtest.',      kind:'Onglet', type:'view' },
   { id:'kb',    name:'📚 Bibliothèque',         desc:'Base de connaissances : tous les concepts trading (ICT, SMC, AT, risque…).', kind:'Onglet', type:'view' },
   { id:'botia', name:'🤖 Bot IA (Claude, externe)', desc:'Intelligence externe via l\'API Anthropic — nécessite ta clé (reste en local).', kind:'Bouton', type:'btn', sel:'#ai-open' },
+  { id:'calc',  name:'🧮 Calculateur de position', desc:'Combien acheter selon ton capital et ton risque (taille, marge, gain/perte).', kind:'Bouton', type:'btn', sel:'#calc-open' },
   { id:'hist',  name:'Historique',           desc:'Journal des trades proposés par les bots (gagné / perdu).',              kind:'Bouton', type:'btn', sel:'#hist-open' }
 ];
 const TOOLS_KEY='tradeassist.tools.v1';
@@ -1513,6 +1672,45 @@ toolsOverlay.addEventListener('click', e=>{ if(e.target===toolsOverlay) toolsOve
 $('#tools-all').addEventListener('click', ()=>{ const st={}; TOOLS.forEach(t=>st[t.id]=true); saveTools(st); renderToolsList(); applyTools(); });
 $('#tools-reset').addEventListener('click', ()=>{ try{ localStorage.removeItem(TOOLS_KEY); }catch(e){} renderToolsList(); applyTools(); });
 applyTools(); // applique les préférences mémorisées au démarrage
+
+/* ---------- Calculateur de position ---------- */
+const calcOverlay=$('#calc-overlay');
+const CALC_KEY='tradeassist.calc.v1';
+function calcGet(){ try{ return JSON.parse(localStorage.getItem(CALC_KEY)||'{}'); }catch(e){ return {}; } }
+function calcSave(){ try{ localStorage.setItem(CALC_KEY, JSON.stringify({cap:$('#calc-cap').value, risk:$('#calc-risk').value, lev:$('#calc-lev').value})); }catch(e){} }
+function calcRun(){
+  const cap=parseFloat($('#calc-cap').value), risk=parseFloat($('#calc-risk').value),
+        entry=parseFloat($('#calc-entry').value), stop=parseFloat($('#calc-stop').value),
+        tp=parseFloat($('#calc-tp').value), lev=Math.max(1, parseFloat($('#calc-lev').value)||1);
+  const out=$('#calc-out');
+  if(!(cap>0)||!(risk>0)||!(entry>0)||!(stop>0)){ out.innerHTML='<div class="calc-warn">Remplis au moins : capital, risque %, prix d\'entrée et prix du stop.</div>'; return; }
+  if(entry===stop){ out.innerHTML='<div class="calc-warn">L\'entrée et le stop ne peuvent pas être identiques (risque nul).</div>'; return; }
+  const riskAmt=cap*risk/100;              // € risqués
+  const perUnit=Math.abs(entry-stop);      // risque par unité
+  const units=riskAmt/perUnit;             // taille en unités de l'actif
+  const posVal=units*entry;                // valeur nominale de la position
+  const margin=posVal/lev;                 // marge/capital immobilisé avec levier
+  const fmtE=n=>(n>=1000?Math.round(n):+n.toFixed(2)).toLocaleString('fr-FR');
+  const fmtU=n=>n>=1?(+n.toFixed(4)).toLocaleString('fr-FR'):(+n.toPrecision(4));
+  let rr=null, gain=null;
+  if(tp>0 && Math.abs(tp-entry)>0){ rr=Math.abs(tp-entry)/perUnit; gain=riskAmt*rr; }
+  let h='<div class="calc-res">'+
+    '<div class="b"><div class="k">Taille à prendre</div><div class="v">'+fmtU(units)+'</div><div class="s">unités de l\'actif</div></div>'+
+    '<div class="b"><div class="k">Valeur position</div><div class="v">'+fmtE(posVal)+' €</div><div class="s">'+(lev>1?('marge : '+fmtE(margin)+' € · levier ×'+lev):'sans levier')+'</div></div>'+
+    '<div class="b"><div class="k">Perte au stop</div><div class="v neg">−'+fmtE(riskAmt)+' €</div><div class="s">soit '+risk+' % du capital</div></div>'+
+    (gain!=null?'<div class="b"><div class="k">Gain si objectif</div><div class="v pos">+'+fmtE(gain)+' €</div><div class="s">RR '+rr.toFixed(2)+'</div></div>':'')+
+    '</div>';
+  if(margin>cap) h+='<div class="calc-warn">⚠️ La marge nécessaire ('+fmtE(margin)+' €) dépasse ton capital ('+fmtE(cap)+' €). Il te faudrait du levier — attention, ça amplifie aussi les pertes.</div>';
+  if(rr!=null && rr<1) h+='<div class="calc-warn">⚠️ Ratio risque/rendement < 1 : tu risques plus que tu ne vises. À éviter.</div>';
+  out.innerHTML=h;
+}
+function openCalc(){ const s=calcGet(); if(s.cap!=null)$('#calc-cap').value=s.cap; if(s.risk!=null&&s.risk!=='')$('#calc-risk').value=s.risk; if(s.lev!=null&&s.lev!=='')$('#calc-lev').value=s.lev; calcOverlay.classList.add('open'); calcRun(); }
+$('#calc-open').addEventListener('click', openCalc);
+$('#calc-close').addEventListener('click', ()=> calcOverlay.classList.remove('open'));
+calcOverlay.addEventListener('click', e=>{ if(e.target===calcOverlay) calcOverlay.classList.remove('open'); });
+['calc-cap','calc-risk','calc-entry','calc-stop','calc-tp','calc-lev'].forEach(id=>{
+  $('#'+id).addEventListener('input', ()=>{ calcRun(); calcSave(); });
+});
 
 /* ---------- IA maison (machine learning dans le navigateur) ---------- */
 let iaLoaded=false, iaLoading=false;
