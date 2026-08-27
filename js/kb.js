@@ -969,6 +969,88 @@
     usage:"On trace les trendlines de fond en échelle log pour les grands mouvements ; les niveaux et angles diffèrent nettement de l'échelle linéaire.",
     biais:'méthode — lecture correcte du graphe' });
 
+  /* ===================== ICT / SMC — compléments avancés (v2, cœur de la méthode) ===================== */
+  add({ id:'poi', nom:'Point of Interest (POI)', alias:['poi','point of interest','point d’intérêt','zone d’intérêt'], cat:'smc', tags:['zone','entrée','umbrella'],
+    def:"Terme parapluie SMC désignant TOUTE zone d'où le smart money est susceptible de réagir : order block, FVG, breaker, mitigation, zone offre/demande. Un POI n'est valide que s'il est frais, en discount/premium correct et aligné avec le biais HTF.",
+    usage:"On ne trade que les POI de haute qualité : frais (non retesté), issu d'un displacement, situé du bon côté de l'équilibre, en confluence avec la liquidité. On attend le retour du prix dessus pour entrer.",
+    biais:'contexte — zone d’entrée qualifiée' });
+  add({ id:'valid-ob', nom:'Critères d’un Order Block VALIDE', alias:['valid order block','ob valide','critères ob','qualité order block'], cat:'ict', tags:['order block','filtre','qualité'],
+    def:"Un OB n'est fiable que s'il coche 3 conditions : (1) il provoque un DISPLACEMENT (mouvement impulsif) ; (2) ce mouvement CASSE la structure (BOS/MSS) ; (3) il laisse un FVG juste après. Un OB sans déplacement ni cassure n'est qu'une bougie ordinaire.",
+    usage:"Filtre anti-fausse-zone : on rejette tout OB qui n'a pas causé de déplacement + cassure + FVG. Cela élimine la majorité des faux order blocks.",
+    biais:'filtre — ne garder que les vrais OB' });
+  add({ id:'ob-refinement', nom:'Raffinement d’Order Block', alias:['ob refinement','raffinement ob','affiner order block','ob sur ltf'], cat:'ict', tags:['order block','précision','ltf'],
+    def:"Affiner une grosse zone OB en descendant d'unité de temps : à l'intérieur du gros OB, on repère le FVG ou la mèche précise d'où part réellement l'impulsion, pour un point d'entrée plus fin et un stop plus serré.",
+    usage:"On zoome sur le POI HTF en H1/M15 pour entrer sur la partie active de l'OB (souvent son FVG interne ou le 50 %), améliorant nettement le RR.",
+    biais:'précision — meilleur RR' });
+  add({ id:'extreme-decisional-ob', nom:'OB extrême vs OB décisionnel', alias:['extreme order block','decisional order block','ob extrême','ob décisionnel'], cat:'smc', tags:['order block','hiérarchie','entrée'],
+    def:"L'OB extrême est le tout dernier bloc avant le retournement (le plus profond, à l'extrémité du mouvement) ; l'OB décisionnel est celui d'où est partie la cassure de structure. L'extrême offre le meilleur RR, le décisionnel une entrée plus précoce mais moins profonde.",
+    usage:"En entrée agressive on vise le décisionnel ; en entrée patiente/meilleur RR on attend l'OB extrême. On peut échelonner sur les deux.",
+    biais:'hiérarchie — choix du point d’entrée' });
+  add({ id:'entry-model-smc', nom:'Modèle d’entrée SMC (CHoCH → POI)', alias:['smc entry model','modèle entrée smc','choch pullback','entrée smc'], cat:'smc', tags:['setup','séquence','entrée'],
+    def:"Séquence d'entrée SMC de référence : (1) le prix balaye une liquidité (sweep) ; (2) il casse la structure interne (CHoCH/MSS) via un displacement ; (3) il laisse un POI (FVG/OB) derrière ; (4) on attend son retour dans ce POI, situé en discount (long) ou premium (short) ; (5) confirmation LTF puis entrée.",
+    usage:"Cadre reproductible : sweep → CHoCH → POI → retour → confirmation → entrée, stop au-delà du sweep, cible sur la liquidité opposée. C'est le squelette d'un trade SMC propre.",
+    biais:'modèle — séquence d’entrée complète' });
+  add({ id:'protected-hl', nom:'Plus-haut / plus-bas protégé', alias:['protected high','protected low','protected high low','point structurel clé'], cat:'structure', tags:['structure','choch','référence'],
+    def:"Le sommet/creux dont la cassure changerait officiellement la structure : le dernier plus-haut avant un plus-bas majeur (et inversement). Tant qu'il tient, la tendance en place est intacte ; sa cassure = CHoCH/BOS.",
+    usage:"Sert de niveau de référence pour définir invalidations et signaux : on surveille précisément ce point, pas tous les petits swings.",
+    biais:'référence — valide/invalide la tendance' });
+  add({ id:'impulse-correction', nom:'Jambes impulsives vs correctives', alias:['impulse leg','corrective leg','jambe impulsive','jambe corrective','impulse correction'], cat:'structure', tags:['structure','lecture','tendance'],
+    def:"Une tendance alterne des jambes IMPULSIVES (rapides, longues, avec FVG, dans le sens du flux) et des jambes CORRECTIVES (lentes, chevauchées, contre le flux). Le sens des jambes impulsives donne la vraie direction.",
+    usage:"On trade DANS le sens des jambes impulsives et on utilise les jambes correctives comme opportunités de pullback vers un POI. Une correction qui devient impulsive à contre-sens = alerte de retournement.",
+    biais:'lecture — révèle le vrai sens du flux' });
+  add({ id:'swing-internal-structure', nom:'Structure de swing vs interne', alias:['swing structure','internal structure','structure interne','fractale de structure'], cat:'structure', tags:['structure','fractal','htf ltf'],
+    def:"Deux niveaux de structure coexistent : la structure de SWING (majeure, sur les grands sommets/creux) et la structure INTERNE (mineure, les swings à l'intérieur d'une jambe). Un CHoCH interne ne renverse pas forcément la structure de swing.",
+    usage:"On lit d'abord la structure de swing (biais) puis l'interne (timing) : on entre sur un CHoCH interne UNIQUEMENT s'il va dans le sens de la structure de swing.",
+    biais:'cadre — évite les faux retournements' });
+  add({ id:'irl-erl', nom:'Liquidité de range interne / externe (IRL ↔ ERL)', alias:['irl','erl','internal range liquidity','external range liquidity','irl erl'], cat:'smc', tags:['liquidité','séquence','cible'],
+    def:"ERL = liquidité externe (les extrêmes du range : plus-hauts/bas, equal highs-lows). IRL = liquidité interne (les FVG à l'intérieur). Le prix livre en alternance : il prend l'IRL (comble un FVG) pour se propulser vers l'ERL (un extrême), puis inverse.",
+    usage:"On lit la séquence de livraison : après avoir comblé un FVG interne, la cible logique est l'extrême opposé (ERL) ; après un sweep d'ERL, la cible devient le FVG interne (IRL). Donne l'objectif du trade.",
+    biais:'séquence — enchaîne les cibles' });
+  add({ id:'rebalance', nom:'Rééquilibrage / Efficient Price Delivery', alias:['rebalance','rééquilibrage','efficient price delivery','remplissage fvg','offre efficace'], cat:'ict', tags:['fvg','aimant','logique'],
+    def:"Principe moteur ICT : le marché cherche à livrer le prix de façon « efficace », c'est-à-dire à rééquilibrer les zones de déséquilibre (FVG) laissées par les mouvements rapides. Un FVG non comblé est une inefficacité qui attire le prix.",
+    usage:"On anticipe les retours du prix pour combler les FVG ouverts (surtout les plus proches et les plus gros) : ce sont des cibles ET des zones d'entrée naturelles.",
+    biais:'aimant — le prix revient rééquilibrer' });
+  add({ id:'fpfvg', nom:'First Presented FVG (FPFVG)', alias:['fpfvg','first presented fvg','premier fvg de session','fvg d’ouverture'], cat:'ict', tags:['fvg','session','timing'],
+    def:"Le premier Fair Value Gap formé après l'ouverture d'une session/journée. ICT le considère comme un niveau de référence privilégié : le prix y réagit souvent en début de séance.",
+    usage:"On repère le 1ᵉʳ FVG après l'open (minuit NY, open Londres/NY) : son retour offre une entrée dans le sens du biais du jour.",
+    biais:'niveau — référence d’ouverture' });
+  add({ id:'fvg-continuation-reversal', nom:'FVG de continuation vs de retournement', alias:['continuation fvg','reversal fvg','fvg continuation','fvg retournement'], cat:'ict', tags:['fvg','contexte','filtre'],
+    def:"Un FVG dans le sens de la tendance en place (après un BOS) = FVG de CONTINUATION, fiable pour suivre. Un FVG créé juste après un sweep + MSS contre la tendance = FVG de RETOURNEMENT, utilisé pour entrer dans le nouveau sens.",
+    usage:"On classe chaque FVG par son contexte : continuation → on suit ; retournement → on attend confirmation (MSS + sweep) avant d'entrer à contre-tendance.",
+    biais:'contexte — qualifie le FVG' });
+  add({ id:'trendline-liquidity', nom:'Liquidité de trendline', alias:['trendline liquidity','liquidité de trendline','stops sous la ligne','angular liquidity'], cat:'ict', tags:['liquidité','trendline','piège'],
+    def:"Les stops que les traders placent le long d'une ligne de tendance forment une liquidité « diagonale » que le smart money vient raider. Une trendline « trop parfaite » est souvent construite comme un appât.",
+    usage:"On identifie les trendlines évidentes comme cibles de balayage : leur cassure est souvent un piège (fakeout) suivi d'un retournement — on fade plutôt que de suivre.",
+    biais:'piège — cible de raid' });
+  add({ id:'liquidity-engineering', nom:'Ingénierie de liquidité', alias:['liquidity engineering','ingénierie de liquidité','fabrication de liquidité','equal highs induction'], cat:'ict', tags:['manipulation','equal highs','liquidité'],
+    def:"Le smart money « fabrique » de la liquidité avant de s'en servir : il laisse le prix créer des equal highs/lows, des trendlines nettes ou des figures évidentes, pour attirer un maximum d'ordres (stops), puis raide cette liquidité pour se positionner à contre-courant.",
+    usage:"Quand une figure ou un niveau est « trop évident » et que tout le monde le voit, on se méfie : c'est souvent de la liquidité fabriquée destinée à être prise avant le vrai mouvement.",
+    biais:'manipulation — le piège précède le mouvement' });
+  add({ id:'liquidity-purge', nom:'Double purge de liquidité', alias:['liquidity purge','double purge','purge des deux côtés','swept both sides'], cat:'ict', tags:['liquidité','range','manipulation'],
+    def:"Séquence où le prix balaye la liquidité des DEUX côtés d'un range (d'abord un extrême, puis l'autre) pour nettoyer tous les stops avant de choisir sa vraie direction. Typique des phases de manipulation.",
+    usage:"Dans un range serré, on attend que les deux bords soient balayés avant de se positionner dans le sens du dernier rejet — évite de se faire piéger par le premier faux mouvement.",
+    biais:'manipulation — nettoyage avant expansion' });
+  add({ id:'equilibrium-leg', nom:'Équilibre d’une jambe (50 %)', alias:['equilibrium','équilibre','50% de la jambe','fib 0.5 ict'], cat:'ict', tags:['premium','discount','entrée'],
+    def:"Le point médian (50 %) d'une jambe de prix sépare son premium (haut, cher) de son discount (bas, bon marché). ICT n'achète qu'en dessous de l'équilibre et ne vend qu'au-dessus, pour ne payer que le « bon » côté de la valeur.",
+    usage:"On trace le Fib sur la dernière jambe : entrée longue seulement si le POI est sous le 50 % (discount), short seulement au-dessus (premium). Filtre de RR essentiel.",
+    biais:'filtre — n’entrer que du bon côté' });
+  add({ id:'ny-reversal', nom:'Retournement de New York (AM / PM)', alias:['ny reversal','new york reversal','ny am','ny pm','retournement new york'], cat:'session', tags:['session','horaire','retournement'],
+    def:"La séance de New York offre deux fenêtres de retournement classiques : la session AM (≈08h30-11h NY, souvent le mouvement principal après un piège d'ouverture) et un retournement PM (≈13h30-15h NY) qui peut inverser ou prolonger le mouvement du matin.",
+    usage:"On cible les setups de retournement dans ces fenêtres (souvent après un balayage de la liquidité de Londres ou du PDH/PDL), plutôt qu'à la mi-journée (lunch, faible).",
+    biais:'timing — fenêtres de retournement' });
+  add({ id:'london-model', nom:'Modèle de Londres (Judas + expansion)', alias:['london model','modèle de londres','london open','judas londres'], cat:'session', tags:['session','londres','setup'],
+    def:"Schéma récurrent à l'ouverture de Londres : un faux mouvement initial (Judas swing) qui balaye la liquidité du range asiatique, suivi du VRAI mouvement dirigé en sens inverse pour le reste de la matinée.",
+    usage:"On note le haut/bas du range d'Asie ; à l'open de Londres on attend le balayage d'un côté + le retournement (MSS) pour entrer dans le vrai sens, cible sur la liquidité opposée.",
+    biais:'setup — piège puis expansion' });
+  add({ id:'session-liquidity', nom:'Liquidité de session (Asia/London highs-lows)', alias:['session liquidity','asia high low','london high low','liquidité de session'], cat:'session', tags:['liquidité','session','cible'],
+    def:"Les plus-hauts/plus-bas de chaque session (Asia High/Low, London High/Low, ainsi que PDH/PDL) sont des pools de liquidité de référence que les sessions suivantes viennent souvent chercher.",
+    usage:"On cartographie ces niveaux avant la séance : ils servent de cibles (DOL) et de zones de balayage. Le prix va typiquement chercher la liquidité de la session précédente.",
+    biais:'niveau — cibles inter-sessions' });
+  add({ id:'stop-placement-ict', nom:'Placement du stop (logique ICT)', alias:['stop placement','placement du stop','stop ict','stop au-delà du sweep'], cat:'risque', tags:['stop','structure','invalidation'],
+    def:"En ICT/SMC, le stop se place là où le SCÉNARIO est invalidé, pas à une distance arbitraire : juste au-delà de la mèche du balayage (sweep) ou de l'extrême de l'order block d'où l'on entre. Si ce niveau cède, l'idée est fausse.",
+    usage:"On définit d'abord l'invalidation (au-delà du sweep/OB), puis on dimensionne la position pour que cette distance = 1 % du capital. Jamais l'inverse.",
+    biais:'gestion — stop au point d’invalidation' });
+
   // ---------------------------------------------------------------------------
   // MOTEUR DE RECHERCHE + API
   // ---------------------------------------------------------------------------
@@ -1046,21 +1128,53 @@
   // Digest COMPLET et compact de TOUTE la base, groupé par catégorie.
   // Sert à donner à l'IA l'intégralité du vocabulaire du site en un bloc
   // dense (nom : définition + signal), sans exploser le nombre de tokens.
+  // Catégories « actionnables » : pour celles-ci on donne aussi le USAGE
+  // (comment s'en servir), car c'est ce qui transforme la connaissance en
+  // trade concret. Cœur de la méthode = ICT / SMC / structure / risque.
+  var ACTIONABLE = { ict: 1, smc: 1, structure: 1, risque: 1 };
+
   function digest() {
     var out = "BASE DE CONNAISSANCES COMPLÈTE DU SITE (" + C.length +
       " concepts). Utilise ce vocabulaire et ces définitions comme référence " +
-      "pour toute ton analyse — c'est la méthode maison du site.\n";
+      "pour toute ton analyse — c'est la méthode maison du site. Pour les concepts " +
+      "ICT/SMC, structure et risque, le champ « Usage » indique COMMENT t'en servir " +
+      "pour construire un trade : appuie-toi dessus.\n";
     CATEGORIES.forEach(function (cat) {
       var items = byCat(cat.id);
       if (!items.length) return;
       out += "\n## " + cat.emoji + " " + cat.nom + "\n";
       items.forEach(function (it) {
-        out += "- " + it.nom + " : " + it.def +
-          " (Signal : " + it.biais + ")\n";
+        out += "- " + it.nom + " : " + it.def;
+        if (ACTIONABLE[it.cat] && it.usage) out += " — Usage : " + it.usage;
+        out += " (Signal : " + it.biais + ")\n";
       });
     });
+    out += PLAYBOOK;
     return out;
   }
+
+  // Méthode d'exécution pas-à-pas : relie les concepts ci-dessus en un
+  // vrai trade ICT/SMC. C'est la checklist directrice du bot.
+  var PLAYBOOK =
+    "\n## ♟️ PLAYBOOK ICT/SMC — comment assembler un trade (méthode maison, à suivre)\n" +
+    "Construis CHAQUE idée de trade selon cette séquence, dans l'ordre :\n" +
+    "1) BIAIS HTF (D1) : tendance (HH/HL ou LH/LL), position dans le dealing range (premium/discount), " +
+    "FVG D1 ouverts, liquidité déjà prise ou non. Le biais D1 dicte le SENS autorisé.\n" +
+    "2) DOL (cible) : identifie la liquidité que le prix veut atteindre (equal highs/lows, PDH/PDL, PWH/PWL, " +
+    "FVG à combler, extrême de range). Pas de DOL clair = pas de trade.\n" +
+    "3) AFFINAGE H4 : repère le POI de qualité sur le chemin vers le DOL (order block VALIDE — displacement + " +
+    "cassure + FVG — breaker, ou FVG de continuation), situé du bon côté de l'équilibre (discount pour un long, " +
+    "premium pour un short).\n" +
+    "4) DÉCLENCHEUR H1 : attends la séquence — balayage de liquidité (sweep/inducement pris) PUIS displacement qui " +
+    "casse la structure interne (MSS/CHoCH) et laisse un FVG. Sans displacement, la cassure est suspecte : on n'entre pas.\n" +
+    "5) ENTRÉE : sur le retour dans le POI/FVG (idéalement au CE = 50 % du gap), après le sweep. Raffine l'OB si besoin " +
+    "pour un stop plus serré.\n" +
+    "6) STOP : juste au-delà de la mèche du balayage ou de l'extrême de l'OB (le point d'INVALIDATION), jamais arbitraire.\n" +
+    "7) OBJECTIF : la liquidité opposée / le DOL (séquence IRL↔ERL). Vise le RR le plus élevé atteignable (2, 3, 4+). " +
+    "Si le stop logique ne laisse pas ≥ 1 RR jusqu'au DOL, NE PRENDS PAS le trade.\n" +
+    "8) CONFLUENCE : renforce si killzone (Londres/NY), SMT divergence, alignement DXY (inversé pour crypto/or), " +
+    "premium/discount correct, et accord de l'IA maison / du Quant. Plus de confluence = plus de confiance.\n" +
+    "RÈGLE D'OR : mieux vaut 0 trade qu'un trade sans sweep, sans displacement, sans DOL clair, ou sous 1 RR.\n";
 
   root.KB = {
     CATEGORIES: CATEGORIES,
