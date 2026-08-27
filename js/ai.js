@@ -61,6 +61,11 @@
         "\nSi tes idées vont dans le sens de l'IA maison et/ou du Quant, c'est un signal renforcé ; " +
         "en cas de désaccord net, sois plus prudent ou explique pourquoi tu diverges.";
     }
+    // Conscience du calendrier : date/heure du jour + annonces économiques à
+    // fort impact (FOMC/CPI/NFP/OPEX), pour que l'IA évite de trader dans le chaos.
+    if (root.ECON && typeof root.ECON.promptBlock === 'function') {
+      txt += "\n\n" + root.ECON.promptBlock();
+    }
     // Base de connaissances : on injecte TOUTE la base (digest complet) pour
     // que l'IA raisonne sur les définitions et la méthode maison du site.
     var kb = root.KB;
