@@ -181,6 +181,20 @@
   .viewswitch{flex-wrap:wrap}
   .pro-intro{color:var(--muted);font-size:.9rem;max-width:70ch;margin:0 0 20px;line-height:1.55}
   .pro-warn{color:var(--faint)}
+  /* Calendrier économique */
+  .eco-toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 16px}
+  .eco-filters{display:flex;gap:6px;flex-wrap:wrap}
+  .eco-day{margin:0 0 14px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .eco-day.today{border-color:var(--acc)}
+  .eco-dayhead{background:rgba(255,255,255,.04);padding:8px 12px;font-weight:700;font-size:.92rem}
+  .eco-day.today .eco-dayhead{background:rgba(110,120,255,.14)}
+  .eco-row{display:grid;grid-template-columns:52px 84px 26px 1fr;gap:8px;align-items:center;padding:7px 12px;border-top:1px solid var(--line);font-size:.86rem}
+  .eco-row .eco-fp{grid-column:1/-1;color:var(--faint);font-size:.78rem;padding-left:52px}
+  .eco-row.imp-high{background:rgba(255,80,80,.06)}
+  .eco-time{color:var(--muted);font-variant-numeric:tabular-nums}
+  .eco-cur{font-size:.8rem;white-space:nowrap}
+  .eco-name{font-weight:600}
+  @media(min-width:640px){ .eco-row{grid-template-columns:56px 92px 28px minmax(160px,1.4fr) 1.2fr} .eco-row .eco-fp{grid-column:auto;padding-left:0;text-align:right} }
   /* Bibliothèque (base de connaissances) */
   .kb-toolbar{margin:0 0 18px}
   #kb-search{width:100%;max-width:640px;font:inherit;font-size:.95rem;padding:12px 16px;border-radius:12px;
@@ -556,6 +570,7 @@
     <button class="vs" data-v="pro">♟️ Stratégies Pro</button>
     <button class="vs" data-v="ia">🧠 IA maison <span class="vs-tag local">locale</span></button>
     <button class="vs" data-v="quant">🏛️ Quant</button>
+    <button class="vs" data-v="eco">📅 Économie</button>
     <button class="vs" data-v="kb">📚 Bibliothèque</button>
   </div>
 
@@ -593,6 +608,24 @@
   <div id="view-quant" style="display:none">
     <p class="pro-intro">La façon dont travaillent <b>réellement les grands fonds</b> (Renaissance, Two Sigma, Citadel…). On ne prédit pas la direction (pile ou face) : on construit un panier <b>market-neutral</b> — <b>long</b> les plus forts, <b>short</b> les plus faibles — noté sur des <b>facteurs</b> (momentum, tendance, faible volatilité). <span class="pro-warn">On gagne sur l'écart, peu importe que le marché monte ou baisse. La vraie métrique visée : le <b>Sharpe</b> (rendement ÷ risque), pas le win rate.</span></p>
     <div id="quant-body"><div class="hist-empty">⏳ Construction du panier factoriel + backtest market-neutral…</div></div>
+  </div>
+
+  <div id="view-eco" style="display:none">
+    <p class="pro-intro">Le <b>calendrier économique complet de la semaine</b> — <b>toutes les annonces</b>, toutes devises (emploi, inflation, PIB, banques centrales, ventes…), avec prévision et valeur précédente. <span class="pro-warn">Les jours d'annonces à <b>fort impact</b> 🔴, le marché devient erratique : le Bot IA en tient compte et évite d'y ouvrir un trade. Données ForexFactory — pédagogique, vérifie l'officiel avant de trader.</span></p>
+    <div class="eco-toolbar">
+      <div class="eco-filters" id="eco-imp">
+        <button class="tab on" data-imp="all">Tous impacts</button>
+        <button class="tab" data-imp="high">🔴 Fort</button>
+        <button class="tab" data-imp="mid">🟠 Moyen+</button>
+      </div>
+      <div class="eco-filters" id="eco-cur">
+        <button class="tab on" data-cur="all">Toutes devises</button>
+        <button class="tab" data-cur="major">Majeures (USD/EUR/GBP/JPY)</button>
+        <button class="tab" data-cur="USD">🇺🇸 USD</button>
+      </div>
+      <button class="btn" id="eco-refresh" style="margin-left:auto">🔄 Actualiser</button>
+    </div>
+    <div id="eco-body"><div class="hist-empty">⏳ Récupération du calendrier économique…</div></div>
   </div>
 
   <div id="view-kb" style="display:none">
@@ -2276,34 +2309,115 @@
     return list;
   }
 
+  // ---------------------------------------------------------------------------
+  // CALENDRIER LIVE (flux hebdo ForexFactory via proxy CORS) — TOUTES les annonces
+  // ---------------------------------------------------------------------------
+  var FEED = 'https://nfs.faireconomy.media/ff_calendar_thisweek.xml';
+  var PROXY = 'https://api.allorigins.win/raw?url='; // ajoute l'en-tête CORS manquant
+  var CACHE = 'tradeassist.econ.v1';
+  var TTL = 45 * 60 * 1000; // 45 min
+  var _live = null; // { events:[...], at:ms }
+
+  function loadCache() { try { var j = JSON.parse(localStorage.getItem(CACHE) || 'null'); return (j && j.events) ? j : null; } catch (e) { return null; } }
+  function saveCache(o) { try { localStorage.setItem(CACHE, JSON.stringify(o)); } catch (e) {} }
+
+  // Parse le XML (sans DOMParser → marche aussi côté Node) champ par champ.
+  function field(block, tag) {
+    var x = block.match(new RegExp('<' + tag + '>(?:<!\\[CDATA\\[)?([\\s\\S]*?)(?:\\]\\]>)?<\\/' + tag + '>'));
+    return x ? x[1].trim() : '';
+  }
+  function parseFeed(txt) {
+    var out = [], re = /<event>([\s\S]*?)<\/event>/g, m;
+    while ((m = re.exec(txt))) {
+      var b = m[1];
+      out.push({ title: field(b, 'title'), country: field(b, 'country'),
+        date: field(b, 'date'), time: field(b, 'time'), impact: field(b, 'impact'),
+        forecast: field(b, 'forecast'), previous: field(b, 'previous'),
+        actual: field(b, 'actual'), url: field(b, 'url') });
+    }
+    return out;
+  }
+  // Récupère le flux (avec cache). Résout toujours (null si échec + pas de cache).
+  function fetchLive(force) {
+    var c = loadCache();
+    if (!force && c && (Date.now() - c.at) < TTL) { _live = c; return Promise.resolve(c); }
+    if (typeof fetch === 'undefined') { _live = c; return Promise.resolve(c); }
+    return fetch(PROXY + encodeURIComponent(FEED)).then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status); return r.text();
+    }).then(function (txt) {
+      var ev = parseFeed(txt);
+      if (!ev.length) throw new Error('flux vide');
+      var o = { events: ev, at: Date.now() }; _live = o; saveCache(o); return o;
+    }).catch(function () { _live = c; return c; });
+  }
+
+  var CUR_LABEL = { USD: '🇺🇸 USD', EUR: '🇪🇺 EUR', GBP: '🇬🇧 GBP', JPY: '🇯🇵 JPY',
+    CAD: '🇨🇦 CAD', AUD: '🇦🇺 AUD', NZD: '🇳🇿 NZD', CHF: '🇨🇭 CHF', CNY: '🇨🇳 CNY', ALL: '🌐' };
+  function impactLevel(imp) { var i = (imp || '').toLowerCase(); return i.indexOf('high') >= 0 ? 'high' : i.indexOf('med') >= 0 ? 'mid' : 'low'; }
+  function parseEvTime(e) {
+    var d = (e.date || '').split('-'); if (d.length !== 3) return null; // MM-DD-YYYY
+    var h = 0, min = 0, allday = true, t = (e.time || '').toLowerCase().replace(/\s/g, '');
+    var mt = t.match(/^(\d{1,2}):(\d{2})(am|pm)$/);
+    if (mt) { h = (+mt[1] % 12) + (mt[3] === 'pm' ? 12 : 0); min = +mt[2]; allday = false; }
+    return { y: +d[2], m: +d[0], day: +d[1], h: h, min: min, allday: allday };
+  }
+  // Événements live normalisés au même format que le calendrier calculé.
+  function liveNormalized() {
+    if (!_live || !_live.events) return null;
+    var arr = [];
+    _live.events.forEach(function (e) {
+      var t = parseEvTime(e); if (!t) return;
+      arr.push({ name: e.title, country: e.country, impact: impactLevel(e.impact),
+        y: t.y, m: t.m, day: t.day, h: t.h, min: t.min, allday: t.allday, calc: 'live',
+        forecast: e.forecast, previous: e.previous, actual: e.actual });
+    });
+    return arr;
+  }
+  // Convertit le calendrier calculé au format normalisé.
+  function computedNormalized(y, m) {
+    return eventsAround(y, m).map(function (e) {
+      var p = e.iso.split('-');
+      return { name: e.name, country: 'USD', impact: e.impact, y: +p[0], m: +p[1], day: +p[2],
+        h: e.h, min: e.min, allday: false, calc: e.calc };
+    });
+  }
+
   function status(now) {
     var d = now || new Date();
     var et = etParts(d);
     var todayNum = dayNum(et.y, et.m, et.day);
     var nowMin = et.h * 60 + et.min;
-    var evs = eventsAround(et.y, et.m);
+    var live = liveNormalized();
+    var evs = (live && live.length) ? live : computedNormalized(et.y, et.m);
+    var usingLive = !!(live && live.length);
 
     var alerts = [], upcoming = [];
     evs.forEach(function (e) {
-      var p = e.iso.split('-'), en = dayNum(+p[0], +p[1], +p[2]);
+      var en = dayNum(e.y, e.m, e.day);
       var diff = en - todayNum; // en jours
       if (diff < 0 || diff > 12) return;
       var evMin = e.h * 60 + e.min;
-      var label = JOURS[etParts(new Date(Date.UTC(+p[0], +p[1] - 1, +p[2], 12))).wd] || '';
-      var human = label + ' ' + p[2] + '/' + p[1] + ' à ' + pad(e.h) + 'h' + pad(e.min) + ' ET';
+      var label = JOURS[etParts(new Date(Date.UTC(e.y, e.m - 1, e.day, 12))).wd] || '';
+      var who = (usingLive && e.country && e.country !== 'USD') ? ' (' + e.country + ')' : '';
+      var human = label + ' ' + pad(e.day) + '/' + pad(e.m) + (e.allday ? '' : ' à ' + pad(e.h) + 'h' + pad(e.min) + ' ET');
       if (diff === 0) {
-        var delta = evMin - nowMin; // minutes avant l'événement (négatif = passé)
-        if (e.impact === 'high' && delta <= 120 && delta >= -90) {
-          alerts.push({ level: 'high', name: e.name, when: 'IMMINENT (' + (delta >= 0 ? 'dans ~' + delta + ' min' : 'il y a ' + (-delta) + ' min') + ')', calc: e.calc });
-        } else if (delta > 120 || (e.impact === 'mid')) {
-          alerts.push({ level: 'watch', name: e.name, when: "aujourd'hui à " + pad(e.h) + 'h' + pad(e.min) + ' ET', calc: e.calc });
+        var delta = evMin - nowMin; // minutes avant (négatif = passé)
+        if (e.impact === 'high' && !e.allday && delta <= 120 && delta >= -90) {
+          alerts.push({ level: 'high', name: e.name + who, when: 'IMMINENT (' + (delta >= 0 ? 'dans ~' + delta + ' min' : 'il y a ' + (-delta) + ' min') + ')', calc: e.calc });
+        } else if (e.impact === 'high' || e.impact === 'mid') {
+          alerts.push({ level: (e.impact === 'high' ? 'watch' : 'watch'), name: e.name + who, when: "aujourd'hui" + (e.allday ? '' : ' à ' + pad(e.h) + 'h' + pad(e.min) + ' ET'), calc: e.calc });
         }
       } else if (diff === 1 && e.impact === 'high') {
-        alerts.push({ level: 'watch', name: e.name, when: 'demain ' + pad(e.h) + 'h' + pad(e.min) + ' ET', calc: e.calc });
-      } else if (diff >= 1) {
-        upcoming.push({ name: e.name, human: human, diff: diff, calc: e.calc });
+        alerts.push({ level: 'watch', name: e.name + who, when: 'demain' + (e.allday ? '' : ' ' + pad(e.h) + 'h' + pad(e.min) + ' ET'), calc: e.calc });
+      } else if (diff >= 1 && e.impact === 'high') {
+        upcoming.push({ name: e.name + who, human: human, diff: diff, calc: e.calc });
       }
     });
+    // dédoublonne/limite les alertes (le flux peut être dense)
+    var seen = {}; alerts = alerts.filter(function (a) { var k = a.level + a.name + a.when; if (seen[k]) return false; seen[k] = 1; return true; });
+    var order = { high: 0, watch: 1 };
+    alerts.sort(function (a, b) { return order[a.level] - order[b.level]; });
+    alerts = alerts.slice(0, 8);
     upcoming.sort(function (a, b) { return a.diff - b.diff; });
 
     var level = alerts.some(function (a) { return a.level === 'high'; }) ? 'high'
@@ -2317,44 +2431,74 @@
     else message = "🟢 Aucune annonce majeure imminente.";
 
     return { etIso: isoOf(et.y, et.m, et.day), etLabel: etLabel, level: level,
-      alerts: alerts, next: upcoming[0] || null, upcoming: upcoming.slice(0, 3), message: message };
+      alerts: alerts, next: upcoming[0] || null, upcoming: upcoming.slice(0, 3),
+      message: message, source: usingLive ? 'live' : 'calculé',
+      updated: usingLive && _live ? _live.at : null };
   }
 
-  // Bloc texte pour le prompt de l'IA.
+  // Bloc texte pour le prompt de l'IA (n'envoie que le pertinent, pas toute la semaine).
   function promptBlock(now) {
     var s = status(now);
     var t = "CONTEXTE TEMPOREL & ANNONCES ÉCONOMIQUES (heure de New York / ET) :\n";
     t += "- Maintenant : " + s.etLabel + ".\n";
     if (s.alerts.length) {
-      t += "- Alertes : " + s.alerts.map(function (a) {
-        return (a.level === 'high' ? '⚠️ ' : '🟠 ') + a.name + ' — ' + a.when + ' [' + a.calc + ']';
+      t += "- Annonces aujourd'hui/demain : " + s.alerts.map(function (a) {
+        return (a.level === 'high' ? '⚠️ ' : '🟠 ') + a.name + ' — ' + a.when;
       }).join(' ; ') + ".\n";
     } else {
-      t += "- Aucune annonce majeure dans la fenêtre immédiate.\n";
+      t += "- Aucune annonce à fort impact dans la fenêtre immédiate.\n";
     }
-    if (s.next) t += "- Prochaine à fort impact : " + s.next.name + ' — ' + s.next.human + ' (dans ' + s.next.diff + ' j) [' + s.next.calc + '].\n';
-    t += "CONSIGNE : n'ouvre PAS de nouveau trade dans la fenêtre d'une annonce à fort impact (FOMC/CPI/NFP). " +
-      "Si une alerte 'IMMINENT' est active, privilégie l'attente ou réduis fortement le risque, et mentionne-le. " +
-      "Calendrier indicatif (NFP/OPEX calculés, FOMC prévisionnel, CPI estimé) — à confirmer sur un calendrier officiel.";
+    if (s.next) t += "- Prochaine à fort impact : " + s.next.name + ' — ' + s.next.human + ' (dans ' + s.next.diff + ' j).\n';
+    t += "CONSIGNE : n'ouvre PAS de nouveau trade dans la fenêtre d'une annonce à fort impact. " +
+      "Si une alerte 'IMMINENT' est active, privilégie l'attente ou réduis fortement le risque, et mentionne-le dans ton analyse. " +
+      (s.source === 'live'
+        ? "Source : calendrier économique live (ForexFactory), toutes devises."
+        : "Source : calendrier interne indicatif (NFP/OPEX calculés, FOMC prévisionnel, CPI estimé) — flux live indisponible.");
     return t;
   }
 
-  // Petit bandeau HTML pour l'interface.
+  // Petit bandeau HTML pour l'interface (modal Bot IA).
   function bannerHTML(now) {
     var s = status(now);
     var bg = s.level === 'high' ? 'rgba(255,80,80,.14)' : s.level === 'watch' ? 'rgba(255,176,32,.14)' : 'rgba(64,220,140,.10)';
     var bd = s.level === 'high' ? 'rgba(255,80,80,.5)' : s.level === 'watch' ? 'rgba(255,176,32,.5)' : 'rgba(64,220,140,.35)';
     var lines = '<b>' + s.message + '</b><br><span style="opacity:.8">🕐 ' + s.etLabel + '</span>';
-    if (s.alerts.length) lines += '<br>' + s.alerts.map(function (a) {
+    if (s.alerts.length) lines += '<br>' + s.alerts.slice(0, 5).map(function (a) {
       return (a.level === 'high' ? '⚠️ ' : '🟠 ') + a.name + ' — ' + a.when;
     }).join('<br>');
     else if (s.next) lines += '<br><span style="opacity:.8">Prochaine : ' + s.next.name + ' — ' + s.next.human + ' (dans ' + s.next.diff + ' j)</span>';
+    var src = s.source === 'live' ? 'Calendrier live (ForexFactory) — toutes devises.' : 'Calendrier interne indicatif (flux live indisponible).';
     return '<div style="margin:12px 0;padding:10px 12px;border:1px solid ' + bd + ';background:' + bg +
       ';border-radius:10px;font-size:13px;line-height:1.5">' + lines +
-      '<br><span style="opacity:.55;font-size:11px">Calendrier indicatif — vérifie un calendrier officiel avant de trader une news.</span></div>';
+      '<br><span style="opacity:.55;font-size:11px">' + src + ' Vérifie un calendrier officiel avant de trader une news.</span></div>';
   }
 
-  root.ECON = { status: status, promptBlock: promptBlock, bannerHTML: bannerHTML };
+  // TOUS les événements de la semaine, groupés par jour (pour l'onglet Économie).
+  // Renvoie [{ dayIso, dayLabel, items:[{time,country,impact,name,forecast,previous,actual}] }].
+  function weekEvents() {
+    var live = liveNormalized();
+    var src = (live && live.length) ? live : computedNormalized(etParts(new Date()).y, etParts(new Date()).m);
+    var byDay = {};
+    src.forEach(function (e) {
+      var iso = isoOf(e.y, e.m, e.day);
+      (byDay[iso] = byDay[iso] || []).push(e);
+    });
+    return Object.keys(byDay).sort().map(function (iso) {
+      var p = iso.split('-');
+      var wd = JOURS[etParts(new Date(Date.UTC(+p[0], +p[1] - 1, +p[2], 12))).wd] || '';
+      var items = byDay[iso].sort(function (a, b) {
+        return (a.allday ? -1 : a.h * 60 + a.min) - (b.allday ? -1 : b.h * 60 + b.min);
+      }).map(function (e) {
+        return { time: e.allday ? '—' : pad(e.h) + 'h' + pad(e.min), country: e.country || '',
+          curLabel: CUR_LABEL[e.country] || ('🏳️ ' + (e.country || '')), impact: e.impact,
+          name: e.name, forecast: e.forecast || '', previous: e.previous || '', actual: e.actual || '' };
+      });
+      return { dayIso: iso, dayLabel: wd + ' ' + p[2] + '/' + p[1], items: items };
+    });
+  }
+
+  root.ECON = { status: status, promptBlock: promptBlock, bannerHTML: bannerHTML,
+    fetchLive: fetchLive, weekEvents: weekEvents };
 })(typeof window !== 'undefined' ? window : this);
 
 </script>
@@ -4041,7 +4185,10 @@ function buildCollab(){
   return Object.keys(out).length? out : null;
 }
 function renderEcon(){
-  try{ const el=$('#econ-note'); if(el&&window.ECON) el.innerHTML=ECON.bannerHTML(); }catch(e){}
+  try{ const el=$('#econ-note'); if(!el||!window.ECON) return;
+    el.innerHTML=ECON.bannerHTML(); // rendu immédiat (cache ou calendrier interne)
+    if(ECON.fetchLive) ECON.fetchLive().then(()=>{ el.innerHTML=ECON.bannerHTML(); }).catch(()=>{});
+  }catch(e){}
 }
 function openAI(){
   if(window.AI){ $('#ai-key').value=AI.getKey(); $('#ai-model').value=AI.getModel(); }
@@ -4070,6 +4217,8 @@ $('#ai-run').addEventListener('click', async ()=>{
   try{
     let mtf=null;
     try{ if(window.LIVE&&LIVE.mtf) mtf=await LIVE.mtf(); }catch(e){}
+    try{ if(window.ECON&&ECON.fetchLive) await ECON.fetchLive(); }catch(e){} // calendrier éco live pour le prompt
+    renderEcon();
     const linkOn = $('#ai-link') && $('#ai-link').checked;
     const collab = linkOn ? buildCollab() : null;
     const r = await AI.analyze(PAIRS, mtf, collab);
@@ -4378,13 +4527,65 @@ $('.viewswitch').addEventListener('click', e=>{
   $('#view-pro').style.display   = v==='pro'?'':'none';
   $('#view-ia').style.display    = v==='ia' ?'':'none';
   $('#view-quant').style.display = v==='quant'?'':'none';
+  $('#view-eco').style.display   = v==='eco'?'':'none';
   $('#view-kb').style.display    = v==='kb'?'':'none';
   if(v==='pro') loadPro();
   if(v==='ia')  loadIA();
   if(v==='quant') loadQuant();
   if(v==='kb')  loadKB();
   if(v==='cons') loadConsensus();
+  if(v==='eco') loadEco();
 });
+
+/* ---------- Calendrier économique (onglet Économie) ---------- */
+let ecoLoaded=false, ecoImp='all', ecoCur='all';
+const MAJOR_CUR=['USD','EUR','GBP','JPY'];
+function ecoDot(imp){ return imp==='high'?'🔴':imp==='mid'?'🟠':'⚪'; }
+function ecoFmt(v){ return (v==null||v==='')?'<span style="opacity:.35">—</span>':v; }
+function renderEco(){
+  const body=$('#eco-body'); if(!body) return;
+  if(!window.ECON){ body.innerHTML='<div class="hist-empty">Module calendrier indisponible.</div>'; return; }
+  const s=ECON.status();
+  const days=ECON.weekEvents();
+  let shown=0, html='';
+  html+='<div style="margin:0 0 12px">'+ECON.bannerHTML()+'</div>';
+  days.forEach(d=>{
+    let items=d.items.filter(i=>{
+      if(ecoImp==='high'&&i.impact!=='high') return false;
+      if(ecoImp==='mid'&&i.impact==='low') return false;
+      if(ecoCur==='major'&&MAJOR_CUR.indexOf(i.country)===-1) return false;
+      if(ecoCur==='USD'&&i.country!=='USD') return false;
+      return true;
+    });
+    if(!items.length) return;
+    const isToday = d.dayIso===s.etIso;
+    html+='<div class="eco-day'+(isToday?' today':'')+'"><div class="eco-dayhead">'+(isToday?'📍 ':'')+d.dayLabel+(isToday?' · aujourd’hui':'')+'</div>';
+    items.forEach(i=>{ shown++;
+      html+='<div class="eco-row imp-'+i.impact+'">'+
+        '<span class="eco-time">'+i.time+'</span>'+
+        '<span class="eco-cur">'+i.curLabel+'</span>'+
+        '<span class="eco-imp">'+ecoDot(i.impact)+'</span>'+
+        '<span class="eco-name">'+i.name+'</span>'+
+        '<span class="eco-fp"><b>prév</b> '+ecoFmt(i.forecast)+' · <b>préc</b> '+ecoFmt(i.previous)+(i.actual?' · <b>réel</b> '+i.actual:'')+'</span>'+
+        '</div>';
+    });
+    html+='</div>';
+  });
+  if(!shown) html+='<div class="hist-empty">Aucune annonce pour ce filtre.</div>';
+  html+='<p class="ai-note" style="margin-top:14px">Source : '+(s.source==='live'?'calendrier live ForexFactory (toutes devises)':'calendrier interne indicatif (flux live indisponible — réessaie plus tard)')+'. Heures en <b>ET</b> (New York). Pédagogique — vérifie un calendrier officiel avant de trader une news.</p>';
+  body.innerHTML=html;
+}
+function loadEco(){
+  const body=$('#eco-body');
+  if(!ecoLoaded && body) body.innerHTML='<div class="hist-empty">⏳ Récupération du calendrier économique…</div>';
+  if(window.ECON&&ECON.fetchLive){ ECON.fetchLive().then(()=>{ ecoLoaded=true; renderEco(); }).catch(()=>{ ecoLoaded=true; renderEco(); }); }
+  else renderEco();
+}
+document.addEventListener('click', e=>{
+  const bi=e.target.closest('#eco-imp .tab'); if(bi){ $('#eco-imp .on').classList.remove('on'); bi.classList.add('on'); ecoImp=bi.dataset.imp; renderEco(); return; }
+  const bc=e.target.closest('#eco-cur .tab'); if(bc){ $('#eco-cur .on').classList.remove('on'); bc.classList.add('on'); ecoCur=bc.dataset.cur; renderEco(); return; }
+});
+$('#eco-refresh')&&$('#eco-refresh').addEventListener('click', ()=>{ if(window.ECON&&ECON.fetchLive){ $('#eco-body').innerHTML='<div class="hist-empty">🔄 Actualisation…</div>'; ECON.fetchLive(true).then(()=>renderEco()); } });
 
 /* ---------- Consensus des bots (coordination) ---------- */
 function consVotes(sym){

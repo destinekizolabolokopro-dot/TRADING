@@ -181,6 +181,20 @@
   .viewswitch{flex-wrap:wrap}
   .pro-intro{color:var(--muted);font-size:.9rem;max-width:70ch;margin:0 0 20px;line-height:1.55}
   .pro-warn{color:var(--faint)}
+  /* Calendrier économique */
+  .eco-toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 16px}
+  .eco-filters{display:flex;gap:6px;flex-wrap:wrap}
+  .eco-day{margin:0 0 14px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .eco-day.today{border-color:var(--acc)}
+  .eco-dayhead{background:rgba(255,255,255,.04);padding:8px 12px;font-weight:700;font-size:.92rem}
+  .eco-day.today .eco-dayhead{background:rgba(110,120,255,.14)}
+  .eco-row{display:grid;grid-template-columns:52px 84px 26px 1fr;gap:8px;align-items:center;padding:7px 12px;border-top:1px solid var(--line);font-size:.86rem}
+  .eco-row .eco-fp{grid-column:1/-1;color:var(--faint);font-size:.78rem;padding-left:52px}
+  .eco-row.imp-high{background:rgba(255,80,80,.06)}
+  .eco-time{color:var(--muted);font-variant-numeric:tabular-nums}
+  .eco-cur{font-size:.8rem;white-space:nowrap}
+  .eco-name{font-weight:600}
+  @media(min-width:640px){ .eco-row{grid-template-columns:56px 92px 28px minmax(160px,1.4fr) 1.2fr} .eco-row .eco-fp{grid-column:auto;padding-left:0;text-align:right} }
   /* Bibliothèque (base de connaissances) */
   .kb-toolbar{margin:0 0 18px}
   #kb-search{width:100%;max-width:640px;font:inherit;font-size:.95rem;padding:12px 16px;border-radius:12px;
@@ -556,6 +570,7 @@
     <button class="vs" data-v="pro">♟️ Stratégies Pro</button>
     <button class="vs" data-v="ia">🧠 IA maison <span class="vs-tag local">locale</span></button>
     <button class="vs" data-v="quant">🏛️ Quant</button>
+    <button class="vs" data-v="eco">📅 Économie</button>
     <button class="vs" data-v="kb">📚 Bibliothèque</button>
   </div>
 
@@ -593,6 +608,24 @@
   <div id="view-quant" style="display:none">
     <p class="pro-intro">La façon dont travaillent <b>réellement les grands fonds</b> (Renaissance, Two Sigma, Citadel…). On ne prédit pas la direction (pile ou face) : on construit un panier <b>market-neutral</b> — <b>long</b> les plus forts, <b>short</b> les plus faibles — noté sur des <b>facteurs</b> (momentum, tendance, faible volatilité). <span class="pro-warn">On gagne sur l'écart, peu importe que le marché monte ou baisse. La vraie métrique visée : le <b>Sharpe</b> (rendement ÷ risque), pas le win rate.</span></p>
     <div id="quant-body"><div class="hist-empty">⏳ Construction du panier factoriel + backtest market-neutral…</div></div>
+  </div>
+
+  <div id="view-eco" style="display:none">
+    <p class="pro-intro">Le <b>calendrier économique complet de la semaine</b> — <b>toutes les annonces</b>, toutes devises (emploi, inflation, PIB, banques centrales, ventes…), avec prévision et valeur précédente. <span class="pro-warn">Les jours d'annonces à <b>fort impact</b> 🔴, le marché devient erratique : le Bot IA en tient compte et évite d'y ouvrir un trade. Données ForexFactory — pédagogique, vérifie l'officiel avant de trader.</span></p>
+    <div class="eco-toolbar">
+      <div class="eco-filters" id="eco-imp">
+        <button class="tab on" data-imp="all">Tous impacts</button>
+        <button class="tab" data-imp="high">🔴 Fort</button>
+        <button class="tab" data-imp="mid">🟠 Moyen+</button>
+      </div>
+      <div class="eco-filters" id="eco-cur">
+        <button class="tab on" data-cur="all">Toutes devises</button>
+        <button class="tab" data-cur="major">Majeures (USD/EUR/GBP/JPY)</button>
+        <button class="tab" data-cur="USD">🇺🇸 USD</button>
+      </div>
+      <button class="btn" id="eco-refresh" style="margin-left:auto">🔄 Actualiser</button>
+    </div>
+    <div id="eco-body"><div class="hist-empty">⏳ Récupération du calendrier économique…</div></div>
   </div>
 
   <div id="view-kb" style="display:none">
@@ -1031,7 +1064,10 @@ function buildCollab(){
   return Object.keys(out).length? out : null;
 }
 function renderEcon(){
-  try{ const el=$('#econ-note'); if(el&&window.ECON) el.innerHTML=ECON.bannerHTML(); }catch(e){}
+  try{ const el=$('#econ-note'); if(!el||!window.ECON) return;
+    el.innerHTML=ECON.bannerHTML(); // rendu immédiat (cache ou calendrier interne)
+    if(ECON.fetchLive) ECON.fetchLive().then(()=>{ el.innerHTML=ECON.bannerHTML(); }).catch(()=>{});
+  }catch(e){}
 }
 function openAI(){
   if(window.AI){ $('#ai-key').value=AI.getKey(); $('#ai-model').value=AI.getModel(); }
@@ -1060,6 +1096,8 @@ $('#ai-run').addEventListener('click', async ()=>{
   try{
     let mtf=null;
     try{ if(window.LIVE&&LIVE.mtf) mtf=await LIVE.mtf(); }catch(e){}
+    try{ if(window.ECON&&ECON.fetchLive) await ECON.fetchLive(); }catch(e){} // calendrier éco live pour le prompt
+    renderEcon();
     const linkOn = $('#ai-link') && $('#ai-link').checked;
     const collab = linkOn ? buildCollab() : null;
     const r = await AI.analyze(PAIRS, mtf, collab);
@@ -1368,13 +1406,65 @@ $('.viewswitch').addEventListener('click', e=>{
   $('#view-pro').style.display   = v==='pro'?'':'none';
   $('#view-ia').style.display    = v==='ia' ?'':'none';
   $('#view-quant').style.display = v==='quant'?'':'none';
+  $('#view-eco').style.display   = v==='eco'?'':'none';
   $('#view-kb').style.display    = v==='kb'?'':'none';
   if(v==='pro') loadPro();
   if(v==='ia')  loadIA();
   if(v==='quant') loadQuant();
   if(v==='kb')  loadKB();
   if(v==='cons') loadConsensus();
+  if(v==='eco') loadEco();
 });
+
+/* ---------- Calendrier économique (onglet Économie) ---------- */
+let ecoLoaded=false, ecoImp='all', ecoCur='all';
+const MAJOR_CUR=['USD','EUR','GBP','JPY'];
+function ecoDot(imp){ return imp==='high'?'🔴':imp==='mid'?'🟠':'⚪'; }
+function ecoFmt(v){ return (v==null||v==='')?'<span style="opacity:.35">—</span>':v; }
+function renderEco(){
+  const body=$('#eco-body'); if(!body) return;
+  if(!window.ECON){ body.innerHTML='<div class="hist-empty">Module calendrier indisponible.</div>'; return; }
+  const s=ECON.status();
+  const days=ECON.weekEvents();
+  let shown=0, html='';
+  html+='<div style="margin:0 0 12px">'+ECON.bannerHTML()+'</div>';
+  days.forEach(d=>{
+    let items=d.items.filter(i=>{
+      if(ecoImp==='high'&&i.impact!=='high') return false;
+      if(ecoImp==='mid'&&i.impact==='low') return false;
+      if(ecoCur==='major'&&MAJOR_CUR.indexOf(i.country)===-1) return false;
+      if(ecoCur==='USD'&&i.country!=='USD') return false;
+      return true;
+    });
+    if(!items.length) return;
+    const isToday = d.dayIso===s.etIso;
+    html+='<div class="eco-day'+(isToday?' today':'')+'"><div class="eco-dayhead">'+(isToday?'📍 ':'')+d.dayLabel+(isToday?' · aujourd’hui':'')+'</div>';
+    items.forEach(i=>{ shown++;
+      html+='<div class="eco-row imp-'+i.impact+'">'+
+        '<span class="eco-time">'+i.time+'</span>'+
+        '<span class="eco-cur">'+i.curLabel+'</span>'+
+        '<span class="eco-imp">'+ecoDot(i.impact)+'</span>'+
+        '<span class="eco-name">'+i.name+'</span>'+
+        '<span class="eco-fp"><b>prév</b> '+ecoFmt(i.forecast)+' · <b>préc</b> '+ecoFmt(i.previous)+(i.actual?' · <b>réel</b> '+i.actual:'')+'</span>'+
+        '</div>';
+    });
+    html+='</div>';
+  });
+  if(!shown) html+='<div class="hist-empty">Aucune annonce pour ce filtre.</div>';
+  html+='<p class="ai-note" style="margin-top:14px">Source : '+(s.source==='live'?'calendrier live ForexFactory (toutes devises)':'calendrier interne indicatif (flux live indisponible — réessaie plus tard)')+'. Heures en <b>ET</b> (New York). Pédagogique — vérifie un calendrier officiel avant de trader une news.</p>';
+  body.innerHTML=html;
+}
+function loadEco(){
+  const body=$('#eco-body');
+  if(!ecoLoaded && body) body.innerHTML='<div class="hist-empty">⏳ Récupération du calendrier économique…</div>';
+  if(window.ECON&&ECON.fetchLive){ ECON.fetchLive().then(()=>{ ecoLoaded=true; renderEco(); }).catch(()=>{ ecoLoaded=true; renderEco(); }); }
+  else renderEco();
+}
+document.addEventListener('click', e=>{
+  const bi=e.target.closest('#eco-imp .tab'); if(bi){ $('#eco-imp .on').classList.remove('on'); bi.classList.add('on'); ecoImp=bi.dataset.imp; renderEco(); return; }
+  const bc=e.target.closest('#eco-cur .tab'); if(bc){ $('#eco-cur .on').classList.remove('on'); bc.classList.add('on'); ecoCur=bc.dataset.cur; renderEco(); return; }
+});
+$('#eco-refresh')&&$('#eco-refresh').addEventListener('click', ()=>{ if(window.ECON&&ECON.fetchLive){ $('#eco-body').innerHTML='<div class="hist-empty">🔄 Actualisation…</div>'; ECON.fetchLive(true).then(()=>renderEco()); } });
 
 /* ---------- Consensus des bots (coordination) ---------- */
 function consVotes(sym){
