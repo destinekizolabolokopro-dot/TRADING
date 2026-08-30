@@ -4241,9 +4241,11 @@ $('#ai-run').addEventListener('click', async ()=>{
         '<div class="inums"><span>Entrée '+fmtN(i.entree)+'</span><span class="lo">Stop '+fmtN(i.stop)+'</span>'+
         '<span class="tp">Objectif '+fmtN(i.objectif)+'</span><span>RR '+(i.rr!=null?i.rr:'—')+'</span></div>'+
         ((i.entree&&i.objectif&&i.stop)?'<div class="inums"><span class="tp">Objectif +'+(pctMove(+i.entree,+i.objectif,long)||0).toFixed(1)+'%</span><span class="lo">Risque '+(pctMove(+i.entree,+i.stop,long)||0).toFixed(1)+'% au stop</span>'+(i.tf?'<span>unité '+i.tf+'</span>':'')+'</div>':'')+
+        ((i.entree&&i.objectif&&i.stop)?netRRLine(+i.entree,+i.stop,+i.objectif,long):'')+
         (i.rr!=null?'<div class="inums"><span class="tp">Sur 10 000 € (risque 1 %) : +'+Math.round(100*(+i.rr))+' € si TP</span><span class="lo">−100 € si SL</span></div>':'')+
         '<div class="why">'+(i.pourquoi||'')+'</div></div>';
     });
+    html+=corrWarnHTML(idees.map(i=>({sym:i.paire,dir:(i.sens||'').toUpperCase()})));
     out.innerHTML=html; out.classList.add('show');
   }catch(e){ st.textContent='❌ '+e.message; }
 });
@@ -4255,6 +4257,37 @@ function frDate(ts){ return new Date(ts).toLocaleString('fr-FR',{day:'2-digit',m
 function fmtDur(ms){ if(ms==null) return '—'; const m=ms/60000; if(m<60) return Math.round(m)+' min'; const h=m/60; if(h<24) return (h<10?h.toFixed(1):Math.round(h))+' h'; const j=Math.floor(h/24), rh=Math.round(h%24); return j+' j'+(rh?' '+rh+' h':''); }
 // Écart en % entre l'entrée et un niveau, dans le sens du trade (positif = favorable).
 function pctMove(entry, level, long){ if(entry==null||level==null||!entry) return null; return (long ? (level/entry-1) : (entry/level-1))*100; }
+/* ---- RR NET : intègre une estimation frais + spread (coût aller-retour) ----
+   Le RR affiché par les bots est théorique. En réel, frais + spread rongent le
+   gain et aggravent la perte. On déduit un coût aller-retour (% du prix) pour
+   afficher un RR RÉALISTE. Défaut prudent pour cryptos majeures : ~0,10 %. */
+const COST_PCT = 0.10; // coût aller-retour estimé (frais + spread) en % du prix
+function netRR(entry, sl, tp, long){
+  if(entry==null||sl==null||tp==null||!entry) return null;
+  const cost = (COST_PCT/100)*Math.abs(entry);
+  const reward = Math.abs(tp-entry) - cost;   // gain net
+  const risk = Math.abs(sl-entry) + cost;     // risque net (le coût s'ajoute)
+  if(risk<=0) return null;
+  return reward>0 ? reward/risk : 0;
+}
+function netRRLine(entry, sl, tp, long){
+  const n = netRR(entry, sl, tp, long);
+  if(n==null) return '';
+  const ok = n>=1;
+  return `<div class="inums"><span class="${ok?'tp':'lo'}">RR net ~${n.toFixed(2)} après frais/spread (~${COST_PCT}%)</span>`+
+    `<span style="opacity:.6">${ok?'':'⚠️ sous 1 RR une fois les frais déduits'}</span></div>`;
+}
+/* ---- Alerte corrélation : plusieurs positions crypto dans le même sens = un
+   seul gros pari (le risque réel n'est pas divisé). ---- */
+const NON_CRYPTO = ['EUR/USD','GBP/USD','USD/JPY','XAU/USD','USD/CHF','AUD/USD','USD/CAD','NZD/USD'];
+function corrWarnHTML(trades){
+  const cr = (trades||[]).filter(t=>t&&t.dir&&t.dir!=='WAIT'&&NON_CRYPTO.indexOf(t.sym)===-1);
+  const longs = cr.filter(t=>t.dir==='LONG').length, shorts = cr.filter(t=>t.dir==='SHORT').length;
+  const n = Math.max(longs, shorts); if(n<3) return '';
+  const sens = longs>=shorts?'à la hausse (LONG)':'à la baisse (SHORT)';
+  return `<div style="margin:10px 0;padding:9px 12px;border:1px solid rgba(255,176,32,.5);background:rgba(255,176,32,.12);border-radius:10px;font-size:12.5px;line-height:1.5">`+
+    `⚠️ <b>Attention corrélation</b> — ${n} positions crypto ${sens} en même temps. Les cryptos bougent ensemble : c'est en réalité <b>un seul gros pari</b>, pas ${n} paris indépendants. Ton risque réel est concentré — réduis le nombre ou la taille.</div>`;
+}
 function srcClass(s){ return (s||'').indexOf('IA')>=0?'ia':'regles'; }
 // Petite courbe d'équité (R cumulés) en SVG inline.
 function equitySVG(eq){
@@ -4786,7 +4819,7 @@ function renderQuant(d){
   const qTrades = quantBuildTrades(d.longs, d.shorts);
   html += `<div class="ia-h" style="margin-top:22px">🎯 Positions du panier <span class="stag" style="font-weight:400">long les forts · short les faibles · stop sur volatilité · RR 2</span></div>`;
   html += qTrades.length
-    ? `<div class="ai-out show" style="margin-top:4px">${qTrades.map(quantTradeCard).join('')}</div>`
+    ? `<div class="ai-out show" style="margin-top:4px">${qTrades.map(quantTradeCard).join('')}</div>${corrWarnHTML(qTrades)}`
     : `<div class="hist-empty">Données insuffisantes pour proposer des positions.</div>`;
   html += `<p class="bt-caveat" style="margin-top:14px">🔎 Chaque barre montre la force du facteur (z-score vs le panier). Les <b>positions</b> ci-dessus traduisent le panier en trades (long les plus forts, short les plus faibles, stop sur la volatilité, RR 2). Elles s'ajoutent à ton <b>historique</b> (bot « Quant »). <b>Market-neutral ≠ sans risque — pédagogique, pas un conseil financier.</b></p>`;
   if(window.History && qTrades.length){
@@ -4816,6 +4849,7 @@ function quantTradeCard(t){
     <div class="inums"><span>Entrée ${fmtN(t.entry)}</span><span class="lo">Stop ${fmtN(t.sl)}</span>
       <span class="tp">Objectif ${fmtN(t.tp)}</span><span>RR ${t.rr}</span></div>
     <div class="inums"><span class="tp">Objectif +${(pctMove(t.entry,t.tp,long)||0).toFixed(1)}%</span><span class="lo">Risque ${(pctMove(t.entry,t.sl,long)||0).toFixed(1)}% au stop</span></div>
+    ${netRRLine(t.entry,t.sl,t.tp,long)}
     <div class="inums"><span class="tp">Sur 10 000 € (risque 1 %) : +${Math.round(100*t.rr)} € si TP</span><span class="lo">−100 € si SL</span></div>
   </div>`;
 }
@@ -4976,6 +5010,7 @@ function iaTradeCard(t){
     <div class="inums"><span>Entrée ${fmtN(t.entry)}</span><span class="lo">Stop ${fmtN(t.sl)}</span>
       <span class="tp">Objectif ${fmtN(t.tp)}</span><span>RR ${t.rr}</span></div>
     <div class="inums"><span class="tp">Objectif +${(pctMove(t.entry,t.tp,long)||0).toFixed(1)}%</span><span class="lo">Risque ${(pctMove(t.entry,t.sl,long)||0).toFixed(1)}% au stop</span><span>durée cible ~${IA_HORIZON} j</span></div>
+    ${netRRLine(t.entry,t.sl,t.tp,long)}
     <div class="inums"><span class="tp">Sur 10 000 € (risque 1 %) : +${Math.round(100*t.rr)} € si TP</span><span class="lo">−100 € si SL</span></div>
   </div>`;
 }
@@ -5044,7 +5079,7 @@ function renderIA(d){
   const iaTrades = iaBuildTrades(d.signals);
   html += `<div class="ia-h" style="margin-top:22px">🎯 Positions proposées par l'IA maison <span class="stag" style="font-weight:400">déduites du classement · stop sur volatilité · RR 2</span></div>`;
   html += iaTrades.length
-    ? `<div class="ai-out show" style="margin-top:4px">${iaTrades.map(iaTradeCard).join('')}</div>`
+    ? `<div class="ai-out show" style="margin-top:4px">${iaTrades.map(iaTradeCard).join('')}</div>${corrWarnHTML(iaTrades)}`
     : `<div class="hist-empty">Aucun signal assez marqué pour proposer une position (le panier est indécis en ce moment).</div>`;
   html += `<p class="bt-caveat" style="margin-top:14px">🔎 Ces positions traduisent le classement de force relative en trades : les plus forts en <b>LONG</b>, les plus faibles en <b>SHORT</b>, entrée au prix actuel, stop calé sur la volatilité (ATR) et objectif à RR 2 sur ~${IA_HORIZON} j. Elles s'ajoutent à ton <b>historique</b> (bot « IA maison ») et sont notées au TP/SL. <b>Avantage statistique modeste — pédagogique, pas un conseil financier.</b></p>`;
   // Enregistre les positions dans l'historique (source « IA maison »)
