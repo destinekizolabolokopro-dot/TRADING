@@ -2758,6 +2758,12 @@
     "RÈGLE STRICTE : n'envoie JAMAIS un trade sous 1 RR. Si tu ne peux pas obtenir au moins 1 RR avec un stop logique, " +
     "n'envoie tout simplement PAS ce trade (ne le mets pas dans la liste). Point d'entrée précis, stop au-delà d'un balayage/structure, objectif atteignable. " +
     "Sois HONNÊTE : si aucun setup n'est net, renvoie une liste vide plutôt que de forcer un trade. " +
+    "En PLUS de tes idées de trade, tu fais DEUX choses : " +
+    "(1) AMD — pour chaque actif pertinent, identifie sa phase du Power of 3 : Accumulation (range), " +
+    "Manipulation (faux mouvement / balayage de liquidité), Distribution (vrai mouvement dirigé) ou Expansion. " +
+    "(2) PRESHOT — repère les setups EN PRÉPARATION (pré-signaux) : les conditions s'alignent mais le déclencheur " +
+    "n'est PAS encore validé. Pour chacun, dis ce qui manque et le déclencheur précis à surveiller. Un preshot n'est PAS " +
+    "un trade à prendre maintenant : c'est une alerte « bientôt prêt ». " +
     "Tu n'es pas un conseiller financier ; règle de gestion : risque max 1 % du compte par trade.";
 
   function buildUser(pairs, mtf, collab) {
@@ -2770,10 +2776,16 @@
     var txt = "Tu es le Bot IA du site. Analyse le marché et envoie TES meilleures idées de trade (0 à 3), " +
       "sur H1/H4/D1 uniquement, classées de la plus forte à la plus faible. " +
       "N'inclus QUE des trades dont le rr est >= 1 (privilégie 2, 3, 4 ou plus). Jamais de trade sous 1 RR. " +
+      "Ajoute AUSSI : \"amd\" (phase Power of 3 de chaque actif pertinent) et \"preshot\" (setups en préparation, " +
+      "pas encore déclenchés). " +
       "Réponds UNIQUEMENT avec un objet JSON valide, sans texte autour, de la forme :\n" +
-      '{"marche":"résumé global en 1-2 phrases","idees":[{"paire":"BTC/USD","sens":"LONG|SHORT","tf":"H1|H4|D1",' +
+      '{"marche":"résumé global en 1-2 phrases",' +
+      '"amd":[{"paire":"BTC/USD","phase":"Accumulation|Manipulation|Distribution|Expansion","note":"courte explication"}],' +
+      '"preshot":[{"paire":"ETH/USD","sens":"LONG|SHORT","tf":"H1|H4|D1","setup":"nom du setup (ex. Sweep+MSS, STRIKE, Unicorn…)",' +
+      '"zone":"zone/niveau à surveiller","manque":"ce qui manque pour valider","declencheur":"le signal précis qui validera l\'entrée","confiance":0}],' +
+      '"idees":[{"paire":"BTC/USD","sens":"LONG|SHORT","tf":"H1|H4|D1",' +
       '"entree":00,"stop":00,"objectif":00,"rr":0.0,"confiance":0,"pourquoi":"explication ICT/SMC courte en français"}]}\n' +
-      "Si rien n'atteint au moins 1 RR, renvoie \"idees\": [].";
+      "Si rien n'atteint au moins 1 RR, renvoie \"idees\": []. Renvoie \"amd\": [] et \"preshot\": [] si tu n'as rien à signaler.";
     if (mtf && mtf.length) {
       txt += "\n\nDONNÉES MULTI-UNITÉS (D1 → H4 → H1) pour l'alignement top-down :\n" + JSON.stringify(mtf, null, 2);
     }
@@ -4447,6 +4459,8 @@ $('#ai-run').addEventListener('click', async ()=>{
     if(!r.parsed){ out.innerHTML='<div class="ai-summary">'+(r.raw||'Réponse vide.').slice(0,1200)+'</div>'; out.classList.add('show'); return; }
     let html='';
     if(r.parsed.marche) html+='<div class="ai-summary">'+r.parsed.marche+'</div>';
+    html+=amdBlockHTML(r.parsed.amd);
+    html+=preshotBlockHTML(r.parsed.preshot);
     // Sécurité : on n'affiche que les trades >= 1 RR, meilleurs ratios d'abord
     let idees=(r.parsed.idees||[]).filter(i=> i.rr==null || +i.rr>=1);
     idees.sort((a,b)=> (+b.rr||0)-(+a.rr||0));
@@ -4507,6 +4521,39 @@ function corrWarnHTML(trades){
   const sens = longs>=shorts?'à la hausse (LONG)':'à la baisse (SHORT)';
   return `<div style="margin:10px 0;padding:9px 12px;border:1px solid rgba(255,176,32,.5);background:rgba(255,176,32,.12);border-radius:10px;font-size:12.5px;line-height:1.5">`+
     `⚠️ <b>Attention corrélation</b> — ${n} positions crypto ${sens} en même temps. Les cryptos bougent ensemble : c'est en réalité <b>un seul gros pari</b>, pas ${n} paris indépendants. Ton risque réel est concentré — réduis le nombre ou la taille.</div>`;
+}
+/* ---- AMD (Power of 3) : phase de chaque actif repérée par le Bot IA ---- */
+function amdColor(ph){ const p=(ph||'').toLowerCase();
+  if(p.indexOf('manip')>=0) return '#ff8a3d';      // manipulation = piège (orange)
+  if(p.indexOf('distrib')>=0) return '#3ddc84';    // distribution = vrai move (vert)
+  if(p.indexOf('expans')>=0) return '#6ea8ff';     // expansion (bleu)
+  return '#9aa0aa';                                 // accumulation (gris)
+}
+function amdBlockHTML(amd){
+  if(!Array.isArray(amd)||!amd.length) return '';
+  let rows=amd.map(a=>`<div style="display:flex;gap:8px;align-items:baseline;padding:5px 0;border-top:1px solid var(--line)">`+
+    `<b style="min-width:74px">${a.paire||'—'}</b>`+
+    `<span style="color:${amdColor(a.phase)};font-weight:700;min-width:96px">${a.phase||'—'}</span>`+
+    `<span style="color:var(--faint);font-size:12.5px">${a.note||''}</span></div>`).join('');
+  return `<div style="margin:10px 0;padding:10px 12px;border:1px solid var(--line);border-radius:10px">`+
+    `<div style="font-weight:700;margin-bottom:4px">🔄 Phases AMD (Power of 3) <span style="color:var(--faint);font-weight:400;font-size:12px">— Accumulation → Manipulation (piège) → Distribution (vrai move)</span></div>${rows}</div>`;
+}
+/* ---- PRESHOT : setups en préparation (pré-signaux, pas encore déclenchés) ---- */
+function preshotBlockHTML(ps){
+  if(!Array.isArray(ps)||!ps.length) return '';
+  let cards=ps.map(p=>{
+    const long=(p.sens||'').toUpperCase()==='LONG';
+    return `<div class="ai-idea ${long?'long':'short'}" style="border-style:dashed;opacity:.96">`+
+      `<div class="ihead"><span class="isym">${p.paire||'—'}</span>`+
+      `<span class="ilvl">⏳ PRESHOT · ${long?'▲ LONG':(((p.sens||'').toUpperCase()==='SHORT')?'▼ SHORT':'—')}${p.tf?' · '+p.tf:''}${p.confiance!=null?' · '+p.confiance+'%':''}</span></div>`+
+      (p.setup?`<div class="inums"><span>Setup : <b>${p.setup}</b></span></div>`:'')+
+      (p.zone?`<div class="inums"><span>Zone à surveiller : ${p.zone}</span></div>`:'')+
+      (p.manque?`<div class="why" style="color:#ffb020">⛔ Il manque : ${p.manque}</div>`:'')+
+      (p.declencheur?`<div class="why" style="color:#3ddc84">✅ Déclencheur : ${p.declencheur}</div>`:'')+
+      `</div>`;
+  }).join('');
+  return `<div style="margin:14px 0 4px"><div style="font-weight:700;margin-bottom:6px">⏳ PRESHOT — setups en préparation `+
+    `<span style="color:var(--faint);font-weight:400;font-size:12px">— pas encore déclenchés, à surveiller</span></div>${cards}</div>`;
 }
 function srcClass(s){ return (s||'').indexOf('IA')>=0?'ia':'regles'; }
 // Petite courbe d'équité (R cumulés) en SVG inline.
