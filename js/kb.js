@@ -1150,6 +1150,14 @@
     def:"MON setup (Stratton Trader) — SWING trading simple et sécuritaire. Confluence de tendance : D1 ET W1 alignés dans la MÊME direction, zone premium/discount Daily. Zone d'intervention sur le DAILY (Fibonacci : discount <50% = ACHAT, premium >50% = VENTE). Fair Value Gap HTF requis (BISI = achat, SIBI = vente) — pas de FVG = PAS DE TRADE.",
     usage:"Exécution en H4 sur un BREAKER BLOCK. ENTRÉE : sur le breaker H4, en discount (achat) / premium (vente), D1+W1 alignés. STOP : sous/au-dessus du swing du breaker H4. OBJECTIF : swing (RR élevé). Exemple : Discount Daily + tendance Weekly haussière + BB H4 haussier → swing à l'achat. Unités : biais D1/W1 → exécution H4.",
     biais:'directionnel — tendance D1/W1' });
+  add({ id:'su-shield', nom:'SHIELD Setup (perso, swing W1)', alias:['shield setup','stratton shield','fvg w1 setup'], cat:'setup', tags:['perso','stratton','swing','fvg w1','breaker h4','a'],
+    def:"MON setup (Stratton Trader) — exploite la touche d'un FVG W1 (swing). Conditions : (1) PD Arrays W1 — le FVG W1 ET le BB H4 doivent être ALIGNÉS dans la même direction que la tendance W1 ; en cas de désalignement, IGNORER ce setup ; (2) tendance W1 CLAIRE (haussière/baissière) — si pas claire, PAS DE TRADE ; (3) FVG W1 (BISI = achat, SIBI = vente) — pas de FVG = PAS DE TRADE.",
+    usage:"Exécution en H4 sur un BREAKER BLOCK. RÈGLE ABSOLUE : pas de swing setup sans BB H4 validé — soit Premium/Discount + BB H4, soit un support Weekly + BB H4 dans le sens de la tendance. ENTRÉE : sur le breaker H4. STOP : sous/au-dessus du swing du breaker. OBJECTIF : swing (RR élevé). Unités : biais W1 → exécution H4.",
+    biais:'directionnel — tendance W1' });
+  add({ id:'su-tip-session', nom:'Astuce perso : BB M5 le matin & poids des sessions', alias:['bb m5 matin','poids des sessions','londres vs new york','astuce session'], cat:'setup', tags:['perso','session','exécution','volume'],
+    def:"Note perso (DreamxNQ) sur l'exécution : le MATIN (session de Londres), utiliser un Breaker Block M5 au lieu de M15 à cause du volume plus faible. Surtout : « on ne compare pas une entrée en session de Londres qui pèse 3 € à une entrée en session de New York qui pèse 3 M » — le contexte de session change le POIDS et la fiabilité d'une entrée.",
+    usage:"Adapter l'unité d'exécution au volume : M5 pour l'entrée du matin (Londres), M15 sinon. Pondérer davantage les entrées de la session de NEW YORK (volume institutionnel) et se méfier des entrées légères du matin. Ne pas traiter toutes les entrées comme équivalentes.",
+    biais:'contexte — poids selon la session' });
 
   // — ICT / SMC —
   add({ id:'su-sweep-mss', nom:'Sweep + MSS (retournement, modèle 2022)', alias:['sweep mss','modèle 2022 setup','reversal sweep'], cat:'setup', tags:['retournement','ict','a+'],
