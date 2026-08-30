@@ -36,6 +36,16 @@
   .tf-badge{font-family:var(--mono);font-size:.72rem;font-weight:600;padding:1px 7px;border-radius:999px;
     background:var(--surface-3);color:var(--muted);border:1px solid var(--border);white-space:nowrap}
   .hfilter-sep{display:inline-block;width:1px;height:18px;background:var(--border-strong);margin:0 4px;vertical-align:middle}
+  /* Titres de section dans la sortie du Bot IA (cohérence AMD / Preshot / idées) */
+  .ai-sec{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;font-weight:700;font-size:.98rem;margin:18px 0 9px}
+  .ai-sec .sub{color:var(--faint);font-weight:400;font-size:12px}
+  .ai-sec::before{content:'';width:3px;height:15px;border-radius:2px;background:var(--border-strong);display:inline-block;align-self:center}
+  .amd-rows{border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .amd-row{display:flex;gap:10px;align-items:baseline;padding:8px 12px}
+  .amd-row+.amd-row{border-top:1px solid var(--line)}
+  .amd-row .amd-sym{min-width:78px;font-weight:600}
+  .amd-row .amd-ph{min-width:104px;font-weight:700}
+  .amd-row .amd-note{color:var(--faint);font-size:12.5px}
   .ai-idea.copyable{cursor:pointer;transition:transform .08s ease,box-shadow .15s ease,border-color .15s ease}
   .ai-idea.copyable:hover{border-color:var(--border-strong);box-shadow:0 4px 18px rgba(0,0,0,.35)}
   .ai-idea.copyable:active{transform:scale(.99)}
@@ -666,6 +676,7 @@
     <button class="modal-close" id="ai-close" aria-label="Fermer">×</button>
     <h2>Bot IA <span style="color:var(--faint);font-weight:400">— propulsé par Claude</span></h2>
     <div class="ident ext"><span class="ident-badge">🤖 Bot IA · intelligence externe (Claude)</span> <span class="ident-vs">≠ l'🧠 IA maison locale &amp; gratuite de l'onglet dédié</span></div>
+    <div id="ai-onboard">
     <p class="sub">Claude analyse les vraies bougies <b>selon le style choisi (Scalp, Intraday ou Swing)</b> en s'appuyant sur <b>toute la bibliothèque du site (303 concepts ICT/SMC & co)</b>, puis envoie ses meilleures idées de trade, les phases <b>AMD</b> et les <b>preshot</b>. Ta clé reste <b>sur ton ordinateur</b>.</p>
     <div class="ai-steps">
       <span class="ai-step"><b>1</b> Crée une clé sur <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com&nbsp;↗</a> (+ un peu de crédit)</span>
@@ -676,6 +687,8 @@
       <label>Clé API Anthropic <span style="color:var(--faint);font-weight:400">— commence par sk-ant-…</span></label>
       <input type="password" id="ai-key" placeholder="sk-ant-..." autocomplete="off">
     </div>
+    </div>
+    <div id="ai-keystate" style="display:none;margin:2px 0 14px;font-size:13.5px;color:var(--muted)">🔑 Clé API enregistrée ✓ <a id="ai-editkey" style="color:var(--ink);text-decoration:underline;cursor:pointer;margin-left:6px">Modifier</a></div>
     <div class="field">
       <label>Modèle <span style="color:var(--faint);font-weight:400">— commence par Haiku (le moins cher)</span></label>
       <select id="ai-model">
@@ -1099,6 +1112,9 @@ function renderEcon(){
 }
 function openAI(){
   if(window.AI){ $('#ai-key').value=AI.getKey(); $('#ai-model').value=AI.getModel(); if($('#ai-style')&&AI.getStyle) $('#ai-style').value=AI.getStyle(); }
+  const hasKey = !!(window.AI && AI.getKey());
+  if($('#ai-onboard')) $('#ai-onboard').style.display = hasKey?'none':'';
+  if($('#ai-keystate')) $('#ai-keystate').style.display = hasKey?'':'none';
   aiOverlay.classList.add('open');
   renderEcon(); // affiche l'état du calendrier économique
   restoreLastAI(); // réaffiche la dernière analyse mémorisée
@@ -1108,11 +1124,13 @@ function openAI(){
 function closeAI(){ aiOverlay.classList.remove('open'); }
 $('#ai-open').addEventListener('click', openAI);
 $('#ai-close').addEventListener('click', closeAI);
+$('#ai-editkey') && $('#ai-editkey').addEventListener('click', ()=>{ if($('#ai-onboard'))$('#ai-onboard').style.display=''; if($('#ai-keystate'))$('#ai-keystate').style.display='none'; $('#ai-key').focus(); });
 aiOverlay.addEventListener('click', e=>{ if(e.target===aiOverlay) closeAI(); });
 $('#ai-save').addEventListener('click', ()=>{
   if(!window.AI) return;
   AI.setKey($('#ai-key').value); AI.setModel($('#ai-model').value); if(AI.setStyle) AI.setStyle($('#ai-style').value);
   $('#ai-status').textContent='✅ Clé, modèle et style enregistrés (en local).';
+  if(AI.getKey()){ if($('#ai-onboard'))$('#ai-onboard').style.display='none'; if($('#ai-keystate'))$('#ai-keystate').style.display=''; }
 });
 function fmtN(n){ return n==null?'—':(Math.abs(n)>=1000?Math.round(n):+(+n).toFixed(Math.abs(n)>=10?2:4)).toLocaleString('fr-FR'); }
 $('#ai-run').addEventListener('click', async ()=>{
@@ -1142,6 +1160,7 @@ $('#ai-run').addEventListener('click', async ()=>{
     idees.sort((a,b)=> (+b.rr||0)-(+a.rr||0));
     lastAI=idees; refreshConsensusIfVisible(); // pour l'onglet Consensus
     if(window.History){ const pm=priceMap(); const styl=(window.AI&&AI.getStyle)?AI.getStyle():null; History.record(idees.map(i=>({sym:i.paire,dir:(i.sens||'').toUpperCase(),entry:+i.entree,sl:+i.stop,tp:+i.objectif,rr:+i.rr,note:i.pourquoi||'',tf:i.tf||null,style:styl,price:(pm[i.paire]!=null?pm[i.paire]:null)})),'Bot IA'); History.evaluate(pm); }
+    html+='<div class="ai-sec">⚡ Idées de trade <span class="sub">prêtes · clique une carte pour copier</span></div>';
     if(!idees.length) html+='<div class="ai-summary">Aucune idée ≥ 1 RR pour l’instant — le Bot IA préfère attendre.</div>';
     idees.forEach(i=>{
       const long=(i.sens||'').toUpperCase()==='LONG';
@@ -1219,12 +1238,12 @@ function amdColor(ph){ const p=(ph||'').toLowerCase();
 }
 function amdBlockHTML(amd){
   if(!Array.isArray(amd)||!amd.length) return '';
-  let rows=amd.map(a=>`<div style="display:flex;gap:8px;align-items:baseline;padding:5px 0;border-top:1px solid var(--line)">`+
-    `<b style="min-width:74px">${a.paire||'—'}</b>`+
-    `<span style="color:${amdColor(a.phase)};font-weight:700;min-width:96px">${a.phase||'—'}</span>`+
-    `<span style="color:var(--faint);font-size:12.5px">${a.note||''}</span></div>`).join('');
-  return `<div style="margin:10px 0;padding:10px 12px;border:1px solid var(--line);border-radius:10px">`+
-    `<div style="font-weight:700;margin-bottom:4px">🔄 Phases AMD (Power of 3) <span style="color:var(--faint);font-weight:400;font-size:12px">— Accumulation → Manipulation (piège) → Distribution (vrai move)</span></div>${rows}</div>`;
+  let rows=amd.map(a=>`<div class="amd-row">`+
+    `<span class="amd-sym">${a.paire||'—'}</span>`+
+    `<span class="amd-ph" style="color:${amdColor(a.phase)}">${a.phase||'—'}</span>`+
+    `<span class="amd-note">${a.note||''}</span></div>`).join('');
+  return `<div class="ai-sec">🔄 Phases AMD <span class="sub">Accumulation → Manipulation (piège) → Distribution (vrai move)</span></div>`+
+    `<div class="amd-rows">${rows}</div>`;
 }
 /* ---- PRESHOT : setups en préparation (pré-signaux, pas encore déclenchés) ---- */
 function preshotBlockHTML(ps){
@@ -1240,8 +1259,7 @@ function preshotBlockHTML(ps){
       (p.declencheur?`<div class="why" style="color:#3ddc84">✅ Déclencheur : ${p.declencheur}</div>`:'')+
       `</div>`;
   }).join('');
-  return `<div style="margin:14px 0 4px"><div style="font-weight:700;margin-bottom:6px">⏳ PRESHOT — setups en préparation `+
-    `<span style="color:var(--faint);font-weight:400;font-size:12px">— pas encore déclenchés, à surveiller</span></div>${cards}</div>`;
+  return `<div class="ai-sec">⏳ PRESHOT — setups en préparation <span class="sub">pas encore déclenchés, à surveiller</span></div>${cards}`;
 }
 /* ---- Toast + clic pour copier une position ---- */
 let _toastT=null;
