@@ -12,17 +12,27 @@
 
   var KEY_STORE = 'anthropic.key';
   var MODEL_STORE = 'anthropic.model';
+  var STYLE_STORE = 'anthropic.style';
   var ENDPOINT = 'https://api.anthropic.com/v1/messages';
+
+  // Styles de trading = quelles unités de temps le bot exploite.
+  var STYLES = {
+    scalp:    { nom: 'Scalp',    tfs: 'M1, M5, M15',  htf: 'M15/H1', ltf: 'M1/M5',  horizon: 'quelques minutes à 1-2 h' },
+    intraday: { nom: 'Intraday', tfs: 'M15, H1, H4',  htf: 'H4/H1',  ltf: 'M15',    horizon: 'quelques heures (clôturé le jour même)' },
+    swing:    { nom: 'Swing',    tfs: 'H1, H4, D1',   htf: 'D1/H4',  ltf: 'H1',     horizon: 'quelques jours' }
+  };
 
   function getKey() { try { return localStorage.getItem(KEY_STORE) || ''; } catch (e) { return ''; } }
   function setKey(k) { try { localStorage.setItem(KEY_STORE, (k || '').trim()); } catch (e) {} }
   function getModel() { try { return localStorage.getItem(MODEL_STORE) || 'claude-haiku-4-5'; } catch (e) { return 'claude-haiku-4-5'; } }
   function setModel(m) { try { localStorage.setItem(MODEL_STORE, m); } catch (e) {} }
+  function getStyle() { try { return localStorage.getItem(STYLE_STORE) || 'swing'; } catch (e) { return 'swing'; } }
+  function setStyle(s) { try { localStorage.setItem(STYLE_STORE, s); } catch (e) {} }
 
   var SYSTEM =
     "Tu es un BOT DE TRADING autonome, propulsé par Claude (Anthropic), intégré à un site ICT/SMC. Tu écris en français. " +
-    "Tu opères UNIQUEMENT sur les unités de temps H1, H4 et D1 — jamais en dessous de H1. " +
-    "Tu raisonnes en TOP-DOWN : le biais vient du D1, tu affines en H4, tu synchronises l'entrée en H1. " +
+    "Tu opères sur les unités de temps du STYLE demandé (précisé dans le message : Scalp, Intraday ou Swing). " +
+    "Tu raisonnes en TOP-DOWN : le biais vient de l'unité haute du style, tu affines sur l'intermédiaire, tu synchronises l'entrée sur l'unité basse. " +
     "Tu bases tes décisions PRINCIPALEMENT sur les concepts ICT/SMC (structure & BOS/CHoCH, MSS, FVG, order blocks, " +
     "breaker, OTE 62-79%, liquidité/equal highs-lows, premium/discount, cycles Accumulation-Manipulation-Expansion-Distribution), " +
     "MAIS tu es LIBRE d'employer toute autre technique intelligente et pertinente (momentum, confluence multi-unités, " +
@@ -39,17 +49,24 @@
     "(2) PRESHOT — repère les setups EN PRÉPARATION (pré-signaux) : les conditions s'alignent mais le déclencheur " +
     "n'est PAS encore validé. Pour chacun, dis ce qui manque et le déclencheur précis à surveiller. Un preshot n'est PAS " +
     "un trade à prendre maintenant : c'est une alerte « bientôt prêt ». " +
+    "Pour CHAQUE idée de trade, le champ \"pourquoi\" doit être DÉTAILLÉ et structuré (2 à 4 phrases) : " +
+    "1) le BIAIS et son unité de temps ; 2) le SETUP précis (nom) et le DÉCLENCHEUR qui l'a validé (sweep, MSS, FVG…) ; " +
+    "3) la CONFLUENCE (killzone, discount/premium, SMT, DXY…) ; 4) POURQUOI le stop est là (invalidation) et POURQUOI la cible (liquidité visée). " +
     "Tu n'es pas un conseiller financier ; règle de gestion : risque max 1 % du compte par trade.";
 
-  function buildUser(pairs, mtf, collab) {
+  function buildUser(pairs, mtf, collab, style) {
+    var st = STYLES[style] || STYLES.swing;
     var snap = pairs.map(function (p) {
       return {
         paire: p.sym, prix: p.price, sens_calcule: p.dir, cycle: p.cycle,
         confluence_pct: p.conf, entree: p.entry, stop: p.sl, objectif: p.tp, rr: p.rr, note: p.note
       };
     });
-    var txt = "Tu es le Bot IA du site. Analyse le marché et envoie TES meilleures idées de trade (0 à 3), " +
-      "sur H1/H4/D1 uniquement, classées de la plus forte à la plus faible. " +
+    var txt = "STYLE DEMANDÉ : " + st.nom.toUpperCase() + " — travaille sur les unités " + st.tfs +
+      " (biais sur " + st.htf + ", entrée sur " + st.ltf + "), horizon ~" + st.horizon + ". " +
+      "Adapte tes entrées/stops/objectifs à ce style (en scalp, stops et objectifs plus serrés).\n\n" +
+      "Tu es le Bot IA du site. Analyse le marché et envoie TES meilleures idées de trade (0 à 3), " +
+      "sur les unités du style ci-dessus, classées de la plus forte à la plus faible. " +
       "N'inclus QUE des trades dont le rr est >= 1 (privilégie 2, 3, 4 ou plus). Jamais de trade sous 1 RR. " +
       "Ajoute AUSSI : \"amd\" (phase Power of 3 de chaque actif pertinent) et \"preshot\" (setups en préparation, " +
       "pas encore déclenchés). " +
@@ -93,11 +110,12 @@
     var key = getKey();
     if (!key) return Promise.reject(new Error('Aucune clé API. Colle ta clé Anthropic dans les réglages.'));
     var model = getModel();
+    var style = getStyle();
     var body = {
       model: model,
-      max_tokens: 4000, // marge pour la réflexion + le JSON (sinon risque de réponse coupée)
+      max_tokens: 6000, // marge pour AMD + preshot + raisons détaillées + JSON
       system: SYSTEM,
-      messages: [{ role: 'user', content: buildUser(pairs, mtf, collab) }]
+      messages: [{ role: 'user', content: buildUser(pairs, mtf, collab, style) }]
     };
     // Le paramètre `effort` n'est supporté que par certains modèles (Opus/Sonnet
     // récents). Haiku 4.5 le refuse (erreur 400) — on ne l'envoie que si le
@@ -134,5 +152,6 @@
     });
   }
 
-  root.AI = { analyze: analyze, getKey: getKey, setKey: setKey, getModel: getModel, setModel: setModel };
+  root.AI = { analyze: analyze, getKey: getKey, setKey: setKey, getModel: getModel, setModel: setModel,
+    getStyle: getStyle, setStyle: setStyle, STYLES: STYLES };
 })(typeof window !== 'undefined' ? window : this);

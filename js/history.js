@@ -31,6 +31,7 @@
       h.push({ id: Date.now() + '-' + t.sym + '-' + source + '-' + Math.random().toString(36).slice(2, 6),
         ts: Date.now(), source: source, symbol: t.sym, direction: t.dir,
         entry: +t.entry, sl: +t.sl, tp: +t.tp, rr: +t.rr, motif: t.note || '',
+        tf: t.tf || null, style: t.style || null,
         status: 'open', result: null, r: null });
       added++;
     });

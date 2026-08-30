@@ -27,7 +27,25 @@
   *{box-sizing:border-box}
   html{-webkit-text-size-adjust:100%}
   body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
-    line-height:1.55;font-size:15px;overflow-x:hidden}
+    line-height:1.6;font-size:15.5px;overflow-x:hidden;letter-spacing:-.005em;
+    -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility;
+    font-feature-settings:'kern' 1,'liga' 1,'calt' 1}
+  h1,h2,h3,h4{letter-spacing:-.02em;line-height:1.25}
+  p{line-height:1.62}
+  /* Badge d'unité de temps + position copiable + toast */
+  .tf-badge{font-family:var(--mono);font-size:.72rem;font-weight:600;padding:1px 7px;border-radius:999px;
+    background:var(--surface-3);color:var(--muted);border:1px solid var(--border);white-space:nowrap}
+  .ai-idea.copyable{cursor:pointer;transition:transform .08s ease,box-shadow .15s ease,border-color .15s ease}
+  .ai-idea.copyable:hover{border-color:var(--border-strong);box-shadow:0 4px 18px rgba(0,0,0,.35)}
+  .ai-idea.copyable:active{transform:scale(.99)}
+  .ai-idea.copyable::after{content:'📋 copier';position:absolute;top:9px;right:11px;font-size:.66rem;color:var(--faint);opacity:.65}
+  .ai-idea{position:relative}
+  .ai-idea.copied{border-color:var(--long)!important;box-shadow:0 0 0 2px var(--long-dim)}
+  #toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);z-index:9999;
+    background:var(--surface-3);color:var(--ink);border:1px solid var(--border-strong);border-radius:12px;
+    padding:11px 16px;font-size:13.5px;font-weight:500;max-width:88vw;box-shadow:0 8px 30px rgba(0,0,0,.5);
+    opacity:0;pointer-events:none;transition:opacity .2s ease,transform .2s ease}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
   .mono{font-family:var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
   .wrap{max-width:1120px;margin:0 auto;padding:0 clamp(16px,4vw,32px)}
   a{color:inherit}
@@ -647,7 +665,7 @@
     <button class="modal-close" id="ai-close" aria-label="Fermer">×</button>
     <h2>Bot IA <span style="color:var(--faint);font-weight:400">— propulsé par Claude</span></h2>
     <div class="ident ext"><span class="ident-badge">🤖 Bot IA · intelligence externe (Claude)</span> <span class="ident-vs">≠ l'🧠 IA maison locale &amp; gratuite de l'onglet dédié</span></div>
-    <p class="sub">Claude analyse les vraies bougies <b>H1/H4/D1</b> en s'appuyant sur <b>toute la bibliothèque du site (303 concepts ICT/SMC & co)</b>, puis envoie ses meilleures idées de trade. Ta clé reste <b>sur ton ordinateur</b>.</p>
+    <p class="sub">Claude analyse les vraies bougies <b>selon le style choisi (Scalp, Intraday ou Swing)</b> en s'appuyant sur <b>toute la bibliothèque du site (303 concepts ICT/SMC & co)</b>, puis envoie ses meilleures idées de trade, les phases <b>AMD</b> et les <b>preshot</b>. Ta clé reste <b>sur ton ordinateur</b>.</p>
     <div class="ai-steps">
       <span class="ai-step"><b>1</b> Crée une clé sur <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com&nbsp;↗</a> (+ un peu de crédit)</span>
       <span class="ai-step"><b>2</b> Colle-la ci-dessous &amp; enregistre</span>
@@ -663,6 +681,14 @@
         <option value="claude-haiku-4-5">Haiku 4.5 — rapide &amp; économique (conseillé pour débuter)</option>
         <option value="claude-sonnet-5">Sonnet 5 — équilibré</option>
         <option value="claude-opus-5">Opus 5 — le plus intelligent (le plus cher)</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Style / unités de temps <span style="color:var(--faint);font-weight:400">— détermine sur quelles bougies le bot travaille</span></label>
+      <select id="ai-style">
+        <option value="swing">📈 Swing — H1 à D1 · quelques jours (par défaut)</option>
+        <option value="intraday">☀️ Intraday — M15 à H1 · dans la journée</option>
+        <option value="scalp">⚡ Scalp — M1 à M15 · quelques minutes</option>
       </select>
     </div>
     <label class="ai-link" for="ai-link">
@@ -815,6 +841,7 @@
       h.push({ id: Date.now() + '-' + t.sym + '-' + source + '-' + Math.random().toString(36).slice(2, 6),
         ts: Date.now(), source: source, symbol: t.sym, direction: t.dir,
         entry: +t.entry, sl: +t.sl, tp: +t.tp, rr: +t.rr, motif: t.note || '',
+        tf: t.tf || null, style: t.style || null,
         status: 'open', result: null, r: null });
       added++;
     });
@@ -2737,17 +2764,27 @@
 
   var KEY_STORE = 'anthropic.key';
   var MODEL_STORE = 'anthropic.model';
+  var STYLE_STORE = 'anthropic.style';
   var ENDPOINT = 'https://api.anthropic.com/v1/messages';
+
+  // Styles de trading = quelles unités de temps le bot exploite.
+  var STYLES = {
+    scalp:    { nom: 'Scalp',    tfs: 'M1, M5, M15',  htf: 'M15/H1', ltf: 'M1/M5',  horizon: 'quelques minutes à 1-2 h' },
+    intraday: { nom: 'Intraday', tfs: 'M15, H1, H4',  htf: 'H4/H1',  ltf: 'M15',    horizon: 'quelques heures (clôturé le jour même)' },
+    swing:    { nom: 'Swing',    tfs: 'H1, H4, D1',   htf: 'D1/H4',  ltf: 'H1',     horizon: 'quelques jours' }
+  };
 
   function getKey() { try { return localStorage.getItem(KEY_STORE) || ''; } catch (e) { return ''; } }
   function setKey(k) { try { localStorage.setItem(KEY_STORE, (k || '').trim()); } catch (e) {} }
   function getModel() { try { return localStorage.getItem(MODEL_STORE) || 'claude-haiku-4-5'; } catch (e) { return 'claude-haiku-4-5'; } }
   function setModel(m) { try { localStorage.setItem(MODEL_STORE, m); } catch (e) {} }
+  function getStyle() { try { return localStorage.getItem(STYLE_STORE) || 'swing'; } catch (e) { return 'swing'; } }
+  function setStyle(s) { try { localStorage.setItem(STYLE_STORE, s); } catch (e) {} }
 
   var SYSTEM =
     "Tu es un BOT DE TRADING autonome, propulsé par Claude (Anthropic), intégré à un site ICT/SMC. Tu écris en français. " +
-    "Tu opères UNIQUEMENT sur les unités de temps H1, H4 et D1 — jamais en dessous de H1. " +
-    "Tu raisonnes en TOP-DOWN : le biais vient du D1, tu affines en H4, tu synchronises l'entrée en H1. " +
+    "Tu opères sur les unités de temps du STYLE demandé (précisé dans le message : Scalp, Intraday ou Swing). " +
+    "Tu raisonnes en TOP-DOWN : le biais vient de l'unité haute du style, tu affines sur l'intermédiaire, tu synchronises l'entrée sur l'unité basse. " +
     "Tu bases tes décisions PRINCIPALEMENT sur les concepts ICT/SMC (structure & BOS/CHoCH, MSS, FVG, order blocks, " +
     "breaker, OTE 62-79%, liquidité/equal highs-lows, premium/discount, cycles Accumulation-Manipulation-Expansion-Distribution), " +
     "MAIS tu es LIBRE d'employer toute autre technique intelligente et pertinente (momentum, confluence multi-unités, " +
@@ -2764,17 +2801,24 @@
     "(2) PRESHOT — repère les setups EN PRÉPARATION (pré-signaux) : les conditions s'alignent mais le déclencheur " +
     "n'est PAS encore validé. Pour chacun, dis ce qui manque et le déclencheur précis à surveiller. Un preshot n'est PAS " +
     "un trade à prendre maintenant : c'est une alerte « bientôt prêt ». " +
+    "Pour CHAQUE idée de trade, le champ \"pourquoi\" doit être DÉTAILLÉ et structuré (2 à 4 phrases) : " +
+    "1) le BIAIS et son unité de temps ; 2) le SETUP précis (nom) et le DÉCLENCHEUR qui l'a validé (sweep, MSS, FVG…) ; " +
+    "3) la CONFLUENCE (killzone, discount/premium, SMT, DXY…) ; 4) POURQUOI le stop est là (invalidation) et POURQUOI la cible (liquidité visée). " +
     "Tu n'es pas un conseiller financier ; règle de gestion : risque max 1 % du compte par trade.";
 
-  function buildUser(pairs, mtf, collab) {
+  function buildUser(pairs, mtf, collab, style) {
+    var st = STYLES[style] || STYLES.swing;
     var snap = pairs.map(function (p) {
       return {
         paire: p.sym, prix: p.price, sens_calcule: p.dir, cycle: p.cycle,
         confluence_pct: p.conf, entree: p.entry, stop: p.sl, objectif: p.tp, rr: p.rr, note: p.note
       };
     });
-    var txt = "Tu es le Bot IA du site. Analyse le marché et envoie TES meilleures idées de trade (0 à 3), " +
-      "sur H1/H4/D1 uniquement, classées de la plus forte à la plus faible. " +
+    var txt = "STYLE DEMANDÉ : " + st.nom.toUpperCase() + " — travaille sur les unités " + st.tfs +
+      " (biais sur " + st.htf + ", entrée sur " + st.ltf + "), horizon ~" + st.horizon + ". " +
+      "Adapte tes entrées/stops/objectifs à ce style (en scalp, stops et objectifs plus serrés).\n\n" +
+      "Tu es le Bot IA du site. Analyse le marché et envoie TES meilleures idées de trade (0 à 3), " +
+      "sur les unités du style ci-dessus, classées de la plus forte à la plus faible. " +
       "N'inclus QUE des trades dont le rr est >= 1 (privilégie 2, 3, 4 ou plus). Jamais de trade sous 1 RR. " +
       "Ajoute AUSSI : \"amd\" (phase Power of 3 de chaque actif pertinent) et \"preshot\" (setups en préparation, " +
       "pas encore déclenchés). " +
@@ -2818,11 +2862,12 @@
     var key = getKey();
     if (!key) return Promise.reject(new Error('Aucune clé API. Colle ta clé Anthropic dans les réglages.'));
     var model = getModel();
+    var style = getStyle();
     var body = {
       model: model,
-      max_tokens: 4000, // marge pour la réflexion + le JSON (sinon risque de réponse coupée)
+      max_tokens: 6000, // marge pour AMD + preshot + raisons détaillées + JSON
       system: SYSTEM,
-      messages: [{ role: 'user', content: buildUser(pairs, mtf, collab) }]
+      messages: [{ role: 'user', content: buildUser(pairs, mtf, collab, style) }]
     };
     // Le paramètre `effort` n'est supporté que par certains modèles (Opus/Sonnet
     // récents). Haiku 4.5 le refuse (erreur 400) — on ne l'envoie que si le
@@ -2859,7 +2904,8 @@
     });
   }
 
-  root.AI = { analyze: analyze, getKey: getKey, setKey: setKey, getModel: getModel, setModel: setModel };
+  root.AI = { analyze: analyze, getKey: getKey, setKey: setKey, getModel: getModel, setModel: setModel,
+    getStyle: getStyle, setStyle: setStyle, STYLES: STYLES };
 })(typeof window !== 'undefined' ? window : this);
 
 </script>
@@ -4423,7 +4469,7 @@ function renderEcon(){
   }catch(e){}
 }
 function openAI(){
-  if(window.AI){ $('#ai-key').value=AI.getKey(); $('#ai-model').value=AI.getModel(); }
+  if(window.AI){ $('#ai-key').value=AI.getKey(); $('#ai-model').value=AI.getModel(); if($('#ai-style')&&AI.getStyle) $('#ai-style').value=AI.getStyle(); }
   aiOverlay.classList.add('open');
   renderEcon(); // affiche l'état du calendrier économique
   // Préchauffe les avis de l'IA maison + Quant en arrière-plan pour la liaison.
@@ -4435,13 +4481,13 @@ $('#ai-close').addEventListener('click', closeAI);
 aiOverlay.addEventListener('click', e=>{ if(e.target===aiOverlay) closeAI(); });
 $('#ai-save').addEventListener('click', ()=>{
   if(!window.AI) return;
-  AI.setKey($('#ai-key').value); AI.setModel($('#ai-model').value);
-  $('#ai-status').textContent='✅ Clé et modèle enregistrés (en local).';
+  AI.setKey($('#ai-key').value); AI.setModel($('#ai-model').value); if(AI.setStyle) AI.setStyle($('#ai-style').value);
+  $('#ai-status').textContent='✅ Clé, modèle et style enregistrés (en local).';
 });
 function fmtN(n){ return n==null?'—':(Math.abs(n)>=1000?Math.round(n):+(+n).toFixed(Math.abs(n)>=10?2:4)).toLocaleString('fr-FR'); }
 $('#ai-run').addEventListener('click', async ()=>{
   if(!window.AI){ $('#ai-status').textContent='Module IA indisponible.'; return; }
-  AI.setKey($('#ai-key').value); AI.setModel($('#ai-model').value);
+  AI.setKey($('#ai-key').value); AI.setModel($('#ai-model').value); if(AI.setStyle) AI.setStyle($('#ai-style').value);
   const st=$('#ai-status'), out=$('#ai-out');
   renderEcon(); // met à jour le bandeau annonces éco avant l'analyse
   out.classList.remove('show'); out.innerHTML='';
@@ -4465,11 +4511,12 @@ $('#ai-run').addEventListener('click', async ()=>{
     let idees=(r.parsed.idees||[]).filter(i=> i.rr==null || +i.rr>=1);
     idees.sort((a,b)=> (+b.rr||0)-(+a.rr||0));
     lastAI=idees; refreshConsensusIfVisible(); // pour l'onglet Consensus
-    if(window.History){ const pm=priceMap(); History.record(idees.map(i=>({sym:i.paire,dir:(i.sens||'').toUpperCase(),entry:+i.entree,sl:+i.stop,tp:+i.objectif,rr:+i.rr,note:i.pourquoi||'',price:(pm[i.paire]!=null?pm[i.paire]:null)})),'Bot IA'); History.evaluate(pm); }
+    if(window.History){ const pm=priceMap(); const styl=(window.AI&&AI.getStyle)?AI.getStyle():null; History.record(idees.map(i=>({sym:i.paire,dir:(i.sens||'').toUpperCase(),entry:+i.entree,sl:+i.stop,tp:+i.objectif,rr:+i.rr,note:i.pourquoi||'',tf:i.tf||null,style:styl,price:(pm[i.paire]!=null?pm[i.paire]:null)})),'Bot IA'); History.evaluate(pm); }
     if(!idees.length) html+='<div class="ai-summary">Aucune idée ≥ 1 RR pour l’instant — le Bot IA préfère attendre.</div>';
     idees.forEach(i=>{
       const long=(i.sens||'').toUpperCase()==='LONG';
-      html+='<div class="ai-idea '+(long?'long':'short')+'">'+
+      const cp=encodeURIComponent((i.paire||'')+' '+(long?'LONG':'SHORT')+(i.tf?' '+i.tf:'')+' | Entrée '+fmtN(i.entree)+' | SL '+fmtN(i.stop)+' | TP '+fmtN(i.objectif)+' | RR '+(i.rr!=null?i.rr:'—'));
+      html+='<div class="ai-idea copyable '+(long?'long':'short')+'" data-copy="'+cp+'" title="Clique pour copier cette position">'+
         '<div class="ihead"><span class="isym">'+(i.paire||'—')+'</span>'+
         '<span class="ilvl">'+(long?'▲ LONG':'▼ SHORT')+(i.tf?' · '+i.tf:'')+' · '+(i.confiance!=null?i.confiance+'%':'')+'</span></div>'+
         '<div class="inums"><span>Entrée '+fmtN(i.entree)+'</span><span class="lo">Stop '+fmtN(i.stop)+'</span>'+
@@ -4555,6 +4602,21 @@ function preshotBlockHTML(ps){
   return `<div style="margin:14px 0 4px"><div style="font-weight:700;margin-bottom:6px">⏳ PRESHOT — setups en préparation `+
     `<span style="color:var(--faint);font-weight:400;font-size:12px">— pas encore déclenchés, à surveiller</span></div>${cards}</div>`;
 }
+/* ---- Toast + clic pour copier une position ---- */
+let _toastT=null;
+function toast(msg){
+  let el=$('#toast'); if(!el){ el=document.createElement('div'); el.id='toast'; document.body.appendChild(el); }
+  el.textContent=msg; el.classList.add('show');
+  clearTimeout(_toastT); _toastT=setTimeout(()=>el.classList.remove('show'),1900);
+}
+document.addEventListener('click', e=>{
+  const card=e.target.closest('.ai-idea.copyable'); if(!card||!card.dataset.copy) return;
+  const txt=decodeURIComponent(card.dataset.copy);
+  const done=()=>{ card.classList.add('copied'); setTimeout(()=>card.classList.remove('copied'),700); toast('📋 Position copiée : '+txt); };
+  try{ navigator.clipboard.writeText(txt).then(done, ()=>{ fallbackCopy(txt); done(); }); }
+  catch(_){ fallbackCopy(txt); done(); }
+});
+function fallbackCopy(txt){ try{ const ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); }catch(_){}}
 function srcClass(s){ return (s||'').indexOf('IA')>=0?'ia':'regles'; }
 // Petite courbe d'équité (R cumulés) en SVG inline.
 function equitySVG(eq){
@@ -4669,7 +4731,7 @@ function renderHist(){
 
   const nowTs=Date.now();
   function tableFor(rows){
-    let h='<table class="htable"><thead><tr><th>Envoyé par</th><th>Paire</th><th>Sens</th><th>Entrée</th><th>SL</th><th>TP</th><th>RR</th><th>Résultat</th><th>Gain</th><th>Var.&nbsp;%</th><th>Durée</th><th>Clôturé</th><th>Motif</th><th>Date</th></tr></thead><tbody>';
+    let h='<table class="htable"><thead><tr><th>Envoyé par</th><th>Paire</th><th>Sens</th><th>TF</th><th>Entrée</th><th>SL</th><th>TP</th><th>RR</th><th>Résultat</th><th>Gain</th><th>Var.&nbsp;%</th><th>Durée</th><th>Clôturé</th><th>Motif</th><th>Date</th></tr></thead><tbody>';
     rows.forEach(t=>{
       const long=t.direction==='LONG';
       const src=(t.source||'').indexOf('IA')>=0?'ia':'regles';
@@ -4696,6 +4758,7 @@ function renderHist(){
         '<td><span class="src '+src+'">'+(t.source||'—')+'</span></td>'+
         '<td>'+t.symbol+'</td>'+
         '<td class="'+(long?'hd-long':'hd-short')+'">'+(long?'▲ LONG':'▼ SHORT')+'</td>'+
+        '<td><span class="tf-badge">'+(t.tf||'—')+'</span></td>'+
         '<td>'+fmtN(t.entry)+'</td><td>'+fmtN(t.sl)+'</td><td>'+fmtN(t.tp)+'</td><td>'+t.rr+'</td>'+
         '<td><span class="rc '+rc+'">'+rlbl+'</span></td>'+
         gainCell+varCell+durCell+closedCell+
@@ -5090,7 +5153,7 @@ function renderQuant(d){
     : `<div class="hist-empty">Données insuffisantes pour proposer des positions.</div>`;
   html += `<p class="bt-caveat" style="margin-top:14px">🔎 Chaque barre montre la force du facteur (z-score vs le panier). Les <b>positions</b> ci-dessus traduisent le panier en trades (long les plus forts, short les plus faibles, stop sur la volatilité, RR 2). Elles s'ajoutent à ton <b>historique</b> (bot « Quant »). <b>Market-neutral ≠ sans risque — pédagogique, pas un conseil financier.</b></p>`;
   if(window.History && qTrades.length){
-    History.record(qTrades.map(t=>({sym:t.sym,dir:t.dir,entry:t.entry,sl:t.sl,tp:t.tp,rr:t.rr,note:t.note,price:t.entry})),'Quant');
+    History.record(qTrades.map(t=>({sym:t.sym,dir:t.dir,entry:t.entry,sl:t.sl,tp:t.tp,rr:t.rr,note:t.note,tf:'D1',style:'swing',price:t.entry})),'Quant');
     const pm=priceMap(); if(Object.keys(pm).length) History.evaluate(pm);
   }
   body.innerHTML = html;
@@ -5110,7 +5173,8 @@ function quantBuildTrades(longs, shorts){
 }
 function quantTradeCard(t){
   const long=t.dir==='LONG';
-  return `<div class="ai-idea ${long?'long':'short'}">
+  const cp=encodeURIComponent(`${t.sym} ${long?'LONG':'SHORT'} D1 | Entrée ${fmtN(t.entry)} | SL ${fmtN(t.sl)} | TP ${fmtN(t.tp)} | RR ${t.rr}`);
+  return `<div class="ai-idea copyable ${long?'long':'short'}" data-copy="${cp}" title="Clique pour copier cette position">
     <div class="ihead"><span class="isym">${t.sym}</span>
       <span class="ilvl">${long?'▲ LONG':'▼ SHORT'} · score ${t.score>=0?'+':''}${t.score}</span></div>
     <div class="inums"><span>Entrée ${fmtN(t.entry)}</span><span class="lo">Stop ${fmtN(t.sl)}</span>
@@ -5271,7 +5335,8 @@ function iaBuildTrades(sigs){
 }
 function iaTradeCard(t){
   const long=t.dir==='LONG';
-  return `<div class="ai-idea ${long?'long':'short'}">
+  const cp=encodeURIComponent(`${t.sym} ${long?'LONG':'SHORT'} D1 | Entrée ${fmtN(t.entry)} | SL ${fmtN(t.sl)} | TP ${fmtN(t.tp)} | RR ${t.rr}`);
+  return `<div class="ai-idea copyable ${long?'long':'short'}" data-copy="${cp}" title="Clique pour copier cette position">
     <div class="ihead"><span class="isym">${t.sym}</span>
       <span class="ilvl">${long?'▲ LONG':'▼ SHORT'} · ~${IA_HORIZON} j · ${t.prob}% · confiance ${t.conf}%</span></div>
     <div class="inums"><span>Entrée ${fmtN(t.entry)}</span><span class="lo">Stop ${fmtN(t.sl)}</span>
@@ -5351,7 +5416,7 @@ function renderIA(d){
   html += `<p class="bt-caveat" style="margin-top:14px">🔎 Ces positions traduisent le classement de force relative en trades : les plus forts en <b>LONG</b>, les plus faibles en <b>SHORT</b>, entrée au prix actuel, stop calé sur la volatilité (ATR) et objectif à RR 2 sur ~${IA_HORIZON} j. Elles s'ajoutent à ton <b>historique</b> (bot « IA maison ») et sont notées au TP/SL. <b>Avantage statistique modeste — pédagogique, pas un conseil financier.</b></p>`;
   // Enregistre les positions dans l'historique (source « IA maison »)
   if(window.History && iaTrades.length){
-    History.record(iaTrades.map(t=>({sym:t.sym,dir:t.dir,entry:t.entry,sl:t.sl,tp:t.tp,rr:t.rr,note:t.note,price:t.entry})),'IA maison');
+    History.record(iaTrades.map(t=>({sym:t.sym,dir:t.dir,entry:t.entry,sl:t.sl,tp:t.tp,rr:t.rr,note:t.note,tf:'D1',style:'swing',price:t.entry})),'IA maison');
     const pm=priceMap(); if(Object.keys(pm).length) History.evaluate(pm);
   }
   body.innerHTML = html;
