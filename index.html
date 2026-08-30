@@ -35,6 +35,7 @@
   /* Badge d'unité de temps + position copiable + toast */
   .tf-badge{font-family:var(--mono);font-size:.72rem;font-weight:600;padding:1px 7px;border-radius:999px;
     background:var(--surface-3);color:var(--muted);border:1px solid var(--border);white-space:nowrap}
+  .hfilter-sep{display:inline-block;width:1px;height:18px;background:var(--border-strong);margin:0 4px;vertical-align:middle}
   .ai-idea.copyable{cursor:pointer;transition:transform .08s ease,box-shadow .15s ease,border-color .15s ease}
   .ai-idea.copyable:hover{border-color:var(--border-strong);box-shadow:0 4px 18px rgba(0,0,0,.35)}
   .ai-idea.copyable:active{transform:scale(.99)}
@@ -800,6 +801,7 @@
     <div class="hist-block" id="hist-compare"></div>
     <div class="htable-wrap" id="hist-table"></div>
     <div class="modal-actions" style="margin-top:16px">
+      <button class="btn" id="hist-csv">⬇️ Exporter en CSV (Excel)</button>
       <button class="btn" id="hist-reset">Réinitialiser l'historique</button>
     </div>
   </div>
@@ -1099,6 +1101,7 @@ function openAI(){
   if(window.AI){ $('#ai-key').value=AI.getKey(); $('#ai-model').value=AI.getModel(); if($('#ai-style')&&AI.getStyle) $('#ai-style').value=AI.getStyle(); }
   aiOverlay.classList.add('open');
   renderEcon(); // affiche l'état du calendrier économique
+  restoreLastAI(); // réaffiche la dernière analyse mémorisée
   // Préchauffe les avis de l'IA maison + Quant en arrière-plan pour la liaison.
   try{ if($('#ai-link')&&$('#ai-link').checked){ loadIA&&loadIA(); loadQuant&&loadQuant(); } }catch(e){}
 }
@@ -1155,12 +1158,23 @@ $('#ai-run').addEventListener('click', async ()=>{
     });
     html+=corrWarnHTML(idees.map(i=>({sym:i.paire,dir:(i.sens||'').toUpperCase()})));
     out.innerHTML=html; out.classList.add('show');
+    saveLastAI(html, st.textContent); // mémorise la dernière analyse
   }catch(e){ st.textContent='❌ '+e.message; }
 });
+const AI_LAST='tradeassist.ai.last';
+function saveLastAI(html, statusTxt){ try{ localStorage.setItem(AI_LAST, JSON.stringify({ts:Date.now(), html:html, status:statusTxt||''})); }catch(e){} }
+function loadLastAI(){ try{ return JSON.parse(localStorage.getItem(AI_LAST)||'null'); }catch(e){ return null; } }
+function agoTxt(ms){ const s=Math.round((Date.now()-ms)/1000); if(s<60) return 'il y a '+s+' s'; const m=Math.round(s/60); if(m<60) return 'il y a '+m+' min'; const h=Math.floor(m/60); if(h<24) return 'il y a '+h+' h'; return 'il y a '+Math.floor(h/24)+' j'; }
+function restoreLastAI(){
+  const last=loadLastAI(); const out=$('#ai-out'); if(!last||!last.html||!out||out.classList.contains('show')) return;
+  out.innerHTML='<div style="margin:0 0 10px;padding:8px 11px;border:1px dashed var(--border-strong);border-radius:9px;font-size:12.5px;color:var(--muted)">📊 Dernière analyse '+agoTxt(last.ts)+' (mémorisée). Clique « Analyser le marché » pour actualiser.</div>'+last.html;
+  out.classList.add('show');
+}
 
 /* ---------- Historique des trades ---------- */
 const histOverlay=$('#hist-overlay');
 let histSource=''; // '' = toutes
+let histStyle=''; // '' = tous styles (scalp/intraday/swing)
 function frDate(ts){ return new Date(ts).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}); }
 function fmtDur(ms){ if(ms==null) return '—'; const m=ms/60000; if(m<60) return Math.round(m)+' min'; const h=m/60; if(h<24) return (h<10?h.toFixed(1):Math.round(h))+' h'; const j=Math.floor(h/24), rh=Math.round(h%24); return j+' j'+(rh?' '+rh+' h':''); }
 // Écart en % entre l'entrée et un niveau, dans le sens du trade (positif = favorable).
@@ -1289,7 +1303,14 @@ function renderHist(){
   const srcs=History.sources();
   let chips='<button class="hfilter'+(histSource===''?' on':'')+'" data-s="">Toutes</button>';
   srcs.forEach(s=>{ chips+='<button class="hfilter '+srcClass(s)+(histSource===s?' on':'')+'" data-s="'+s.replace(/"/g,'')+'">'+s+'</button>'; });
-  const filterBar=$('#hist-filter'); if(filterBar) filterBar.innerHTML = srcs.length>1 ? chips : '';
+  // Filtre par style (unités de temps) présents dans le journal
+  const stylesPresent=[...new Set(History.load().map(t=>t.style).filter(Boolean))];
+  if(stylesPresent.length){
+    const lbl={scalp:'⚡ Scalp',intraday:'☀️ Intraday',swing:'📈 Swing'};
+    chips+='<span class="hfilter-sep"></span><button class="hfilter'+(histStyle===''?' on':'')+'" data-st="">Tous styles</button>';
+    stylesPresent.forEach(st=>{ chips+='<button class="hfilter'+(histStyle===st?' on':'')+'" data-st="'+st+'">'+(lbl[st]||st)+'</button>'; });
+  }
+  const filterBar=$('#hist-filter'); if(filterBar) filterBar.innerHTML = (srcs.length>1||stylesPresent.length) ? chips : '';
 
   const s=History.stats(histSource||undefined);
   const pfTxt = s.pf==null ? '∞' : s.pf;
@@ -1352,7 +1373,8 @@ function renderHist(){
 
   if(!all.length){ wrap.innerHTML='<div class="hist-empty">Aucun trade enregistré pour l’instant. Chaque idée réelle proposée par un bot (données en direct) s’ajoutera ici automatiquement.</div>'; return; }
   const esc=s=>(s||'').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  const filt = histSource ? all.filter(t=>t.source===histSource) : all;
+  let filt = histSource ? all.filter(t=>t.source===histSource) : all;
+  if(histStyle) filt = filt.filter(t=>t.style===histStyle);
   const open=filt.filter(t=>t.status==='open').sort((a,b)=>b.ts-a.ts);
   const closed=filt.filter(t=>t.status!=='open').sort((a,b)=>b.ts-a.ts);
 
@@ -1403,10 +1425,30 @@ function renderHist(){
   wrap.innerHTML=h;
 }
 $('#hist-open').addEventListener('click', ()=>{ renderHist(); histOverlay.classList.add('open'); });
-$('#hist-filter').addEventListener('click', e=>{ const b=e.target.closest('.hfilter'); if(!b) return; histSource=b.dataset.s||''; renderHist(); });
+$('#hist-filter').addEventListener('click', e=>{ const b=e.target.closest('.hfilter'); if(!b) return;
+  if(b.dataset.st!==undefined) histStyle=b.dataset.st||''; else histSource=b.dataset.s||''; renderHist(); });
 $('#hist-close').addEventListener('click', ()=> histOverlay.classList.remove('open'));
 histOverlay.addEventListener('click', e=>{ if(e.target===histOverlay) histOverlay.classList.remove('open'); });
 $('#hist-reset').addEventListener('click', ()=>{ if(window.History && confirm('Effacer tout l’historique des trades ?')){ History.reset(); renderHist(); } });
+/* Export CSV de l'historique (ouvre dans Excel / Google Sheets) */
+function histCSV(){
+  if(!window.History) return;
+  const rows=History.load();
+  if(!rows.length){ toast('Historique vide — rien à exporter.'); return; }
+  const cols=['source','symbol','direction','tf','style','entry','sl','tp','rr','status','result','r','motif','ts','closedTs'];
+  const head=['Bot','Paire','Sens','TF','Style','Entrée','SL','TP','RR','Statut','Résultat','Gain(R)','Motif','Ouvert','Clôturé'];
+  const esc=v=>{ let s=(v==null?'':String(v)); if(/[",;\n]/.test(s)) s='"'+s.replace(/"/g,'""')+'"'; return s; };
+  const fmtTs=v=> v? new Date(+v).toLocaleString('fr-FR') : '';
+  let csv=head.join(';')+'\n';
+  rows.forEach(t=>{ csv+=cols.map(c=>{ if(c==='ts'||c==='closedTs') return esc(fmtTs(t[c])); return esc(t[c]); }).join(';')+'\n'; });
+  const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob); const a=document.createElement('a');
+  a.href=url; a.download='tradeassist-historique-'+new Date().toISOString().slice(0,10)+'.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url),1500);
+  toast('⬇️ CSV exporté ('+rows.length+' trades).');
+}
+$('#hist-csv').addEventListener('click', histCSV);
 
 /* ---------- Stratégies Pro (nouvel onglet) ---------- */
 let proLoaded=false, proLoading=false;
