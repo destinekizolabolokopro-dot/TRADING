@@ -647,7 +647,7 @@
     <button class="modal-close" id="ai-close" aria-label="Fermer">×</button>
     <h2>Bot IA <span style="color:var(--faint);font-weight:400">— propulsé par Claude</span></h2>
     <div class="ident ext"><span class="ident-badge">🤖 Bot IA · intelligence externe (Claude)</span> <span class="ident-vs">≠ l'🧠 IA maison locale &amp; gratuite de l'onglet dédié</span></div>
-    <p class="sub">Claude analyse les vraies bougies <b>H1/H4/D1</b> en s'appuyant sur <b>toute la bibliothèque du site (252 concepts ICT/SMC & co)</b>, puis envoie ses meilleures idées de trade. Ta clé reste <b>sur ton ordinateur</b>.</p>
+    <p class="sub">Claude analyse les vraies bougies <b>H1/H4/D1</b> en s'appuyant sur <b>toute la bibliothèque du site (282 concepts ICT/SMC & co)</b>, puis envoie ses meilleures idées de trade. Ta clé reste <b>sur ton ordinateur</b>.</p>
     <div class="ai-steps">
       <span class="ai-step"><b>1</b> Crée une clé sur <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com&nbsp;↗</a> (+ un peu de crédit)</span>
       <span class="ai-step"><b>2</b> Colle-la ci-dessous &amp; enregistre</span>
@@ -688,7 +688,7 @@
     <div class="how-steps">
       <div class="how-step"><span class="how-n">1</span><div><b>Regarde les signaux</b> — l'onglet <b>Signaux ICT/SMC</b> te montre, pour chaque actif, le sens (long/short), la confluence et un trade prêt (entrée, stop, objectif). Rien à installer.</div></div>
       <div class="how-step"><span class="how-n">2</span><div><b>Explore les autres angles</b> — <b>Stratégies Pro</b>, <b>IA maison</b> (un modèle entraîné dans ton navigateur) et <b>Quant</b> (panier market-neutral) donnent chacun un avis indépendant.</div></div>
-      <div class="how-step"><span class="how-n">3</span><div><b>Apprends dans la 📚 Bibliothèque</b> — 252 concepts de trading (ICT, SMC, chandeliers, risque, psycho…) expliqués simplement. Cherche n'importe quel terme.</div></div>
+      <div class="how-step"><span class="how-n">3</span><div><b>Apprends dans la 📚 Bibliothèque</b> — 282 concepts de trading (ICT, SMC, chandeliers, risque, psycho…) expliqués simplement. Cherche n'importe quel terme.</div></div>
       <div class="how-step"><span class="how-n">4</span><div><b>Active le Bot IA (Claude)</b> — le plus puissant : il analyse les vraies bougies <b>avec toute la bibliothèque</b> et propose ses meilleurs trades. Il te faut une clé API (2 min à créer).</div></div>
     </div>
     <div class="duo">
@@ -698,7 +698,7 @@
           <div class="duo-title">🤖 Bot IA <span class="vs-tag ext">Claude</span></div>
           <ul>
             <li>Cerveau <b>expert externe</b> (cloud Anthropic)</li>
-            <li>Raisonne avec <b>toute la bibliothèque (252 concepts)</b></li>
+            <li>Raisonne avec <b>toute la bibliothèque (282 concepts)</b></li>
             <li>Rédige de <b>vraies idées de trade</b> (entrée/stop/objectif)</li>
             <li>Besoin d'une <b>clé API</b> · payant à l'usage</li>
           </ul>
@@ -961,6 +961,7 @@
     { id: 'quant',    nom: 'Quant & statistiques',        emoji: '🔬' },
     { id: 'produits', nom: 'Produits & marchés',          emoji: '💱' },
     { id: 'strat',    nom: 'Stratégies de trading',       emoji: '♟️' },
+    { id: 'setup',    nom: 'Setups prêts à l’emploi (A/A+)', emoji: '✅' },
     { id: 'wyckoff',  nom: 'Wyckoff',                     emoji: '📉' },
     { id: 'onchain',  nom: 'Crypto & on-chain',           emoji: '⛓️' }
   ];
@@ -2040,6 +2041,137 @@
     usage:"Antidotes : n'utiliser que quelques concepts robustes en confluence, décider AVANT le mouvement (pas après), journaliser, et exiger sweep + displacement + DOL objectifs plutôt qu'une belle histoire. La discipline prime sur l'élégance de l'analyse.",
     biais:'garde-fou — rester objectif' });
 
+  /* ===================== SETUPS PRÊTS À L'EMPLOI (plans de trade A/A+) =====================
+     Chaque setup = un plan complet : CONDITIONS (déclencheur) → ENTRÉE → STOP → OBJECTIF,
+     avec l'unité de temps conseillée et un GRADE de qualité. « minimum A » = on ne prend
+     que les setups riches en confluence. Pédagogique — pas un conseil financier. */
+
+  // — ICT / SMC —
+  add({ id:'su-sweep-mss', nom:'Sweep + MSS (retournement, modèle 2022)', alias:['sweep mss','modèle 2022 setup','reversal sweep'], cat:'setup', tags:['retournement','ict','a+'],
+    def:"CONDITIONS : à un extrême HTF, le prix balaye un pool de liquidité (plus-haut/bas, equal highs-lows) PUIS casse la structure interne (MSS/CHoCH) par un displacement qui laisse un FVG.",
+    usage:"ENTRÉE : retour dans le FVG/OB (idéalement au CE 50 %) après le sweep. STOP : au-delà de la mèche du sweep. OBJECTIF : liquidité opposée / DOL. Unité : H4 biais, H1 entrée. GRADE : A+ (le setup roi d'ICT).",
+    biais:'retournement — sens du displacement' });
+  add({ id:'su-fvg-continuation', nom:'FVG en continuation (pullback de tendance)', alias:['fvg continuation','pullback fvg','retour fvg tendance'], cat:'setup', tags:['continuation','ict','a'],
+    def:"CONDITIONS : tendance claire (HH/HL ou LH/LL) + un BOS dans le sens de la tendance qui laisse un FVG frais derrière lui.",
+    usage:"ENTRÉE : retour du prix dans le FVG (au CE). STOP : sous le FVG / dernier HL (long). OBJECTIF : nouvel extrême / liquidité suivante. Unité : H1-H4. GRADE : A. Ne pas trader contre la tendance.",
+    biais:'continuation — sens de la tendance' });
+  add({ id:'su-ob-fvg-unicorn', nom:'Order Block + FVG superposés (Unicorn)', alias:['unicorn setup','ob fvg overlap','breaker fvg'], cat:'setup', tags:['confluence','ict','a+'],
+    def:"CONDITIONS : après un sweep + MSS, un breaker/OB et un FVG se CHEVAUCHENT exactement sur la même zone (double confluence).",
+    usage:"ENTRÉE : dans la zone de recouvrement OB+FVG. STOP : au-delà de l'OB. OBJECTIF : liquidité opposée, RR ≥ 3. Unité : H1. GRADE : A+ (double confluence = haute proba).",
+    biais:'retournement/continuation — sens de l’impulsion' });
+  add({ id:'su-turtle-soup', nom:'Turtle Soup / SFP (faux breakout)', alias:['turtle soup setup','sfp setup','swing failure'], cat:'setup', tags:['retournement','liquidité','a'],
+    def:"CONDITIONS : le prix dépasse un plus-haut/bas évident (equal highs-lows) par une MÈCHE puis CLÔTURE de nouveau à l'intérieur (échec du breakout = liquidité prise).",
+    usage:"ENTRÉE : au retour dans le range après la clôture de rejet. STOP : au-delà de la mèche du faux dépassement. OBJECTIF : côté opposé du range. Unité : H1-H4. GRADE : A. Attendre la clôture !",
+    biais:'retournement — contre le faux breakout' });
+  add({ id:'su-silver-bullet', nom:'Silver Bullet (FVG 10h-11h NY)', alias:['silver bullet setup','sb 10-11'], cat:'setup', tags:['horaire','ict','a'],
+    def:"CONDITIONS : dans la fenêtre 10h-11h (heure de New York), après un sweep de liquidité au NY open, un displacement forme un FVG.",
+    usage:"ENTRÉE : sur le retour au FVG dans la fenêtre. STOP : au-delà du swing récent. OBJECTIF : pool de liquidité le plus proche. Unité : M15-H1. GRADE : A (dépend du respect strict de l'horaire).",
+    biais:'contexte — sens du displacement' });
+  add({ id:'su-judas-london', nom:'Judas Swing (fade de l’ouverture Londres)', alias:['judas setup','london fade','asian range sweep'], cat:'setup', tags:['session','londres','a'],
+    def:"CONDITIONS : à l'ouverture de Londres, faux mouvement qui balaye le haut/bas du range asiatique (Judas), puis retournement.",
+    usage:"ENTRÉE : après le balayage + MSS, dans le sens inverse du faux mouvement. STOP : au-delà de l'extrême du range asiatique balayé. OBJECTIF : liquidité opposée. Unité : M15-H1. GRADE : A.",
+    biais:'retournement — contre le Judas' });
+  add({ id:'su-ote', nom:'OTE — pullback Fibonacci 62-79 %', alias:['ote setup','optimal trade entry','fib 705'], cat:'setup', tags:['fibonacci','ict','a'],
+    def:"CONDITIONS : impulsion + MSS dans le sens voulu ; on trace le Fib de l'impulsion ; le prix retrace dans la zone 62-79 % (idéal 70,5 %), en confluence avec un OB/FVG.",
+    usage:"ENTRÉE : dans la bande 62-79 %. STOP : juste au-delà du 79-100 %. OBJECTIF : extension (-0,5/-1) ou liquidité, RR ≥ 2. Unité : H1-H4. GRADE : A.",
+    biais:'contexte — sens de l’impulsion' });
+  add({ id:'su-choch-poi', nom:'CHoCH + retour au POI (entrée SMC)', alias:['choch poi','smc reversal setup'], cat:'setup', tags:['retournement','smc','a'],
+    def:"CONDITIONS : sweep de liquidité → CHoCH (cassure de la structure interne) → un POI (OB/FVG) laissé derrière, situé en discount (long) ou premium (short).",
+    usage:"ENTRÉE : retour dans le POI + confirmation LTF. STOP : au-delà du POI/sweep. OBJECTIF : liquidité opposée. Unité : H4 biais, M15-H1 entrée. GRADE : A.",
+    biais:'retournement — nouveau sens' });
+  add({ id:'su-pdh-pdl', nom:'Raid du PDH/PDL puis retournement', alias:['pdh pdl sweep','previous day high low setup'], cat:'setup', tags:['liquidité','niveau','a'],
+    def:"CONDITIONS : le prix va chercher le plus-haut (PDH) ou plus-bas (PDL) de la veille (liquidité évidente), l'accroche par une mèche, puis rejette.",
+    usage:"ENTRÉE : au rejet du PDH/PDL + MSS. STOP : au-delà du PDH/PDL. OBJECTIF : niveau intérieur / liquidité opposée. Unité : H1. GRADE : A.",
+    biais:'retournement — depuis le niveau de référence' });
+  add({ id:'su-po3', nom:'Power of 3 journalier (AMD)', alias:['po3 setup','amd daily','accumulation manipulation distribution'], cat:'setup', tags:['journée','ict','a'],
+    def:"CONDITIONS : lecture de la journée en 3 temps — Accumulation (range asiatique), Manipulation (faux mouvement/sweep à l'open), Distribution (vrai mouvement dirigé).",
+    usage:"ENTRÉE : après la phase de manipulation, dans le sens de la distribution attendue (aligné au biais D1). STOP : au-delà de l'extrême de manipulation. OBJECTIF : liquidité HTF. Unité : H1 sur base D1. GRADE : A.",
+    biais:'directionnel — sens du biais du jour' });
+  add({ id:'su-smt', nom:'Divergence SMT au balayage', alias:['smt setup','divergence corrélée setup'], cat:'setup', tags:['divergence','confirmation','a+'],
+    def:"CONDITIONS : au moment d'un sweep, deux actifs corrélés divergent (l'un fait un nouvel extrême, l'autre non — ex. BTC vs ETH, ES vs NQ).",
+    usage:"ENTRÉE : après le sweep + MSS, dans le sens du rejet, la SMT servant de confirmation. STOP : au-delà de l'extrême. OBJECTIF : liquidité opposée. Unité : H1-H4. GRADE : A+ (confluence forte).",
+    biais:'retournement — confirmé par la divergence' });
+  add({ id:'su-bpr', nom:'Réaction sur Balanced Price Range (BPR)', alias:['bpr setup','fvg opposés'], cat:'setup', tags:['zone','ict','a'],
+    def:"CONDITIONS : deux FVG opposés se superposent (zone équilibrée sensible) sur le chemin d'un DOL.",
+    usage:"ENTRÉE : au retour du prix sur le BPR, dans le sens du biais. STOP : au-delà du BPR. OBJECTIF : DOL. Unité : H1. GRADE : A.",
+    biais:'contexte — sens du biais HTF' });
+  add({ id:'su-breaker-retest', nom:'Retest de Breaker (continuation post-cassure)', alias:['breaker retest setup','flip retest'], cat:'setup', tags:['continuation','ict','a'],
+    def:"CONDITIONS : après une cassure de structure, un ancien OB devient breaker ; le prix revient le tester par le côté opposé.",
+    usage:"ENTRÉE : au rejet du breaker. STOP : de l'autre côté du breaker. OBJECTIF : liquidité dans le nouveau sens. Unité : H1-H4. GRADE : A.",
+    biais:'continuation — nouveau sens confirmé' });
+
+  // — Price action classique —
+  add({ id:'su-sr-bounce', nom:'Rebond sur support/résistance majeur', alias:['sr bounce','rebond support','rejet résistance'], cat:'setup', tags:['niveau','price action','a'],
+    def:"CONDITIONS : niveau S/R testé plusieurs fois + bougie de rejet claire (marteau/étoile/avalement) à son contact, dans le sens de la tendance HTF.",
+    usage:"ENTRÉE : à la clôture de la bougie de rejet. STOP : au-delà du niveau/mèche. OBJECTIF : niveau opposé du range / prochain S/R. Unité : H1-H4. GRADE : A.",
+    biais:'retournement local — depuis le niveau' });
+  add({ id:'su-break-retest', nom:'Cassure + retest de niveau', alias:['break and retest','cassure retest','throwback'], cat:'setup', tags:['cassure','confirmation','a'],
+    def:"CONDITIONS : cassure nette (clôture) d'un niveau/range sur volume, puis retour tester le niveau cassé (polarité : support↔résistance).",
+    usage:"ENTRÉE : au rejet du retest dans le sens de la cassure. STOP : de l'autre côté du niveau. OBJECTIF : mesuré (hauteur de la figure). Unité : H1-H4. GRADE : A (plus sûr que chasser la cassure).",
+    biais:'continuation — sens de la cassure' });
+  add({ id:'su-trendline-retest', nom:'Cassure + retest de trendline', alias:['trendline break retest','cassure oblique'], cat:'setup', tags:['trendline','continuation','a'],
+    def:"CONDITIONS : trendline valide (3+ touches) cassée en clôture, puis retour tester l'oblique devenue support/résistance.",
+    usage:"ENTRÉE : au rejet du retest. STOP : de l'autre côté de la ligne. OBJECTIF : prochain swing / mesuré. Unité : H1-H4. GRADE : A.",
+    biais:'retournement/continuation — sens de la cassure' });
+  add({ id:'su-flag', nom:'Drapeau / fanion (continuation)', alias:['flag setup','pennant','drapeau'], cat:'setup', tags:['continuation','momentum','a'],
+    def:"CONDITIONS : forte impulsion (le mât) suivie d'une petite consolidation contre-tendance (drapeau) sur volume décroissant.",
+    usage:"ENTRÉE : à la cassure du drapeau dans le sens du mât. STOP : sous le drapeau. OBJECTIF : longueur du mât projetée. Unité : H1-H4. GRADE : A.",
+    biais:'continuation — sens du mât' });
+  add({ id:'su-double-bottom', nom:'Double creux / double sommet', alias:['double bottom setup','double top','w m'], cat:'setup', tags:['retournement','figure','a'],
+    def:"CONDITIONS : deux creux (W) ou deux sommets (M) au même niveau, le second échouant à faire un nouvel extrême, souvent avec divergence RSI.",
+    usage:"ENTRÉE : à la cassure du niveau intermédiaire (neckline). STOP : au-delà du double extrême. OBJECTIF : hauteur de la figure. Unité : H4-D1. GRADE : A.",
+    biais:'retournement' });
+  add({ id:'su-hs', nom:'Tête-épaules (retournement)', alias:['head shoulders setup','ete','h&s'], cat:'setup', tags:['retournement','figure','a'],
+    def:"CONDITIONS : trois sommets (tête plus haute), ligne de cou (neckline) tracée sous les creux ; cassure de la neckline en clôture.",
+    usage:"ENTRÉE : à la cassure de la neckline (ou son retest). STOP : au-dessus de l'épaule droite. OBJECTIF : hauteur tête-cou projetée. Unité : H4-D1. GRADE : A.",
+    biais:'retournement — baissier (inversée = haussier)' });
+  add({ id:'su-pinbar', nom:'Pin bar / rejet à un niveau clé', alias:['pin bar setup','rejection candle','marteau niveau'], cat:'setup', tags:['price action','rejet','a'],
+    def:"CONDITIONS : longue mèche de rejet (pin bar) à un niveau clé (S/R, OB, VWAP, nombre rond), dans le sens du biais HTF.",
+    usage:"ENTRÉE : à la clôture de la pin bar. STOP : au-delà de la mèche. OBJECTIF : prochain niveau, RR ≥ 2. Unité : H1-H4. GRADE : A (mieux avec confluence).",
+    biais:'retournement local — sens du rejet' });
+  add({ id:'su-engulf', nom:'Avalement à un niveau', alias:['engulfing setup','avalement niveau'], cat:'setup', tags:['price action','retournement','a'],
+    def:"CONDITIONS : bougie d'avalement (englobante) opposée à un niveau clé ou après un sweep, marquant un basculement de momentum.",
+    usage:"ENTRÉE : à la clôture de l'avalement. STOP : au-delà de la bougie. OBJECTIF : niveau suivant. Unité : H1-H4. GRADE : A.",
+    biais:'retournement — sens de l’avalement' });
+
+  // — Tendance / momentum / indicateurs —
+  add({ id:'su-ma-pullback', nom:'Pullback sur moyenne mobile (tendance)', alias:['ma pullback','ema20 pullback','ema50 bounce'], cat:'setup', tags:['tendance','continuation','a'],
+    def:"CONDITIONS : tendance nette (prix au-dessus de l'EMA200), pullback jusqu'à une EMA dynamique (20 ou 50) qui tient, + bougie de reprise.",
+    usage:"ENTRÉE : au rejet de l'EMA dans le sens de la tendance. STOP : sous l'EMA / dernier creux. OBJECTIF : nouvel extrême, trailing possible. Unité : H1-H4. GRADE : A.",
+    biais:'continuation — sens de la tendance' });
+  add({ id:'su-golden-cross', nom:'Golden cross (tendance de fond)', alias:['golden cross setup','croisement 50 200'], cat:'setup', tags:['tendance','long terme','b'],
+    def:"CONDITIONS : la MA50 croise au-dessus de la MA200 (signal de fond haussier ; death cross = inverse), confirmé par la structure.",
+    usage:"ENTRÉE : sur pullback après le croisement. STOP : sous le dernier creux majeur. OBJECTIF : suivi de tendance (trailing). Unité : D1. GRADE : B (lent mais robuste).",
+    biais:'directionnel long terme' });
+  add({ id:'su-bollinger-squeeze', nom:'Bollinger squeeze (explosion de volatilité)', alias:['bollinger squeeze setup','squeeze breakout'], cat:'setup', tags:['volatilité','breakout','a'],
+    def:"CONDITIONS : bandes de Bollinger très resserrées (faible volatilité prolongée) puis expansion soudaine + cassure directionnelle.",
+    usage:"ENTRÉE : à la cassure sur expansion des bandes. STOP : de l'autre côté du range de compression. OBJECTIF : mesuré / trailing. Unité : H1-H4. GRADE : A.",
+    biais:'directionnel — sens de la sortie' });
+  add({ id:'su-rsi-divergence', nom:'Divergence RSI à un extrême', alias:['rsi divergence setup','divergence momentum'], cat:'setup', tags:['momentum','retournement','a'],
+    def:"CONDITIONS : le prix fait un nouvel extrême mais le RSI non (divergence), à un niveau HTF clé — essoufflement du mouvement.",
+    usage:"ENTRÉE : après confirmation (cassure de micro-structure) dans le sens de la divergence. STOP : au-delà de l'extrême. OBJECTIF : retour à la moyenne / niveau. Unité : H4-D1. GRADE : A (jamais seule, avec niveau).",
+    biais:'retournement — sens de la divergence' });
+  add({ id:'su-vwap-reversion', nom:'Retour au VWAP (intraday)', alias:['vwap reversion setup','vwap bounce'], cat:'setup', tags:['intraday','moyenne','b'],
+    def:"CONDITIONS : en intraday, le prix s'écarte fortement du VWAP puis montre un rejet pour y revenir (ou rebondit dessus en tendance).",
+    usage:"ENTRÉE : au rejet vers/depuis le VWAP. STOP : au-delà de l'extrême intraday. OBJECTIF : VWAP ou bande opposée. Unité : M15-H1. GRADE : B (intraday, exigeant).",
+    biais:'contexte — réversion vers la moyenne' });
+  add({ id:'su-range', nom:'Trading de range (bornes)', alias:['range setup','achat support vente résistance'], cat:'setup', tags:['range','contrarian','a'],
+    def:"CONDITIONS : range horizontal net (support + résistance clairs, ADX bas) ; on joue les rebonds sur les bornes + bougie de rejet.",
+    usage:"ENTRÉE : au rejet d'une borne. STOP : juste au-delà de la borne. OBJECTIF : borne opposée. Unité : H1-H4. GRADE : A tant que le range tient (couper si cassure).",
+    biais:'neutre — rebond sur borne' });
+  add({ id:'su-breakout-adr', nom:'Breakout de range d’ouverture (ORB)', alias:['orb setup','opening range breakout'], cat:'setup', tags:['breakout','intraday','b'],
+    def:"CONDITIONS : cassure du range des premières minutes de séance (ex. 15-30 min) dans le sens du biais du jour, sur volume.",
+    usage:"ENTRÉE : à la cassure du range d'ouverture. STOP : côté opposé du range. OBJECTIF : amplitude du range projetée / liquidité. Unité : M15-H1. GRADE : B.",
+    biais:'directionnel — biais du jour' });
+  add({ id:'su-momentum-breakout', nom:'Breakout de plus-haut (momentum)', alias:['momentum breakout','52w high','donchian breakout'], cat:'setup', tags:['momentum','tendance','a'],
+    def:"CONDITIONS : cassure d'un plus-haut significatif (ex. plus-haut 20-55 j / système Turtle) après une base, dans une tendance haussière, sur volume.",
+    usage:"ENTRÉE : à la cassure du plus-haut. STOP : sous la base / ATR. OBJECTIF : laisser courir avec trailing (stop suiveur). Unité : H4-D1. GRADE : A (peu de gagnants, gros gains).",
+    biais:'continuation — momentum haussier' });
+  add({ id:'su-meanrev-z', nom:'Retour à la moyenne (excès z-score)', alias:['mean reversion setup','z-score extreme','bollinger reversion'], cat:'setup', tags:['réversion','statistique','b'],
+    def:"CONDITIONS : sur actif en range/stationnaire, écart extrême à la moyenne (|z| > 2 / bande de Bollinger externe touchée) sans tendance forte (ADX bas).",
+    usage:"ENTRÉE : au signe de retournement vers la moyenne. STOP : au-delà de l'excès. OBJECTIF : moyenne (VWAP/MA). Unité : H1-H4. GRADE : B (dangereux en tendance forte).",
+    biais:'réversion — vers la moyenne' });
+
   // ---------------------------------------------------------------------------
   // MOTEUR DE RECHERCHE + API
   // ---------------------------------------------------------------------------
@@ -2120,7 +2252,7 @@
   // Catégories « actionnables » : pour celles-ci on donne aussi le USAGE
   // (comment s'en servir), car c'est ce qui transforme la connaissance en
   // trade concret. Cœur de la méthode = ICT / SMC / structure / risque.
-  var ACTIONABLE = { ict: 1, smc: 1, structure: 1, risque: 1 };
+  var ACTIONABLE = { ict: 1, smc: 1, structure: 1, risque: 1, setup: 1, strat: 1 };
 
   function digest() {
     var out = "BASE DE CONNAISSANCES COMPLÈTE DU SITE (" + C.length +
