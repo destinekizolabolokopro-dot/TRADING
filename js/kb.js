@@ -1133,6 +1133,24 @@
      avec l'unité de temps conseillée et un GRADE de qualité. « minimum A » = on ne prend
      que les setups riches en confluence. Pédagogique — pas un conseil financier. */
 
+  // — MES SETUPS PERSO (fournis par l'utilisateur — Stratton Trader) —
+  add({ id:'su-strike', nom:'STRIKE Setup (perso)', alias:['strike setup','mon setup strike','stratton strike'], cat:'setup', tags:['perso','stratton','fvg d1','breaker','a'],
+    def:"MON setup (Stratton Trader) — exploite la touche d'un FVG D1 sur un mouvement COURT et IMPULSIF. Conditions : (1) tendance D1 CLAIRE (haussière/baissière) — si la tendance n'est pas claire, PAS DE TRADE ; vérifier qu'aucune résistance/support majeur ne bloque le setup ; (2) un Fair Value Gap D1 DANS LE SENS de la tendance (BISI = opportunité d'achat, SIBI = opportunité de vente) — pas de FVG = PAS DE TRADE.",
+    usage:"Exécution en M15 sur un BREAKER BLOCK. ENTRÉE : sur le RETEST du breaker (idéalement en zone discount). STOP : sous/au-dessus du swing du breaker. OBJECTIF : RR 2 (mouvement court mais efficace). Unités : biais D1 → exécution M15.",
+    biais:'directionnel — sens de la tendance D1' });
+  add({ id:'su-asia-sweep', nom:'Asia Sweep Setup M5 (perso)', alias:['asia sweep','asia high low setup','prise liquidité asie','stratton asia'], cat:'setup', tags:['perso','stratton','session asie','breaker m5','a'],
+    def:"MON setup (Stratton Trader) — basé sur la liquidité asiatique. Conditions : (1) marquer l'ASIA HIGH / ASIA LOW (session ~2h-6h) ; (2) attendre une PRISE DE LIQUIDITÉ claire du haut ou du bas, qui doit aller DANS LE SENS du biais H4/H1 — biais haussier → prise de l'Asia LOW ; biais baissier → prise de l'Asia HIGH ; (3) un Fair Value Gap HTF (BISI = achat, SIBI = vente) — pas de FVG = PAS DE TRADE.",
+    usage:"Exécution en M5 sur un BREAKER BLOCK. ENTRÉE : sur le breaker block M5, après la prise de liquidité asiatique dans le sens du biais. STOP : sous/au-dessus du swing du breaker. OBJECTIF : liquidité opposée / RR 2. Unités : biais H4/H1 → exécution M5.",
+    biais:'directionnel — sens du biais H4/H1' });
+  add({ id:'su-meek7even', nom:'MEEK 7EVEN Setup (perso)', alias:['meek 7even','meek seven','stratton meek'], cat:'setup', tags:['perso','stratton','discount premium','breaker m15','a'],
+    def:"MON setup (Stratton Trader). Étape 1 — lire la tendance : le DAILY donne la tendance long terme ; H4 et H1 doivent être ALIGNÉS pour la confirmer — en cas de désalignement, PAS DE TRADE. Zone d'intervention premium/discount sur H4 ou H1 (déterminée par Fibonacci : discount <50% = ACHAT, premium >50% = VENTE). Fair Value Gap H4/H1 requis (BISI = achat, SIBI = vente) — pas de FVG = PAS DE TRADE.",
+    usage:"Exécution en M15 sur un BREAKER BLOCK. ENTRÉE : sur le breaker M15, en zone discount (achat) / premium (vente), avec D1+H4+H1 alignés. STOP : sous/au-dessus du swing du breaker. OBJECTIF : RR 2+. Unités : biais D1/H4/H1 → exécution M15.",
+    biais:'directionnel — tendance alignée D1/H4/H1' });
+  add({ id:'su-foundation', nom:'FOUNDATION Setup (perso, swing)', alias:['foundation setup','stratton foundation','swing setup perso'], cat:'setup', tags:['perso','stratton','swing','breaker h4','a'],
+    def:"MON setup (Stratton Trader) — SWING trading simple et sécuritaire. Confluence de tendance : D1 ET W1 alignés dans la MÊME direction, zone premium/discount Daily. Zone d'intervention sur le DAILY (Fibonacci : discount <50% = ACHAT, premium >50% = VENTE). Fair Value Gap HTF requis (BISI = achat, SIBI = vente) — pas de FVG = PAS DE TRADE.",
+    usage:"Exécution en H4 sur un BREAKER BLOCK. ENTRÉE : sur le breaker H4, en discount (achat) / premium (vente), D1+W1 alignés. STOP : sous/au-dessus du swing du breaker H4. OBJECTIF : swing (RR élevé). Exemple : Discount Daily + tendance Weekly haussière + BB H4 haussier → swing à l'achat. Unités : biais D1/W1 → exécution H4.",
+    biais:'directionnel — tendance D1/W1' });
+
   // — ICT / SMC —
   add({ id:'su-sweep-mss', nom:'Sweep + MSS (retournement, modèle 2022)', alias:['sweep mss','modèle 2022 setup','reversal sweep'], cat:'setup', tags:['retournement','ict','a+'],
     def:"CONDITIONS : à un extrême HTF, le prix balaye un pool de liquidité (plus-haut/bas, equal highs-lows) PUIS casse la structure interne (MSS/CHoCH) par un displacement qui laisse un FVG.",
