@@ -76,15 +76,8 @@
   .clock{font-family:var(--mono);font-size:.8rem}
   @media (max-width:600px){.clock{display:none}}
 
-  /* ---------- Épuré : que les positions, MAIS toute l'animation d'origine en haut ---------- */
-  .hero{display:block;padding:24px 0 8px;overflow:visible}
-  .hero .hero-grid{grid-template-columns:1fr!important;gap:0;justify-items:center}
-  .hero .hero-left{display:none}               /* on cache seulement le texte marketing */
-  .hero .hero-visual{display:grid!important;width:100%;max-width:470px;margin:0 auto} /* sphère PLEINE + anneaux + chips flottants */
-  .viewswitch{display:none!important}          /* les moteurs tournent en arrière-plan */
-  #view-ict .toolbar{display:none}             /* pas de barre de filtres */
-  #view-ict{padding-top:6px}
-  .hero-OFF{position:relative;padding:48px 0 34px;overflow:hidden}
+  /* ---------- Hero ---------- */
+  .hero{position:relative;padding:48px 0 34px;overflow:hidden}
   .hero::before{content:'';position:absolute;top:-60px;right:-40px;width:560px;height:560px;
     background:radial-gradient(circle,rgba(109,90,237,.20),rgba(34,201,224,.06) 45%,transparent 68%);
     pointer-events:none;z-index:0}
@@ -169,7 +162,7 @@
   .cycle .cdot{width:7px;height:7px;border-radius:2px}
 
   .conf{margin-top:14px}
-  .conf-head{display:flex;justify-content:space-between;font-size:.78rem;color:var(--faint);margin-bottom:7px;letter-spacing:0}
+  .conf-head{display:flex;justify-content:space-between;font-size:.74rem;color:var(--faint);margin-bottom:7px;text-transform:uppercase;letter-spacing:.06em}
   .conf-head b{color:var(--ink);font-family:var(--mono)}
   .track{height:6px;border-radius:99px;background:var(--surface-3);overflow:hidden}
   .fill{height:100%;border-radius:99px;width:0;transition:width 1s cubic-bezier(.2,.8,.2,1)}
@@ -947,7 +940,7 @@ function card(p){
       <span class="cycle"><span class="cdot" style="background:${CYCLE_COLOR[p.cycle]}"></span>${p.cycle}</span>
     </div>
     <div class="conf">
-      <div class="conf-head"><span>${isTrade?'Setup':'Maturité'}</span><b>${p.prog}%</b></div>
+      <div class="conf-head"><span>${isTrade?'Progression du setup':'Maturité'}</span><b>${p.prog}%</b></div>
       <div class="track"><div class="fill" style="background:${COLOR[p.dir]}" data-w="${p.prog}"></div></div>
     </div>
     <div class="detail"><div class="detail-in">
