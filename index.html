@@ -76,9 +76,11 @@
   .clock{font-family:var(--mono);font-size:.8rem}
   @media (max-width:600px){.clock{display:none}}
 
-  /* ---------- Hero (masqué : interface épurée, on va direct aux positions) ---------- */
+  /* ---------- Épuré au maximum : tout tourne en coulisses, on n'affiche que les positions ---------- */
   .hero{display:none}
-  .viewswitch{margin-top:26px!important}
+  .viewswitch{display:none!important}          /* les moteurs tournent en arrière-plan */
+  #view-ict .toolbar{display:none}             /* pas de barre de filtres */
+  #view-ict{padding-top:28px}
   .hero-OFF{position:relative;padding:48px 0 34px;overflow:hidden}
   .hero::before{content:'';position:absolute;top:-60px;right:-40px;width:560px;height:560px;
     background:radial-gradient(circle,rgba(109,90,237,.20),rgba(34,201,224,.06) 45%,transparent 68%);
