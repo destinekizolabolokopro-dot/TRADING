@@ -780,7 +780,7 @@
   <div class="modal" style="max-width:560px">
     <button class="modal-close" id="calc-close" aria-label="Fermer">×</button>
     <h2>🧮 Calculateur de position</h2>
-    <p class="sub">Combien acheter pour ne risquer qu'un petit % de ton capital ? Entre tes chiffres — tout se calcule tout seul, rien n'est envoyé nulle part.</p>
+    <p class="sub">Combien acheter pour ne risquer qu'un petit % de ton capital ? Entre tes chiffres — tout se calcule tout seul, rien n'est envoyé nulle part. <b>💡 Ton capital et ton risque % sont utilisés PARTOUT sur le site</b> (tous les montants en € des positions et de l'historique s'adaptent à toi).</p>
     <div class="calc-grid">
       <div class="field"><label>Capital total</label><input type="number" id="calc-cap" inputmode="decimal" placeholder="ex. 1000"></div>
       <div class="field"><label>Risque par trade (%)</label><input type="number" id="calc-risk" inputmode="decimal" placeholder="ex. 1" value="1"></div>
@@ -4298,7 +4298,7 @@ function card(p){
   if(!p.chart) p.chart = mockChart(p);
   const v = VERD[p.dir];
   const isTrade = p.dir!=='WAIT';
-  const p10 = { risk:100, gain: isTrade ? Math.round(100*p.rr) : 0 };
+  const p10 = { risk: eurRisk(), gain: isTrade ? eurGain(p.rr) : 0 };
   // Réussite : le VRAI taux du bot (journal) dès qu'il y a assez de trades clôturés, sinon une estimation honnête.
   const jb = (isTrade && window.History) ? History.bilan('Bot règles') : null;
   const realRate = (jb && jb.total>=5) ? jb.rate : null;
@@ -4342,7 +4342,7 @@ function card(p){
         <div class="m"><span class="k">Ratio</span><span class="v">${p.rr} R</span></div>
         <div class="m"><span class="k">${rateKey}</span><span class="v">${rateVal}</span></div>
         <div class="m"><span class="k">Confluence</span><span class="v">${p.conf}%</span></div>
-        <div class="m"><span class="k">Sur 10 000 €</span><span class="v"><span class="gain">+${p10.gain} €</span> / <span class="loss">−${p10.risk} €</span></span></div>
+        <div class="m"><span class="k">Sur ${capFr()} €</span><span class="v"><span class="gain">+${p10.gain} €</span> / <span class="loss">−${p10.risk} €</span></span></div>
       </div>` : `
       <div class="metrics"><div class="m"><span class="k">Confluence</span><span class="v">${p.conf}%</span></div></div>`}
       ${isTrade && p.conflu ? `
@@ -4572,7 +4572,7 @@ $('#ai-run').addEventListener('click', async ()=>{
         '<span class="tp">Objectif '+fmtN(i.objectif)+'</span><span>RR '+(i.rr!=null?i.rr:'—')+'</span></div>'+
         ((i.entree&&i.objectif&&i.stop)?'<div class="inums"><span class="tp">Objectif +'+(pctMove(+i.entree,+i.objectif,long)||0).toFixed(1)+'%</span><span class="lo">Risque '+(pctMove(+i.entree,+i.stop,long)||0).toFixed(1)+'% au stop</span>'+(i.tf?'<span>unité '+i.tf+'</span>':'')+'</div>':'')+
         ((i.entree&&i.objectif&&i.stop)?netRRLine(+i.entree,+i.stop,+i.objectif,long):'')+
-        (i.rr!=null?'<div class="inums"><span class="tp">Sur 10 000 € (risque 1 %) : +'+Math.round(100*(+i.rr))+' € si TP</span><span class="lo">−100 € si SL</span></div>':'')+
+        (i.rr!=null?'<div class="inums"><span class="tp">'+capLabel()+' : +'+eurGain(i.rr)+' € si TP</span><span class="lo">−'+eurRisk()+' € si SL</span></div>':'')+
         '<div class="why">'+(i.pourquoi||'')+'</div></div>';
     });
     html+=corrWarnHTML(idees.map(i=>({sym:i.paire,dir:(i.sens||'').toUpperCase()})));
@@ -4676,6 +4676,14 @@ document.addEventListener('click', e=>{
   catch(_){ fallbackCopy(txt); done(); }
 });
 function fallbackCopy(txt){ try{ const ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); }catch(_){}}
+/* ---- Capital & risque de l'utilisateur (définis dans le 🧮 Calculateur, utilisés PARTOUT) ---- */
+function userCapital(){ try{ const c=parseFloat(calcGet().cap); return (c&&c>0)?c:10000; }catch(e){ return 10000; } }
+function userRiskPct(){ try{ const r=parseFloat(calcGet().risk); return (r&&r>0)?r:1; }catch(e){ return 1; } }
+function userRiskAmt(){ return userCapital()*userRiskPct()/100; }         // € risqués par trade
+function eurGain(rr){ return Math.round(userRiskAmt()*(+rr||0)); }        // € si TP
+function eurRisk(){ return Math.round(userRiskAmt()); }                   // € si SL
+function capFr(){ return userCapital().toLocaleString('fr-FR'); }
+function capLabel(){ return 'Sur '+capFr()+' € (risque '+userRiskPct()+' %)'; }
 function srcClass(s){ return (s||'').indexOf('IA')>=0?'ia':'regles'; }
 // Petite courbe d'équité (R cumulés) en SVG inline.
 function equitySVG(eq){
@@ -4737,7 +4745,7 @@ function renderHist(){
     kpi('Trades', s.total, '', s.open+' en cours')+
     kpi('Réussite', (s.rate!=null?s.rate+'%':'—'), '', s.wins+'✅ / '+s.loss+'❌')+
     kpi('Résultat', (s.rsum>=0?'+':'')+s.rsum+' R', (s.rsum>0?'pos':(s.rsum<0?'neg':'')), 'gain net')+
-    kpi('Sur 10 000 €', (s.eur>=0?'+':'')+s.eur.toLocaleString('fr-FR')+' €', (s.eur>0?'pos':(s.eur<0?'neg':'')), 'risque 1 %/trade')+
+    (()=>{ const eur=Math.round((s.rsum||0)*userRiskAmt()); return kpi('Sur '+capFr()+' €', (eur>=0?'+':'')+eur.toLocaleString('fr-FR')+' €', (eur>0?'pos':(eur<0?'neg':'')), 'risque '+userRiskPct()+' %/trade'); })()+
     kpi('Profit factor', pfTxt, ((s.pf==null||s.pf>=1)?'pos':'neg'), 'gains ÷ pertes')+
     kpi('RR moyen visé', (s.rrPlanned!=null?s.rrPlanned:'—'), '', 'par trade')+
     kpi('Pire creux (DD)', '−'+s.maxdd+' R', (s.maxdd>0?'neg':''), 'max drawdown')+
@@ -5268,7 +5276,7 @@ function quantTradeCard(t){
       <span class="tp">Objectif ${fmtN(t.tp)}</span><span>RR ${t.rr}</span></div>
     <div class="inums"><span class="tp">Objectif +${(pctMove(t.entry,t.tp,long)||0).toFixed(1)}%</span><span class="lo">Risque ${(pctMove(t.entry,t.sl,long)||0).toFixed(1)}% au stop</span></div>
     ${netRRLine(t.entry,t.sl,t.tp,long)}
-    <div class="inums"><span class="tp">Sur 10 000 € (risque 1 %) : +${Math.round(100*t.rr)} € si TP</span><span class="lo">−100 € si SL</span></div>
+    <div class="inums"><span class="tp">${capLabel()} : +${eurGain(t.rr)} € si TP</span><span class="lo">−${eurRisk()} € si SL</span></div>
   </div>`;
 }
 function loadQuant(force){
@@ -5379,7 +5387,13 @@ $('#calc-open').addEventListener('click', openCalc);
 $('#calc-close').addEventListener('click', ()=> calcOverlay.classList.remove('open'));
 calcOverlay.addEventListener('click', e=>{ if(e.target===calcOverlay) calcOverlay.classList.remove('open'); });
 ['calc-cap','calc-risk','calc-entry','calc-stop','calc-tp','calc-lev'].forEach(id=>{
-  $('#'+id).addEventListener('input', ()=>{ calcRun(); calcSave(); });
+  $('#'+id).addEventListener('input', ()=>{ calcRun(); calcSave();
+    // Capital/risque = réglages globaux : on rafraîchit les montants € partout.
+    if(id==='calc-cap'||id==='calc-risk'){
+      try{ render(currentFilter); }catch(e){}
+      try{ if(histOverlay&&histOverlay.classList.contains('open')) renderHist(); }catch(e){}
+    }
+  });
 });
 
 /* ---------- IA maison (machine learning dans le navigateur) ---------- */
@@ -5430,7 +5444,7 @@ function iaTradeCard(t){
       <span class="tp">Objectif ${fmtN(t.tp)}</span><span>RR ${t.rr}</span></div>
     <div class="inums"><span class="tp">Objectif +${(pctMove(t.entry,t.tp,long)||0).toFixed(1)}%</span><span class="lo">Risque ${(pctMove(t.entry,t.sl,long)||0).toFixed(1)}% au stop</span><span>durée cible ~${IA_HORIZON} j</span></div>
     ${netRRLine(t.entry,t.sl,t.tp,long)}
-    <div class="inums"><span class="tp">Sur 10 000 € (risque 1 %) : +${Math.round(100*t.rr)} € si TP</span><span class="lo">−100 € si SL</span></div>
+    <div class="inums"><span class="tp">${capLabel()} : +${eurGain(t.rr)} € si TP</span><span class="lo">−${eurRisk()} € si SL</span></div>
   </div>`;
 }
 // Courbe de progression : précision (walk-forward) au fil des entraînements.
