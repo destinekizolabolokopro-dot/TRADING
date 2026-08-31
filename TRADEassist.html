@@ -76,11 +76,20 @@
   .clock{font-family:var(--mono);font-size:.8rem}
   @media (max-width:600px){.clock{display:none}}
 
-  /* ---------- Épuré au maximum : tout tourne en coulisses, on n'affiche que les positions ---------- */
-  .hero{display:none}
+  /* ---------- Épuré : que les positions, mais on garde la sphère animée (compacte) ---------- */
+  .hero{display:block;padding:16px 0 2px;overflow:hidden}
+  .hero::before{display:none}                  /* pas de gros halo, on reste minimal */
+  .hero .hero-grid{grid-template-columns:1fr!important;gap:0}
+  .hero .hero-left{display:none}               /* on cache le texte marketing */
+  .hero .hero-visual{height:150px;display:grid!important} /* la sphère seule, compacte */
+  .hero .ring.r1{width:92px;height:92px}
+  .hero .ring.r2{width:146px;height:146px}
+  .hero .ring.r3{width:200px;height:200px}
+  .hero .orb{width:92px;height:92px;
+    box-shadow:0 0 56px 8px rgba(124,92,255,.30),inset 0 0 28px rgba(255,255,255,.18)}
   .viewswitch{display:none!important}          /* les moteurs tournent en arrière-plan */
   #view-ict .toolbar{display:none}             /* pas de barre de filtres */
-  #view-ict{padding-top:28px}
+  #view-ict{padding-top:10px}
   .hero-OFF{position:relative;padding:48px 0 34px;overflow:hidden}
   .hero::before{content:'';position:absolute;top:-60px;right:-40px;width:560px;height:560px;
     background:radial-gradient(circle,rgba(109,90,237,.20),rgba(34,201,224,.06) 45%,transparent 68%);
