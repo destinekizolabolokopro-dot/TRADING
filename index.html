@@ -36,6 +36,10 @@
   .tf-badge{font-family:var(--mono);font-size:.72rem;font-weight:600;padding:1px 7px;border-radius:999px;
     background:var(--surface-3);color:var(--muted);border:1px solid var(--border);white-space:nowrap}
   .hfilter-sep{display:inline-block;width:1px;height:18px;background:var(--border-strong);margin:0 4px;vertical-align:middle}
+  /* Formulaire « ajouter mon trade » */
+  .addform{border:1px solid var(--border-strong);border-radius:14px;padding:14px;margin:0 0 16px;background:var(--surface-2)}
+  .addform-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  @media(max-width:600px){.addform-grid{grid-template-columns:repeat(2,1fr)}}
   /* Titres de section dans la sortie du Bot IA (cohérence AMD / Preshot / idées) */
   .ai-sec{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;font-weight:700;font-size:.98rem;margin:18px 0 9px}
   .ai-sec .sub{color:var(--faint);font-weight:400;font-size:12px}
@@ -808,12 +812,29 @@
     <h2>📒 Historique &amp; performance</h2>
     <p class="sub">Chaque trade proposé est enregistré avec le bot qui l'a envoyé, puis clôturé au TP (gagné) ou au SL (perdu). Tout est calculé sur ton ordinateur. <b>R</b> = multiple de risque (1 R ≈ 1 % du capital).</p>
     <div class="hfilters" id="hist-filter"></div>
+    <div id="hist-addform" class="addform" hidden>
+      <div class="addform-grid">
+        <div class="field"><label>Actif</label><input type="text" id="add-sym" placeholder="ex. BTC/USD"></div>
+        <div class="field"><label>Sens</label><select id="add-dir"><option value="LONG">▲ LONG (achat)</option><option value="SHORT">▼ SHORT (vente)</option></select></div>
+        <div class="field"><label>TF</label><input type="text" id="add-tf" placeholder="ex. H1"></div>
+        <div class="field"><label>Entrée</label><input type="number" id="add-entry" inputmode="decimal" placeholder="prix"></div>
+        <div class="field"><label>Stop</label><input type="number" id="add-sl" inputmode="decimal" placeholder="prix"></div>
+        <div class="field"><label>Objectif</label><input type="number" id="add-tp" inputmode="decimal" placeholder="prix"></div>
+      </div>
+      <div class="field" style="margin-top:8px"><label>Note (optionnel)</label><input type="text" id="add-note" placeholder="pourquoi ce trade ?"></div>
+      <div class="modal-actions" style="margin-top:10px">
+        <button class="btn btn-primary" id="add-save">Enregistrer mon trade</button>
+        <button class="btn" id="add-cancel">Annuler</button>
+        <span id="add-msg" style="align-self:center;color:var(--faint);font-size:13px"></span>
+      </div>
+    </div>
     <div class="bilan" id="hist-bilan"></div>
     <div class="hist-block" id="hist-equity"></div>
     <div class="hist-block" id="hist-sim"></div>
     <div class="hist-block" id="hist-compare"></div>
     <div class="htable-wrap" id="hist-table"></div>
     <div class="modal-actions" style="margin-top:16px">
+      <button class="btn btn-primary" id="hist-add">➕ Ajouter mon trade</button>
       <button class="btn" id="hist-csv">⬇️ Exporter en CSV (Excel)</button>
       <button class="btn" id="hist-reset">Réinitialiser l'historique</button>
     </div>
@@ -1498,6 +1519,30 @@ function histCSV(){
   toast('⬇️ CSV exporté ('+rows.length+' trades).');
 }
 $('#hist-csv').addEventListener('click', histCSV);
+/* Journal manuel : l'utilisateur ajoute ses PROPRES trades (source « Moi ») */
+$('#hist-add').addEventListener('click', ()=>{ const f=$('#hist-addform'); f.hidden=!f.hidden; if(!f.hidden){ $('#add-sym').focus(); $('#add-msg').textContent=''; } });
+$('#add-cancel').addEventListener('click', ()=>{ $('#hist-addform').hidden=true; });
+$('#add-save').addEventListener('click', ()=>{
+  const sym=($('#add-sym').value||'').trim().toUpperCase();
+  const dir=$('#add-dir').value;
+  const tf=($('#add-tf').value||'').trim().toUpperCase();
+  const entry=parseFloat($('#add-entry').value), sl=parseFloat($('#add-sl').value), tp=parseFloat($('#add-tp').value);
+  const note=($('#add-note').value||'').trim();
+  const msg=$('#add-msg');
+  if(!sym){ msg.textContent='⚠️ Indique l’actif.'; return; }
+  if(!(entry>0)||!(sl>0)||!(tp>0)){ msg.textContent='⚠️ Entrée, stop et objectif requis.'; return; }
+  const long=dir==='LONG';
+  if(long && !(sl<entry && tp>entry)){ msg.textContent='⚠️ Pour un LONG : stop < entrée < objectif.'; return; }
+  if(!long && !(sl>entry && tp<entry)){ msg.textContent='⚠️ Pour un SHORT : objectif < entrée < stop.'; return; }
+  const rr=+(Math.abs(tp-entry)/Math.abs(sl-entry)).toFixed(2);
+  if(!window.History){ msg.textContent='Historique indisponible.'; return; }
+  History.record([{sym,dir,entry,sl,tp,rr,note:note||'Trade perso',tf:tf||null,style:'manuel'}],'Moi');
+  History.evaluate(priceMap());
+  ['add-sym','add-tf','add-entry','add-sl','add-tp','add-note'].forEach(id=>$('#'+id).value='');
+  $('#hist-addform').hidden=true;
+  renderHist();
+  toast('✅ Trade ajouté à ton historique (RR '+rr+').');
+});
 
 /* ---------- Stratégies Pro (nouvel onglet) ---------- */
 let proLoaded=false, proLoading=false;
