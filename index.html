@@ -162,7 +162,7 @@
   .cycle .cdot{width:7px;height:7px;border-radius:2px}
 
   .conf{margin-top:14px}
-  .conf-head{display:flex;justify-content:space-between;font-size:.74rem;color:var(--faint);margin-bottom:7px;text-transform:uppercase;letter-spacing:.06em}
+  .conf-head{display:flex;justify-content:space-between;font-size:.78rem;color:var(--faint);margin-bottom:7px;letter-spacing:0}
   .conf-head b{color:var(--ink);font-family:var(--mono)}
   .track{height:6px;border-radius:99px;background:var(--surface-3);overflow:hidden}
   .fill{height:100%;border-radius:99px;width:0;transition:width 1s cubic-bezier(.2,.8,.2,1)}
@@ -585,10 +585,6 @@
       <div class="hero-visual" aria-hidden="true">
         <span class="ring r1"></span><span class="ring r2"></span><span class="ring r3"></span>
         <div class="orb"></div>
-        <span class="chip-f c1"><span class="d" style="background:var(--long)"></span>BTC ▲ Long</span>
-        <span class="chip-f c2"><span class="d" style="background:var(--wait)"></span>MSS détecté</span>
-        <span class="chip-f c3"><span class="d" style="background:var(--short)"></span>DXY ▼ baissier</span>
-        <span class="chip-f c4"><span class="d" style="background:var(--long)"></span>FVG H4 frais</span>
       </div>
     </div>
   </section>
@@ -940,7 +936,7 @@ function card(p){
       <span class="cycle"><span class="cdot" style="background:${CYCLE_COLOR[p.cycle]}"></span>${p.cycle}</span>
     </div>
     <div class="conf">
-      <div class="conf-head"><span>${isTrade?'Progression du setup':'Maturité'}</span><b>${p.prog}%</b></div>
+      <div class="conf-head"><span>${isTrade?'Setup':'Maturité'}</span><b>${p.prog}%</b></div>
       <div class="track"><div class="fill" style="background:${COLOR[p.dir]}" data-w="${p.prog}"></div></div>
     </div>
     <div class="detail"><div class="detail-in">
@@ -1070,6 +1066,15 @@ async function boot(){
   setSource(false);
   await refreshLive();            // vraies données + journal
   setInterval(refreshLive, 300000); // rafraîchit toutes les 5 min (met à jour l'historique)
+  backgroundCompute();            // IA maison + Quant + Pro tournent tout seuls
+  setInterval(backgroundCompute, 30*60000); // re-calcul auto toutes les 30 min
+}
+// Fait tourner TOUS les moteurs en arrière-plan : ils calculent leurs positions
+// et les enregistrent dans l'historique même si l'utilisateur n'ouvre pas leurs onglets.
+function backgroundCompute(){
+  setTimeout(()=>{ try{ loadIA&&loadIA(true); }catch(e){} }, 800);
+  setTimeout(()=>{ try{ loadQuant&&loadQuant(true); }catch(e){} }, 2200);
+  setTimeout(()=>{ try{ loadPro&&loadPro(true); }catch(e){} }, 3600);
 }
 boot();
 
@@ -1576,8 +1581,8 @@ function perfBadge(p){
     `<span>${p.trades} trades</span>`+
     `<span>pire série <b>−${p.maxDD} R</b></span></div>`;
 }
-function loadPro(){
-  if(proLoaded||proLoading||!window.PRO) return;
+function loadPro(force){
+  if((proLoaded&&!force)||proLoading||!window.PRO) return;
   proLoading=true;
   PRO.load().then(d=>{ proLoaded=true; proLoading=false; lastPro=d; renderPro(d); refreshConsensusIfVisible(); })
             .catch(()=>{ proLoading=false; renderPro(null); });
