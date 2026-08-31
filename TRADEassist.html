@@ -76,20 +76,14 @@
   .clock{font-family:var(--mono);font-size:.8rem}
   @media (max-width:600px){.clock{display:none}}
 
-  /* ---------- Épuré : que les positions, mais on garde la sphère animée (compacte) ---------- */
-  .hero{display:block;padding:16px 0 2px;overflow:hidden}
-  .hero::before{display:none}                  /* pas de gros halo, on reste minimal */
-  .hero .hero-grid{grid-template-columns:1fr!important;gap:0}
-  .hero .hero-left{display:none}               /* on cache le texte marketing */
-  .hero .hero-visual{height:150px;display:grid!important} /* la sphère seule, compacte */
-  .hero .ring.r1{width:92px;height:92px}
-  .hero .ring.r2{width:146px;height:146px}
-  .hero .ring.r3{width:200px;height:200px}
-  .hero .orb{width:92px;height:92px;
-    box-shadow:0 0 56px 8px rgba(124,92,255,.30),inset 0 0 28px rgba(255,255,255,.18)}
+  /* ---------- Épuré : que les positions, MAIS toute l'animation d'origine en haut ---------- */
+  .hero{display:block;padding:24px 0 8px;overflow:visible}
+  .hero .hero-grid{grid-template-columns:1fr!important;gap:0;justify-items:center}
+  .hero .hero-left{display:none}               /* on cache seulement le texte marketing */
+  .hero .hero-visual{display:grid!important;width:100%;max-width:470px;margin:0 auto} /* sphère PLEINE + anneaux + chips flottants */
   .viewswitch{display:none!important}          /* les moteurs tournent en arrière-plan */
   #view-ict .toolbar{display:none}             /* pas de barre de filtres */
-  #view-ict{padding-top:10px}
+  #view-ict{padding-top:6px}
   .hero-OFF{position:relative;padding:48px 0 34px;overflow:hidden}
   .hero::before{content:'';position:absolute;top:-60px;right:-40px;width:560px;height:560px;
     background:radial-gradient(circle,rgba(109,90,237,.20),rgba(34,201,224,.06) 45%,transparent 68%);
@@ -598,6 +592,10 @@
       <div class="hero-visual" aria-hidden="true">
         <span class="ring r1"></span><span class="ring r2"></span><span class="ring r3"></span>
         <div class="orb"></div>
+        <span class="chip-f c1"><span class="d" style="background:var(--long)"></span>BTC ▲ Long</span>
+        <span class="chip-f c2"><span class="d" style="background:var(--wait)"></span>MSS détecté</span>
+        <span class="chip-f c3"><span class="d" style="background:var(--short)"></span>DXY ▼ baissier</span>
+        <span class="chip-f c4"><span class="d" style="background:var(--long)"></span>FVG H4 frais</span>
       </div>
     </div>
   </section>
