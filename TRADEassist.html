@@ -707,7 +707,7 @@
     </div>
     <label class="ai-link" for="ai-link">
       <input type="checkbox" id="ai-link" checked>
-      <span><b>🔗 Lier l'🧠 IA maison + le 🏛️ Quant</b> — Claude confronte son analyse à leurs classements (confluence). <span style="color:var(--faint)">Recommandé.</span></span>
+      <span><b>🧠 Cerveau central : utiliser TOUTES les données du site</b> — signaux ICT/SMC + IA maison + Quant + Stratégies Pro + calendrier éco + base de 303 concepts. Claude centralise tout pour décider les positions. <span style="color:var(--faint)">Fortement recommandé.</span></span>
     </label>
     <div class="modal-actions">
       <button class="btn ai-run" id="ai-run">Analyser le marché</button>
@@ -2797,7 +2797,9 @@
   function setStyle(s) { try { localStorage.setItem(STYLE_STORE, s); } catch (e) {} }
 
   var SYSTEM =
-    "Tu es un BOT DE TRADING autonome, propulsé par Claude (Anthropic), intégré à un site ICT/SMC. Tu écris en français. " +
+    "Tu es le CERVEAU CENTRAL d'un site de trading ICT/SMC, propulsé par Claude (Anthropic). Tu écris en français. " +
+    "Tu centralises TOUTES les données du site — signaux ICT/SMC, IA maison (ML), Quant (market-neutral), Stratégies Pro, " +
+    "calendrier économique et la base de 303 concepts + setups — pour produire LES positions finales unifiées. Rien n'est éparpillé : tout converge vers ta décision. " +
     "Tu opères sur les unités de temps du STYLE demandé (précisé dans le message : Scalp, Intraday ou Swing). " +
     "Tu raisonnes en TOP-DOWN : le biais vient de l'unité haute du style, tu affines sur l'intermédiaire, tu synchronises l'entrée sur l'unité basse. " +
     "Tu bases tes décisions PRINCIPALEMENT sur les concepts ICT/SMC (structure & BOS/CHoCH, MSS, FVG, order blocks, " +
@@ -2852,10 +2854,12 @@
     // Liaison des IA : on donne à Claude l'avis des autres moteurs du site
     // (IA maison ML + Quant market-neutral) comme confluence supplémentaire.
     if (collab) {
-      txt += "\n\nAVIS DES AUTRES MOTEURS DU SITE (confluence — à confronter, PAS à suivre aveuglément) :\n" +
+      txt += "\n\n=== DONNÉES DE TOUS LES MOTEURS DU SITE (tu es le CERVEAU CENTRAL qui les unifie) ===\n" +
         JSON.stringify(collab, null, 2) +
-        "\nSi tes idées vont dans le sens de l'IA maison et/ou du Quant, c'est un signal renforcé ; " +
-        "en cas de désaccord net, sois plus prudent ou explique pourquoi tu diverges.";
+        "\nTu centralises TOUTES ces sources (signaux ICT/SMC, IA maison ML, Quant market-neutral, Stratégies Pro) " +
+        "en UNE décision. Méthode d'unification : un actif où PLUSIEURS moteurs sont d'accord (ex. ICT LONG + IA maison fort + Quant jambe longue + Pro haussier) = signal RENFORCÉ, priorité haute et confiance élevée ; " +
+        "en cas de désaccord entre moteurs, tranche avec la méthode ICT/SMC (structure, liquidité, biais HTF) et baisse la confiance, ou n'envoie rien. " +
+        "Dans le champ \"pourquoi\", cite quels moteurs sont alignés (ex. « 4/4 moteurs d'accord »). Ne suis jamais un seul moteur aveuglément.";
     }
     // Conscience du calendrier : date/heure du jour + annonces économiques à
     // fort impact (FOMC/CPI/NFP/OPEX), pour que l'IA évite de trader dans le chaos.
@@ -4475,6 +4479,20 @@ function buildCollab(){
       };
     }
   }catch(e){}
+  try{
+    if(lastPro && lastPro.synthese && lastPro.synthese.length){
+      out.strategies_pro={
+        note:"Stratégies systématiques à règles (tendance, cassure, retour à la moyenne) — verdict par actif.",
+        verdicts: lastPro.synthese.filter(s=>s.verdict&&s.verdict!=='neutre').map(s=>({actif:s.sym, verdict:s.verdict}))
+      };
+    }
+  }catch(e){}
+  try{
+    // Signaux ICT/SMC du site (le moteur à règles) : sens + cycle + confluence par actif.
+    const ict=(typeof PAIRS!=='undefined'?PAIRS:[]).filter(p=>p.dir&&p.dir!=='WAIT')
+      .map(p=>({actif:p.sym, sens:p.dir, cycle:p.cycle, confluence_pct:p.conf}));
+    if(ict.length) out.signaux_ict_smc={ note:"Moteur ICT/SMC du site (structure, FVG, OB, liquidité, confluence).", signaux:ict };
+  }catch(e){}
   return Object.keys(out).length? out : null;
 }
 function renderEcon(){
@@ -4491,8 +4509,8 @@ function openAI(){
   aiOverlay.classList.add('open');
   renderEcon(); // affiche l'état du calendrier économique
   restoreLastAI(); // réaffiche la dernière analyse mémorisée
-  // Préchauffe les avis de l'IA maison + Quant en arrière-plan pour la liaison.
-  try{ if($('#ai-link')&&$('#ai-link').checked){ loadIA&&loadIA(); loadQuant&&loadQuant(); } }catch(e){}
+  // Préchauffe TOUS les moteurs du site (IA maison + Quant + Stratégies Pro) pour la centralisation.
+  try{ if($('#ai-link')&&$('#ai-link').checked){ loadIA&&loadIA(); loadQuant&&loadQuant(); loadPro&&loadPro(); } }catch(e){}
 }
 function closeAI(){ aiOverlay.classList.remove('open'); }
 $('#ai-open').addEventListener('click', openAI);

@@ -707,7 +707,7 @@
     </div>
     <label class="ai-link" for="ai-link">
       <input type="checkbox" id="ai-link" checked>
-      <span><b>🔗 Lier l'🧠 IA maison + le 🏛️ Quant</b> — Claude confronte son analyse à leurs classements (confluence). <span style="color:var(--faint)">Recommandé.</span></span>
+      <span><b>🧠 Cerveau central : utiliser TOUTES les données du site</b> — signaux ICT/SMC + IA maison + Quant + Stratégies Pro + calendrier éco + base de 303 concepts. Claude centralise tout pour décider les positions. <span style="color:var(--faint)">Fortement recommandé.</span></span>
     </label>
     <div class="modal-actions">
       <button class="btn ai-run" id="ai-run">Analyser le marché</button>
@@ -1102,6 +1102,20 @@ function buildCollab(){
       };
     }
   }catch(e){}
+  try{
+    if(lastPro && lastPro.synthese && lastPro.synthese.length){
+      out.strategies_pro={
+        note:"Stratégies systématiques à règles (tendance, cassure, retour à la moyenne) — verdict par actif.",
+        verdicts: lastPro.synthese.filter(s=>s.verdict&&s.verdict!=='neutre').map(s=>({actif:s.sym, verdict:s.verdict}))
+      };
+    }
+  }catch(e){}
+  try{
+    // Signaux ICT/SMC du site (le moteur à règles) : sens + cycle + confluence par actif.
+    const ict=(typeof PAIRS!=='undefined'?PAIRS:[]).filter(p=>p.dir&&p.dir!=='WAIT')
+      .map(p=>({actif:p.sym, sens:p.dir, cycle:p.cycle, confluence_pct:p.conf}));
+    if(ict.length) out.signaux_ict_smc={ note:"Moteur ICT/SMC du site (structure, FVG, OB, liquidité, confluence).", signaux:ict };
+  }catch(e){}
   return Object.keys(out).length? out : null;
 }
 function renderEcon(){
@@ -1118,8 +1132,8 @@ function openAI(){
   aiOverlay.classList.add('open');
   renderEcon(); // affiche l'état du calendrier économique
   restoreLastAI(); // réaffiche la dernière analyse mémorisée
-  // Préchauffe les avis de l'IA maison + Quant en arrière-plan pour la liaison.
-  try{ if($('#ai-link')&&$('#ai-link').checked){ loadIA&&loadIA(); loadQuant&&loadQuant(); } }catch(e){}
+  // Préchauffe TOUS les moteurs du site (IA maison + Quant + Stratégies Pro) pour la centralisation.
+  try{ if($('#ai-link')&&$('#ai-link').checked){ loadIA&&loadIA(); loadQuant&&loadQuant(); loadPro&&loadPro(); } }catch(e){}
 }
 function closeAI(){ aiOverlay.classList.remove('open'); }
 $('#ai-open').addEventListener('click', openAI);

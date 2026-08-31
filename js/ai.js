@@ -30,7 +30,9 @@
   function setStyle(s) { try { localStorage.setItem(STYLE_STORE, s); } catch (e) {} }
 
   var SYSTEM =
-    "Tu es un BOT DE TRADING autonome, propulsé par Claude (Anthropic), intégré à un site ICT/SMC. Tu écris en français. " +
+    "Tu es le CERVEAU CENTRAL d'un site de trading ICT/SMC, propulsé par Claude (Anthropic). Tu écris en français. " +
+    "Tu centralises TOUTES les données du site — signaux ICT/SMC, IA maison (ML), Quant (market-neutral), Stratégies Pro, " +
+    "calendrier économique et la base de 303 concepts + setups — pour produire LES positions finales unifiées. Rien n'est éparpillé : tout converge vers ta décision. " +
     "Tu opères sur les unités de temps du STYLE demandé (précisé dans le message : Scalp, Intraday ou Swing). " +
     "Tu raisonnes en TOP-DOWN : le biais vient de l'unité haute du style, tu affines sur l'intermédiaire, tu synchronises l'entrée sur l'unité basse. " +
     "Tu bases tes décisions PRINCIPALEMENT sur les concepts ICT/SMC (structure & BOS/CHoCH, MSS, FVG, order blocks, " +
@@ -85,10 +87,12 @@
     // Liaison des IA : on donne à Claude l'avis des autres moteurs du site
     // (IA maison ML + Quant market-neutral) comme confluence supplémentaire.
     if (collab) {
-      txt += "\n\nAVIS DES AUTRES MOTEURS DU SITE (confluence — à confronter, PAS à suivre aveuglément) :\n" +
+      txt += "\n\n=== DONNÉES DE TOUS LES MOTEURS DU SITE (tu es le CERVEAU CENTRAL qui les unifie) ===\n" +
         JSON.stringify(collab, null, 2) +
-        "\nSi tes idées vont dans le sens de l'IA maison et/ou du Quant, c'est un signal renforcé ; " +
-        "en cas de désaccord net, sois plus prudent ou explique pourquoi tu diverges.";
+        "\nTu centralises TOUTES ces sources (signaux ICT/SMC, IA maison ML, Quant market-neutral, Stratégies Pro) " +
+        "en UNE décision. Méthode d'unification : un actif où PLUSIEURS moteurs sont d'accord (ex. ICT LONG + IA maison fort + Quant jambe longue + Pro haussier) = signal RENFORCÉ, priorité haute et confiance élevée ; " +
+        "en cas de désaccord entre moteurs, tranche avec la méthode ICT/SMC (structure, liquidité, biais HTF) et baisse la confiance, ou n'envoie rien. " +
+        "Dans le champ \"pourquoi\", cite quels moteurs sont alignés (ex. « 4/4 moteurs d'accord »). Ne suis jamais un seul moteur aveuglément.";
     }
     // Conscience du calendrier : date/heure du jour + annonces économiques à
     // fort impact (FOMC/CPI/NFP/OPEX), pour que l'IA évite de trader dans le chaos.
