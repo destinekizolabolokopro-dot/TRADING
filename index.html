@@ -1220,6 +1220,7 @@ $('#ai-run').addEventListener('click', async ()=>{
       html+='<div class="ai-idea copyable '+(long?'long':'short')+'" data-copy="'+cp+'" title="Clique pour copier cette position">'+
         '<div class="ihead"><span class="isym">'+(i.paire||'—')+'</span>'+
         '<span class="ilvl">'+(long?'▲ LONG':'▼ SHORT')+(i.tf?' · '+i.tf:'')+' · '+(i.confiance!=null?i.confiance+'%':'')+'</span></div>'+
+        (i.strategie?'<div class="inums"><span>📋 Stratégie : <b>'+i.strategie+'</b></span></div>':'')+
         '<div class="inums"><span>Entrée '+fmtN(i.entree)+'</span><span class="lo">Stop '+fmtN(i.stop)+'</span>'+
         '<span class="tp">Objectif '+fmtN(i.objectif)+'</span><span>RR '+(i.rr!=null?i.rr:'—')+'</span></div>'+
         ((i.entree&&i.objectif&&i.stop)?'<div class="inums"><span class="tp">Objectif +'+(pctMove(+i.entree,+i.objectif,long)||0).toFixed(1)+'%</span><span class="lo">Risque '+(pctMove(+i.entree,+i.stop,long)||0).toFixed(1)+'% au stop</span>'+(i.tf?'<span>unité '+i.tf+'</span>':'')+'</div>':'')+

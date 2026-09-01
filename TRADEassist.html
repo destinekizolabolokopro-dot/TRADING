@@ -2828,10 +2828,10 @@
     "MAIS tu es LIBRE d'employer toute autre technique intelligente et pertinente (momentum, confluence multi-unités, " +
     "corrélations, contexte DXY) si elle augmente la probabilité de gagner. " +
     "Le DXY est inversé pour crypto/or : DXY baissier = favorable, DXY haussier = défavorable. " +
-    "Ton objectif est d'être RENTABLE : cherche EN PRIORITÉ les meilleurs ratios risque/rendement — vise 2, 3, 4 ou plus " +
-    "quand la structure le permet (objectif au prochain pool de liquidité / extrême de range, stop serré mais logique). " +
-    "RÈGLE STRICTE : n'envoie JAMAIS un trade sous 1 RR. Si tu ne peux pas obtenir au moins 1 RR avec un stop logique, " +
-    "n'envoie tout simplement PAS ce trade (ne le mets pas dans la liste). Point d'entrée précis, stop au-delà d'un balayage/structure, objectif atteignable. " +
+    "PRIORITÉ ABSOLUE : le TAUX DE RÉUSSITE, pas le gros gain. Vise des RR MODESTES mais TRÈS FIABLES (idéalement 1,5 à 2), " +
+    "avec un objectif PROCHE et hautement atteignable (le premier pool de liquidité / la première zone logique), plutôt qu'un gros RR risqué qui échoue souvent. " +
+    "Mieux vaut gagner SOUVENT un RR raisonnable que rarement un gros RR. " +
+    "RÈGLE STRICTE : n'envoie JAMAIS un trade sous 1 RR. Point d'entrée précis, stop au-delà d'un balayage/structure, objectif proche et réaliste. " +
     "Sois HONNÊTE : si aucun setup n'est net, renvoie une liste vide plutôt que de forcer un trade. " +
     "En PLUS de tes idées de trade, tu fais DEUX choses : " +
     "(1) AMD — pour chaque actif pertinent, identifie sa phase du Power of 3 : Accumulation (range), " +
@@ -2866,8 +2866,8 @@
       '"amd":[{"paire":"BTC/USD","phase":"Accumulation|Manipulation|Distribution|Expansion","note":"courte explication"}],' +
       '"preshot":[{"paire":"ETH/USD","sens":"LONG|SHORT","tf":"H1|H4|D1","setup":"nom du setup (ex. Sweep+MSS, STRIKE, Unicorn…)",' +
       '"zone":"zone/niveau à surveiller","manque":"ce qui manque pour valider","declencheur":"le signal précis qui validera l\'entrée","confiance":0}],' +
-      '"idees":[{"paire":"BTC/USD","sens":"LONG|SHORT","tf":"H1|H4|D1",' +
-      '"entree":00,"stop":00,"objectif":00,"rr":0.0,"confiance":0,"pourquoi":"explication ICT/SMC courte en français"}]}\n' +
+      '"idees":[{"paire":"BTC/USD","sens":"LONG|SHORT","tf":"H1|H4|D1","strategie":"nom de la stratégie enregistrée utilisée, ou \'ICT/SMC + indicateurs\'",' +
+      '"entree":00,"stop":00,"objectif":00,"rr":0.0,"confiance":0,"pourquoi":"déclencheur + confirmations + confluence indicateurs, en français"}]}\n' +
       "Si rien n'atteint au moins 1 RR, renvoie \"idees\": []. Renvoie \"amd\": [] et \"preshot\": [] si tu n'as rien à signaler.";
     if (mtf && mtf.length) {
       txt += "\n\nDONNÉES MULTI-UNITÉS (D1 → H4 → H1) pour l'alignement top-down :\n" + JSON.stringify(mtf, null, 2);
@@ -2883,6 +2883,24 @@
         "en cas de désaccord entre moteurs, tranche avec la méthode ICT/SMC (structure, liquidité, biais HTF) et baisse la confiance, ou n'envoie rien. " +
         "Dans le champ \"pourquoi\", cite quels moteurs sont alignés (ex. « 4/4 moteurs d'accord »). Ne suis jamais un seul moteur aveuglément.";
     }
+    // Méthode obligatoire : d'abord les stratégies enregistrées, puis à défaut
+    // un setup concepts ICT/SMC + confluence indicateurs.
+    txt += "\n\nMÉTHODE OBLIGATOIRE (dans cet ordre, pour CHAQUE actif) :\n" +
+      "ÉTAPE 1 — STRATÉGIES ENREGISTRÉES : passe en revue TOUTES les stratégies/setups de la base " +
+      "(en priorité les setups perso : STRIKE, Asia Sweep M5, MEEK 7EVEN, FOUNDATION, SHIELD ; puis les setups A/A+ : " +
+      "Sweep+MSS/modèle 2022, Unicorn, Turtle Soup/SFP, OTE, CHoCH+POI, Silver Bullet, Venom, MMXM, etc.). " +
+      "Pour chaque actif, sur les unités du style demandé, vérifie si les CONDITIONS d'une stratégie sont réunies. " +
+      "Vérifie-les TOUTES, ne t'arrête pas à la première : un actif validant plusieurs stratégies = signal renforcé. " +
+      "Si une stratégie est compatible : indique LAQUELLE (champ 'strategie'), OÙ précisément elle se déclenche " +
+      "(niveau/zone/bougie) et cherche des CONFIRMATIONS (clôture de bougie, displacement, sweep, FVG, alignement des unités). " +
+      "Un setup encore non déclenché va dans 'preshot' ; un setup validé + confirmé va dans 'idees'.\n" +
+      "ÉTAPE 2 — SI AUCUNE stratégie enregistrée n'est réunie sur un actif : construis un setup à partir des autres concepts " +
+      "ICT/SMC (order block, FVG, liquidité, premium/discount, structure BOS/CHoCH…). Ces concepts DOIVENT être appuyés par " +
+      "une CONFLUENCE avec les INDICATEURS (RSI, MACD, moyennes mobiles, VWAP, Bollinger, ADX, stochastique). " +
+      "Sans confluence indicateur claire, n'envoie PAS ce trade. Sur ces setups (étape 2), vise un RR encore plus prudent (~1,5) et fiable, " +
+      "et mets 'strategie':'ICT/SMC + indicateurs'.\n" +
+      "Dans TOUS les cas : RR modeste mais sûr (1,5-2), objectif proche et atteignable, taux de réussite maximal. " +
+      "S'il n'y a ni stratégie réunie ni confluence concept+indicateur nette, renvoie une idée VIDE pour cet actif.\n";
     // Conscience du calendrier : date/heure du jour + annonces économiques à
     // fort impact (FOMC/CPI/NFP/OPEX), pour que l'IA évite de trader dans le chaos.
     if (root.ECON && typeof root.ECON.promptBlock === 'function') {
@@ -4598,6 +4616,7 @@ $('#ai-run').addEventListener('click', async ()=>{
       html+='<div class="ai-idea copyable '+(long?'long':'short')+'" data-copy="'+cp+'" title="Clique pour copier cette position">'+
         '<div class="ihead"><span class="isym">'+(i.paire||'—')+'</span>'+
         '<span class="ilvl">'+(long?'▲ LONG':'▼ SHORT')+(i.tf?' · '+i.tf:'')+' · '+(i.confiance!=null?i.confiance+'%':'')+'</span></div>'+
+        (i.strategie?'<div class="inums"><span>📋 Stratégie : <b>'+i.strategie+'</b></span></div>':'')+
         '<div class="inums"><span>Entrée '+fmtN(i.entree)+'</span><span class="lo">Stop '+fmtN(i.stop)+'</span>'+
         '<span class="tp">Objectif '+fmtN(i.objectif)+'</span><span>RR '+(i.rr!=null?i.rr:'—')+'</span></div>'+
         ((i.entree&&i.objectif&&i.stop)?'<div class="inums"><span class="tp">Objectif +'+(pctMove(+i.entree,+i.objectif,long)||0).toFixed(1)+'%</span><span class="lo">Risque '+(pctMove(+i.entree,+i.stop,long)||0).toFixed(1)+'% au stop</span>'+(i.tf?'<span>unité '+i.tf+'</span>':'')+'</div>':'')+
