@@ -67,8 +67,9 @@
     var txt = "STYLE DEMANDÉ : " + st.nom.toUpperCase() + " — travaille sur les unités " + st.tfs +
       " (biais sur " + st.htf + ", entrée sur " + st.ltf + "), horizon ~" + st.horizon + ". " +
       "Adapte tes entrées/stops/objectifs à ce style (en scalp, stops et objectifs plus serrés).\n\n" +
-      "Tu es le Bot IA du site. Analyse le marché et envoie TES meilleures idées de trade (0 à 3), " +
-      "sur les unités du style ci-dessus, classées de la plus forte à la plus faible. " +
+      "Tu es le Bot IA du site. Sois ULTRA-SÉLECTIF : n'envoie QUE des setups A ou A+ (confiance >= 70), " +
+      "0 à 2 idées MAXIMUM, sur les unités du style ci-dessus, classées de la plus forte à la plus faible. " +
+      "Mieux vaut renvoyer une liste VIDE que des trades moyens — la sélectivité prime sur la quantité. " +
       "N'inclus QUE des trades dont le rr est >= 1 (privilégie 2, 3, 4 ou plus). Jamais de trade sous 1 RR. " +
       "Ajoute AUSSI : \"amd\" (phase Power of 3 de chaque actif pertinent) et \"preshot\" (setups en préparation, " +
       "pas encore déclenchés). " +
