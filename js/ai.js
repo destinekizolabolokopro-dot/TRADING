@@ -101,7 +101,7 @@
     txt += "\n\nMÉTHODE OBLIGATOIRE (dans cet ordre, pour CHAQUE actif) :\n" +
       "ÉTAPE 1 — STRATÉGIES ENREGISTRÉES : passe en revue TOUTES les stratégies/setups de la base " +
       "(en priorité les setups perso : STRIKE, Asia Sweep M5, MEEK 7EVEN, FOUNDATION, SHIELD ; puis les setups A/A+ : " +
-      "Sweep+MSS/modèle 2022, Unicorn, Turtle Soup/SFP, OTE, CHoCH+POI, Silver Bullet, Venom, MMXM, etc.). " +
+      "Sweep+MSS/modèle 2022, Unicorn, Turtle Soup/SFP, OTE, CHoCH+POI, Silver Bullet, Venom, MMXM, iFVG Model, etc.). " +
       "Pour chaque actif, sur les unités du style demandé, vérifie si les CONDITIONS d'une stratégie sont réunies. " +
       "Vérifie-les TOUTES, ne t'arrête pas à la première : un actif validant plusieurs stratégies = signal renforcé. " +
       "Si une stratégie est compatible : indique LAQUELLE (champ 'strategie'), OÙ précisément elle se déclenche " +

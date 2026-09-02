@@ -37,6 +37,18 @@
     background:var(--surface-3);color:var(--muted);border:1px solid var(--border);white-space:nowrap}
   .hfilter-sep{display:inline-block;width:1px;height:18px;background:var(--border-strong);margin:0 4px;vertical-align:middle}
   /* Formulaire « ajouter mon trade » */
+  /* Validation & robustesse */
+  .valid-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:4px 0 10px}
+  @media(max-width:640px){.valid-grid{grid-template-columns:repeat(2,1fr)}}
+  .valcard{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:11px 13px}
+  .valcard .vk{font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:var(--faint);margin-bottom:5px}
+  .valcard .vv{font-family:var(--display);font-weight:600;font-size:1.18rem}
+  .valcard .vv.pos{color:var(--long)} .valcard .vv.neg{color:var(--short)} .valcard .vv.wait{color:var(--wait)}
+  .valcard .vs{font-size:.74rem;color:var(--muted);margin-top:3px;line-height:1.35}
+  .valid-note{font-size:12.5px;line-height:1.5;color:var(--muted);padding:9px 12px;border:1px solid var(--border);border-radius:10px;margin:8px 0 0}
+  .valid-note.pos{border-color:rgba(55,196,107,.45);background:rgba(55,196,107,.08)}
+  .valid-note.neg{border-color:rgba(240,85,91,.45);background:rgba(240,85,91,.08)}
+  .valid-note.wait{border-color:rgba(224,166,63,.45);background:rgba(224,166,63,.08)}
   .addform{border:1px solid var(--border-strong);border-radius:14px;padding:14px;margin:0 0 16px;background:var(--surface-2)}
   .addform-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
   @media(max-width:600px){.addform-grid{grid-template-columns:repeat(2,1fr)}}
@@ -829,6 +841,7 @@
       </div>
     </div>
     <div class="bilan" id="hist-bilan"></div>
+    <div class="hist-block" id="hist-valid"></div>
     <div class="hist-block" id="hist-equity"></div>
     <div class="hist-block" id="hist-sim"></div>
     <div class="hist-block" id="hist-compare"></div>
@@ -2196,6 +2209,10 @@
     def:"CONDITIONS : un FVG est traversé et invalidé (clôture au-delà), il change alors de rôle — un FVG haussier cassé devient résistance (et inversement). Le prix revient tester cet iFVG.",
     usage:"ENTRÉE : au rejet de l'iFVG dans le nouveau sens. STOP : de l'autre côté de l'iFVG. OBJECTIF : liquidité suivante. Unité : H1. GRADE : A (confirme le changement de biais).",
     biais:'retournement — nouveau sens' });
+  add({ id:'su-ifvg-model', nom:'⭐ iFVG Model (modèle complet)', alias:['ifvg model','modèle ifvg','inversion fvg model','ict ifvg model'], cat:'setup', tags:['ict','retournement','a+','modèle','confirmation'],
+    def:"MODÈLE complet basé sur l'inversion de FVG. CONDITIONS : (1) biais HTF clair ; (2) le prix balaye une liquidité (sweep) à un extrême ; (3) un FVG contraire à la tendance existante est TRAVERSÉ et invalidé par un displacement qui CLÔTURE au-delà → ce FVG s'inverse (iFVG) et devient une zone S/R dans le nouveau sens ; (4) une cassure de structure (MSS/CHoCH) accompagne le displacement.",
+    usage:"ENTRÉE : au RETEST de l'iFVG, avec confirmation LTF (clôture de rejet / FVG de continuation dans le nouveau sens). STOP : juste au-delà de l'iFVG (ou de la mèche du sweep). OBJECTIF : le premier pool de liquidité opposé (RR modeste ~1,5-2, priorité au taux de réussite). Unités : biais D1/H4, entrée H1/M15. CONFLUENCE conseillée : SMT, killzone, discount/premium, RSI/MACD. GRADE : A+ (le displacement + inversion + MSS = triple confirmation).",
+    biais:'retournement confirmé — sens du displacement' });
   add({ id:'su-mitigation', nom:'Mitigation Block (continuation)', alias:['mitigation setup','bloc mitigation','réentrée tendance'], cat:'setup', tags:['continuation','ict','a'],
     def:"CONDITIONS : en tendance, le smart money réentre depuis un mitigation block (dernier OB avant l'impulsion) retesté pour équilibrer des positions, dans le sens du flux.",
     usage:"ENTRÉE : au retour dans le mitigation block. STOP : au-delà du bloc. OBJECTIF : nouvel extrême de tendance. Unité : H1-H4. GRADE : A.",
@@ -2889,7 +2906,7 @@
     txt += "\n\nMÉTHODE OBLIGATOIRE (dans cet ordre, pour CHAQUE actif) :\n" +
       "ÉTAPE 1 — STRATÉGIES ENREGISTRÉES : passe en revue TOUTES les stratégies/setups de la base " +
       "(en priorité les setups perso : STRIKE, Asia Sweep M5, MEEK 7EVEN, FOUNDATION, SHIELD ; puis les setups A/A+ : " +
-      "Sweep+MSS/modèle 2022, Unicorn, Turtle Soup/SFP, OTE, CHoCH+POI, Silver Bullet, Venom, MMXM, etc.). " +
+      "Sweep+MSS/modèle 2022, Unicorn, Turtle Soup/SFP, OTE, CHoCH+POI, Silver Bullet, Venom, MMXM, iFVG Model, etc.). " +
       "Pour chaque actif, sur les unités du style demandé, vérifie si les CONDITIONS d'une stratégie sont réunies. " +
       "Vérifie-les TOUTES, ne t'arrête pas à la première : un actif validant plusieurs stratégies = signal renforcé. " +
       "Si une stratégie est compatible : indique LAQUELLE (champ 'strategie'), OÙ précisément elle se déclenche " +
@@ -4727,6 +4744,43 @@ document.addEventListener('click', e=>{
   catch(_){ fallbackCopy(txt); done(); }
 });
 function fallbackCopy(txt){ try{ const ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); }catch(_){}}
+/* ---- Validation & robustesse : les principes des vrais bots pros ----
+   1) Edge réel APRÈS frais  2) Fiabilité statistique (taille d'échantillon)
+   3) Gestion du risque (exposition ouverte)  4) Garde-fou anti-overfitting  */
+function renderValidation(s, all){
+  const el=$('#hist-valid'); if(!el) return;
+  const closed = s.total||0;
+  // 1) Espérance (edge) en R par trade, et NET après frais estimés.
+  const expR = s.avgR!=null ? s.avgR : 0;                 // R moyen / trade (brut)
+  const costR = 0.06;                                     // ~frais+spread ramenés en R (estimation prudente)
+  const netExpR = +(expR - (closed?costR:0)).toFixed(2);  // edge net après frais
+  const netEur = Math.round(netExpR * userRiskAmt());
+  // 2) Fiabilité selon la taille d'échantillon.
+  let fiab, fcol, fmsg;
+  if(closed < 20){ fiab='Trop tôt'; fcol='neg'; fmsg='Moins de 20 trades clôturés — les stats ne veulent RIEN dire encore. Ne te fie pas à ce win rate. Attends 30-50+ trades.'; }
+  else if(closed < 50){ fiab='Indicatif'; fcol='wait'; fmsg='20-50 trades : tendance indicative, mais encore fragile. Continue à accumuler avant de conclure.'; }
+  else { fiab='Significatif'; fcol='pos'; fmsg='50+ trades clôturés : l’échantillon devient statistiquement exploitable. C’est ce que font les pros — juger sur beaucoup de trades, pas 3.'; }
+  // 3) Exposition ouverte (portfolio heat) = risque cumulé des positions ouvertes.
+  const openCount = s.open||0;
+  const heatPct = +(openCount * userRiskPct()).toFixed(1);
+  const heatWarn = heatPct > 6;
+  // seuil de rentabilité (win rate d'équilibre) pour le RR moyen visé
+  const rrp = s.rrPlanned || 1.5;
+  const beWin = Math.round(100/(1+rrp));
+  const verdict = (netExpR>0 && closed>=20) ? {t:'Edge POSITIF après frais ✅', c:'pos'} : (netExpR<=0 && closed>=20) ? {t:'Pas d’edge après frais ⚠️', c:'neg'} : {t:'Edge indéterminé (trop peu de trades)', c:'wait'};
+  el.innerHTML =
+    '<div class="eq-head">🔬 Validation &amp; robustesse <span class="eq-sub">les critères des vrais bots pros</span></div>'+
+    '<div class="valid-grid">'+
+      valCard('Espérance NETTE / trade', (netExpR>=0?'+':'')+netExpR+' R', verdict.c, (netEur>=0?'+':'')+netEur+' € · après frais estimés') +
+      valCard('Fiabilité stats', fiab, fcol, closed+' trades clôturés') +
+      valCard('Seuil de rentabilité', beWin+'% de réussite', '', 'à RR '+rrp+' visé — au-dessus = rentable') +
+      valCard('Exposition ouverte', heatPct+' %', heatWarn?'neg':'', openCount+' position(s) · risque cumulé') +
+    '</div>'+
+    '<div class="valid-note '+verdict.c+'"><b>'+verdict.t+'</b> — '+fmsg+'</div>'+
+    (heatWarn?'<div class="valid-note neg">⚠️ Exposition élevée ('+heatPct+' %) : beaucoup de positions ouvertes en même temps. Les pros plafonnent le risque total (souvent ≤ 6 %).</div>':'')+
+    '<div class="valid-note"><b>🧠 Garde-fou anti-overfitting :</b> ne bidouille pas les réglages jusqu’à ce que le passé soit « parfait » — c’est le piège n°1 des bots perdants. Juge en <b>paper-trading sur beaucoup de trades</b>, pas sur quelques-uns. Un edge réel survit aux frais ; sinon il n’existe pas.</div>';
+}
+function valCard(k,v,cls,sub){ return '<div class="valcard"><div class="vk">'+k+'</div><div class="vv '+(cls||'')+'">'+v+'</div><div class="vs">'+(sub||'')+'</div></div>'; }
 /* ---- Capital & risque de l'utilisateur (définis dans le 🧮 Calculateur, utilisés PARTOUT) ---- */
 function userCapital(){ try{ const c=parseFloat(calcGet().cap); return (c&&c>0)?c:10000; }catch(e){ return 10000; } }
 function userRiskPct(){ try{ const r=parseFloat(calcGet().risk); return (r&&r>0)?r:1; }catch(e){ return 1; } }
@@ -4804,6 +4858,8 @@ function renderHist(){
     kpi('Durée moyenne', (s.avgDurMs!=null?fmtDur(s.avgDurMs):'—'), '', 'ouvert → clôturé')+
     kpi('Série', streakTxt, (s.streakType==='win'?'pos':(s.streakType==='loss'?'neg':'')), '');
 
+  // Validation & robustesse (les principes des vrais bots pros)
+  renderValidation(s, all);
   // Courbe d'équité
   const eqWrap=$('#hist-equity');
   if(eqWrap){ eqWrap.innerHTML = '<div class="eq-head">Courbe d’équité <span class="eq-sub">'+(histSource||'tous les bots')+' · R cumulés</span></div>'+equitySVG(s.equity); }

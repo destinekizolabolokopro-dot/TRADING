@@ -1220,6 +1220,10 @@
     def:"CONDITIONS : un FVG est traversé et invalidé (clôture au-delà), il change alors de rôle — un FVG haussier cassé devient résistance (et inversement). Le prix revient tester cet iFVG.",
     usage:"ENTRÉE : au rejet de l'iFVG dans le nouveau sens. STOP : de l'autre côté de l'iFVG. OBJECTIF : liquidité suivante. Unité : H1. GRADE : A (confirme le changement de biais).",
     biais:'retournement — nouveau sens' });
+  add({ id:'su-ifvg-model', nom:'⭐ iFVG Model (modèle complet)', alias:['ifvg model','modèle ifvg','inversion fvg model','ict ifvg model'], cat:'setup', tags:['ict','retournement','a+','modèle','confirmation'],
+    def:"MODÈLE complet basé sur l'inversion de FVG. CONDITIONS : (1) biais HTF clair ; (2) le prix balaye une liquidité (sweep) à un extrême ; (3) un FVG contraire à la tendance existante est TRAVERSÉ et invalidé par un displacement qui CLÔTURE au-delà → ce FVG s'inverse (iFVG) et devient une zone S/R dans le nouveau sens ; (4) une cassure de structure (MSS/CHoCH) accompagne le displacement.",
+    usage:"ENTRÉE : au RETEST de l'iFVG, avec confirmation LTF (clôture de rejet / FVG de continuation dans le nouveau sens). STOP : juste au-delà de l'iFVG (ou de la mèche du sweep). OBJECTIF : le premier pool de liquidité opposé (RR modeste ~1,5-2, priorité au taux de réussite). Unités : biais D1/H4, entrée H1/M15. CONFLUENCE conseillée : SMT, killzone, discount/premium, RSI/MACD. GRADE : A+ (le displacement + inversion + MSS = triple confirmation).",
+    biais:'retournement confirmé — sens du displacement' });
   add({ id:'su-mitigation', nom:'Mitigation Block (continuation)', alias:['mitigation setup','bloc mitigation','réentrée tendance'], cat:'setup', tags:['continuation','ict','a'],
     def:"CONDITIONS : en tendance, le smart money réentre depuis un mitigation block (dernier OB avant l'impulsion) retesté pour équilibrer des positions, dans le sens du flux.",
     usage:"ENTRÉE : au retour dans le mitigation block. STOP : au-delà du bloc. OBJECTIF : nouvel extrême de tendance. Unité : H1-H4. GRADE : A.",
