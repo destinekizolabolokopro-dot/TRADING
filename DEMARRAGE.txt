@@ -1,0 +1,31 @@
+TRADEassist — DÉMARRAGE RAPIDE
+==============================
+
+1) OUVRIR LE SITE
+   - Télécharge le fichier "TRADEassist.html".
+   - Double-clique dessus : il s'ouvre dans ton navigateur (Chrome, Edge, Firefox...).
+   - En haut à droite, l'indicateur doit passer à "Données en direct".
+     Si c'est écrit "Mode démo", c'est que tu le regardes dans un aperçu en ligne :
+     télécharge-le et ouvre-le depuis ton ordinateur.
+
+2) CE QUI TRADE POUR DE VRAI (sans aucune clé)
+   - Crypto : BTC, ETH, SOL, XRP, BNB  (données Binance)
+   - Forex  : EUR/USD                  (Binance EUR/USDT)
+   - Or     : XAU/USD                  (Binance PAXG/USDT)
+   - DXY (dollar) = boussole : il oriente le biais, il ne se trade pas.
+   Le bot est SÉLECTIF : beaucoup de paires restent "en attente" tant que la
+   confluence ICT/SMC n'est pas nette. C'est normal et voulu.
+
+3) ACTIVER LE BOT IA (facultatif, payant à l'usage)
+   - Il faut une clé API Anthropic : https://console.anthropic.com (créer un compte,
+     ajouter un petit crédit, générer une clé "sk-ant-...").
+   - Sur le site : bouton "Bot IA" -> colle la clé -> "Enregistrer la clé".
+   - La clé reste EN LOCAL dans ton navigateur, elle ne part nulle part.
+   - L'abonnement Claude Pro ne donne PAS accès à l'API (c'est séparé).
+
+4) HISTORIQUE
+   - Bouton "Historique" : tous les trades proposés, avec le bot d'origine et le motif,
+     séparés en "en cours" et "clôturés", avec le bilan réel.
+
+RAPPEL : outil pédagogique, pas un conseil financier. Les bots donnent des signaux,
+ils n'exécutent pas d'ordre chez un courtier. Risque conseillé : 1 % du compte / trade.
