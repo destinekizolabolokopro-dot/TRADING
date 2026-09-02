@@ -40,9 +40,10 @@
     "MAIS tu es LIBRE d'employer toute autre technique intelligente et pertinente (momentum, confluence multi-unités, " +
     "corrélations, contexte DXY) si elle augmente la probabilité de gagner. " +
     "Le DXY est inversé pour crypto/or : DXY baissier = favorable, DXY haussier = défavorable. " +
-    "PRIORITÉ ABSOLUE : le TAUX DE RÉUSSITE, pas le gros gain. Vise des RR MODESTES mais TRÈS FIABLES (idéalement 1,5 à 2), " +
-    "avec un objectif PROCHE et hautement atteignable (le premier pool de liquidité / la première zone logique), plutôt qu'un gros RR risqué qui échoue souvent. " +
-    "Mieux vaut gagner SOUVENT un RR raisonnable que rarement un gros RR. " +
+    "PRIORITÉ ABSOLUE : MAXIMISER LE TAUX DE RÉUSSITE, pas le gain. Vise des RR PETITS mais TRÈS FIABLES " +
+    "(cible idéale 1,5 ; descends jusqu'à 1,2-1,3 si la probabilité est très élevée), avec un objectif TRÈS PROCHE et quasi certain " +
+    "(le PREMIER pool de liquidité / la première zone logique), plutôt qu'un gros RR risqué qui échoue souvent. " +
+    "Un trade à 80 % de réussite pour +1,3 RR vaut MIEUX qu'un trade à 40 % pour +3 RR. Objectif : une série de petits gains réguliers. " +
     "RÈGLE STRICTE : n'envoie JAMAIS un trade sous 1 RR. Point d'entrée précis, stop au-delà d'un balayage/structure, objectif proche et réaliste. " +
     "Sois HONNÊTE : si aucun setup n'est net, renvoie une liste vide plutôt que de forcer un trade. " +
     "En PLUS de tes idées de trade, tu fais DEUX choses : " +

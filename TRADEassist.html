@@ -2828,9 +2828,10 @@
     "MAIS tu es LIBRE d'employer toute autre technique intelligente et pertinente (momentum, confluence multi-unités, " +
     "corrélations, contexte DXY) si elle augmente la probabilité de gagner. " +
     "Le DXY est inversé pour crypto/or : DXY baissier = favorable, DXY haussier = défavorable. " +
-    "PRIORITÉ ABSOLUE : le TAUX DE RÉUSSITE, pas le gros gain. Vise des RR MODESTES mais TRÈS FIABLES (idéalement 1,5 à 2), " +
-    "avec un objectif PROCHE et hautement atteignable (le premier pool de liquidité / la première zone logique), plutôt qu'un gros RR risqué qui échoue souvent. " +
-    "Mieux vaut gagner SOUVENT un RR raisonnable que rarement un gros RR. " +
+    "PRIORITÉ ABSOLUE : MAXIMISER LE TAUX DE RÉUSSITE, pas le gain. Vise des RR PETITS mais TRÈS FIABLES " +
+    "(cible idéale 1,5 ; descends jusqu'à 1,2-1,3 si la probabilité est très élevée), avec un objectif TRÈS PROCHE et quasi certain " +
+    "(le PREMIER pool de liquidité / la première zone logique), plutôt qu'un gros RR risqué qui échoue souvent. " +
+    "Un trade à 80 % de réussite pour +1,3 RR vaut MIEUX qu'un trade à 40 % pour +3 RR. Objectif : une série de petits gains réguliers. " +
     "RÈGLE STRICTE : n'envoie JAMAIS un trade sous 1 RR. Point d'entrée précis, stop au-delà d'un balayage/structure, objectif proche et réaliste. " +
     "Sois HONNÊTE : si aucun setup n'est net, renvoie une liste vide plutôt que de forcer un trade. " +
     "En PLUS de tes idées de trade, tu fais DEUX choses : " +
@@ -4469,8 +4470,9 @@ function setSource(live){
 function priceMap(){ const m={}; PAIRS.forEach(p=>{ if(p.price!=null) m[p.sym]=p.price; }); return m; }
 function journal(source){ if(!window.History) return;
   if(source){
-    // SÉLECTIF : on n'enregistre que les signaux FORTS (confluence >= 70 % et RR >= 2).
-    const strong = PAIRS.filter(p=>p && p.dir && p.dir!=='WAIT' && (p.conf||0)>=70 && (p.rr||0)>=2);
+    // SÉLECTIF + orienté RÉUSSITE : forte confluence (>= 70 %) suffit ; on ne
+    // force plus un gros RR (qui baisse le taux de réussite). RR >= 1 seulement.
+    const strong = PAIRS.filter(p=>p && p.dir && p.dir!=='WAIT' && (p.conf||0)>=70 && (p.rr||0)>=1);
     History.record(strong, source);
   }
   History.evaluate(priceMap());
@@ -5315,11 +5317,11 @@ function renderQuant(d){
     <div class="q-basket">${d.shorts.map(g=>qCard(g,'short')).join('')}</div></div>`;
   // Positions concrètes du panier : jambe longue => LONG, jambe courte => SHORT.
   const qTrades = quantBuildTrades(d.longs, d.shorts);
-  html += `<div class="ia-h" style="margin-top:22px">🎯 Positions <span class="stag" style="font-weight:400">SÉLECTIF · convictions fortes (|score| ≥ 1) · 2 max/côté · RR 2</span></div>`;
+  html += `<div class="ia-h" style="margin-top:22px">🎯 Positions <span class="stag" style="font-weight:400">SÉLECTIF · convictions fortes (|score| ≥ 1) · 2 max/côté · RR 1,5 (plus de réussite)</span></div>`;
   html += qTrades.length
     ? `<div class="ai-out show" style="margin-top:4px">${qTrades.map(quantTradeCard).join('')}</div>${corrWarnHTML(qTrades)}`
     : `<div class="hist-empty">Aucune conviction assez forte en ce moment — le Quant préfère ne rien prendre. C'est normal et sain (moins de trades = moins de pertes).</div>`;
-  html += `<p class="bt-caveat" style="margin-top:14px">🔎 Chaque barre montre la force du facteur (z-score vs le panier). Les <b>positions</b> ci-dessus traduisent le panier en trades (long les plus forts, short les plus faibles, stop sur la volatilité, RR 2). Elles s'ajoutent à ton <b>historique</b> (bot « Quant »). <b>Market-neutral ≠ sans risque — pédagogique, pas un conseil financier.</b></p>`;
+  html += `<p class="bt-caveat" style="margin-top:14px">🔎 Chaque barre montre la force du facteur (z-score vs le panier). Les <b>positions</b> ci-dessus traduisent le panier en trades (long les plus forts, short les plus faibles, stop sur la volatilité, RR 1,5). Elles s'ajoutent à ton <b>historique</b> (bot « Quant »). <b>Market-neutral ≠ sans risque — pédagogique, pas un conseil financier.</b></p>`;
   if(window.History && qTrades.length){
     History.record(qTrades.map(t=>({sym:t.sym,dir:t.dir,entry:t.entry,sl:t.sl,tp:t.tp,rr:t.rr,note:t.note,tf:'D1',style:'swing',price:t.entry})),'Quant');
     const pm=priceMap(); if(Object.keys(pm).length) History.evaluate(pm);
@@ -5331,8 +5333,8 @@ function quantBuildTrades(longs, shorts){
   function mk(g, long){
     if(g.price==null) return null;
     const vol=Math.max(0.005, g.vol||0.02), k=Math.min(0.15, Math.max(0.03, vol*2.5));
-    const entry=g.price, sl=long?entry*(1-k):entry*(1+k), tp=long?entry*(1+2*k):entry*(1-2*k);
-    return { sym:g.sym, dir:long?'LONG':'SHORT', entry, sl, tp, rr:2, score:g.score,
+    const entry=g.price, sl=long?entry*(1-k):entry*(1+k), tp=long?entry*(1+1.5*k):entry*(1-1.5*k);
+    return { sym:g.sym, dir:long?'LONG':'SHORT', entry, sl, tp, rr:1.5, score:g.score,
       note:`Quant — panier factoriel (score ${g.score>=0?'+':''}${g.score})` };
   }
   // SÉLECTIF : uniquement les convictions FORTES (|score| >= 1), 2 max par côté.
@@ -5489,7 +5491,7 @@ function iaSigCard(s){
 let IA_HORIZON=4;
 // Transforme les prédictions de force relative en VRAIES positions :
 // les plus forts (▲) => LONG, les plus faibles (▼) => SHORT. Le stop est
-// calibré sur la volatilité (ATR) de l'actif, l'objectif à RR 2.
+// calibré sur la volatilité (ATR) de l'actif, l'objectif à RR 1,5 (cible proche = plus de réussite).
 function iaBuildTrades(sigs){
   // SÉLECTIF : seulement les convictions FORTES (>= 60 % pour un long, <= 40 %
   // pour un short), 2 max par côté. Mieux vaut peu de trades solides.
@@ -5501,8 +5503,8 @@ function iaBuildTrades(sigs){
     const k = Math.min(0.15, Math.max(0.03, vol*2.5)); // distance de stop (3 %..15 %)
     const entry = s.price;
     const sl = long ? entry*(1-k) : entry*(1+k);
-    const tp = long ? entry*(1+2*k) : entry*(1-2*k);   // RR 2
-    return { sym:s.sym, dir: long?'LONG':'SHORT', entry, sl, tp, rr:2,
+    const tp = long ? entry*(1+1.5*k) : entry*(1-1.5*k); // RR 1,5 : cible plus proche = plus de réussite
+    return { sym:s.sym, dir: long?'LONG':'SHORT', entry, sl, tp, rr:1.5,
       conf:s.conf, prob:Math.round(s.prob*100),
       note:`IA maison — momentum relatif (${Math.round(s.prob*100)}% de surperformance à ~${IA_HORIZON} j)` };
   }
@@ -5584,11 +5586,11 @@ function renderIA(d){
   if(mid.length) html += `<details style="margin-top:14px"><summary style="cursor:pointer;color:var(--muted);font-size:.86rem">Voir le milieu du classement (${mid.length} actifs, signal indécis)</summary><div class="ia-sigs" style="margin-top:12px">${mid.map(iaSigCard).join('')}</div></details>`;
   // Positions concrètes déduites du classement (forts => LONG, faibles => SHORT)
   const iaTrades = iaBuildTrades(d.signals);
-  html += `<div class="ia-h" style="margin-top:22px">🎯 Positions proposées par l'IA maison <span class="stag" style="font-weight:400">SÉLECTIF · convictions fortes (≥ 60 % / ≤ 40 %) · 2 max/côté · RR 2</span></div>`;
+  html += `<div class="ia-h" style="margin-top:22px">🎯 Positions proposées par l'IA maison <span class="stag" style="font-weight:400">SÉLECTIF · convictions fortes (≥ 60 % / ≤ 40 %) · 2 max/côté · RR 1,5 (plus de réussite)</span></div>`;
   html += iaTrades.length
     ? `<div class="ai-out show" style="margin-top:4px">${iaTrades.map(iaTradeCard).join('')}</div>${corrWarnHTML(iaTrades)}`
     : `<div class="hist-empty">Aucune conviction assez forte pour proposer une position — l'IA maison préfère attendre (moins de trades = moins de pertes).</div>`;
-  html += `<p class="bt-caveat" style="margin-top:14px">🔎 Ces positions traduisent le classement de force relative en trades : les plus forts en <b>LONG</b>, les plus faibles en <b>SHORT</b>, entrée au prix actuel, stop calé sur la volatilité (ATR) et objectif à RR 2 sur ~${IA_HORIZON} j. Elles s'ajoutent à ton <b>historique</b> (bot « IA maison ») et sont notées au TP/SL. <b>Avantage statistique modeste — pédagogique, pas un conseil financier.</b></p>`;
+  html += `<p class="bt-caveat" style="margin-top:14px">🔎 Ces positions traduisent le classement de force relative en trades : les plus forts en <b>LONG</b>, les plus faibles en <b>SHORT</b>, entrée au prix actuel, stop calé sur la volatilité (ATR) et objectif à RR 1,5 sur ~${IA_HORIZON} j. Elles s'ajoutent à ton <b>historique</b> (bot « IA maison ») et sont notées au TP/SL. <b>Avantage statistique modeste — pédagogique, pas un conseil financier.</b></p>`;
   // Enregistre les positions dans l'historique (source « IA maison »)
   if(window.History && iaTrades.length){
     History.record(iaTrades.map(t=>({sym:t.sym,dir:t.dir,entry:t.entry,sl:t.sl,tp:t.tp,rr:t.rr,note:t.note,tf:'D1',style:'swing',price:t.entry})),'IA maison');
