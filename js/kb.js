@@ -96,18 +96,10 @@
     def:"Balayage d'un pool de liquidité : le prix perce brièvement un plus-haut/plus-bas pour déclencher les stops, puis repart en sens inverse. Faux mouvement typique du smart money.",
     usage:"Setup de retournement clé : on attend le balayage d'un extrême + un MSS/CHoCH pour entrer dans le sens du rejet (Turtle Soup).",
     biais:'retournement — après le balayage, on trade le rejet' });
-  add({ id:'turtle-soup', nom:'Turtle Soup', alias:['turtle soup','faux breakout','stop run'], cat:'ict', tags:['retournement','faux breakout','liquidité'],
-    def:"Setup contre-tendance : faux dépassement d'un plus-haut/plus-bas (balayage de liquidité) suivi d'un retour rapide dans le range. On fade le faux breakout.",
-    usage:"Entrée après le retour à l'intérieur du range + confirmation (MSS). Stop au-delà de l'extrême balayé.",
-    biais:'retournement' });
   add({ id:'judas', nom:'Judas Swing', alias:['judas','faux mouvement d’ouverture'], cat:'ict', tags:['manipulation','ouverture','session'],
     def:"Faux mouvement initial en début de session (souvent Londres/New York) qui piège les traders, avant le vrai mouvement en sens inverse.",
     usage:"On se méfie du premier mouvement d'une session ; on attend le balayage + le retournement pour se positionner dans le vrai sens.",
     biais:'manipulation — le 1ᵉʳ mouvement est souvent un piège' });
-  add({ id:'silver-bullet', nom:'Silver Bullet', alias:['silver bullet','fenêtre 10-11'], cat:'ict', tags:['horaire','fvg','setup'],
-    def:"Setup ICT sur une fenêtre horaire précise (ex. 10h-11h heure de New York) : on cherche un FVG formé dans cette fenêtre pour une entrée rapide vers la liquidité proche.",
-    usage:"Dans la fenêtre, repérer l'impulsion, tracer le FVG, entrer sur le retour, viser le pool de liquidité le plus proche.",
-    biais:'contexte — dépend du biais du jour' });
   add({ id:'power-of-3', nom:'Power of Three (AMD)', alias:['po3','power of three','AMD','accumulation manipulation distribution'], cat:'ict', tags:['cycle','journée','institutionnel'],
     def:"Modèle en 3 phases d'une bougie/journée institutionnelle : Accumulation (range), Manipulation (faux mouvement / balayage), Distribution (vrai mouvement dirigé).",
     usage:"Cadre pour lire une journée : on attend la manipulation (piège) puis on suit la distribution. Aide à ne pas entrer pendant l'accumulation.",
@@ -564,10 +556,6 @@
     def:"Théorie ICT où chaque grande bougie contient un cycle complet : un range se forme, un balayage d'un côté (manipulation), puis expansion vers l'autre extrême. Fractale du Power of Three.",
     usage:"On repère le range de la bougie mère, on attend le balayage d'un côté puis on trade l'expansion vers l'extrême opposé.",
     biais:'cadre directionnel intra-bougie' });
-  add({ id:'unicorn', nom:'Modèle Unicorn (Breaker + FVG)', alias:['unicorn','breaker fvg','unicorn model'], cat:'ict', tags:['confluence','entrée','haute proba'],
-    def:"Setup à haute probabilité où un breaker block et un FVG se chevauchent exactement sur la même zone, après un balayage de liquidité + MSS.",
-    usage:"Entrée dans la zone de recouvrement breaker+FVG ; double confluence = signal plus fiable.",
-    biais:'contexte — entrée haute proba' });
   add({ id:'bpr', nom:'Balanced Price Range (BPR)', alias:['bpr','balanced price range','fvg opposés'], cat:'ict', tags:['fvg','zone','réaction'],
     def:"Zone où deux FVG opposés (un haussier et un baissier) se superposent : le prix y a été « équilibré » dans les deux sens, créant une zone de réaction sensible.",
     usage:"Zone d'entrée/rejet : le prix réagit souvent nettement en revenant sur un BPR.",
@@ -609,14 +597,6 @@
     def:"La cible vers laquelle le prix est « aspiré » : le pool de liquidité le plus probable que le marché cherche à atteindre (un plus-haut/bas évident, des equal highs/lows, un FVG à combler).",
     usage:"On définit le DOL AVANT d'entrer : c'est l'objectif logique du trade. Tout setup doit pointer vers un DOL clair, sinon on s'abstient.",
     biais:'directionnel — indique la cible' });
-  add({ id:'model-2022', nom:'Modèle ICT 2022', alias:['2022 model','modèle 2022','mentorship 2022','ict 2022'], cat:'ict', tags:['modèle','setup complet','journalier'],
-    def:"Modèle phare d'ICT : biais journalier HTF → balayage de liquidité dans une killzone (Londres ou New York) → displacement qui laisse un FVG → entrée sur le retour au FVG → objectif au pool de liquidité opposé.",
-    usage:"Cadre d'exécution clé en main : biais, timing (killzone), déclencheur (sweep + FVG), entrée, cible. Le squelette de la plupart des trades ICT modernes.",
-    biais:'modèle — setup directionnel complet' });
-  add({ id:'mmxm', nom:'Market Maker Model (achat/vente)', alias:['mmxm','mmbm','mmsm','market maker buy model','market maker sell model','modèle teneur de marché'], cat:'ict', tags:['cycle','institutionnel','profil'],
-    def:"Profil complet d'un cycle de teneur de marché : consolidation, phase de contrat (accumulation d'un côté), retournement (smart money reversal), puis phase d'expansion (redistribution) vers la liquidité opposée. MMBM = version haussière, MMSM = baissière.",
-    usage:"Grille de lecture d'un swing entier : repérer où l'on est dans le cycle du teneur de marché pour anticiper le retournement et la cible.",
-    biais:'cadre — cycle directionnel complet' });
   add({ id:'smr', nom:'Smart Money Reversal (SMR)', alias:['smr','smart money reversal','retournement smart money'], cat:'ict', tags:['retournement','sweep','mss'],
     def:"Point de bascule du market maker model : un balayage de liquidité à un extrême suivi d'un displacement qui casse la structure (MSS) — le moment précis où le smart money inverse le marché.",
     usage:"Signal de retournement majeur : on entre après le sweep + MSS, en visant le DOL opposé.",
@@ -1107,14 +1087,6 @@
     biais:'sélection — ne garder que le haut du panier' });
 
   /* ===================== ICT — modèles & culture des forums/communautés ===================== */
-  add({ id:'venom-model', nom:'Modèle Venom (ICT 2025)', alias:['venom model','venom box','modèle venom','ict venom','venom 2025'], cat:'ict', tags:['modèle','new york','opening range','récent'],
-    def:"Modèle ICT récent très discuté en communauté : une « Venom Box » se forme entre 08h00 et 09h30 NY (range pré-ouverture serré, un piège à retail). À l'open de 09h30, le prix balaye le haut OU le bas de cette box pour prendre la liquidité, puis se retourne. Déclencheur : retest d'un Balanced Price Range (BPR) ou bougie « Venom Breakout » englobante.",
-    usage:"On marque le haut/bas de la box 08h-09h30 NY ; après le sweep à l'open, on attend le retest du BPR / la bougie de déplacement pour entrer dans le sens du rejet, cible sur la liquidité opposée. Version plus mécanique et rapide du modèle 2022.",
-    biais:'modèle — sweep d’ouverture NY puis expansion' });
-  add({ id:'bread-butter', nom:'Setup Bread and Butter (ICT)', alias:['bread and butter','pain et beurre','bread butter setup','modèle intraday ict'], cat:'ict', tags:['modèle','intraday','daily bias','sessions'],
-    def:"Modèle intraday « quotidien » d'ICT calé sur les sessions : quand le biais journalier HTF est haussier, on cherche des achats de court terme alignés (et l'inverse en biais baissier), en s'appuyant sur la liquidité et les FVG de chaque session (Asie → Londres → NY).",
-    usage:"Setup « de tous les jours » : on suit le biais du jour et on entre sur les pullbacks de session vers un POI, sans chercher le coup exotique. Discipline et répétition plutôt que perfection.",
-    biais:'modèle — continuation du biais du jour' });
   add({ id:'vacuum-block', nom:'Vacuum Block (gaps d’ouverture)', alias:['vacuum block','bloc de vide','opening gap void','gap de session'], cat:'ict', tags:['gap','vide','rééquilibrage','ouverture'],
     def:"Vide de prix créé par un gap d'ouverture (week-end, ouverture 18h EST, spike de news FOMC/NFP) : une plage où le « fair value » n'a pas été offert aux deux camps. Différent du FVG classique (qui naît d'un déplacement intra-séance) — ici c'est une discontinuité d'ouverture.",
     usage:"Le prix retrace souvent vers le vacuum block pour le rééquilibrer : on l'utilise comme cible de comblement et comme zone de rejet/entrée quand le prix y revient.",
@@ -1128,228 +1100,43 @@
     usage:"Antidotes : n'utiliser que quelques concepts robustes en confluence, décider AVANT le mouvement (pas après), journaliser, et exiger sweep + displacement + DOL objectifs plutôt qu'une belle histoire. La discipline prime sur l'élégance de l'analyse.",
     biais:'garde-fou — rester objectif' });
 
-  /* ===================== SETUPS PRÊTS À L'EMPLOI (plans de trade A/A+) =====================
-     Chaque setup = un plan complet : CONDITIONS (déclencheur) → ENTRÉE → STOP → OBJECTIF,
-     avec l'unité de temps conseillée et un GRADE de qualité. « minimum A » = on ne prend
-     que les setups riches en confluence. Pédagogique — pas un conseil financier. */
+  /* ===================== LA SEULE STRATÉGIE DU SITE : MECH MODEL (PB Blake) =====================
+     Tous les autres setups ont été retirés volontairement. Le bot ne trade QUE ce modèle.
+     Modèle MÉCANIQUE (règles fixes, zéro interprétation) : viser les GAPS NON COMBLÉS,
+     entrée sur inversion, RR faible (1:1 à 1:1,5) mais TAUX DE RÉUSSITE élevé (~70-80 %).
+     Conçu à l'origine pour le Nasdaq (NQ/MNQ) en day trading. Pédagogique — pas un conseil financier. */
 
-  // — MES SETUPS PERSO (fournis par l'utilisateur — Stratton Trader) —
-  add({ id:'su-strike', nom:'STRIKE Setup (perso)', alias:['strike setup','mon setup strike','stratton strike'], cat:'setup', tags:['perso','stratton','fvg d1','breaker','a'],
-    def:"MON setup (Stratton Trader) — exploite la touche d'un FVG D1 sur un mouvement COURT et IMPULSIF. Conditions : (1) tendance D1 CLAIRE (haussière/baissière) — si la tendance n'est pas claire, PAS DE TRADE ; vérifier qu'aucune résistance/support majeur ne bloque le setup ; (2) un Fair Value Gap D1 DANS LE SENS de la tendance (BISI = opportunité d'achat, SIBI = opportunité de vente) — pas de FVG = PAS DE TRADE.",
-    usage:"Exécution en M15 sur un BREAKER BLOCK. ENTRÉE : sur le RETEST du breaker (idéalement en zone discount). STOP : sous/au-dessus du swing du breaker. OBJECTIF : RR 2 (mouvement court mais efficace). Unités : biais D1 → exécution M15.",
-    biais:'directionnel — sens de la tendance D1' });
-  add({ id:'su-asia-sweep', nom:'Asia Sweep Setup M5 (perso)', alias:['asia sweep','asia high low setup','prise liquidité asie','stratton asia'], cat:'setup', tags:['perso','stratton','session asie','breaker m5','a'],
-    def:"MON setup (Stratton Trader) — basé sur la liquidité asiatique. Conditions : (1) marquer l'ASIA HIGH / ASIA LOW (session ~2h-6h) ; (2) attendre une PRISE DE LIQUIDITÉ claire du haut ou du bas, qui doit aller DANS LE SENS du biais H4/H1 — biais haussier → prise de l'Asia LOW ; biais baissier → prise de l'Asia HIGH ; (3) un Fair Value Gap HTF (BISI = achat, SIBI = vente) — pas de FVG = PAS DE TRADE.",
-    usage:"Exécution en M5 sur un BREAKER BLOCK. ENTRÉE : sur le breaker block M5, après la prise de liquidité asiatique dans le sens du biais. STOP : sous/au-dessus du swing du breaker. OBJECTIF : liquidité opposée / RR 2. Unités : biais H4/H1 → exécution M5.",
-    biais:'directionnel — sens du biais H4/H1' });
-  add({ id:'su-meek7even', nom:'MEEK 7EVEN Setup (perso)', alias:['meek 7even','meek seven','stratton meek'], cat:'setup', tags:['perso','stratton','discount premium','breaker m15','a'],
-    def:"MON setup (Stratton Trader). Étape 1 — lire la tendance : le DAILY donne la tendance long terme ; H4 et H1 doivent être ALIGNÉS pour la confirmer — en cas de désalignement, PAS DE TRADE. Zone d'intervention premium/discount sur H4 ou H1 (déterminée par Fibonacci : discount <50% = ACHAT, premium >50% = VENTE). Fair Value Gap H4/H1 requis (BISI = achat, SIBI = vente) — pas de FVG = PAS DE TRADE.",
-    usage:"Exécution en M15 sur un BREAKER BLOCK. ENTRÉE : sur le breaker M15, en zone discount (achat) / premium (vente), avec D1+H4+H1 alignés. STOP : sous/au-dessus du swing du breaker. OBJECTIF : RR 2+. Unités : biais D1/H4/H1 → exécution M15.",
-    biais:'directionnel — tendance alignée D1/H4/H1' });
-  add({ id:'su-foundation', nom:'FOUNDATION Setup (perso, swing)', alias:['foundation setup','stratton foundation','swing setup perso'], cat:'setup', tags:['perso','stratton','swing','breaker h4','a'],
-    def:"MON setup (Stratton Trader) — SWING trading simple et sécuritaire. Confluence de tendance : D1 ET W1 alignés dans la MÊME direction, zone premium/discount Daily. Zone d'intervention sur le DAILY (Fibonacci : discount <50% = ACHAT, premium >50% = VENTE). Fair Value Gap HTF requis (BISI = achat, SIBI = vente) — pas de FVG = PAS DE TRADE.",
-    usage:"Exécution en H4 sur un BREAKER BLOCK. ENTRÉE : sur le breaker H4, en discount (achat) / premium (vente), D1+W1 alignés. STOP : sous/au-dessus du swing du breaker H4. OBJECTIF : swing (RR élevé). Exemple : Discount Daily + tendance Weekly haussière + BB H4 haussier → swing à l'achat. Unités : biais D1/W1 → exécution H4.",
-    biais:'directionnel — tendance D1/W1' });
-  add({ id:'su-shield', nom:'SHIELD Setup (perso, swing W1)', alias:['shield setup','stratton shield','fvg w1 setup'], cat:'setup', tags:['perso','stratton','swing','fvg w1','breaker h4','a'],
-    def:"MON setup (Stratton Trader) — exploite la touche d'un FVG W1 (swing). Conditions : (1) PD Arrays W1 — le FVG W1 ET le BB H4 doivent être ALIGNÉS dans la même direction que la tendance W1 ; en cas de désalignement, IGNORER ce setup ; (2) tendance W1 CLAIRE (haussière/baissière) — si pas claire, PAS DE TRADE ; (3) FVG W1 (BISI = achat, SIBI = vente) — pas de FVG = PAS DE TRADE.",
-    usage:"Exécution en H4 sur un BREAKER BLOCK. RÈGLE ABSOLUE : pas de swing setup sans BB H4 validé — soit Premium/Discount + BB H4, soit un support Weekly + BB H4 dans le sens de la tendance. ENTRÉE : sur le breaker H4. STOP : sous/au-dessus du swing du breaker. OBJECTIF : swing (RR élevé). Unités : biais W1 → exécution H4.",
-    biais:'directionnel — tendance W1' });
-  add({ id:'su-tip-session', nom:'Astuce perso : BB M5 le matin & poids des sessions', alias:['bb m5 matin','poids des sessions','londres vs new york','astuce session'], cat:'setup', tags:['perso','session','exécution','volume'],
-    def:"Note perso (DreamxNQ) sur l'exécution : le MATIN (session de Londres), utiliser un Breaker Block M5 au lieu de M15 à cause du volume plus faible. Surtout : « on ne compare pas une entrée en session de Londres qui pèse 3 € à une entrée en session de New York qui pèse 3 M » — le contexte de session change le POIDS et la fiabilité d'une entrée.",
-    usage:"Adapter l'unité d'exécution au volume : M5 pour l'entrée du matin (Londres), M15 sinon. Pondérer davantage les entrées de la session de NEW YORK (volume institutionnel) et se méfier des entrées légères du matin. Ne pas traiter toutes les entrées comme équivalentes.",
-    biais:'contexte — poids selon la session' });
+  add({ id:'mech-model', nom:'⭐ MECH MODEL (PB Blake) — le modèle', alias:['mech model','mech','blake','pb blake','modèle mécanique','mechanical model'], cat:'setup', tags:['mech','blake','mécanique','gap','a+','haute réussite'],
+    def:"LA stratégie du site. Modèle MÉCANIQUE de PB Blake : on vise les GAPS NON COMBLÉS (unfilled gaps) en M5/M15, après le rejet d'un niveau clé HTF. " +
+      "CONTEXTE à marquer avant : biais journalier, niveaux clés HTF, pools de liquidité des sessions ASIE et LONDRES, PDH/PDL (plus-haut/bas de la veille), " +
+      "les hauts/bas marquants à l'intérieur des gaps, et les FVG en H1/H4/D1. " +
+      "STRUCTURE VALIDE requise : un swing low, un swing high, un lower low, ET un BALAYAGE de liquidité (sweep). " +
+      "Performance annoncée : ~70-80 % de réussite pour un RR 1:1 à 1:1,5 (petits gains réguliers). Origine : Nasdaq futures (NQ/MNQ) en day trading.",
+    usage:"SÉQUENCE : (1) marquer la liquidité (Asie/Londres, PDH/PDL) et les GAPS non comblés ; (2) attendre le REJET d'un niveau clé HTF ; " +
+      "(3) repérer le gap visé en M5/M15 ; (4) entrer sur l'INVERSION (voir « MECH — Entrée »). " +
+      "OBJECTIF principal : l'ÉQUILIBRE (EQ) du gap non comblé ; objectif secondaire : 1:1. On peut laisser un runner vers la liquidité externe. " +
+      "Unités : lecture M5/M15, entrée M1-M5 (éviter les grandes unités sauf si expérimenté). GRADE : A+ (le modèle unique du site).",
+    biais:'directionnel — sens du rejet, vers le gap non comblé' });
 
-  // — ICT / SMC —
-  add({ id:'su-sweep-mss', nom:'Sweep + MSS (retournement, modèle 2022)', alias:['sweep mss','modèle 2022 setup','reversal sweep'], cat:'setup', tags:['retournement','ict','a+'],
-    def:"CONDITIONS : à un extrême HTF, le prix balaye un pool de liquidité (plus-haut/bas, equal highs-lows) PUIS casse la structure interne (MSS/CHoCH) par un displacement qui laisse un FVG.",
-    usage:"ENTRÉE : retour dans le FVG/OB (idéalement au CE 50 %) après le sweep. STOP : au-delà de la mèche du sweep. OBJECTIF : liquidité opposée / DOL. Unité : H4 biais, H1 entrée. GRADE : A+ (le setup roi d'ICT).",
-    biais:'retournement — sens du displacement' });
-  add({ id:'su-fvg-continuation', nom:'FVG en continuation (pullback de tendance)', alias:['fvg continuation','pullback fvg','retour fvg tendance'], cat:'setup', tags:['continuation','ict','a'],
-    def:"CONDITIONS : tendance claire (HH/HL ou LH/LL) + un BOS dans le sens de la tendance qui laisse un FVG frais derrière lui.",
-    usage:"ENTRÉE : retour du prix dans le FVG (au CE). STOP : sous le FVG / dernier HL (long). OBJECTIF : nouvel extrême / liquidité suivante. Unité : H1-H4. GRADE : A. Ne pas trader contre la tendance.",
-    biais:'continuation — sens de la tendance' });
-  add({ id:'su-ob-fvg-unicorn', nom:'Order Block + FVG superposés (Unicorn)', alias:['unicorn setup','ob fvg overlap','breaker fvg'], cat:'setup', tags:['confluence','ict','a+'],
-    def:"CONDITIONS : après un sweep + MSS, un breaker/OB et un FVG se CHEVAUCHENT exactement sur la même zone (double confluence).",
-    usage:"ENTRÉE : dans la zone de recouvrement OB+FVG. STOP : au-delà de l'OB. OBJECTIF : liquidité opposée, RR ≥ 3. Unité : H1. GRADE : A+ (double confluence = haute proba).",
-    biais:'retournement/continuation — sens de l’impulsion' });
-  add({ id:'su-turtle-soup', nom:'Turtle Soup / SFP (faux breakout)', alias:['turtle soup setup','sfp setup','swing failure'], cat:'setup', tags:['retournement','liquidité','a'],
-    def:"CONDITIONS : le prix dépasse un plus-haut/bas évident (equal highs-lows) par une MÈCHE puis CLÔTURE de nouveau à l'intérieur (échec du breakout = liquidité prise).",
-    usage:"ENTRÉE : au retour dans le range après la clôture de rejet. STOP : au-delà de la mèche du faux dépassement. OBJECTIF : côté opposé du range. Unité : H1-H4. GRADE : A. Attendre la clôture !",
-    biais:'retournement — contre le faux breakout' });
-  add({ id:'su-silver-bullet', nom:'Silver Bullet (FVG 10h-11h NY)', alias:['silver bullet setup','sb 10-11'], cat:'setup', tags:['horaire','ict','a'],
-    def:"CONDITIONS : dans la fenêtre 10h-11h (heure de New York), après un sweep de liquidité au NY open, un displacement forme un FVG.",
-    usage:"ENTRÉE : sur le retour au FVG dans la fenêtre. STOP : au-delà du swing récent. OBJECTIF : pool de liquidité le plus proche. Unité : M15-H1. GRADE : A (dépend du respect strict de l'horaire).",
-    biais:'contexte — sens du displacement' });
-  add({ id:'su-judas-london', nom:'Judas Swing (fade de l’ouverture Londres)', alias:['judas setup','london fade','asian range sweep'], cat:'setup', tags:['session','londres','a'],
-    def:"CONDITIONS : à l'ouverture de Londres, faux mouvement qui balaye le haut/bas du range asiatique (Judas), puis retournement.",
-    usage:"ENTRÉE : après le balayage + MSS, dans le sens inverse du faux mouvement. STOP : au-delà de l'extrême du range asiatique balayé. OBJECTIF : liquidité opposée. Unité : M15-H1. GRADE : A.",
-    biais:'retournement — contre le Judas' });
-  add({ id:'su-ote', nom:'OTE — pullback Fibonacci 62-79 %', alias:['ote setup','optimal trade entry','fib 705'], cat:'setup', tags:['fibonacci','ict','a'],
-    def:"CONDITIONS : impulsion + MSS dans le sens voulu ; on trace le Fib de l'impulsion ; le prix retrace dans la zone 62-79 % (idéal 70,5 %), en confluence avec un OB/FVG.",
-    usage:"ENTRÉE : dans la bande 62-79 %. STOP : juste au-delà du 79-100 %. OBJECTIF : extension (-0,5/-1) ou liquidité, RR ≥ 2. Unité : H1-H4. GRADE : A.",
-    biais:'contexte — sens de l’impulsion' });
-  add({ id:'su-choch-poi', nom:'CHoCH + retour au POI (entrée SMC)', alias:['choch poi','smc reversal setup'], cat:'setup', tags:['retournement','smc','a'],
-    def:"CONDITIONS : sweep de liquidité → CHoCH (cassure de la structure interne) → un POI (OB/FVG) laissé derrière, situé en discount (long) ou premium (short).",
-    usage:"ENTRÉE : retour dans le POI + confirmation LTF. STOP : au-delà du POI/sweep. OBJECTIF : liquidité opposée. Unité : H4 biais, M15-H1 entrée. GRADE : A.",
-    biais:'retournement — nouveau sens' });
-  add({ id:'su-pdh-pdl', nom:'Raid du PDH/PDL puis retournement', alias:['pdh pdl sweep','previous day high low setup'], cat:'setup', tags:['liquidité','niveau','a'],
-    def:"CONDITIONS : le prix va chercher le plus-haut (PDH) ou plus-bas (PDL) de la veille (liquidité évidente), l'accroche par une mèche, puis rejette.",
-    usage:"ENTRÉE : au rejet du PDH/PDL + MSS. STOP : au-delà du PDH/PDL. OBJECTIF : niveau intérieur / liquidité opposée. Unité : H1. GRADE : A.",
-    biais:'retournement — depuis le niveau de référence' });
-  add({ id:'su-po3', nom:'Power of 3 journalier (AMD)', alias:['po3 setup','amd daily','accumulation manipulation distribution'], cat:'setup', tags:['journée','ict','a'],
-    def:"CONDITIONS : lecture de la journée en 3 temps — Accumulation (range asiatique), Manipulation (faux mouvement/sweep à l'open), Distribution (vrai mouvement dirigé).",
-    usage:"ENTRÉE : après la phase de manipulation, dans le sens de la distribution attendue (aligné au biais D1). STOP : au-delà de l'extrême de manipulation. OBJECTIF : liquidité HTF. Unité : H1 sur base D1. GRADE : A.",
-    biais:'directionnel — sens du biais du jour' });
-  add({ id:'su-smt', nom:'Divergence SMT au balayage', alias:['smt setup','divergence corrélée setup'], cat:'setup', tags:['divergence','confirmation','a+'],
-    def:"CONDITIONS : au moment d'un sweep, deux actifs corrélés divergent (l'un fait un nouvel extrême, l'autre non — ex. BTC vs ETH, ES vs NQ).",
-    usage:"ENTRÉE : après le sweep + MSS, dans le sens du rejet, la SMT servant de confirmation. STOP : au-delà de l'extrême. OBJECTIF : liquidité opposée. Unité : H1-H4. GRADE : A+ (confluence forte).",
-    biais:'retournement — confirmé par la divergence' });
-  add({ id:'su-bpr', nom:'Réaction sur Balanced Price Range (BPR)', alias:['bpr setup','fvg opposés'], cat:'setup', tags:['zone','ict','a'],
-    def:"CONDITIONS : deux FVG opposés se superposent (zone équilibrée sensible) sur le chemin d'un DOL.",
-    usage:"ENTRÉE : au retour du prix sur le BPR, dans le sens du biais. STOP : au-delà du BPR. OBJECTIF : DOL. Unité : H1. GRADE : A.",
-    biais:'contexte — sens du biais HTF' });
-  add({ id:'su-breaker-retest', nom:'Retest de Breaker (continuation post-cassure)', alias:['breaker retest setup','flip retest'], cat:'setup', tags:['continuation','ict','a'],
-    def:"CONDITIONS : après une cassure de structure, un ancien OB devient breaker ; le prix revient le tester par le côté opposé.",
-    usage:"ENTRÉE : au rejet du breaker. STOP : de l'autre côté du breaker. OBJECTIF : liquidité dans le nouveau sens. Unité : H1-H4. GRADE : A.",
-    biais:'continuation — nouveau sens confirmé' });
-  add({ id:'su-mmxm', nom:'Market Maker Model (MMBM/MMSM)', alias:['market maker model setup','mmbm','mmsm','mmxm setup'], cat:'setup', tags:['cycle','ict','a'],
-    def:"CONDITIONS : lire le cycle complet du teneur de marché — consolidation, accumulation d'un côté, Smart Money Reversal (sweep + MSS), puis expansion vers la liquidité opposée. MMBM = version haussière, MMSM = baissière.",
-    usage:"ENTRÉE : après le SMR (sweep + MSS) sur le retour au premier FVG/OB de la phase d'expansion. STOP : au-delà de l'extrême de manipulation. OBJECTIF : liquidité opposée (fin du cycle). Unité : H4 lecture, H1 entrée. GRADE : A.",
-    biais:'retournement puis continuation — sens de l’expansion' });
-  add({ id:'su-ifvg', nom:'Inversion FVG (iFVG) — reclaim', alias:['ifvg setup','inversion fvg','fvg inversé setup'], cat:'setup', tags:['fvg','retournement','ict','a'],
-    def:"CONDITIONS : un FVG est traversé et invalidé (clôture au-delà), il change alors de rôle — un FVG haussier cassé devient résistance (et inversement). Le prix revient tester cet iFVG.",
-    usage:"ENTRÉE : au rejet de l'iFVG dans le nouveau sens. STOP : de l'autre côté de l'iFVG. OBJECTIF : liquidité suivante. Unité : H1. GRADE : A (confirme le changement de biais).",
-    biais:'retournement — nouveau sens' });
-  add({ id:'su-ifvg-model', nom:'⭐ iFVG Model (modèle complet)', alias:['ifvg model','modèle ifvg','inversion fvg model','ict ifvg model'], cat:'setup', tags:['ict','retournement','a+','modèle','confirmation'],
-    def:"MODÈLE complet basé sur l'inversion de FVG. CONDITIONS : (1) biais HTF clair ; (2) le prix balaye une liquidité (sweep) à un extrême ; (3) un FVG contraire à la tendance existante est TRAVERSÉ et invalidé par un displacement qui CLÔTURE au-delà → ce FVG s'inverse (iFVG) et devient une zone S/R dans le nouveau sens ; (4) une cassure de structure (MSS/CHoCH) accompagne le displacement.",
-    usage:"ENTRÉE : au RETEST de l'iFVG, avec confirmation LTF (clôture de rejet / FVG de continuation dans le nouveau sens). STOP : juste au-delà de l'iFVG (ou de la mèche du sweep). OBJECTIF : le premier pool de liquidité opposé (RR modeste ~1,5-2, priorité au taux de réussite). Unités : biais D1/H4, entrée H1/M15. CONFLUENCE conseillée : SMT, killzone, discount/premium, RSI/MACD. GRADE : A+ (le displacement + inversion + MSS = triple confirmation).",
-    biais:'retournement confirmé — sens du displacement' });
-  add({ id:'su-mitigation', nom:'Mitigation Block (continuation)', alias:['mitigation setup','bloc mitigation','réentrée tendance'], cat:'setup', tags:['continuation','ict','a'],
-    def:"CONDITIONS : en tendance, le smart money réentre depuis un mitigation block (dernier OB avant l'impulsion) retesté pour équilibrer des positions, dans le sens du flux.",
-    usage:"ENTRÉE : au retour dans le mitigation block. STOP : au-delà du bloc. OBJECTIF : nouvel extrême de tendance. Unité : H1-H4. GRADE : A.",
-    biais:'continuation — sens de la tendance' });
-  add({ id:'su-smc-sweep-ob', nom:'Sweep + OB/FVG en discount/premium (SMC mécanique)', alias:['sweep ob discount','smc mechanical setup','liquidity sweep order block'], cat:'setup', tags:['smc','confluence','a+'],
-    def:"CONDITIONS : biais HTF (H4/D1) défini ; le prix BALAYE une liquidité claire PUIS entre dans un order block ou FVG situé du bon côté de l'équilibre (discount pour un long, premium pour un short). Le trio sweep + OB/FVG + discount/premium = plus haute proba SMC.",
-    usage:"ENTRÉE : dans l'OB/FVG après le sweep, confirmation LTF (M5-M15). STOP : au-delà du sweep. OBJECTIF : liquidité opposée, RR ≥ 3. Unité : H4 biais, M15 entrée. GRADE : A+.",
-    biais:'contexte — sens du biais HTF' });
-  add({ id:'su-cisd', nom:'CISD — Change in State of Delivery', alias:['cisd setup','change in state of delivery','clôture des open'], cat:'setup', tags:['confirmation','ict','a'],
-    def:"CONDITIONS : le prix clôture au-delà de l'ouverture de la série de bougies qui a produit le dernier mouvement (les « open » des bougies baissières/haussières précédentes), signalant un changement d'état de livraison — micro-confirmation de retournement.",
-    usage:"ENTRÉE : après le CISD, sur le retour au FVG créé par le déplacement. STOP : au-delà de l'extrême récent. OBJECTIF : liquidité opposée. Unité : M5-H1. GRADE : A (confirmation d'entrée fine).",
-    biais:'retournement — changement de livraison' });
-  add({ id:'su-rejection', nom:'Rejection Block (amas de mèches)', alias:['rejection block setup','bloc de rejet'], cat:'setup', tags:['mèches','rejet','ict','a'],
-    def:"CONDITIONS : zone marquée par un amas de longues mèches (rejets répétés) à un niveau clé, plutôt que par des corps — refus de prix marqué, souvent après un sweep.",
-    usage:"ENTRÉE : au retour du prix sur la zone de rejet, dans le sens du biais. STOP : au-delà des mèches. OBJECTIF : liquidité opposée. Unité : H1-H4. GRADE : A.",
-    biais:'retournement — sens du rejet' });
-  add({ id:'su-spring', nom:'Wyckoff Spring (accumulation)', alias:['spring setup','wyckoff spring','ressort'], cat:'setup', tags:['wyckoff','retournement','a'],
-    def:"CONDITIONS : en fin d'accumulation (range), le prix casse brièvement SOUS le support pour piéger les vendeurs (spring/balayage) puis remonte vivement au-dessus — signe de force (SOS).",
-    usage:"ENTRÉE : au retour au-dessus du support après le spring (ou sur le test du spring). STOP : sous le plus-bas du spring. OBJECTIF : haut du range / expansion. Unité : H4-D1. GRADE : A (équivalent Wyckoff du sweep haussier).",
-    biais:'retournement haussier' });
-  add({ id:'su-upthrust', nom:'Wyckoff Upthrust / UTAD (distribution)', alias:['upthrust setup','utad','faux plus-haut wyckoff'], cat:'setup', tags:['wyckoff','retournement','a'],
-    def:"CONDITIONS : en fin de distribution, le prix casse brièvement AU-DESSUS de la résistance pour piéger les acheteurs (upthrust) puis rechute sous la résistance — signe de faiblesse (SOW).",
-    usage:"ENTRÉE : au retour sous la résistance après l'upthrust. STOP : au-dessus du plus-haut de l'upthrust. OBJECTIF : bas du range / cassure. Unité : H4-D1. GRADE : A (miroir baissier du spring).",
-    biais:'retournement baissier' });
-  add({ id:'su-vpvr', nom:'Volume Profile — POC / Value Area', alias:['volume profile setup','poc setup','value area edge'], cat:'setup', tags:['volume','niveau','a'],
-    def:"CONDITIONS : le POC (niveau le plus échangé) et les bords de la value area (VAH/VAL) agissent comme aimants/rejets ; on trade soit le retour à la value (équilibre), soit la cassure hors value (déséquilibre) sur volume.",
-    usage:"ENTRÉE : au rejet d'un bord de value area (fade) ou à la cassure confirmée (breakout). STOP : de l'autre côté du niveau/value. OBJECTIF : POC ou bord opposé. Unité : H1-H4. GRADE : A.",
-    biais:'contexte — équilibre/déséquilibre' });
-  add({ id:'su-supply-demand', nom:'Zone offre/demande fraîche', alias:['supply demand setup','zone fraîche','demande fraîche'], cat:'setup', tags:['zone','institutionnel','a'],
-    def:"CONDITIONS : zone d'où part une forte impulsion (base avant le départ) encore FRAÎCHE (non retestée) : demande sous le prix (achat), offre au-dessus (vente), alignée au biais HTF.",
-    usage:"ENTRÉE : au premier retour du prix dans la zone fraîche + bougie de réaction. STOP : au-delà de la zone. OBJECTIF : zone opposée / liquidité. Unité : H1-H4. GRADE : A (une zone déjà testée perd de sa force).",
-    biais:'contexte — demande = long, offre = short' });
-  add({ id:'su-qm', nom:'Quasimodo (QM) — retournement', alias:['quasimodo setup','qm setup','over and under'], cat:'setup', tags:['retournement','smc','a'],
-    def:"CONDITIONS : un plus-haut est dépassé (prise de liquidité) puis la structure casse dans l'autre sens (tête-épaules asymétrique) ; on repère la « QM line » (niveau de l'épaule gauche).",
-    usage:"ENTRÉE : au retour du prix sur la QM line après la cassure. STOP : au-delà de la tête. OBJECTIF : liquidité opposée. Unité : H1-H4. GRADE : A.",
-    biais:'retournement' });
-  add({ id:'su-bos-retest', nom:'BOS + retest (continuation structurelle)', alias:['bos retest setup','break of structure retest'], cat:'setup', tags:['continuation','structure','a'],
-    def:"CONDITIONS : cassure de structure (BOS) dans le sens de la tendance via un displacement laissant un FVG/OB ; on attend le retest de ce point de cassure.",
-    usage:"ENTRÉE : au retest du niveau de BOS (FVG/OB). STOP : sous le dernier HL (long) / au-dessus du dernier LH (short). OBJECTIF : nouvel extrême / liquidité. Unité : H1-H4. GRADE : A.",
-    biais:'continuation — sens de la tendance' });
+  add({ id:'mech-entree', nom:'MECH MODEL — Entrée (inversion / OB / FVG)', alias:['mech entrée','inversion m1','mech entry','entrée mech'], cat:'setup', tags:['mech','entrée','inversion','order block','a+'],
+    def:"Le DÉCLENCHEUR d'entrée du MECH Model. L'entrée se fait sur une INVERSION, repérée dans la plus haute unité de temps de la jambe de prix en cours. " +
+      "Le « setup d'inversion M1 » suffit à obtenir un bon RR sans exiger de confirmation supplémentaire en unité supérieure. " +
+      "Entrée alternative sur ORDER BLOCK : un OB haussier = une bougie ROUGE encadrée par deux vertes (et l'inverse pour un OB baissier).",
+    usage:"ENTRÉE : sur l'inversion (M1) après le rejet du niveau clé, ou sur l'order block / le FVG. " +
+      "Tenir compte des CLÔTURES de bougie : si la bougie clôture haut, utiliser un ORDRE LIMITE plutôt que de chasser le prix. " +
+      "STOP : au swing low du gap ou de l'OB ; on peut utiliser toute la structure de la bougie de l'order block, ou le bas du FVG (selon la structure). " +
+      "Unités : entrée M1-M5 sur une lecture M5/M15.",
+    biais:'déclencheur — valide l’entrée dans le sens du rejet' });
 
-  // — ÉLITE (A+ / confluence MAXIMALE — le « max max ») —
-  add({ id:'su-elite-stack', nom:'⭐ Setup ÉLITE A+ (confluence maximale)', alias:['setup élite','a++ setup','confluence maximale','le meilleur setup','max max'], cat:'setup', tags:['élite','a+','confluence maximale','ict','smc'],
-    def:"LE setup idéal : on n'entre QUE si TOUTES ces confluences s'alignent — (1) biais D1 clair + on est en discount (long) / premium (short) du dealing range ; (2) DOL évident (liquidité cible) ; (3) balayage de liquidité (sweep) réalisé ; (4) displacement qui casse la structure (MSS/CHoCH) + FVG ; (5) POI = Unicorn (OB + FVG superposés) ou OB valide ; (6) divergence SMT sur l'actif corrélé ; (7) dans une killzone (Londres/NY). Il manque un élément → ce n'est PAS un setup élite.",
-    usage:"ENTRÉE : dans le POI/Unicorn (CE du FVG) après le sweep. STOP : au-delà de la mèche du sweep (serré). OBJECTIF : DOL / liquidité opposée, RR ≥ 4. Unité : D1 biais, H1/M15 entrée. GRADE : A+ MAX — rare mais le plus haut win rate. Honnête : même un A+ perd parfois, la gestion du risque reste obligatoire.",
-    biais:'directionnel — confluence totale' });
-  add({ id:'su-nyam-silver', nom:'⭐ New York AM — Silver Bullet + 2022 (premium)', alias:['ny am silver bullet','new york am setup','sb 2022 combo'], cat:'setup', tags:['élite','a+','session','ict'],
-    def:"CONDITIONS (haut de gamme) : à l'open de New York, sweep de la liquidité (PDH/PDL ou Londres) → MSS avec displacement → dans la fenêtre Silver Bullet (10h-11h NY) un FVG se forme, aligné au biais D1.",
-    usage:"ENTRÉE : au FVG dans la fenêtre 10h-11h NY, après le sweep+MSS. STOP : au-delà du swing. OBJECTIF : liquidité opposée, RR ≥ 3. Unité : M5-H1 sur biais D1. GRADE : A+ (timing + structure + liquidité réunis).",
-    biais:'directionnel — biais du jour, session NY' });
-  add({ id:'su-htf-poi-smt', nom:'⭐ Retournement HTF POI + SMT (élite)', alias:['htf poi smt','elite reversal','retournement élite'], cat:'setup', tags:['élite','a+','retournement','smt'],
-    def:"CONDITIONS : à un POI majeur HTF (OB/FVG D1/H4 à un extrême de dealing range), le prix balaye la liquidité externe AVEC une divergence SMT sur l'actif corrélé, puis MSS sur LTF.",
-    usage:"ENTRÉE : après le sweep + SMT + MSS, sur le retour au FVG LTF. STOP : au-delà de l'extrême HTF. OBJECTIF : liquidité opposée majeure, RR ≥ 4. Unité : D1/H4 zone, M15-H1 entrée. GRADE : A+ (retournement de swing haute proba).",
-    biais:'retournement majeur — confirmé SMT' });
-
-  // — Price action classique —
-  add({ id:'su-sr-bounce', nom:'Rebond sur support/résistance majeur', alias:['sr bounce','rebond support','rejet résistance'], cat:'setup', tags:['niveau','price action','a'],
-    def:"CONDITIONS : niveau S/R testé plusieurs fois + bougie de rejet claire (marteau/étoile/avalement) à son contact, dans le sens de la tendance HTF.",
-    usage:"ENTRÉE : à la clôture de la bougie de rejet. STOP : au-delà du niveau/mèche. OBJECTIF : niveau opposé du range / prochain S/R. Unité : H1-H4. GRADE : A.",
-    biais:'retournement local — depuis le niveau' });
-  add({ id:'su-break-retest', nom:'Cassure + retest de niveau', alias:['break and retest','cassure retest','throwback'], cat:'setup', tags:['cassure','confirmation','a'],
-    def:"CONDITIONS : cassure nette (clôture) d'un niveau/range sur volume, puis retour tester le niveau cassé (polarité : support↔résistance).",
-    usage:"ENTRÉE : au rejet du retest dans le sens de la cassure. STOP : de l'autre côté du niveau. OBJECTIF : mesuré (hauteur de la figure). Unité : H1-H4. GRADE : A (plus sûr que chasser la cassure).",
-    biais:'continuation — sens de la cassure' });
-  add({ id:'su-trendline-retest', nom:'Cassure + retest de trendline', alias:['trendline break retest','cassure oblique'], cat:'setup', tags:['trendline','continuation','a'],
-    def:"CONDITIONS : trendline valide (3+ touches) cassée en clôture, puis retour tester l'oblique devenue support/résistance.",
-    usage:"ENTRÉE : au rejet du retest. STOP : de l'autre côté de la ligne. OBJECTIF : prochain swing / mesuré. Unité : H1-H4. GRADE : A.",
-    biais:'retournement/continuation — sens de la cassure' });
-  add({ id:'su-flag', nom:'Drapeau / fanion (continuation)', alias:['flag setup','pennant','drapeau'], cat:'setup', tags:['continuation','momentum','a'],
-    def:"CONDITIONS : forte impulsion (le mât) suivie d'une petite consolidation contre-tendance (drapeau) sur volume décroissant.",
-    usage:"ENTRÉE : à la cassure du drapeau dans le sens du mât. STOP : sous le drapeau. OBJECTIF : longueur du mât projetée. Unité : H1-H4. GRADE : A.",
-    biais:'continuation — sens du mât' });
-  add({ id:'su-double-bottom', nom:'Double creux / double sommet', alias:['double bottom setup','double top','w m'], cat:'setup', tags:['retournement','figure','a'],
-    def:"CONDITIONS : deux creux (W) ou deux sommets (M) au même niveau, le second échouant à faire un nouvel extrême, souvent avec divergence RSI.",
-    usage:"ENTRÉE : à la cassure du niveau intermédiaire (neckline). STOP : au-delà du double extrême. OBJECTIF : hauteur de la figure. Unité : H4-D1. GRADE : A.",
-    biais:'retournement' });
-  add({ id:'su-hs', nom:'Tête-épaules (retournement)', alias:['head shoulders setup','ete','h&s'], cat:'setup', tags:['retournement','figure','a'],
-    def:"CONDITIONS : trois sommets (tête plus haute), ligne de cou (neckline) tracée sous les creux ; cassure de la neckline en clôture.",
-    usage:"ENTRÉE : à la cassure de la neckline (ou son retest). STOP : au-dessus de l'épaule droite. OBJECTIF : hauteur tête-cou projetée. Unité : H4-D1. GRADE : A.",
-    biais:'retournement — baissier (inversée = haussier)' });
-  add({ id:'su-pinbar', nom:'Pin bar / rejet à un niveau clé', alias:['pin bar setup','rejection candle','marteau niveau'], cat:'setup', tags:['price action','rejet','a'],
-    def:"CONDITIONS : longue mèche de rejet (pin bar) à un niveau clé (S/R, OB, VWAP, nombre rond), dans le sens du biais HTF.",
-    usage:"ENTRÉE : à la clôture de la pin bar. STOP : au-delà de la mèche. OBJECTIF : prochain niveau, RR ≥ 2. Unité : H1-H4. GRADE : A (mieux avec confluence).",
-    biais:'retournement local — sens du rejet' });
-  add({ id:'su-engulf', nom:'Avalement à un niveau', alias:['engulfing setup','avalement niveau'], cat:'setup', tags:['price action','retournement','a'],
-    def:"CONDITIONS : bougie d'avalement (englobante) opposée à un niveau clé ou après un sweep, marquant un basculement de momentum.",
-    usage:"ENTRÉE : à la clôture de l'avalement. STOP : au-delà de la bougie. OBJECTIF : niveau suivant. Unité : H1-H4. GRADE : A.",
-    biais:'retournement — sens de l’avalement' });
-
-  // — Tendance / momentum / indicateurs —
-  add({ id:'su-ma-pullback', nom:'Pullback sur moyenne mobile (tendance)', alias:['ma pullback','ema20 pullback','ema50 bounce'], cat:'setup', tags:['tendance','continuation','a'],
-    def:"CONDITIONS : tendance nette (prix au-dessus de l'EMA200), pullback jusqu'à une EMA dynamique (20 ou 50) qui tient, + bougie de reprise.",
-    usage:"ENTRÉE : au rejet de l'EMA dans le sens de la tendance. STOP : sous l'EMA / dernier creux. OBJECTIF : nouvel extrême, trailing possible. Unité : H1-H4. GRADE : A.",
-    biais:'continuation — sens de la tendance' });
-  add({ id:'su-golden-cross', nom:'Golden cross (tendance de fond)', alias:['golden cross setup','croisement 50 200'], cat:'setup', tags:['tendance','long terme','b'],
-    def:"CONDITIONS : la MA50 croise au-dessus de la MA200 (signal de fond haussier ; death cross = inverse), confirmé par la structure.",
-    usage:"ENTRÉE : sur pullback après le croisement. STOP : sous le dernier creux majeur. OBJECTIF : suivi de tendance (trailing). Unité : D1. GRADE : B (lent mais robuste).",
-    biais:'directionnel long terme' });
-  add({ id:'su-bollinger-squeeze', nom:'Bollinger squeeze (explosion de volatilité)', alias:['bollinger squeeze setup','squeeze breakout'], cat:'setup', tags:['volatilité','breakout','a'],
-    def:"CONDITIONS : bandes de Bollinger très resserrées (faible volatilité prolongée) puis expansion soudaine + cassure directionnelle.",
-    usage:"ENTRÉE : à la cassure sur expansion des bandes. STOP : de l'autre côté du range de compression. OBJECTIF : mesuré / trailing. Unité : H1-H4. GRADE : A.",
-    biais:'directionnel — sens de la sortie' });
-  add({ id:'su-rsi-divergence', nom:'Divergence RSI à un extrême', alias:['rsi divergence setup','divergence momentum'], cat:'setup', tags:['momentum','retournement','a'],
-    def:"CONDITIONS : le prix fait un nouvel extrême mais le RSI non (divergence), à un niveau HTF clé — essoufflement du mouvement.",
-    usage:"ENTRÉE : après confirmation (cassure de micro-structure) dans le sens de la divergence. STOP : au-delà de l'extrême. OBJECTIF : retour à la moyenne / niveau. Unité : H4-D1. GRADE : A (jamais seule, avec niveau).",
-    biais:'retournement — sens de la divergence' });
-  add({ id:'su-vwap-reversion', nom:'Retour au VWAP (intraday)', alias:['vwap reversion setup','vwap bounce'], cat:'setup', tags:['intraday','moyenne','b'],
-    def:"CONDITIONS : en intraday, le prix s'écarte fortement du VWAP puis montre un rejet pour y revenir (ou rebondit dessus en tendance).",
-    usage:"ENTRÉE : au rejet vers/depuis le VWAP. STOP : au-delà de l'extrême intraday. OBJECTIF : VWAP ou bande opposée. Unité : M15-H1. GRADE : B (intraday, exigeant).",
-    biais:'contexte — réversion vers la moyenne' });
-  add({ id:'su-range', nom:'Trading de range (bornes)', alias:['range setup','achat support vente résistance'], cat:'setup', tags:['range','contrarian','a'],
-    def:"CONDITIONS : range horizontal net (support + résistance clairs, ADX bas) ; on joue les rebonds sur les bornes + bougie de rejet.",
-    usage:"ENTRÉE : au rejet d'une borne. STOP : juste au-delà de la borne. OBJECTIF : borne opposée. Unité : H1-H4. GRADE : A tant que le range tient (couper si cassure).",
-    biais:'neutre — rebond sur borne' });
-  add({ id:'su-breakout-adr', nom:'Breakout de range d’ouverture (ORB)', alias:['orb setup','opening range breakout'], cat:'setup', tags:['breakout','intraday','b'],
-    def:"CONDITIONS : cassure du range des premières minutes de séance (ex. 15-30 min) dans le sens du biais du jour, sur volume.",
-    usage:"ENTRÉE : à la cassure du range d'ouverture. STOP : côté opposé du range. OBJECTIF : amplitude du range projetée / liquidité. Unité : M15-H1. GRADE : B.",
-    biais:'directionnel — biais du jour' });
-  add({ id:'su-momentum-breakout', nom:'Breakout de plus-haut (momentum)', alias:['momentum breakout','52w high','donchian breakout'], cat:'setup', tags:['momentum','tendance','a'],
-    def:"CONDITIONS : cassure d'un plus-haut significatif (ex. plus-haut 20-55 j / système Turtle) après une base, dans une tendance haussière, sur volume.",
-    usage:"ENTRÉE : à la cassure du plus-haut. STOP : sous la base / ATR. OBJECTIF : laisser courir avec trailing (stop suiveur). Unité : H4-D1. GRADE : A (peu de gagnants, gros gains).",
-    biais:'continuation — momentum haussier' });
-  add({ id:'su-meanrev-z', nom:'Retour à la moyenne (excès z-score)', alias:['mean reversion setup','z-score extreme','bollinger reversion'], cat:'setup', tags:['réversion','statistique','b'],
-    def:"CONDITIONS : sur actif en range/stationnaire, écart extrême à la moyenne (|z| > 2 / bande de Bollinger externe touchée) sans tendance forte (ADX bas).",
-    usage:"ENTRÉE : au signe de retournement vers la moyenne. STOP : au-delà de l'excès. OBJECTIF : moyenne (VWAP/MA). Unité : H1-H4. GRADE : B (dangereux en tendance forte).",
-    biais:'réversion — vers la moyenne' });
+  add({ id:'mech-filtres', nom:'MECH MODEL — Filtres, cibles & gestion', alias:['mech filtres','mech règles','smt filtre','break even mech'], cat:'setup', tags:['mech','filtre','smt','break-even','gestion'],
+    def:"Les RÈGLES qui font le taux de réussite du MECH Model. FILTRES : ne JAMAIS trader contre une divergence SMT (c'est ce qui améliore le plus le win rate) ; " +
+      "ne pas trader contre la tendance dominante ; éviter les entrées avec un déplacement au-dessus du buy-side / sell-side. " +
+      "Le rejet de liquidité renforce la probabilité sans être toujours obligatoire ; la configuration la plus forte est quand le REJET DE LIQUIDITÉ et le REJET DE PÉRIODE s'alignent. " +
+      "Le modèle fonctionne même en plus-hauts historiques, là où le biais classique est flou.",
+    usage:"CIBLES : d'abord l'EQ (équilibre) du gap non comblé, puis 1:1 ; runner possible vers la liquidité externe. " +
+      "BREAK-EVEN : remonter le stop au point d'entrée une fois le gap comblé OU le 1:1 atteint (seulement quand ces conditions sont remplies). " +
+      "RR visé : 1:1 à 1:1,5 — on privilégie la RÉGULARITÉ (70-80 % de réussite) au gros gain. Si un filtre est violé (SMT contraire, contre-tendance) : PAS DE TRADE.",
+    biais:'gestion — protège le taux de réussite' });
 
   // ---------------------------------------------------------------------------
   // MOTEUR DE RECHERCHE + API

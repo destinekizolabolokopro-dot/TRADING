@@ -40,10 +40,10 @@
     "MAIS tu es LIBRE d'employer toute autre technique intelligente et pertinente (momentum, confluence multi-unités, " +
     "corrélations, contexte DXY) si elle augmente la probabilité de gagner. " +
     "Le DXY est inversé pour crypto/or : DXY baissier = favorable, DXY haussier = défavorable. " +
-    "PRIORITÉ ABSOLUE : MAXIMISER LE TAUX DE RÉUSSITE, pas le gain. Vise des RR PETITS mais TRÈS FIABLES " +
-    "(cible idéale 1,5 ; descends jusqu'à 1,2-1,3 si la probabilité est très élevée), avec un objectif TRÈS PROCHE et quasi certain " +
-    "(le PREMIER pool de liquidité / la première zone logique), plutôt qu'un gros RR risqué qui échoue souvent. " +
-    "Un trade à 80 % de réussite pour +1,3 RR vaut MIEUX qu'un trade à 40 % pour +3 RR. Objectif : une série de petits gains réguliers. " +
+    "Tu appliques UNE SEULE stratégie : le MECH MODEL de PB Blake (modèle mécanique, règles fixes, zéro interprétation). " +
+    "PRIORITÉ ABSOLUE : MAXIMISER LE TAUX DE RÉUSSITE (~70-80 %), pas le gain. RR visé : 1:1 à 1:1,5 — petit RR, objectif TRÈS PROCHE " +
+    "(l'EQ du gap non comblé), atteint souvent. Un trade à 80 % pour +1 RR vaut MIEUX qu'un trade à 40 % pour +3 RR : " +
+    "l'objectif est une série de petits gains réguliers. " +
     "RÈGLE STRICTE : n'envoie JAMAIS un trade sous 1 RR. Point d'entrée précis, stop au-delà d'un balayage/structure, objectif proche et réaliste. " +
     "Sois HONNÊTE : si aucun setup n'est net, renvoie une liste vide plutôt que de forcer un trade. " +
     "En PLUS de tes idées de trade, tu fais DEUX choses : " +
@@ -98,22 +98,24 @@
     }
     // Méthode obligatoire : d'abord les stratégies enregistrées, puis à défaut
     // un setup concepts ICT/SMC + confluence indicateurs.
-    txt += "\n\nMÉTHODE OBLIGATOIRE (dans cet ordre, pour CHAQUE actif) :\n" +
-      "ÉTAPE 1 — STRATÉGIES ENREGISTRÉES : passe en revue TOUTES les stratégies/setups de la base " +
-      "(en priorité les setups perso : STRIKE, Asia Sweep M5, MEEK 7EVEN, FOUNDATION, SHIELD ; puis les setups A/A+ : " +
-      "Sweep+MSS/modèle 2022, Unicorn, Turtle Soup/SFP, OTE, CHoCH+POI, Silver Bullet, Venom, MMXM, iFVG Model, etc.). " +
-      "Pour chaque actif, sur les unités du style demandé, vérifie si les CONDITIONS d'une stratégie sont réunies. " +
-      "Vérifie-les TOUTES, ne t'arrête pas à la première : un actif validant plusieurs stratégies = signal renforcé. " +
-      "Si une stratégie est compatible : indique LAQUELLE (champ 'strategie'), OÙ précisément elle se déclenche " +
-      "(niveau/zone/bougie) et cherche des CONFIRMATIONS (clôture de bougie, displacement, sweep, FVG, alignement des unités). " +
-      "Un setup encore non déclenché va dans 'preshot' ; un setup validé + confirmé va dans 'idees'.\n" +
-      "ÉTAPE 2 — SI AUCUNE stratégie enregistrée n'est réunie sur un actif : construis un setup à partir des autres concepts " +
-      "ICT/SMC (order block, FVG, liquidité, premium/discount, structure BOS/CHoCH…). Ces concepts DOIVENT être appuyés par " +
-      "une CONFLUENCE avec les INDICATEURS (RSI, MACD, moyennes mobiles, VWAP, Bollinger, ADX, stochastique). " +
-      "Sans confluence indicateur claire, n'envoie PAS ce trade. Sur ces setups (étape 2), vise un RR encore plus prudent (~1,5) et fiable, " +
-      "et mets 'strategie':'ICT/SMC + indicateurs'.\n" +
-      "Dans TOUS les cas : RR modeste mais sûr (1,5-2), objectif proche et atteignable, taux de réussite maximal. " +
-      "S'il n'y a ni stratégie réunie ni confluence concept+indicateur nette, renvoie une idée VIDE pour cet actif.\n";
+    txt += "\n\n=== TU TRADES UNE SEULE STRATÉGIE : LE MECH MODEL (PB Blake) ===\n" +
+      "IGNORE toute autre stratégie. Le MECH Model est un modèle MÉCANIQUE : si les règles ne sont pas TOUTES cochées, il n'y a PAS de trade.\n" +
+      "PROCÉDURE pour CHAQUE actif :\n" +
+      "1) CONTEXTE : marque le biais du jour, les niveaux clés HTF, les pools de liquidité des sessions ASIE et LONDRES, " +
+      "le PDH/PDL (plus-haut/plus-bas de la veille), les hauts/bas marquants dans les gaps, et les FVG H1/H4/D1.\n" +
+      "2) CIBLE : identifie les GAPS NON COMBLÉS en M5/M15 — c'est l'objectif du modèle (l'EQ/équilibre du gap).\n" +
+      "3) STRUCTURE VALIDE : il faut un swing low, un swing high, un lower low ET un BALAYAGE de liquidité (sweep). Sinon : pas de trade.\n" +
+      "4) DÉCLENCHEUR : le prix REJETTE un niveau clé HTF, puis tu entres sur l'INVERSION (repérée dans la plus haute unité de la jambe ; " +
+      "le setup d'inversion M1 suffit). Entrée alternative : order block (OB haussier = bougie rouge entre deux vertes) ou FVG. " +
+      "Tiens compte des CLÔTURES : si la bougie clôture haut, privilégie un ORDRE LIMITE plutôt que de chasser.\n" +
+      "5) STOP : au swing low du gap ou de l'OB (ou toute la structure de la bougie OB, ou le bas du FVG).\n" +
+      "6) OBJECTIF : l'EQ du gap non comblé ; secondaire 1:1. RR visé 1:1 à 1:1,5 — PETIT RR, GROS TAUX DE RÉUSSITE (~70-80 %). " +
+      "Break-even : stop au point d'entrée une fois le gap comblé OU le 1:1 atteint.\n" +
+      "7) FILTRES ÉLIMINATOIRES (c'est eux qui font le win rate) : ❌ JAMAIS contre une divergence SMT ; ❌ jamais contre la tendance dominante ; " +
+      "❌ évite les entrées avec déplacement au-dessus du buy-side/sell-side. Le meilleur cas : rejet de liquidité ET rejet de période alignés.\n" +
+      "Mets toujours 'strategie':'MECH Model' (précise l'entrée : inversion M1 / order block / FVG). " +
+      "Un setup repéré mais pas encore déclenché va dans 'preshot' avec le niveau exact à surveiller. " +
+      "Si les règles du MECH ne sont pas réunies sur un actif : AUCUN trade sur cet actif (liste vide plutôt qu'un trade forcé).\n";
     // Conscience du calendrier : date/heure du jour + annonces économiques à
     // fort impact (FOMC/CPI/NFP/OPEX), pour que l'IA évite de trader dans le chaos.
     if (root.ECON && typeof root.ECON.promptBlock === 'function') {
