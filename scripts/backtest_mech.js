@@ -725,8 +725,21 @@ function journal(trades, cs, hs, nJours) {
     const p = trades.filter(t => t.sortie === 'perte' || t.sortie === 'ambigu').length;
     const b = trades.filter(t => t.sortie === 'break-even').length;
     const R = trades.reduce((s, t) => s + t.r, 0);
+    // Intervalle de confiance sur l'espérance. C'est LA question : avec si peu
+    // de trades, l'écart-type des résultats écrase la moyenne, et l'intervalle
+    // va de la ruine à la fortune. Tant qu'il contient zéro, on ne sait rien.
+    const moy = trades.length ? R / trades.length : 0;
+    const varr = trades.length > 1
+      ? trades.reduce((a, t) => a + Math.pow(t.r - moy, 2), 0) / (trades.length - 1) : 0;
+    const sd = Math.sqrt(varr);
+    const se = trades.length ? sd / Math.sqrt(trades.length) : 0;
+    const ic = [moy - 1.96 * se, moy + 1.96 * se];
+    // Combien de trades faudrait-il pour que l'intervalle exclue zéro ?
+    const requis = moy !== 0 ? Math.ceil(Math.pow(1.96 * sd / Math.abs(moy), 2)) : null;
     console.log(JSON.stringify({ tf: TF, moitie: MOITIE, sl: SLMODE, zentree: ZENTREE, disp: DISP, partiel: PART, smt: SMTMOD, n: trades.length, gains: g, pertes: p, be: b,
       wr: trades.length ? +(g / trades.length * 100).toFixed(1) : 0,
-      esperance: trades.length ? +(R / trades.length).toFixed(3) : 0, cumulR: +R.toFixed(1) }));
+      esperance: +moy.toFixed(3), ecartType: +sd.toFixed(2),
+      ic95: [+ic[0].toFixed(3), +ic[1].toFixed(3)],
+      tradesRequis: requis, cumulR: +R.toFixed(1) }));
   } else { rapport(trades, nq, TF); if (JOURS) journal(trades, nq, hs, JOURS); }
 })().catch(e => { console.error('ERREUR :', e.message); process.exit(1); });
