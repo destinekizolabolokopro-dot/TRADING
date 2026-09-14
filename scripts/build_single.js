@@ -22,3 +22,12 @@ let html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
 
 fs.writeFileSync(out, html);
 console.log('✅ Écrit :', out, '(' + Math.round(html.length / 1024) + ' Ko)');
+
+// Même fichier publié sous docs/ : c'est ce dossier que GitHub Pages sert, pour
+// pouvoir ouvrir le site depuis une simple adresse (tablette, téléphone) au lieu
+// de balader un fichier .html d'un appareil à l'autre.
+const docs = path.join(ROOT, 'docs');
+fs.mkdirSync(docs, { recursive: true });
+fs.writeFileSync(path.join(docs, 'index.html'), html);
+fs.writeFileSync(path.join(docs, '.nojekyll'), '');   // pas de traitement Jekyll
+console.log('✅ Écrit : docs/index.html (GitHub Pages)');
