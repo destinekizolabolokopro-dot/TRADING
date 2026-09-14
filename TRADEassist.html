@@ -95,6 +95,16 @@
   .live{display:inline-flex;align-items:center;gap:7px;color:var(--muted)}
   .dot{width:7px;height:7px;border-radius:50%;background:var(--faint);display:inline-block}
   .dot.on{background:var(--long)}
+.mrow{display:flex;gap:11px;align-items:flex-start;padding:11px 13px;border-radius:11px;margin-bottom:7px;
+  border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.03)}
+.mrow.ok{border-color:rgba(34,197,94,.35);background:rgba(34,197,94,.07)}
+.mrow.no{border-color:rgba(248,113,113,.35);background:rgba(248,113,113,.07)}
+.mrow.wait{opacity:.85}
+.mico{font-size:15px;line-height:1.3;flex:none}
+.mrow b{display:block;font-size:13.5px;margin-bottom:2px}
+.mrow span{font-size:12.5px;color:var(--muted);line-height:1.45}
+.mech-cta{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}
+
 .nq-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin:0 0 10px}
 .nq-cell{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:8px 10px}
 .nq-cell span{display:block;font-size:11px;color:var(--muted);margin-bottom:2px}
@@ -614,76 +624,39 @@
   <section class="hero">
     <div class="hero-grid">
       <div class="hero-left">
-        <div class="hero-eyebrow">Signaux ICT / SMC · lecture top-down</div>
-        <h1>Le marché, lu d'un coup d'œil. <em>Puis décidé.</em></h1>
-        <p class="hero-sub">La complexité — DXY, structure, zones institutionnelles — est calculée en coulisses. À l'écran, il ne reste que la décision.</p>
+        <div class="hero-eyebrow">MECH Model · Nasdaq (NQ) · SMT contre le S&amp;P 500</div>
+        <h1>Un seul modèle. <em>Appliqué à la lettre.</em></h1>
+        <p class="hero-sub">Le MECH Model de PB Blake, sur le NQ uniquement : balayage de liquidité, structure, inversion, puis un gap non comblé comme cible. Si une règle manque, il n'y a pas de trade.</p>
         <div class="cta-row">
-          <button class="btn btn-primary" id="cta-signals">Voir les signaux</button>
+          <button class="btn btn-primary" id="cta-signals">Voir les données</button>
           <button class="btn" id="cta-how">Comment ça marche</button>
         </div>
         <div class="hero-stats">
-          <div class="stat"><div class="k">Biais dominant</div><div class="v" id="s-bias">—</div></div>
-          <div class="stat"><div class="k">DXY (dollar)</div><div class="v mono" id="s-dxy">—</div></div>
-          <div class="stat"><div class="k">Paires en signal</div><div class="v mono" id="s-count">—</div></div>
+          <div class="stat"><div class="k">Fenêtre de trading</div><div class="v" id="s-win">—</div></div>
+          <div class="stat"><div class="k">NQ (Nasdaq)</div><div class="v mono" id="s-nq">—</div></div>
+          <div class="stat"><div class="k">Gaps non comblés</div><div class="v mono" id="s-gaps">—</div></div>
         </div>
       </div>
       <div class="hero-visual" aria-hidden="true">
         <span class="ring r1"></span><span class="ring r2"></span><span class="ring r3"></span>
         <div class="orb"></div>
-        <span class="chip-f c1"><span class="d" style="background:var(--long)"></span>BTC ▲ Long</span>
-        <span class="chip-f c2"><span class="d" style="background:var(--wait)"></span>MSS détecté</span>
-        <span class="chip-f c3"><span class="d" style="background:var(--short)"></span>DXY ▼ baissier</span>
-        <span class="chip-f c4"><span class="d" style="background:var(--long)"></span>FVG H4 frais</span>
+        <span class="chip-f c1"><span class="d" style="background:var(--long)"></span>Sweep de liquidité</span>
+        <span class="chip-f c2"><span class="d" style="background:var(--wait)"></span>Inversion confirmée</span>
+        <span class="chip-f c3"><span class="d" style="background:var(--short)"></span>SMT NQ vs ES</span>
+        <span class="chip-f c4"><span class="d" style="background:var(--long)"></span>Gap non comblé</span>
       </div>
     </div>
   </section>
 
   <div class="viewswitch">
-    <button class="vs on" data-v="ict">🎯 Signaux ICT / SMC</button>
-    <button class="vs" data-v="cons">🤝 Consensus</button>
-    <button class="vs" data-v="pro">♟️ Stratégies Pro</button>
-    <button class="vs" data-v="ia">🧠 IA maison <span class="vs-tag local">locale</span></button>
-    <button class="vs" data-v="quant">🏛️ Quant</button>
+    <button class="vs on" data-v="mech">🎯 MECH Model · NQ</button>
     <button class="vs" data-v="eco">📅 Économie</button>
     <button class="vs" data-v="kb">📚 Bibliothèque</button>
   </div>
 
-  <div id="view-cons" style="display:none">
-    <p class="pro-intro">Le <b>consensus des 5 bots</b> : pour chaque actif, on regarde ce que disent l'ICT, les Stratégies Pro, le Quant, l'IA maison et le Bot IA (Claude), et on compte les votes. <span class="pro-warn">Quand plusieurs bots sont d'accord (ex. « 4 sur 5 disent ACHETER »), le signal est bien plus solide qu'un seul bot isolé. Pédagogique, pas un conseil financier.</span></p>
-    <div class="modal-actions" style="margin:0 0 14px"><button class="btn" id="cons-refresh">🔄 Rafraîchir les avis</button></div>
-    <div id="cons-body"><div class="hist-empty">Ouvre une fois les onglets IA maison, Quant et Stratégies Pro pour que leurs avis se chargent, puis reviens ici (ou clique « Rafraîchir »).</div></div>
+  <div id="view-mech">
+    <div id="mech-body"><div class="hist-empty">⏳ Récupération des données NQ et ES…</div></div>
   </div>
-
-  <div id="view-ict">
-    <div class="toolbar">
-      <div class="tabs" id="tabs">
-        <button class="tab on" data-f="all">Toutes</button>
-        <button class="tab" data-f="signal">En signal</button>
-        <button class="tab" data-f="strong">Forts ≥70%</button>
-        <button class="tab" data-f="crypto">Crypto</button>
-        <button class="tab" data-f="forex">Forex / Or</button>
-      </div>
-      <div class="count"><span class="srcbadge off" id="src">● …</span> <span id="count"></span></div>
-    </div>
-    <main class="grid" id="grid"></main>
-  </div>
-
-  <div id="view-pro" style="display:none">
-    <p class="pro-intro">Les méthodes <b>systématiques</b> réellement utilisées par les fonds — calculées sur les vraies bougies journalières. Chaque bloc explique comment la stratégie marche. <span class="pro-warn">Chacune a sa propre logique : elles peuvent être en désaccord, c'est normal.</span></p>
-    <div id="pro-body"><div class="hist-empty">Chargement des stratégies…</div></div>
-  </div>
-
-  <div id="view-ia" style="display:none">
-    <div class="ident local"><span class="ident-badge">🧠 IA maison · locale &amp; gratuite</span> <span class="ident-vs">≠ le 🤖 Bot IA (Claude), qui est une intelligence externe payante</span></div>
-    <p class="pro-intro">Un <b>vrai modèle de machine learning qui tourne chez toi</b>, dans cette page — pas une IA externe. Plutôt que de deviner « ça va monter » (pile ou face), il apprend une question <b>réellement exploitable</b> : <b>quels actifs vont être plus forts que le panier</b> (momentum relatif). <span class="pro-warn">Il s'entraîne tout seul à chaque ouverture sur 14 actifs, se souvient d'une fois sur l'autre, et note ses propres prédictions passées.</span></p>
-    <div id="ia-body"><div class="hist-empty">⏳ L'IA maison récupère les vraies bougies et s'entraîne…</div></div>
-  </div>
-
-  <div id="view-quant" style="display:none">
-    <p class="pro-intro">La façon dont travaillent <b>réellement les grands fonds</b> (Renaissance, Two Sigma, Citadel…). On ne prédit pas la direction (pile ou face) : on construit un panier <b>market-neutral</b> — <b>long</b> les plus forts, <b>short</b> les plus faibles — noté sur des <b>facteurs</b> (momentum, tendance, faible volatilité). <span class="pro-warn">On gagne sur l'écart, peu importe que le marché monte ou baisse. La vraie métrique visée : le <b>Sharpe</b> (rendement ÷ risque), pas le win rate.</span></p>
-    <div id="quant-body"><div class="hist-empty">⏳ Construction du panier factoriel + backtest market-neutral…</div></div>
-  </div>
-
   <div id="view-eco" style="display:none">
     <p class="pro-intro">Le <b>calendrier économique complet de la semaine</b> — <b>toutes les annonces</b>, toutes devises (emploi, inflation, PIB, banques centrales, ventes…), avec prévision et valeur précédente. <span class="pro-warn">Les jours d'annonces à <b>fort impact</b> 🔴, le marché devient erratique : le Bot IA en tient compte et évite d'y ouvrir un trade. Données ForexFactory — pédagogique, vérifie l'officiel avant de trader.</span></p>
     <div class="eco-toolbar">
@@ -713,7 +686,7 @@
 </div>
 
 <footer class="wrap">
-  Données réelles (Binance · Frankfurter/BCE) · les bots produisent des <b>signaux/analyses</b>, ils n'exécutent aucun ordre chez un courtier · <b>pédagogique, pas un conseil financier</b> · risque max 1 % par trade.
+  Données réelles NQ / ES (Yahoo Finance) · calendrier ForexFactory · le bot produit des <b>analyses</b>, il n'exécute aucun ordre chez un courtier · <b>pédagogique, pas un conseil financier</b> · risque max 1 % par trade.
 </footer>
 
 <div class="overlay" id="ai-overlay">
@@ -750,10 +723,6 @@
         <option value="scalp">⚡ Scalp — M1 à M15 · quelques minutes</option>
       </select>
     </div>
-    <label class="ai-link" for="ai-link">
-      <input type="checkbox" id="ai-link" checked>
-      <span><b>🧠 Cerveau central : utiliser TOUTES les données du site</b> — signaux ICT/SMC + IA maison + Quant + Stratégies Pro + calendrier éco + base de 248 concepts + le MECH Model. Claude centralise tout pour décider les positions. <span style="color:var(--faint)">Fortement recommandé.</span></span>
-    </label>
     <div class="modal-actions">
       <button class="btn ai-run" id="ai-run">Analyser le marché</button>
       <button class="btn" id="ai-save">Enregistrer la clé</button>
@@ -2946,8 +2915,8 @@
 
   var SYSTEM =
     "Tu es le CERVEAU CENTRAL d'un site de trading ICT/SMC, propulsé par Claude (Anthropic). Tu écris en français. " +
-    "Tu centralises TOUTES les données du site — signaux ICT/SMC, IA maison (ML), Quant (market-neutral), Stratégies Pro, " +
-    "calendrier économique et la base de 303 concepts + setups — pour produire LES positions finales unifiées. Rien n'est éparpillé : tout converge vers ta décision. " +
+    "Tu travailles sur UN SEUL actif : le NASDAQ (NQ). Tu reçois ses données réelles (prix, PDH/PDL, gaps non comblés, " +
+    "divergence SMT contre le S&P 500), le calendrier économique et la base de concepts du site. Tout converge vers une seule décision. " +
     "Tu opères sur les unités de temps du STYLE demandé (précisé dans le message : Scalp, Intraday ou Swing). " +
     "Tu raisonnes en TOP-DOWN : le biais vient de l'unité haute du style, tu affines sur l'intermédiaire, tu synchronises l'entrée sur l'unité basse. " +
     "Tu bases tes décisions PRINCIPALEMENT sur les concepts ICT/SMC (structure & BOS/CHoCH, MSS, FVG, order blocks, " +
@@ -3012,7 +2981,9 @@
     if (mtf && mtf.length) {
       txt += "\n\nDONNÉES MULTI-UNITÉS (D1 → H4 → H1) pour l'alignement top-down :\n" + JSON.stringify(mtf, null, 2);
     }
-    txt += "\n\nRÉSUMÉ par paire (toutes paires, dont DXY/forex) :\n" + JSON.stringify(snap, null, 2);
+    if (snap.length) {
+      txt += "\n\nRÉSUMÉ par paire :\n" + JSON.stringify(snap, null, 2);
+    }
     // Liaison des IA : on donne à Claude l'avis des autres moteurs du site
     // (IA maison ML + Quant market-neutral) comme confluence supplémentaire.
     if (collab) {
@@ -3111,1315 +3082,6 @@
 
 </script>
 <script>
-/*
- * Stratégies "Trader Pro" — méthodes SYSTÉMATIQUES réellement utilisées par les fonds,
- * calculées sur les vraies bougies journalières (Binance, sans clé). Contrairement à
- * l'ICT/SMC (lecture de structure), ce sont des règles quantitatives simples et éprouvées :
- *   1. Suivi de tendance (CTA / trend following)      — EMA 50/200 + repli
- *   2. Cassure Donchian (Turtle Traders)              — plus haut/bas des 20 bougies
- *   3. Retour à la moyenne (mean reversion / RSI)     — extrême + retour vers la moyenne
- *   4. Momentum relatif (factor momentum, cross-asset)— on privilégie ce qui va le plus fort
- * Chaque signal a entrée / SL / TP / RR (RR plafonné à 6, jamais sous 1).
- */
-(function (root) {
-  'use strict';
-
-  var HOSTS = ['https://api.binance.com', 'https://data-api.binance.vision', 'https://api1.binance.com'];
-  var ASSETS = [
-    { sym: 'BTC/USD', src: 'BTCUSDT', cls: 'crypto' },
-    { sym: 'ETH/USD', src: 'ETHUSDT', cls: 'crypto' },
-    { sym: 'SOL/USD', src: 'SOLUSDT', cls: 'crypto' },
-    { sym: 'XRP/USD', src: 'XRPUSDT', cls: 'crypto' },
-    { sym: 'BNB/USD', src: 'BNBUSDT', cls: 'crypto' },
-    { sym: 'EUR/USD', src: 'EURUSDT', cls: 'forex' },
-    { sym: 'XAU/USD', src: 'PAXGUSDT', cls: 'forex' }
-  ];
-
-  // ---- Indicateurs -----------------------------------------------------------
-  function ema(v, p) { var k = 2 / (p + 1), e = v[0], out = [e]; for (var i = 1; i < v.length; i++) { e = v[i] * k + e * (1 - k); out.push(e); } return out; }
-  function sma(v, p) { var out = [], s = 0; for (var i = 0; i < v.length; i++) { s += v[i]; if (i >= p) s -= v[i - p]; out.push(i >= p - 1 ? s / p : null); } return out; }
-  function stdev(cl, p) { var n = cl.length, r = [], i; for (i = Math.max(1, n - p); i < n; i++) r.push((cl[i] - cl[i - 1]) / cl[i - 1]); if (!r.length) return 0; var m = r.reduce(function (a, b) { return a + b; }, 0) / r.length; return Math.sqrt(r.reduce(function (a, b) { return a + (b - m) * (b - m); }, 0) / r.length); }
-  function rsi(cl, p) {
-    var out = []; var i; for (i = 0; i < p; i++) out.push(null);
-    if (cl.length <= p) return out;
-    var g = 0, l = 0;
-    for (i = 1; i <= p; i++) { var d = cl[i] - cl[i - 1]; if (d >= 0) g += d; else l -= d; }
-    var ag = g / p, al = l / p;
-    out[p] = al === 0 ? 100 : 100 - 100 / (1 + ag / al);
-    for (i = p + 1; i < cl.length; i++) {
-      var dd = cl[i] - cl[i - 1], gg = dd > 0 ? dd : 0, ll = dd < 0 ? -dd : 0;
-      ag = (ag * (p - 1) + gg) / p; al = (al * (p - 1) + ll) / p;
-      out.push(al === 0 ? 100 : 100 - 100 / (1 + ag / al));
-    }
-    return out;
-  }
-  function atr(c, p) { // renvoie la dernière valeur (Wilder)
-    if (c.length <= p) return null;
-    var trs = [], i;
-    for (i = 1; i < c.length; i++) { var h = c[i].h, lo = c[i].l, pc = c[i - 1].c; trs.push(Math.max(h - lo, Math.abs(h - pc), Math.abs(lo - pc))); }
-    var a = 0; for (i = 0; i < p; i++) a += trs[i]; a /= p;
-    for (i = p; i < trs.length; i++) a = (a * (p - 1) + trs[i]) / p;
-    return a;
-  }
-  function roc(cl, p) { var n = cl.length; if (n <= p || !cl[n - 1 - p]) return 0; return (cl[n - 1] - cl[n - 1 - p]) / cl[n - 1 - p] * 100; }
-  // Efficiency Ratio (Kaufman) : proche de 1 = tendance nette, proche de 0 = marché haché (range).
-  function effRatio(cl, p) { var n = cl.length; if (n <= p) return 0; var chg = Math.abs(cl[n - 1] - cl[n - 1 - p]), vol = 0; for (var i = n - p; i < n; i++) vol += Math.abs(cl[i] - cl[i - 1]); return vol ? chg / vol : 0; }
-  // Régime de marché : tendance (et son sens) ou range. Sert à savoir quelle stratégie privilégier.
-  function regime(c) {
-    var cl = c.map(function (x) { return x.c; }), n = cl.length, er = effRatio(cl, 20);
-    var e50 = ema(cl, 50), e200 = ema(cl, 200), up = (e50[n - 1] || 0) > (e200[n - 1] || 0);
-    if (er >= 0.35) return { type: up ? 'Tendance haussière' : 'Tendance baissière', trend: true, dir: up ? 'haussier' : 'baissier', er: +er.toFixed(2) };
-    return { type: 'Range (sans tendance)', trend: false, dir: null, er: +er.toFixed(2) };
-  }
-  function donchian(c, p) { var s = c.slice(c.length - 1 - p, c.length - 1); var hi = -Infinity, lo = Infinity; s.forEach(function (x) { if (x.h > hi) hi = x.h; if (x.l < lo) lo = x.l; }); return { hi: hi, lo: lo }; }
-
-  // Construit un signal cohérent (RR ≥ 1, plafonné à 6) ou null.
-  function mk(dir, entry, sl, tp) {
-    var risk = Math.abs(entry - sl), rew = Math.abs(tp - entry);
-    if (risk <= 0) return null;
-    var ok = dir === 'LONG' ? (sl < entry && tp > entry) : (sl > entry && tp < entry);
-    if (!ok) return null;
-    var rr = rew / risk;
-    if (rr < 1) return null;
-    if (rr > 6) { rew = risk * 6; tp = dir === 'LONG' ? entry + rew : entry - rew; rr = 6; }
-    return { dir: dir, entry: +entry, sl: +sl, tp: +tp, rr: +rr.toFixed(1) };
-  }
-
-  // ---- Stratégies (sur bougies D1) ------------------------------------------
-  // 1. Suivi de tendance : EMA50 vs EMA200 = sens ; on entre sur un repli vers l'EMA50.
-  function trendFollow(c) {
-    var cl = c.map(function (x) { return x.c; }), n = cl.length;
-    if (n < 210) return { dir: 'WAIT', note: 'Pas assez d\'historique.' };
-    var e50 = ema(cl, 50), e200 = ema(cl, 200), a = atr(c, 14), price = cl[n - 1];
-    var up = e50[n - 1] > e200[n - 1], dir = up ? 'LONG' : 'SHORT';
-    if (Math.abs(price - e50[n - 1]) > 1.6 * a)
-      return { dir: 'WAIT', note: 'Tendance ' + (up ? 'haussière' : 'baissière') + ' (EMA50 ' + (up ? '>' : '<') + ' EMA200), mais pas de repli — on attend un retour vers l\'EMA50.' };
-    var s = mk(dir, price, up ? price - 1.5 * a : price + 1.5 * a, up ? price + 3 * a : price - 3 * a);
-    if (!s) return { dir: 'WAIT', note: 'Géométrie invalide.' };
-    s.note = 'Tendance ' + (up ? 'haussière' : 'baissière') + ' confirmée (EMA50/EMA200) + repli sur l\'EMA50 → on suit la tendance.';
-    return s;
-  }
-  // 2. Cassure Donchian (Turtle Traders) : cassure du plus haut/bas des 20 bougies.
-  function breakout(c) {
-    var n = c.length; if (n < 25) return { dir: 'WAIT', note: 'Pas assez d\'historique.' };
-    var d = donchian(c, 20), a = atr(c, 14), price = c[n - 1].c;
-    if (price >= d.hi) { var L = mk('LONG', price, price - 2 * a, price + 4 * a); if (L) { L.note = 'Cassure du plus haut des 20 bougies → percée haussière (méthode des Tortues).'; return L; } }
-    if (price <= d.lo) { var S = mk('SHORT', price, price + 2 * a, price - 4 * a); if (S) { S.note = 'Cassure du plus bas des 20 bougies → percée baissière (méthode des Tortues).'; return S; } }
-    return { dir: 'WAIT', note: 'Prix dans le canal des 20 bougies — pas de cassure.' };
-  }
-  // 3. Retour à la moyenne : RSI extrême + prix éloigné de sa moyenne (EMA20) → retour visé.
-  function meanRevert(c) {
-    var cl = c.map(function (x) { return x.c; }), n = cl.length;
-    if (n < 30) return { dir: 'WAIT', note: 'Pas assez d\'historique.' };
-    var r = rsi(cl, 14), e20 = ema(cl, 20), a = atr(c, 14), price = cl[n - 1], rv = r[n - 1], mean = e20[n - 1];
-    if (rv == null) return { dir: 'WAIT', note: 'RSI indisponible.' };
-    if (rv < 30 && price < mean) { var L = mk('LONG', price, price - 1.5 * a, mean); if (L) { L.note = 'Survendu (RSI ' + Math.round(rv) + ') et sous la moyenne → pari sur le retour vers la moyenne.'; return L; } }
-    if (rv > 70 && price > mean) { var S = mk('SHORT', price, price + 1.5 * a, mean); if (S) { S.note = 'Suracheté (RSI ' + Math.round(rv) + ') et au-dessus de la moyenne → pari sur le retour vers la moyenne.'; return S; } }
-    return { dir: 'WAIT', note: 'RSI ' + Math.round(rv) + ' — pas d\'excès (ni survendu < 30, ni suracheté > 70).' };
-  }
-
-  // 4. Règle des 200 jours de Paul Tudor Jones : jamais acheteur sous la MA200, ni vendeur au-dessus. Vise ~5:1.
-  function ptj(c) {
-    var cl = c.map(function (x) { return x.c; }), n = cl.length;
-    if (n < 210) return { dir: 'WAIT', note: 'Historique insuffisant (< 200 jours).' };
-    var ma = sma(cl, 200), a = atr(c, 14), price = cl[n - 1], m = ma[n - 1], above = price > m, risk = 1.2 * a;
-    var s = mk(above ? 'LONG' : 'SHORT', price, above ? price - risk : price + risk, above ? price + 5 * risk : price - 5 * risk);
-    if (!s) return { dir: 'WAIT', note: 'Géométrie invalide.' };
-    s.note = 'Prix ' + (above ? 'au-dessus' : 'en-dessous') + ' de la moyenne 200 jours → biais ' + (above ? 'acheteur' : 'vendeur') + ' (règle PTJ), objectif ambitieux ~5:1.';
-    return s;
-  }
-  // Allocation "risk parity" (Ray Dalio) : plus de poids aux actifs les MOINS volatils (risque équilibré).
-  function riskParity(rows) {
-    var vols = rows.map(function (r) { return { sym: r.a.sym, vol: stdev(r.c.map(function (x) { return x.c; }), 30) || 1e-6 }; });
-    var inv = vols.map(function (v) { return 1 / v.vol; }), tot = inv.reduce(function (a, b) { return a + b; }, 0) || 1;
-    return vols.map(function (v, i) { return { sym: v.sym, w: +(inv[i] / tot * 100).toFixed(1) }; }).sort(function (a, b) { return b.w - a.w; });
-  }
-
-  // ---- Backtest : mesure la VRAIE performance passée d'une stratégie ---------
-  // Rejoue la stratégie bougie par bougie sur l'historique, simule TP/SL, et calcule les stats.
-  function btOne(c, fn) {
-    var open = null, R = [], i, n = c.length;
-    for (i = 205; i < n; i++) {
-      if (open) {
-        var bar = c[i], hitSL, hitTP;
-        if (open.dir === 'LONG') { hitSL = bar.l <= open.sl; hitTP = bar.h >= open.tp; }
-        else { hitSL = bar.h >= open.sl; hitTP = bar.l <= open.tp; }
-        if (hitSL) { R.push(-1); open = null; }           // SL prioritaire si les deux touchés (prudence)
-        else if (hitTP) { R.push(open.rr); open = null; }
-        continue;                                         // un seul trade à la fois
-      }
-      var s = fn(c.slice(0, i + 1));
-      if (s && s.dir && s.dir !== 'WAIT' && s.rr) open = { dir: s.dir, sl: s.sl, tp: s.tp, rr: s.rr };
-    }
-    return R;
-  }
-  function btStats(R) {
-    var n = R.length; if (!n) return { trades: 0 };
-    var wins = R.filter(function (r) { return r > 0; }).length;
-    var rSum = R.reduce(function (a, b) { return a + b; }, 0);
-    var gross = R.filter(function (r) { return r > 0; }).reduce(function (a, b) { return a + b; }, 0);
-    var lossSum = -R.filter(function (r) { return r < 0; }).reduce(function (a, b) { return a + b; }, 0);
-    var eq = 0, peak = 0, dd = 0;
-    R.forEach(function (r) { eq += r; if (eq > peak) peak = eq; if (peak - eq > dd) dd = peak - eq; });
-    return { trades: n, winRate: Math.round(wins / n * 100), expectancy: +(rSum / n).toFixed(2),
-      pf: lossSum ? +(gross / lossSum).toFixed(2) : (gross > 0 ? 99 : 0), rSum: +rSum.toFixed(1), maxDD: +dd.toFixed(1) };
-  }
-  function backtest(rows, fn) { var R = []; rows.forEach(function (r) { R = R.concat(btOne(r.c, fn)); }); return btStats(R); }
-
-  // ---- Chargement + assemblage ----------------------------------------------
-  function fetchKlines(src) {
-    var path = '/api/v3/klines?symbol=' + src + '&interval=1d&limit=300';
-    function tryHost(i) {
-      if (i >= HOSTS.length) return Promise.reject(new Error('Binance injoignable'));
-      return fetch(HOSTS[i] + path).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-        .then(function (d) { return d.map(function (k) { return { t: k[0], o: +k[1], h: +k[2], l: +k[3], c: +k[4] }; }).slice(0, -1); })
-        .catch(function () { return tryHost(i + 1); });
-    }
-    return tryHost(0);
-  }
-  var fresh = function (c) { return c && c.length && (Date.now() - c[c.length - 1].t) < 3 * 864e5; };
-
-  function load() {
-    return Promise.all(ASSETS.map(function (a) {
-      return fetchKlines(a.src).then(function (c) { return { a: a, c: c }; }, function () { return { a: a, c: null }; });
-    })).then(function (rows) {
-      rows = rows.filter(function (r) { return fresh(r.c); });
-      if (!rows.length) return null;
-
-      // Régime par actif (calculé une fois) : sert au filtre "adapté / hors régime" et à la conviction.
-      var regBySym = {}; rows.forEach(function (r) { regBySym[r.a.sym] = regime(r.c); });
-
-      // Momentum relatif (cross-asset) : classement par performance sur 30 jours.
-      var mom = rows.map(function (r) { return { sym: r.a.sym, cls: r.a.cls, roc: +roc(r.c.map(function (x) { return x.c; }), 30).toFixed(1) }; })
-        .sort(function (x, y) { return y.roc - x.roc; });
-
-      // kind : 'trend' (stratégie de tendance) ou 'range' (retour à la moyenne) -> détermine si le régime est adapté.
-      function pack(fn, kind) {
-        return rows.map(function (r) {
-          var s = fn(r.c) || { dir: 'WAIT', note: '—' };
-          s.sym = r.a.sym; s.cls = r.a.cls; s.price = r.c[r.c.length - 1].c;
-          var rg = regBySym[r.a.sym];
-          if (s.dir && s.dir !== 'WAIT' && kind) { s.fit = kind === 'trend' ? rg.trend : !rg.trend; s.regType = rg.type; }
-          return s;
-        }).sort(function (x, y) {
-          var a = x.dir !== 'WAIT' ? 1 : 0, b = y.dir !== 'WAIT' ? 1 : 0;
-          if (a !== b) return b - a;
-          return (y.fit ? 1 : 0) - (x.fit ? 1 : 0); // les signaux adaptés au régime d'abord
-        });
-      }
-
-      // SYNTHÈSE MULTI-MÉTHODES : par actif, combien de méthodes vont dans le même sens + régime de marché.
-      function dirOf(s) { return (s && s.dir && s.dir !== 'WAIT') ? (s.dir === 'LONG' ? 'haussier' : 'baissier') : null; }
-      var third = Math.max(1, Math.ceil(mom.length / 3)), momDir = {};
-      mom.forEach(function (m, i) { momDir[m.sym] = i < third ? 'haussier' : (i >= mom.length - third ? 'baissier' : null); });
-      var synthese = rows.map(function (r) {
-        var votes = [
-          { m: 'Tendance', d: dirOf(trendFollow(r.c)) },
-          { m: 'Cassure', d: dirOf(breakout(r.c)) },
-          { m: 'Retour moy.', d: dirOf(meanRevert(r.c)) },
-          { m: 'PTJ 200j', d: dirOf(ptj(r.c)) },
-          { m: 'Momentum', d: momDir[r.a.sym] || null }
-        ].filter(function (v) { return v.d; });
-        var up = votes.filter(function (v) { return v.d === 'haussier'; }).length;
-        var down = votes.filter(function (v) { return v.d === 'baissier'; }).length;
-        var verdict = up > down ? 'haussier' : down > up ? 'baissier' : 'neutre';
-        var reg = regBySym[r.a.sym];
-        // Conviction = ampleur du consensus + régime qui confirme + marché en tendance.
-        var regAlign = reg.trend && reg.dir === verdict;
-        var score = Math.abs(up - down) + (regAlign ? 2 : 0) + (reg.trend ? 1 : 0);
-        var conviction = score >= 4 ? 'Forte' : score >= 2 ? 'Moyenne' : 'Faible';
-        return { sym: r.a.sym, cls: r.a.cls, price: r.c[r.c.length - 1].c, regime: reg,
-          up: up, down: down, total: votes.length, verdict: verdict,
-          regAlign: regAlign, score: score, conviction: conviction, votes: votes };
-      }).sort(function (a, b) { return b.score - a.score; });
-
-      // Backtest de chaque stratégie sur tout l'historique dispo (toutes paires poolées).
-      var perfTrend = backtest(rows, trendFollow), perfBreak = backtest(rows, breakout),
-        perfRev = backtest(rows, meanRevert), perfPtj = backtest(rows, ptj);
-
-      return {
-        synthese: synthese,
-        updated: Date.now(),
-        strategies: [
-          { key: 'trend', name: 'Suivi de tendance (CTA)', tag: 'trend-following', perf: perfTrend,
-            how: 'Ce que font les fonds CTA (Winton, Man AHL) : ils ne prédisent rien, ils SUIVENT la tendance. Tant que la moyenne 50 est au-dessus de la 200, on reste acheteur ; on entre sur un repli vers la moyenne 50. Peu de trades, gardés longtemps, on laisse courir les gains.',
-            signals: pack(trendFollow, 'trend') },
-          { key: 'breakout', name: 'Cassure Donchian (Turtle Traders)', tag: 'breakout', perf: perfBreak,
-            how: 'La stratégie légendaire des « Tortues » : on achète quand le prix casse le plus haut des 20 dernières bougies (et on vend sous le plus bas). L\'idée : une vraie tendance démarre souvent par une cassure. Stop et objectif calés sur la volatilité (ATR).',
-            signals: pack(breakout, 'trend') },
-          { key: 'revert', name: 'Retour à la moyenne (mean reversion)', tag: 'mean-reversion', perf: perfRev,
-            how: 'Approche « statistical arbitrage » simplifiée : quand le prix s\'éloigne trop de sa moyenne (RSI sous 30 = survendu, ou au-dessus de 70 = suracheté), on parie sur le RETOUR vers la moyenne. Marche mieux en marché sans tendance (range).',
-            signals: pack(meanRevert, 'range') },
-          { key: 'momentum', name: 'Momentum relatif (factor momentum)', tag: 'quant',
-            how: 'Ce que font les quants (style AQR) : classer les actifs par performance récente et privilégier les plus FORTS (le momentum a tendance à persister). En haut du classement = biais acheteur ; en bas = biais vendeur.',
-            ranking: mom }
-        ],
-        legends: [
-          { name: 'Paul Tudor Jones', who: 'Macro + technique · a anticipé le krach de 1987',
-            principle: '« Personne ne devrait être acheteur sous la moyenne 200 jours, ni vendeur au-dessus. » Il coupe vite ses pertes et vise un gain/risque d\'au moins 5:1. Sa règle des 200 jours, appliquée à tes actifs :',
-            perf: perfPtj, signals: pack(ptj, 'trend') },
-          { name: 'Ray Dalio', who: 'Bridgewater · plus gros hedge fund du monde',
-            principle: '« All Weather / risk parity » : la diversification est le seul repas gratuit. On équilibre le RISQUE entre actifs (plus de poids aux moins volatils) au lieu de répartir le capital à l\'aveugle. Allocation risk-parity indicative sur tes actifs :',
-            alloc: riskParity(rows) },
-          { name: 'Jim Simons', who: 'Renaissance / Medallion · meilleur track record de l\'histoire',
-            principle: 'Pur quantitatif : des milliers de petits signaux statistiques tenus très court terme, exécutés par des maths et des machines. Le RETOUR À LA MOYENNE (stratégie plus haut) en est une brique accessible. Son fonds Medallion a fait ~66 %/an brut pendant 30 ans — mais fermé au public.' },
-          { name: 'Jesse Livermore', who: '« Boy Plunger » · légende du début XXᵉ siècle',
-            principle: 'Suivre la tendance, acheter sur les cassures de sommets (« points pivots »), renforcer les positions gagnantes (pyramiding) et couper vite les perdantes. C\'est l\'esprit de la CASSURE DONCHIAN plus haut. « Ce n\'est pas la réflexion qui rapporte, c\'est la patience de rester dans le trade gagnant. »' },
-          { name: 'George Soros', who: '« A fait sauter la Banque d\'Angleterre » en 1992',
-            principle: 'Théorie de la réflexivité : les marchés s\'auto-alimentent (les croyances des gens changent la réalité). Gros paris macro quand la conviction est forte, taille énorme, sortie immédiate si on a tort. « L\'important n\'est pas d\'avoir raison ou tort, mais combien tu gagnes quand tu as raison et combien tu perds quand tu as tort. »' },
-          { name: 'Warren Buffett', who: 'Le plus grand investisseur long terme',
-            principle: 'Value investing : acheter des entreprises de qualité sous leur vraie valeur, avec une marge de sécurité, et les garder des décennies. « Sois craintif quand les autres sont avides, avide quand ils sont craintifs. » ⚠️ C\'est pour les ACTIONS et le LONG terme — ça ne s\'applique pas au trading crypto/forex court terme.' }
-        ]
-      };
-    });
-  }
-
-  root.PRO = { load: load };
-})(typeof window !== 'undefined' ? window : this);
-
-</script>
-<script>
-/*
- * IA MAISON — un vrai modèle de machine learning qui tourne DANS le navigateur.
- * =============================================================================
- * Ce n'est PAS un appel à une IA externe (ça, c'est le "Bot IA / Claude"). Ici, le
- * cerveau vit chez toi : une régression logistique entraînée sur les VRAIES bougies.
- *
- * Ce qu'elle fait, honnêtement :
- *  1. Elle transforme chaque bougie en "concepts" ICT/SMC + indicateurs (les FEATURES).
- *  2. Elle apprend, sur l'historique réel, à estimer la probabilité que le prix MONTE.
- *  3. Elle mesure sa précision en WALK-FORWARD (hors échantillon) = son VRAI niveau.
- *  4. Elle S'ENTRAÎNE AUTOMATIQUEMENT à chaque ouverture (rien à cliquer), en repartant
- *     du cerveau sauvegardé (apprentissage continu) et en le complétant sur les nouvelles
- *     données. Elle NOTE ses prédictions passées et vérifie si elle a eu raison → elle
- *     "apprend de ses erreurs" (track record réel affiché).
- *  5. Sa MÉMOIRE NE SE PERD PAS : sauvegarde auto dans IndexedDB (+ export/import d'un
- *     fichier ia-cerveau.json comme filet de sécurité absolu).
- *
- * Limite assumée : sur les marchés, un tel modèle plafonne autour de 52–55 % de réussite.
- * On l'affiche sans mentir. Outil pédagogique, pas un conseil financier.
- */
-(function (root) {
-  'use strict';
-
-  var HOSTS = ['https://api.binance.com', 'https://data-api.binance.vision', 'https://api1.binance.com'];
-  // On "renourrit" l'IA avec un LARGE panier : 28 actifs. Plus la cross-section est riche, plus
-  // la médiane du panier (la cible) est fiable et plus l'IA a d'exemples pour apprendre la force
-  // relative. Le labo confirme : 28 actifs > 14 (précision "engagée" 63 % → 66 %).
-  var ASSETS = [
-    { sym: 'BTC/USD', src: 'BTCUSDT', cls: 'crypto' },
-    { sym: 'ETH/USD', src: 'ETHUSDT', cls: 'crypto' },
-    { sym: 'SOL/USD', src: 'SOLUSDT', cls: 'crypto' },
-    { sym: 'XRP/USD', src: 'XRPUSDT', cls: 'crypto' },
-    { sym: 'BNB/USD', src: 'BNBUSDT', cls: 'crypto' },
-    { sym: 'ADA/USD', src: 'ADAUSDT', cls: 'crypto' },
-    { sym: 'DOGE/USD', src: 'DOGEUSDT', cls: 'crypto' },
-    { sym: 'LTC/USD', src: 'LTCUSDT', cls: 'crypto' },
-    { sym: 'LINK/USD', src: 'LINKUSDT', cls: 'crypto' },
-    { sym: 'DOT/USD', src: 'DOTUSDT', cls: 'crypto' },
-    { sym: 'AVAX/USD', src: 'AVAXUSDT', cls: 'crypto' },
-    { sym: 'TRX/USD', src: 'TRXUSDT', cls: 'crypto' },
-    { sym: 'MATIC/USD', src: 'MATICUSDT', cls: 'crypto' },
-    { sym: 'ATOM/USD', src: 'ATOMUSDT', cls: 'crypto' },
-    { sym: 'UNI/USD', src: 'UNIUSDT', cls: 'crypto' },
-    { sym: 'XLM/USD', src: 'XLMUSDT', cls: 'crypto' },
-    { sym: 'ETC/USD', src: 'ETCUSDT', cls: 'crypto' },
-    { sym: 'FIL/USD', src: 'FILUSDT', cls: 'crypto' },
-    { sym: 'NEAR/USD', src: 'NEARUSDT', cls: 'crypto' },
-    { sym: 'APT/USD', src: 'APTUSDT', cls: 'crypto' },
-    { sym: 'INJ/USD', src: 'INJUSDT', cls: 'crypto' },
-    { sym: 'AAVE/USD', src: 'AAVEUSDT', cls: 'crypto' },
-    { sym: 'ALGO/USD', src: 'ALGOUSDT', cls: 'crypto' },
-    { sym: 'SAND/USD', src: 'SANDUSDT', cls: 'crypto' },
-    { sym: 'EOS/USD', src: 'EOSUSDT', cls: 'crypto' },
-    { sym: 'XTZ/USD', src: 'XTZUSDT', cls: 'crypto' },
-    { sym: 'EUR/USD', src: 'EURUSDT', cls: 'forex' },
-    { sym: 'XAU/USD', src: 'PAXGUSDT', cls: 'forex' }
-  ];
-  // Horizon ~30 j (rotation mensuelle) : c'est là que le momentum RELATIF persiste le mieux.
-  var HORIZON = 30;
-  var MODEL_VERSION = 6;        // + features cross-sectionnelles : on ré-apprend de zéro
-  // 11 features ABSOLUES (l'actif seul) + 7 features RELATIVES (sa position vs le panier).
-  // Comme la cible est relative (surperformer le panier), ces features relatives sont le bon
-  // carburant : elles disent "cet actif est-il plus fort/faible que les autres MAINTENANT ?".
-  var FEATURE_NAMES = [
-    'Biais HTF (EMA50/200)', 'Zone premium/discount', 'RSI (excès)', 'Momentum (ROC)',
-    'Régime (efficiency)', 'Displacement', 'Position dans le range (liquidité)',
-    'Cassure de structure (BOS)', 'Volatilité (ATR)', 'Dernière variation', 'Pente EMA50',
-    'Momentum relatif (vs panier)', 'Rang de momentum', 'Momentum relatif long',
-    'RSI relatif', 'Force de tendance relative', 'Écart au prix relatif', 'Volatilité relative'
-  ];
-  var BF = 11;                  // nombre de features de base (absolues)
-  var NF = FEATURE_NAMES.length; // total (18)
-
-  // ---- Indicateurs (mêmes définitions que le moteur, cohérence garantie) -----
-  function ema(v, p) { var k = 2 / (p + 1), e = v[0], out = [e]; for (var i = 1; i < v.length; i++) { e = v[i] * k + e * (1 - k); out.push(e); } return out; }
-  function rsiArr(cl, p) {
-    var out = [], i; for (i = 0; i < p; i++) out.push(50);
-    if (cl.length <= p) { while (out.length < cl.length) out.push(50); return out; }
-    var g = 0, l = 0;
-    for (i = 1; i <= p; i++) { var d = cl[i] - cl[i - 1]; if (d >= 0) g += d; else l -= d; }
-    var ag = g / p, al = l / p;
-    out[p] = al === 0 ? 100 : 100 - 100 / (1 + ag / al);
-    for (i = p + 1; i < cl.length; i++) {
-      var dd = cl[i] - cl[i - 1], gg = dd > 0 ? dd : 0, ll = dd < 0 ? -dd : 0;
-      ag = (ag * (p - 1) + gg) / p; al = (al * (p - 1) + ll) / p;
-      out.push(al === 0 ? 100 : 100 - 100 / (1 + ag / al));
-    }
-    return out;
-  }
-  function atrArr(c, p) {
-    var out = [0], trs = [0], i;
-    for (i = 1; i < c.length; i++) { var h = c[i].h, lo = c[i].l, pc = c[i - 1].c; trs.push(Math.max(h - lo, Math.abs(h - pc), Math.abs(lo - pc))); }
-    var a = 0, cnt = 0;
-    for (i = 1; i < c.length; i++) {
-      if (i <= p) { a += trs[i]; cnt++; out.push(a / cnt); }
-      else { a = (a * (p - 1) + trs[i]) / p; out.push(a); }
-    }
-    return out;
-  }
-
-  // ---- Extraction des FEATURES : les "concepts" traduits en nombres ----------
-  // Renvoie {X:[[...]], y:[0/1], rows:[{i, feats, ret}]} à partir de bougies d'un actif.
-  function buildFeatures(c) {
-    var n = c.length; if (n < 60) return null;
-    var cl = c.map(function (x) { return x.c; });
-    var e20 = ema(cl, 20), e50 = ema(cl, 50), e200 = ema(cl, 200);
-    var rsi = rsiArr(cl, 14), atr = atrArr(c, 14);
-    var X = [], RAW = [], meta = [];
-    var start = 50, end = n; // on garde les dernières bougies pour la prédiction "live"
-    for (var i = start; i < end; i++) {
-      var price = cl[i], a = atr[i] || price * 0.01;
-      // 1. Biais HTF : EMA50 vs EMA200 (structure haute)
-      var bias = e200[i] ? (e50[i] > e200[i] ? 1 : -1) : 0;
-      // 2. Zone premium/discount : écart au prix "juste" (EMA20), normalisé par l'ATR
-      var distE20 = clampf((price - e20[i]) / a, -3, 3);
-      // 3. RSI centré (excès de sur-achat/sur-vente)
-      var rsiN = (rsi[i] - 50) / 50;
-      // 4. Momentum : variation sur 10 bougies
-      var roc10 = i >= 10 && cl[i - 10] ? clampf((price - cl[i - 10]) / cl[i - 10] * 5, -3, 3) : 0;
-      // 5. Régime : efficiency ratio (tendance nette vs haché)
-      var er = effR(cl, i, 20);
-      // 6. Displacement : corps de la dernière bougie / corps moyen
-      var dispv = displ(c, i, 10);
-      // 7. Position dans le range récent (proche du haut = liquidité au-dessus)
-      var rp = rangePos(c, i, 20);
-      // 8. Cassure de structure (BOS) sur les 20 dernières bougies
-      var bos = bosFlag(c, i, 20);
-      // 9. Volatilité relative
-      var atrN = clampf(a / price * 30, 0, 3);
-      // 10. Dernière variation (1 bougie)
-      var ret1 = i >= 1 && cl[i - 1] ? clampf((price - cl[i - 1]) / cl[i - 1] * 8, -3, 3) : 0;
-      // 11. Pente de l'EMA50 (dynamique de la tendance)
-      var slope = i >= 5 ? clampf((e50[i] - e50[i - 5]) / a, -3, 3) : 0;
-      X.push([bias, distE20, rsiN, roc10, er, dispv, rp, bos, atrN, ret1, slope]);
-      // Métriques BRUTES (non bornées) pour le calcul cross-sectionnel dans load() :
-      // momentum 20/40, RSI, force de tendance, écart au prix, volatilité.
-      var mom20 = i >= 20 && cl[i - 20] ? (price - cl[i - 20]) / cl[i - 20] : 0;
-      var mom40 = i >= 40 && cl[i - 40] ? (price - cl[i - 40]) / cl[i - 40] : 0;
-      var trendv = e200[i] ? (e50[i] - e200[i]) / price : 0;
-      RAW.push([mom20, mom40, rsi[i], trendv, (price - e20[i]) / a, a / price]);
-      meta.push({ i: i, t: c[i].t });
-    }
-    // On expose, pour chaque bougie exploitable, sa feature + son horodatage + son rendement
-    // FUTUR sur HORIZON. L'étiquette (surperforme-t-il le panier ?) est calculée dans load(),
-    // car elle a besoin de TOUS les actifs au même instant (cible RELATIVE / cross-sectionnelle).
-    var rows = [], last = null;
-    for (var k = 0; k < meta.length; k++) {
-      var idx = meta[k].i, future = idx + HORIZON;
-      if (future < n) rows.push({ x: X[k], raw: RAW[k], t: meta[k].t, fret: (cl[future] - cl[idx]) / cl[idx] });
-      if (idx === n - 1) last = { x: X[k], raw: RAW[k], t: meta[k].t }; // dernière bougie = point "live"
-    }
-    if (last == null) last = { x: X[X.length - 1], raw: RAW[X.length - 1], t: meta[meta.length - 1].t };
-    return { rows: rows, live: last, price: cl[n - 1] };
-  }
-  // Features RELATIVES : z-score et rang cross-sectionnels d'un actif vs le panier à l'instant T.
-  // Entrée = { sym: raw6 }. Sortie = { sym: rel7 }. Aligne les features sur la cible relative.
-  function crossFeatures(rawBySym) {
-    var syms = Object.keys(rawBySym); if (syms.length < 4) return null;
-    function z(idx) { var v = syms.map(function (s) { return rawBySym[s][idx]; }), n = v.length,
-      mu = v.reduce(function (a, b) { return a + b; }, 0) / n,
-      sd = Math.sqrt(v.reduce(function (a, b) { return a + (b - mu) * (b - mu); }, 0) / n) || 1, o = {};
-      syms.forEach(function (s) { o[s] = clampf((rawBySym[s][idx] - mu) / sd, -3, 3); }); return o; }
-    function rank(idx) { var ord = syms.slice().sort(function (a, b) { return rawBySym[a][idx] - rawBySym[b][idx]; }),
-      n = ord.length, o = {}; ord.forEach(function (s, i) { o[s] = n > 1 ? (i / (n - 1)) * 2 - 1 : 0; }); return o; }
-    var zMom20 = z(0), rMom20 = rank(0), zMom40 = z(1), zRsi = z(2), zTrend = z(3), zDist = z(4), zVol = z(5);
-    var out = {};
-    syms.forEach(function (s) { out[s] = [zMom20[s], rMom20[s], zMom40[s], zRsi[s], zTrend[s], zDist[s], zVol[s]]; });
-    return out;
-  }
-  function clampf(v, a, b) { return v < a ? a : v > b ? b : v; }
-  function effR(cl, i, p) { if (i < p) return 0; var chg = Math.abs(cl[i] - cl[i - p]), vol = 0; for (var j = i - p + 1; j <= i; j++) vol += Math.abs(cl[j] - cl[j - 1]); return vol ? clampf(chg / vol * 2 - 1, -1, 1) : 0; }
-  function displ(c, i, p) { if (i < p) return 0; var body = Math.abs(c[i].c - c[i].o), s = 0; for (var j = i - p; j < i; j++) s += Math.abs(c[j].c - c[j].o); var avg = s / p; if (!avg) return 0; var sign = c[i].c >= c[i].o ? 1 : -1; return clampf(sign * (body / avg - 1), -3, 3); }
-  function rangePos(c, i, p) { if (i < p) return 0; var hi = -Infinity, lo = Infinity; for (var j = i - p + 1; j <= i; j++) { if (c[j].h > hi) hi = c[j].h; if (c[j].l < lo) lo = c[j].l; } if (hi <= lo) return 0; return (c[i].c - lo) / (hi - lo) * 2 - 1; }
-  function bosFlag(c, i, p) {
-    if (i < p + 2) return 0;
-    var hi = -Infinity, lo = Infinity;
-    for (var j = i - p; j < i; j++) { if (c[j].h > hi) hi = c[j].h; if (c[j].l < lo) lo = c[j].l; }
-    if (c[i].c > hi) return 1; if (c[i].c < lo) return -1; return 0;
-  }
-
-  // ---- Le modèle : régression logistique (poids = le "cerveau") --------------
-  function sigmoid(z) { return z > 30 ? 1 : z < -30 ? 0 : 1 / (1 + Math.exp(-z)); }
-  function standardize(X) {
-    var d = NF, mu = new Array(d).fill(0), sg = new Array(d).fill(0), n = X.length, i, j;
-    for (i = 0; i < n; i++) for (j = 0; j < d; j++) mu[j] += X[i][j];
-    for (j = 0; j < d; j++) mu[j] /= (n || 1);
-    for (i = 0; i < n; i++) for (j = 0; j < d; j++) { var e = X[i][j] - mu[j]; sg[j] += e * e; }
-    for (j = 0; j < d; j++) { sg[j] = Math.sqrt(sg[j] / (n || 1)) || 1; }
-    return { mu: mu, sg: sg };
-  }
-  function applyStd(x, s) { var o = new Array(NF); for (var j = 0; j < NF; j++) o[j] = (x[j] - s.mu[j]) / s.sg[j]; return o; }
-  // Entraînement par descente de gradient. warm = poids de départ (apprentissage continu).
-  function train(X, y, warm, epochs) {
-    var d = NF, n = X.length;
-    var w = (warm && warm.length === d) ? warm.slice() : new Array(d).fill(0);
-    var b = (warm && typeof warm.b === 'number') ? warm.b : 0;
-    var lr = 0.1, lambda = 0.01;
-    epochs = epochs || 250;
-    for (var ep = 0; ep < epochs; ep++) {
-      var gw = new Array(d).fill(0), gb = 0;
-      for (var i = 0; i < n; i++) {
-        var z = b; for (var j = 0; j < d; j++) z += w[j] * X[i][j];
-        var err = sigmoid(z) - y[i];
-        for (j = 0; j < d; j++) gw[j] += err * X[i][j];
-        gb += err;
-      }
-      for (j = 0; j < d; j++) w[j] -= lr * (gw[j] / n + lambda * w[j]);
-      b -= lr * (gb / n);
-    }
-    w.b = b;
-    return w;
-  }
-  function predictOne(x, w, s) { var xs = applyStd(x, s), z = w.b || 0; for (var j = 0; j < NF; j++) z += w[j] * xs[j]; return sigmoid(z); }
-
-  // ---- Calibration (Platt scaling) : que "64 %" veuille VRAIMENT dire 64 % ------
-  // On ajuste p_calibrée = sigmoid(a·logit(p) + b) sur les prédictions d'entraînement, pour que
-  // la probabilité affichée colle à la fréquence réelle. Ne change pas le classement, juste l'échelle.
-  function logit(p) { p = Math.min(0.9999, Math.max(0.0001, p)); return Math.log(p / (1 - p)); }
-  function fitPlatt(ps, ys) {
-    var a = 1, b = 0, lr = 0.3, n = ps.length; if (n < 30) return { a: 1, b: 0 };
-    for (var ep = 0; ep < 400; ep++) {
-      var ga = 0, gb = 0;
-      for (var i = 0; i < n; i++) { var L = logit(ps[i]), q = sigmoid(a * L + b), e = q - ys[i]; ga += e * L; gb += e; }
-      a -= lr * ga / n; b -= lr * gb / n;
-    }
-    return { a: a, b: b };
-  }
-  function applyCal(p, cal) { return cal ? sigmoid(cal.a * logit(p) + cal.b) : p; }
-  // Erreur de calibration attendue (ECE) : écart moyen entre proba prédite et fréquence réelle,
-  // par tranches de 10 %. 0 % = parfaitement calibré. Sert d'indicateur de fiabilité honnête.
-  function ece(pairs) {
-    var bins = []; for (var k = 0; k < 10; k++) bins.push({ sp: 0, sy: 0, n: 0 });
-    pairs.forEach(function (pr) { var b = Math.min(9, Math.floor(pr.p * 10)); bins[b].sp += pr.p; bins[b].sy += pr.y; bins[b].n++; });
-    var N = pairs.length, e = 0;
-    bins.forEach(function (b) { if (b.n) e += b.n / N * Math.abs(b.sp / b.n - b.sy / b.n); });
-    return Math.round(e * 100);
-  }
-
-  // Walk-forward STRICT PAR ACTIF (zéro fuite temporelle) : à chaque coupe, on entraîne sur
-  // le PASSÉ de tous les actifs, puis on teste sur le FUTUR de chaque actif. C'est le test le
-  // plus honnête possible — il révèle le vrai niveau (souvent proche du pile ou face, 50 %).
-  //   perAsset = [{X, y}]  (features/étiquettes d'un actif, dans l'ordre chronologique)
-  // On mesure : accuracy absolue, ET accuracy QUAND LE MODÈLE S'ENGAGE (|prob-0.5| >= marge)
-  // + la couverture (part des cas où il s'engage). Le vrai juge = accuracy vs 50 % (hasard).
-  function walkForward(perAsset) {
-    var assets = perAsset.filter(function (a) { return a.X.length >= 200; });
-    if (assets.length < 3) return null;
-    var folds = 4, margin = 0.07, correct = 0, tested = 0, base = 0, corrC = 0, cov = 0;
-    var calPairsRaw = [], calPairsCal = [];
-    for (var f = 1; f <= folds; f++) {
-      var frac = f / (folds + 1), nextFrac = (f + 1) / (folds + 1);
-      var Xtr = [], ytr = [];
-      assets.forEach(function (a) {
-        var cut = Math.floor(a.X.length * frac);
-        for (var i = 0; i < cut; i++) { Xtr.push(a.X[i]); ytr.push(a.y[i]); }
-      });
-      if (Xtr.length < 300) continue;
-      var s = standardize(Xtr), Xs = Xtr.map(function (x) { return applyStd(x, s); });
-      var w = train(Xs, ytr, null, 180);
-      // Calibration ajustée sur le TRAIN (jamais sur le test) puis appliquée au test.
-      var trProbs = Xs.map(function (x) { var z = w.b; for (var j = 0; j < NF; j++) z += w[j] * x[j]; return sigmoid(z); });
-      var cal = fitPlatt(trProbs, ytr);
-      var ones = ytr.reduce(function (a, b) { return a + b; }, 0), maj = ones >= ytr.length / 2 ? 1 : 0;
-      assets.forEach(function (a) {
-        var lo = Math.floor(a.X.length * frac), hi = Math.floor(a.X.length * nextFrac);
-        for (var t = lo; t < hi; t++) {
-          var praw = predictOne(a.X[t], w, s), p = applyCal(praw, cal), pred = p >= 0.5 ? 1 : 0;
-          if (pred === a.y[t]) correct++;
-          if (maj === a.y[t]) base++;
-          tested++;
-          calPairsRaw.push({ p: praw, y: a.y[t] }); calPairsCal.push({ p: p, y: a.y[t] });
-          if (Math.abs(p - 0.5) >= margin) { cov++; if (pred === a.y[t]) corrC++; }
-        }
-      });
-    }
-    if (!tested) return null;
-    return { acc: Math.round(correct / tested * 100), baseline: Math.round(base / tested * 100),
-      accEngaged: cov ? Math.round(corrC / cov * 100) : null,
-      coverage: Math.round(cov / tested * 100), tested: tested,
-      eceRaw: ece(calPairsRaw), ece: ece(calPairsCal) };
-  }
-
-  // ---- Persistance : IndexedDB (auto) — la mémoire qui ne se perd pas --------
-  var DB = 'tradeassist_ia', STORE = 'brain', KEY = 'model';
-  function idb() {
-    return new Promise(function (res, rej) {
-      if (typeof indexedDB === 'undefined') return rej(new Error('no-idb'));
-      var r = indexedDB.open(DB, 1);
-      r.onupgradeneeded = function () { r.result.createObjectStore(STORE); };
-      r.onsuccess = function () { res(r.result); };
-      r.onerror = function () { rej(r.error); };
-    });
-  }
-  function idbGet() {
-    return idb().then(function (db) {
-      return new Promise(function (res) {
-        var tx = db.transaction(STORE, 'readonly').objectStore(STORE).get(KEY);
-        tx.onsuccess = function () { res(tx.result || null); };
-        tx.onerror = function () { res(null); };
-      });
-    }).catch(function () { return memGet(); });
-  }
-  function idbPut(v) {
-    return idb().then(function (db) {
-      return new Promise(function (res) {
-        var tx = db.transaction(STORE, 'readwrite').objectStore(STORE).put(v, KEY);
-        tx.onsuccess = function () { res(true); };
-        tx.onerror = function () { res(false); };
-      });
-    }).catch(function () { memPut(v); return false; });
-  }
-  // Repli mémoire (environnements sans IndexedDB : tests Node, navigation privée stricte)
-  var _mem = null; function memGet() { return Promise.resolve(_mem); } function memPut(v) { _mem = v; }
-
-  // ---- Chargement des données ------------------------------------------------
-  function fetchKlines(src) {
-    var path = '/api/v3/klines?symbol=' + src + '&interval=1d&limit=1000';
-    function tryHost(i) {
-      if (i >= HOSTS.length) return Promise.reject(new Error('Binance injoignable'));
-      return fetch(HOSTS[i] + path).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-        .then(function (d) { return d.map(function (k) { return { t: k[0], o: +k[1], h: +k[2], l: +k[3], c: +k[4] }; }).slice(0, -1); })
-        .catch(function () { return tryHost(i + 1); });
-    }
-    return tryHost(0);
-  }
-  var fresh = function (c) { return c && c.length && (Date.now() - c[c.length - 1].t) < 3 * 864e5; };
-
-  // ---- Notation des prédictions passées : "apprendre de ses erreurs" ---------
-  // brain.log = [{sym, ts, dueTs, price0, prob, dir, graded, correct}]
-  // La cible est RELATIVE : une prédiction est correcte si l'actif a bien SURPERFORMÉ (ou
-  // sous-performé) le panier sur la période. On regroupe donc par jour et on compare chaque
-  // rendement réalisé à la MÉDIANE du groupe. On note à l'échéance (HORIZON jours passés).
-  function gradeLog(brain, priceBySym) {
-    var log = brain.log || [], now = Date.now(), day = 864e5, changed = false;
-    var due = log.filter(function (e) { return !e.graded && now >= e.dueTs && priceBySym[e.sym] != null; });
-    var byDay = {};
-    due.forEach(function (e) { var d = Math.floor(e.ts / day); (byDay[d] = byDay[d] || []).push(e); });
-    Object.keys(byDay).forEach(function (d) {
-      var grp = byDay[d]; if (grp.length < 3) return; // médiane peu fiable -> on attend
-      var rets = grp.map(function (e) { return priceBySym[e.sym] / e.price0 - 1; });
-      var med = rets.slice().sort(function (a, b) { return a - b; })[Math.floor(rets.length / 2)];
-      grp.forEach(function (e, i) {
-        var out = rets[i] > med ? 1 : 0;
-        e.correct = (out === (e.dir === 'up' ? 1 : 0)) ? 1 : 0;
-        e.ret = +(rets[i] * 100).toFixed(2); e.graded = true; changed = true;
-      });
-    });
-    // Track record réel = prédictions notées ET engagées (l'IA s'est prononcée : fort/faible)
-    var graded = log.filter(function (e) { return e.graded && e.dir !== 'neutre'; });
-    var ok = graded.filter(function (e) { return e.correct; }).length;
-    brain.track = { total: graded.length, correct: ok, rate: graded.length ? Math.round(ok / graded.length * 100) : null };
-    if (log.length > 600) brain.log = log.slice(log.length - 600);
-    return changed;
-  }
-  // Enregistre le panier COMPLET du jour (tous les actifs, y compris neutres) pour pouvoir
-  // calculer une médiane fiable à la notation. Un seul enregistrement par jour (batch cohérent).
-  function logPredictions(brain, signals) {
-    brain.log = brain.log || [];
-    var now = Date.now(), day = 864e5;
-    if (brain.log.some(function (e) { return (now - e.ts) < day; })) return; // déjà loggé aujourd'hui
-    signals.forEach(function (s) {
-      brain.log.push({ sym: s.sym, ts: now, dueTs: now + HORIZON * day, price0: s.price,
-        prob: s.prob, dir: s.dir, graded: false });
-    });
-  }
-
-  // ---- Orchestration : tout se fait tout seul à l'ouverture ------------------
-  function load() {
-    return Promise.all(ASSETS.map(function (a) {
-      return fetchKlines(a.src).then(function (c) { return { a: a, c: c }; }, function () { return { a: a, c: null }; });
-    })).then(function (rows) {
-      rows = rows.filter(function (r) { return fresh(r.c); });
-      if (!rows.length) return null;
-
-      // 1) Features par actif (avec horodatage + rendement futur de chaque bougie)
-      var perAsset = [];
-      rows.forEach(function (r) {
-        var f = buildFeatures(r.c);
-        if (!f || !f.rows.length) return;
-        perAsset.push({ a: r.a, f: f });
-      });
-      if (perAsset.length < 3) return null;
-
-      // 2) CIBLE RELATIVE (cross-sectionnelle) : pour chaque instant, la médiane des rendements
-      // futurs du panier. Étiquette = 1 si l'actif SURPERFORME cette médiane. C'est la seule
-      // question réellement apprenable (le momentum relatif est une anomalie robuste) — bien
-      // plus que « le prix va-t-il monter ? » qui est du pur pile ou face.
-      // Par timestamp : rendements futurs du panier (pour la médiane-cible) ET métriques brutes
-      // de chaque actif (pour les features relatives z-score/rang).
-      var byT = {}, rawByT = {};
-      perAsset.forEach(function (pa) {
-        pa.f.rows.forEach(function (row) {
-          (byT[row.t] = byT[row.t] || []).push(row.fret);
-          (rawByT[row.t] = rawByT[row.t] || {})[pa.a.sym] = row.raw;
-        });
-      });
-      var medByT = {}, relByT = {};
-      Object.keys(byT).forEach(function (t) { var a = byT[t].slice().sort(function (x, y) { return x - y; }); medByT[t] = a[Math.floor(a.length / 2)]; });
-      Object.keys(rawByT).forEach(function (t) { var r = crossFeatures(rawByT[t]); if (r) relByT[t] = r; });
-
-      // Features complètes = base (11) + relatives (7). Étiquette = surperforme la médiane ?
-      var poolX = [], poolY = [];
-      perAsset.forEach(function (pa) {
-        var X = [], y = [], sym = pa.a.sym;
-        pa.f.rows.forEach(function (row) {
-          var m = medByT[row.t], rel = relByT[row.t] && relByT[row.t][sym];
-          if (m == null || !rel) return;
-          X.push(row.x.concat(rel)); y.push(row.fret > m ? 1 : 0);
-        });
-        pa.labX = X; pa.labY = y; poolX = poolX.concat(X); poolY = poolY.concat(y);
-      });
-      if (poolX.length < 200) return null;
-
-      // Features relatives LIVE : cross-section sur la dernière bougie de chaque actif.
-      var liveRawBySym = {};
-      perAsset.forEach(function (pa) { liveRawBySym[pa.a.sym] = pa.f.live.raw; });
-      var liveRel = crossFeatures(liveRawBySym) || {};
-      var ZERO7 = [0, 0, 0, 0, 0, 0, 0];
-
-      return idbGet().then(function (saved) {
-        // 3) Cerveau sauvegardé (apprentissage continu) — sauf si le modèle a changé de version
-        var brain = (saved && saved.v === MODEL_VERSION) ? saved : { v: MODEL_VERSION, log: (saved && saved.log) || [], sessions: 0 };
-        var warm = brain.w || null;
-
-        // 4) Précision honnête HORS échantillon (walk-forward STRICT par actif) — le vrai niveau
-        var wf = walkForward(perAsset.map(function (pa) { return { X: pa.labX, y: pa.labY }; }));
-
-        // 5) Entraînement sur TOUT le dispo, en repartant du cerveau précédent (continu)
-        var std = standardize(poolX);
-        var Xs = poolX.map(function (x) { return applyStd(x, std); });
-        var w = train(Xs, poolY, warm, brain.sessions > 0 ? 120 : 250);
-        // Calibration (Platt) ajustée sur les prédictions d'entraînement → probas affichées fiables.
-        var trProbs = Xs.map(function (x) { var z = w.b; for (var j = 0; j < NF; j++) z += w[j] * x[j]; return sigmoid(z); });
-        var cal = fitPlatt(trProbs, poolY);
-
-        // 6) Prédictions "live" : proba que CHAQUE actif surperforme le panier (force relative)
-        var priceBySym = {};
-        var signals = perAsset.map(function (pa) {
-          var full = pa.f.live.x.concat(liveRel[pa.a.sym] || ZERO7);
-          var prob = applyCal(predictOne(full, w, std), cal); // proba calibrée
-          priceBySym[pa.a.sym] = pa.f.price;
-          var dir = prob >= 0.56 ? 'up' : prob <= 0.44 ? 'down' : 'neutre'; // up = fort, down = faible
-          var conf = Math.round(Math.abs(prob - 0.5) * 200); // 0..100
-          // Contribution de chaque concept = poids × feature standardisée (pourquoi la déci)
-          var xs = applyStd(full, std);
-          var contrib = [];
-          for (var j = 0; j < NF; j++) contrib.push({ n: FEATURE_NAMES[j], v: w[j] * xs[j] });
-          contrib.sort(function (a, b) { return Math.abs(b.v) - Math.abs(a.v); });
-          var drivers = contrib.slice(0, 3).map(function (cc) { return { n: cc.n, d: cc.v >= 0 ? 'haussier' : 'baissier' }; });
-          return { sym: pa.a.sym, cls: pa.a.cls, price: pa.f.price, prob: +prob.toFixed(3),
-            dir: dir, conf: conf, drivers: drivers,
-            vol: +((pa.f.live.raw[5] || 0.02)).toFixed(4) }; // ATR/prix (~volatilité journalière)
-        }).sort(function (a, b) { return b.prob - a.prob; }); // classement par force relative décroissante
-
-        // 7) Apprendre de ses erreurs : noter les anciennes prédictions, puis logger celles du jour
-        gradeLog(brain, priceBySym);
-        logPredictions(brain, signals);
-
-        // 7) Sauvegarde du cerveau (auto) — mémoire persistante
-        brain.w = Array.prototype.slice.call(w); brain.w.b = w.b;
-        brain.mu = std.mu; brain.sg = std.sg;
-        brain.wf = wf; brain.samples = poolX.length; brain.assets = perAsset.length;
-        brain.sessions = (brain.sessions || 0) + 1; brain.updated = Date.now();
-        // Historique de progression : on garde une trace à chaque entraînement
-        // (précision walk-forward, track record réel, nb d'exemples) pour tracer une courbe.
-        brain.progress = (brain.progress || []).concat([{
-          t: brain.updated,
-          acc: wf ? wf.acc : null,
-          edge: (wf && wf.accEngaged != null && wf.baseline != null) ? (wf.accEngaged - wf.baseline) : null,
-          rate: (brain.track && brain.track.rate != null) ? brain.track.rate : null,
-          samples: poolX.length, sessions: brain.sessions
-        }]);
-        if (brain.progress.length > 300) brain.progress = brain.progress.slice(-300);
-        idbPut(brain);
-
-        return { signals: signals, wf: wf, track: brain.track, sessions: brain.sessions,
-          samples: poolX.length, assets: perAsset.length, horizon: HORIZON, updated: brain.updated,
-          featureNames: FEATURE_NAMES, progress: brain.progress };
-      });
-    });
-  }
-
-  // ---- Export / Import : le filet de sécurité absolu (fichier à toi) ---------
-  function exportBrain() {
-    return idbGet().then(function (brain) {
-      if (!brain) throw new Error('Aucun cerveau à exporter — ouvre d\'abord l\'IA au moins une fois.');
-      var blob = new Blob([JSON.stringify(brain)], { type: 'application/json' });
-      var url = URL.createObjectURL(blob), a = document.createElement('a');
-      a.href = url; a.download = 'ia-cerveau.json'; document.body.appendChild(a); a.click();
-      setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 500);
-      return true;
-    });
-  }
-  function importBrain(file) {
-    return new Promise(function (res, rej) {
-      var fr = new FileReader();
-      fr.onload = function () {
-        try {
-          var b = JSON.parse(fr.result);
-          if (!b || typeof b !== 'object' || !('v' in b)) throw new Error('Fichier invalide.');
-          idbPut(b).then(function () { res(b); });
-        } catch (e) { rej(new Error('Fichier illisible : ' + e.message)); }
-      };
-      fr.onerror = function () { rej(new Error('Lecture impossible.')); };
-      fr.readAsText(file);
-    });
-  }
-  function status() { return idbGet(); }
-  function reset() { return idbPut({ v: MODEL_VERSION, log: [], sessions: 0 }); }
-
-  root.IA = { load: load, exportBrain: exportBrain, importBrain: importBrain, status: status, reset: reset,
-    _internals: { buildFeatures: buildFeatures, crossFeatures: crossFeatures, train: train, walkForward: walkForward, standardize: standardize, applyStd: applyStd, predictOne: predictOne, NF: NF, BF: BF } };
-})(typeof window !== 'undefined' ? window : this);
-
-</script>
-<script>
-/*
- * Moteur QUANT / INSTITUTIONNEL — inspiré du fonctionnement réel des grands fonds
- * (Renaissance, Two Sigma, Citadel, DE Shaw…). Il ne prédit PAS la direction du marché
- * (pile ou face) : il construit un panier MARKET-NEUTRAL long/short par FACTEURS.
- *
- * Les 4 piliers repris des pros :
- *  1. FACTEURS : on note chaque actif sur des primes de risque documentées — Momentum (90 j),
- *     Tendance (prix vs EMA200), Faible volatilité (low-vol anomaly).
- *     (Volontairement SIMPLE : en labo, ajouter des facteurs gonflait le Sharpe backtest à ~1,2
- *      mais il s'effondrait à ~0,16 en live = sur-apprentissage. 3 facteurs = bien plus stable.
- *      Le facteur "reversal court terme" a été mesuré NÉGATIF sur ces actifs → exclu.)
- *  2. ENSEMBLE : on combine ces facteurs (z-scores) en un score composite unique.
- *  3. CLASSEMENT CROSS-SECTIONNEL : on va LONG le haut du panier, SHORT le bas.
- *  4. MARKET-NEUTRAL : long + short en même temps → on gagne sur l'ÉCART, peu importe
- *     que le marché monte ou baisse. La vraie métrique visée n'est pas le win rate mais
- *     le SHARPE (rendement ÷ risque).
- *
- * Backtest walk-forward honnête (rebalance tous les 20 j). ⚠️ Échantillon court, sans frais
- * ni coût de short, marché majoritairement haussier → INDICATIF, pas une promesse.
- */
-(function (root) {
-  'use strict';
-
-  var HOSTS = ['https://api.binance.com', 'https://data-api.binance.vision', 'https://api1.binance.com'];
-  var ASSETS = [
-    { sym: 'BTC/USD', src: 'BTCUSDT' }, { sym: 'ETH/USD', src: 'ETHUSDT' }, { sym: 'SOL/USD', src: 'SOLUSDT' },
-    { sym: 'XRP/USD', src: 'XRPUSDT' }, { sym: 'BNB/USD', src: 'BNBUSDT' }, { sym: 'ADA/USD', src: 'ADAUSDT' },
-    { sym: 'DOGE/USD', src: 'DOGEUSDT' }, { sym: 'LTC/USD', src: 'LTCUSDT' }, { sym: 'LINK/USD', src: 'LINKUSDT' },
-    { sym: 'DOT/USD', src: 'DOTUSDT' }, { sym: 'AVAX/USD', src: 'AVAXUSDT' }, { sym: 'TRX/USD', src: 'TRXUSDT' },
-    { sym: 'MATIC/USD', src: 'MATICUSDT' }, { sym: 'ATOM/USD', src: 'ATOMUSDT' }, { sym: 'UNI/USD', src: 'UNIUSDT' },
-    { sym: 'XLM/USD', src: 'XLMUSDT' }, { sym: 'ETC/USD', src: 'ETCUSDT' }, { sym: 'FIL/USD', src: 'FILUSDT' },
-    { sym: 'NEAR/USD', src: 'NEARUSDT' }, { sym: 'APT/USD', src: 'APTUSDT' }, { sym: 'INJ/USD', src: 'INJUSDT' },
-    { sym: 'AAVE/USD', src: 'AAVEUSDT' }, { sym: 'ALGO/USD', src: 'ALGOUSDT' }, { sym: 'SAND/USD', src: 'SANDUSDT' },
-    { sym: 'EOS/USD', src: 'EOSUSDT' }, { sym: 'XTZ/USD', src: 'XTZUSDT' }, { sym: 'EUR/USD', src: 'EURUSDT' },
-    { sym: 'XAU/USD', src: 'PAXGUSDT' }
-  ];
-  var H = 20;                    // horizon / période de rebalance (jours)
-  // Poids de l'ensemble de facteurs (equal-weight des jambes ; l'inverse-vol a été mesuré nuisible).
-  // Volontairement 3 facteurs seulement : plus robuste hors échantillon (voir en-tête).
-  var W = { mom: 1, trend: 1, lowvol: 0.5 };
-  var fresh = function (c) { return c && c.length && (Date.now() - c[c.length - 1].t) < 3 * 864e5; };
-
-  function ema(v, p) { var k = 2 / (p + 1), e = v[0], o = [e]; for (var i = 1; i < v.length; i++) { e = v[i] * k + e * (1 - k); o.push(e); } return o; }
-  function ret(cl, i, p) { return i >= p && cl[i - p] ? (cl[i] - cl[i - p]) / cl[i - p] : 0; }
-  function vol(cl, i, p) { if (i < p) return 0; var r = [], j; for (j = i - p + 1; j <= i; j++) r.push((cl[j] - cl[j - 1]) / cl[j - 1]); var m = r.reduce(function (a, b) { return a + b; }, 0) / r.length; return Math.sqrt(r.reduce(function (a, b) { return a + (b - m) * (b - m); }, 0) / r.length); }
-  function zmap(map) { var s = Object.keys(map), a = s.map(function (x) { return map[x]; }), n = a.length,
-    mu = a.reduce(function (p, q) { return p + q; }, 0) / n, sd = Math.sqrt(a.reduce(function (p, q) { return p + (q - mu) * (q - mu); }, 0) / n) || 1, o = {};
-    s.forEach(function (x) { o[x] = (map[x] - mu) / sd; }); return o; }
-
-  // Facteurs bruts d'un actif à l'indice i (3 facteurs documentés : momentum, tendance, faible vol.)
-  function factorsAt(a, i) {
-    var cl = a.cl;
-    return { mom: ret(cl, i, 90), trend: a.e200[i] ? cl[i] / a.e200[i] - 1 : 0, lowvol: -vol(cl, i, 30) };
-  }
-  // Score composite cross-sectionnel : z-score chaque facteur (vs le panier) puis pondère (ensemble).
-  function compositeAt(assets, idxByT, t) {
-    var raw = { mom: {}, trend: {}, lowvol: {} }, present = [];
-    assets.forEach(function (a) { var i = idxByT[a.sym][t]; if (i == null || i < 205) return;
-      var f = factorsAt(a, i); raw.mom[a.sym] = f.mom; raw.trend[a.sym] = f.trend; raw.lowvol[a.sym] = f.lowvol; present.push(a.sym); });
-    if (present.length < 8) return null;
-    var zM = zmap(raw.mom), zT = zmap(raw.trend), zL = zmap(raw.lowvol), comp = {}, sub = {};
-    present.forEach(function (s) { comp[s] = W.mom * zM[s] + W.trend * zT[s] + W.lowvol * zL[s];
-      sub[s] = { mom: zM[s], trend: zT[s], lowvol: zL[s] }; });
-    return { comp: comp, sub: sub };
-  }
-
-  // Backtest market-neutral : rebalance tous les H j, long topK / short bottomK, on mesure le spread.
-  function backtest(assets, idxByT, times, K) {
-    var rets = [], i;
-    for (i = 210; i < times.length - H; i += H) {
-      var t = times[i], c = compositeAt(assets, idxByT, t); if (!c) continue;
-      var fr = {};
-      assets.forEach(function (a) { var ii = idxByT[a.sym][t]; if (ii != null && ii + H < a.cl.length) fr[a.sym] = (a.cl[ii + H] - a.cl[ii]) / a.cl[ii]; });
-      var ranked = Object.keys(c.comp).filter(function (s) { return fr[s] != null; }).sort(function (x, y) { return c.comp[y] - c.comp[x]; });
-      if (ranked.length < 2 * K) continue;
-      var longs = ranked.slice(0, K), shorts = ranked.slice(-K);
-      var lm = longs.reduce(function (a, s) { return a + fr[s]; }, 0) / K;
-      var sm = shorts.reduce(function (a, s) { return a + fr[s]; }, 0) / K;
-      rets.push(lm - sm);
-    }
-    return rets;
-  }
-  function stats(rets) {
-    var n = rets.length; if (!n) return null;
-    var mean = rets.reduce(function (a, b) { return a + b; }, 0) / n;
-    var sd = Math.sqrt(rets.reduce(function (a, b) { return a + (b - mean) * (b - mean); }, 0) / n) || 1e-9;
-    var perYear = 365 / H, sharpe = (mean / sd) * Math.sqrt(perYear);
-    var win = rets.filter(function (r) { return r > 0; }).length / n * 100;
-    var ann = Math.pow(1 + mean, perYear) - 1;
-    var eq = 1, peak = 1, dd = 0;
-    rets.forEach(function (r) { eq *= 1 + r; if (eq > peak) peak = eq; var d = (peak - eq) / peak; if (d > dd) dd = d; });
-    return { n: n, sharpe: +sharpe.toFixed(2), win: Math.round(win), ann: Math.round(ann * 100), dd: Math.round(dd * 100), meanPct: +(mean * 100).toFixed(2) };
-  }
-
-  function fetchKlines(src) {
-    var path = '/api/v3/klines?symbol=' + src + '&interval=1d&limit=1000';
-    function tryHost(i) {
-      if (i >= HOSTS.length) return Promise.reject(new Error('Binance injoignable'));
-      return fetch(HOSTS[i] + path).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-        .then(function (d) { return d.map(function (k) { return { t: k[0], o: +k[1], h: +k[2], l: +k[3], c: +k[4] }; }).slice(0, -1); })
-        .catch(function () { return tryHost(i + 1); });
-    }
-    return tryHost(0);
-  }
-
-  function load() {
-    return Promise.all(ASSETS.map(function (a) {
-      return fetchKlines(a.src).then(function (c) { return { a: a, c: c }; }, function () { return { a: a, c: null }; });
-    })).then(function (rows) {
-      var assets = [];
-      rows.forEach(function (r) {
-        if (!fresh(r.c)) return;
-        var cl = r.c.map(function (x) { return x.c; }), idx = {};
-        r.c.forEach(function (k, i) { idx[k.t] = i; });
-        assets.push({ sym: r.a.sym, cl: cl, c: r.c, e200: ema(cl, 200), _t: idx });
-      });
-      if (assets.length < 8) return null;
-
-      var idxByT = {}; assets.forEach(function (a) { idxByT[a.sym] = a._t; });
-      var allT = {}; assets.forEach(function (a) { a.c.forEach(function (k) { allT[k.t] = 1; }); });
-      var times = Object.keys(allT).map(Number).sort(function (x, y) { return x - y; });
-      var K = Math.max(3, Math.round(assets.length / 5)); // quintiles (top/bottom 20 %, standard académique)
-
-      // Panier LIVE : composite au dernier instant commun
-      var tLive = times[times.length - 1];
-      var c = compositeAt(assets, idxByT, tLive) || compositeAt(assets, idxByT, times[times.length - 2]);
-      var ranked = c ? Object.keys(c.comp).sort(function (x, y) { return c.comp[y] - c.comp[x]; }) : [];
-      function pack(s) { var a = assets.find(function (x) { return x.sym === s; }); return { sym: s, score: +c.comp[s].toFixed(2), sub: c.sub[s],
-        price: a ? a.cl[a.cl.length - 1] : null,
-        vol: a ? +(vol(a.cl, a.cl.length - 1, 30)).toFixed(4) : 0.02 }; }
-      var longs = ranked.slice(0, K).map(pack), shorts = ranked.slice(-K).map(pack).reverse();
-      var mids = ranked.slice(K, ranked.length - K).map(pack);
-
-      var perf = stats(backtest(assets, idxByT, times, K));
-      return { longs: longs, shorts: shorts, mids: mids, perf: perf, K: K, H: H,
-        assets: assets.length, updated: Date.now() };
-    });
-  }
-
-  root.QUANT = { load: load };
-})(typeof window !== 'undefined' ? window : this);
-
-</script>
-<script>
-/*
- * Couche DONNÉES EN DIRECT du dashboard (navigateur, sans clé)
- * -----------------------------------------------------------------------------
- * - Crypto (BTC/ETH/SOL/XRP/BNB) : Binance (klines D1 + H4), CORS ouvert -> VRAIS trades.
- * - Forex EUR/USD + Or (XAU/USD) : Binance (EUR/USDT, PAXG/USDT), bougies réelles -> VRAIS trades.
- * - DXY : reconstruit depuis les taux BCE (Frankfurter, formule ICE) -> boussole/contexte
- *   qui pilote le biais de tous les actifs cotés en USD (il n'est pas traçable en direct sans clé).
- * Garde-fou anti-données périmées : une paire figée (dernière bougie > 3 j) est ignorée.
- * Renvoie des cartes prêtes à afficher, même forme que les données mock.
- * En cas d'échec d'une source, la carte concernée retombe sur le mock.
- */
-(function (root) {
-  'use strict';
-
-  var BINANCE = ['https://api.binance.com', 'https://data-api.binance.vision', 'https://api1.binance.com'];
-  var clamp = function (n, a, b) { return Math.max(a, Math.min(b, n)); };
-  // Anti-données périmées : une paire dont la dernière bougie a plus de 3 jours est ignorée
-  // (ex. certaines paires forex sont "mortes" sur Binance et resteraient figées).
-  var fresh = function (c) { return c && c.length && (Date.now() - c[c.length - 1].t) < 3 * 864e5; };
-
-  // ---- Détections ICT compactes --------------------------------------------
-  function swings(c) {
-    var hi = [], lo = [];
-    for (var i = 2; i < c.length - 2; i++) {
-      if (c[i].h > c[i - 1].h && c[i].h > c[i - 2].h && c[i].h > c[i + 1].h && c[i].h > c[i + 2].h) hi.push({ i: i, p: c[i].h });
-      if (c[i].l < c[i - 1].l && c[i].l < c[i - 2].l && c[i].l < c[i + 1].l && c[i].l < c[i + 2].l) lo.push({ i: i, p: c[i].l });
-    }
-    return { hi: hi, lo: lo };
-  }
-  function structure(c, s) {
-    var last = c[c.length - 1], h = s.hi, l = s.lo;
-    if (!h.length || !l.length) return { bias: 'neutre', label: 'indéterminée' };
-    var up = h.length >= 2 && h[h.length - 1].p > h[h.length - 2].p && l.length >= 2 && l[l.length - 1].p > l[l.length - 2].p;
-    var dn = h.length >= 2 && h[h.length - 1].p < h[h.length - 2].p && l.length >= 2 && l[l.length - 1].p < l[l.length - 2].p;
-    if (last.c > h[h.length - 1].p) return { bias: 'haussier', label: 'BOS haussier' };
-    if (last.c < l[l.length - 1].p) return { bias: 'baissier', label: 'BOS baissier' };
-    if (up) return { bias: 'haussier', label: 'structure haussière' };
-    if (dn) return { bias: 'baissier', label: 'structure baissière' };
-    return { bias: 'neutre', label: 'range' };
-  }
-  function lastFVG(c) {
-    for (var i = c.length - 2; i >= 1; i--) {
-      var p = c[i - 1], n = c[i + 1], last = c[c.length - 1];
-      if (p.h < n.l) { if (last.c > p.h) return { type: 'haussier', bottom: p.h, top: n.l }; }
-      else if (p.l > n.h) { if (last.c < p.l) return { type: 'baissier', bottom: n.h, top: p.l }; }
-    }
-    return null;
-  }
-  function rng(s) {
-    var hi = s.hi[s.hi.length - 1], lo = s.lo[s.lo.length - 1];
-    if (!hi || !lo) return null;
-    // Sécurité : le dernier swing haut peut se trouver SOUS le dernier swing bas
-    // (détections indépendantes) -> on normalise pour ne jamais avoir un range inversé.
-    var top = Math.max(hi.p, lo.p), bot = Math.min(hi.p, lo.p);
-    if (top <= bot) return null;
-    return { hi: top, lo: bot, eq: (top + bot) / 2 };
-  }
-  function lastOB(c) {
-    for (var i = c.length - 3; i >= 1; i--) {
-      var b = c[i], down = b.c < b.o, up = b.c > b.o;
-      if (down && c[i + 1].c > b.h && c[i + 2].c >= c[i + 1].c) return { type: 'haussier', bottom: b.l, top: Math.max(b.o, b.c) };
-      if (up && c[i + 1].c < b.l && c[i + 2].c <= c[i + 1].c) return { type: 'baissier', bottom: Math.min(b.o, b.c), top: b.h };
-    }
-    return null;
-  }
-  function ote(c, s) {
-    var hi = s.hi[s.hi.length - 1], lo = s.lo[s.lo.length - 1];
-    if (!hi || !lo) return null;
-    var H = hi.p, L = lo.p, span = H - L;
-    if (hi.i > lo.i) return { type: 'achat', bottom: H - 0.79 * span, top: H - 0.62 * span };
-    return { type: 'vente', bottom: L + 0.62 * span, top: L + 0.79 * span };
-  }
-  // Poches de liquidité : "equal highs" (liquidité acheteuse au-dessus) et "equal lows"
-  // (liquidité vendeuse en-dessous) = niveaux où reposent des stops que le prix vient chercher.
-  function liquidity(c, s) {
-    var price = c[c.length - 1].c, tol = price * 0.0018;
-    function cluster(pts) { // renvoie le niveau moyen d'une paire de swings quasi-égaux (récents), sinon null
-      var last = pts.slice(-6), best = null;
-      for (var i = 0; i < last.length; i++)
-        for (var j = i + 1; j < last.length; j++)
-          if (Math.abs(last[i].p - last[j].p) <= tol) best = (last[i].p + last[j].p) / 2;
-      return best;
-    }
-    return { buy: cluster(s.hi), sell: cluster(s.lo) };
-  }
-  // MSS (Market Structure Shift) : cassure de la dernière structure opposée = bascule de momentum.
-  function mss(c, s) {
-    var h = s.hi, l = s.lo, last = c[c.length - 1].c;
-    if (h.length >= 2 && l.length >= 2) {
-      if (h[h.length - 1].p < h[h.length - 2].p && last > h[h.length - 1].p) return 'haussier'; // cassure haussière après plus-hauts descendants
-      if (l[l.length - 1].p > l[l.length - 2].p && last < l[l.length - 1].p) return 'baissier';  // cassure baissière après plus-bas montants
-    }
-    return null;
-  }
-  // Displacement : bougie à corps impulsif (institutionnel), > 1,7× le corps moyen récent.
-  function displacement(c) {
-    var n = c.length; if (n < 11) return null;
-    var w = c.slice(n - 11, n - 1);
-    var avg = w.reduce(function (a, x) { return a + Math.abs(x.c - x.o); }, 0) / w.length;
-    var last = c[n - 1], body = Math.abs(last.c - last.o);
-    if (avg > 0 && body > 1.7 * avg) return last.c > last.o ? 'haussier' : 'baissier';
-    return null;
-  }
-  function cyclePhase(c) {
-    var n = c.length;
-    if (n < 3) return 'Transition';
-    var look = Math.min(12, n - 2), w = c.slice(n - look);
-    var hi = Math.max.apply(0, w.map(function (x) { return x.h; })), lo = Math.min.apply(0, w.map(function (x) { return x.l; }));
-    var price = c[n - 1].c, rangePct = (hi - lo) / price, last = c[n - 1];
-    var lastBody = Math.abs(last.c - last.o), avg = w.map(function (x) { return Math.abs(x.c - x.o); }).reduce(function (a, b) { return a + b; }, 0) / w.length;
-    var lastHi = null, lastLo = null, s = swings(c);
-    lastHi = s.hi[s.hi.length - 1]; lastLo = s.lo[s.lo.length - 1];
-    if (lastLo && last.l < lastLo.p && last.c > lastLo.p) return 'Manipulation';
-    if (lastHi && last.h > lastHi.p && last.c < lastHi.p) return 'Manipulation';
-    if (lastBody > 1.6 * avg) return 'Expansion';
-    if (rangePct < 0.035) return 'Accumulation';
-    var pos = (price - lo) / (hi - lo || 1);
-    if (pos > 0.8 || pos < 0.2) return 'Distribution';
-    return 'Transition';
-  }
-
-  // ---- Construction d'une carte de trade -----------------------------------
-  function buildCard(name, sym, cls, htf, dtf, dxyBias, note, synthetic) {
-    var ds = swings(dtf), st = structure(dtf, ds), r = rng(ds);
-    var price = htf[htf.length - 1].c;
-    // Variation = clôture-à-clôture des 2 dernières bougies de l'unité "daily" (dtf).
-    var dl = dtf.length;
-    var chg = (dl >= 2 && dtf[dl - 2].c) ? (dtf[dl - 1].c - dtf[dl - 2].c) / dtf[dl - 2].c * 100 : 0;
-    var cyc = cyclePhase(htf);
-    var dir = st.bias === 'haussier' ? 'LONG' : st.bias === 'baissier' ? 'SHORT' : 'WAIT';
-    var hsw = swings(htf);
-    var f = lastFVG(htf), ob = lastOB(htf), ot = ote(htf, hsw), liq = liquidity(htf, hsw);
-    var chart = { candles: htf.slice(-48), fvg: f, ob: ob, ote: ot, range: r, liq: liq, entry: null, sl: null, tp: null, dir: dir };
-    var base = { sym: sym, name: name, cls: cls, price: price, chg: chg, dir: 'WAIT', conf: 40, cycle: cyc,
-      entry: null, sl: null, tp: null, rr: null, win: null, prog: 38, note: note || 'Pas de biais net — on attend.', chart: chart };
-
-    // Données SYNTHÉTIQUES (DXY/forex reconstruits depuis les clôtures quotidiennes BCE) :
-    // pas de vraies mèches -> les FVG/OB seraient du bruit. On n'affiche QUE le contexte
-    // (tendance + zone), jamais un trade précis (entrée/SL/TP), pour rester honnête.
-    if (synthetic) {
-      base.note = r
-        ? 'Contexte ' + st.bias + ' · zone ' + (price < r.eq ? 'discount' : 'premium') + ' — clôtures quotidiennes (BCE), pas d\'entrée précise.'
-        : 'Contexte indéterminé — clôtures quotidiennes (BCE).';
-      base.prog = 42;
-      return base;
-    }
-
-    if (dir === 'WAIT' || !r) return base;
-
-    var zoneName = price < r.eq ? 'discount' : 'premium';
-
-    // GARDE-FOU ICT 1 : on n'achète pas en premium, on ne vend pas en discount.
-    var zoneOk = (dir === 'LONG' && zoneName === 'discount') || (dir === 'SHORT' && zoneName === 'premium');
-    if (!zoneOk) {
-      base.prog = 46;
-      base.note = 'Biais ' + st.bias + ' mais prix en ' + zoneName + ' — mauvaise zone pour ' + dir + ', on attend un retour en ' + (dir === 'LONG' ? 'discount' : 'premium') + '.';
-      return base;
-    }
-
-    // GARDE-FOU ICT 2 : il faut un POI aligné (FVG puis OB) dans le sens du biais.
-    var poi = null, poiType = null;
-    if (f && f.type === st.bias) { poi = [f.bottom, f.top]; poiType = 'FVG'; }
-    else if (ob && ob.type === st.bias) { poi = [ob.bottom, ob.top]; poiType = 'Order Block'; }
-    if (!poi) {
-      base.prog = 50;
-      base.note = 'Biais ' + st.bias + ' en ' + zoneName + ', mais pas de FVG/OB aligné — on attend la formation d\'une zone.';
-      return base;
-    }
-
-    // Entrée au milieu du POI. STOP au-delà du POI mais avec un PLANCHER réaliste,
-    // sinon un FVG très fin donne un risque minuscule et un RR délirant (30, 40…).
-    var entry = (poi[0] + poi[1]) / 2;
-    var span = Math.abs(poi[1] - poi[0]) || price * 0.0015;
-    var rangeSpan = Math.abs(r.hi - r.lo) || price * 0.01;
-    // Un stop institutionnel se loge derrière le swing : au minimum ~12 % du dealing range.
-    var minRisk = Math.max(span * 1.1, rangeSpan * 0.12, price * 0.002);
-    var slRaw = dir === 'LONG' ? poi[0] - span * 0.6 : poi[1] + span * 0.6;
-    var slFloor = dir === 'LONG' ? entry - minRisk : entry + minRisk;
-    var sl = dir === 'LONG' ? Math.min(slRaw, slFloor) : Math.max(slRaw, slFloor);
-    var risk = Math.abs(entry - sl);
-    // CIBLE : la liquidité (extrême de range), mais RR PLAFONNÉ à un niveau atteignable.
-    var MAXRR = 6;
-    var tpLiq = dir === 'LONG' ? r.hi : r.lo;
-    var rew = Math.min(Math.abs(tpLiq - entry), risk * MAXRR);
-    var tp = dir === 'LONG' ? entry + rew : entry - rew;
-    var ok = dir === 'LONG' ? (sl < entry && tp > entry) : (sl > entry && tp < entry);
-    if (!ok || risk <= 0) { base.prog = 48; base.note = 'Géométrie invalide — on attend.'; return base; }
-    var rr = +(rew / risk).toFixed(1);
-    if (rr < 1) { base.prog = 48; base.note = 'Setup aligné mais RR < 1 (cible trop proche) — on attend un meilleur point.'; return base; }
-
-    // ================= CONFLUENCE DE CONCEPTS =================
-    // Chaque concept ICT/SMC "vote" une direction. Plus de concepts alignés = conviction plus forte.
-    var bias = st.bias; // 'haussier' (LONG) ou 'baissier' (SHORT) — dir en découle
-    var hBias = structure(htf, hsw).bias;                 // structure H4 (alignement top-down)
-    var ms = mss(htf, hsw);                               // Market Structure Shift / CHoCH
-    var disp = displacement(htf);                         // mouvement impulsif institutionnel
-    var zoneVote = zoneName === 'discount' ? 'haussier' : 'baissier';       // acheter bas / vendre haut
-    var oteVote = ot ? (ot.type === 'achat' ? 'haussier' : 'baissier') : null;
-    var oteIn = ot && price >= Math.min(ot.bottom, ot.top) && price <= Math.max(ot.bottom, ot.top);
-    var liqTarget = dir === 'LONG' ? liq.buy : liq.sell;  // poche de liquidité visée
-    var oppPool = dir === 'LONG' ? liq.sell : liq.buy, sweep = false;       // balayage de la poche opposée
-    if (oppPool != null) htf.slice(-3).forEach(function (k) {
-      if (dir === 'LONG' && k.l < oppPool && k.c > oppPool) sweep = true;
-      if (dir === 'SHORT' && k.h > oppPool && k.c < oppPool) sweep = true;
-    });
-    // DXY inversé pour crypto/or ET forex …/USD : DXY baissier = dollar faible = favorable au long.
-    var dxyVote = dxyBias === 'baissier' ? 'haussier' : dxyBias === 'haussier' ? 'baissier' : null;
-
-    var concepts = [
-      { n: 'Structure D1', d: st.bias },
-      { n: 'Structure H4', d: hBias },
-      { n: 'BOS', d: st.label.indexOf('BOS') >= 0 ? st.bias : null },
-      { n: 'Zone ' + zoneName, d: zoneVote },
-      { n: 'FVG', d: f ? f.type : null },
-      { n: 'Order Block', d: ob ? ob.type : null },
-      { n: 'OTE', d: (oteIn ? oteVote : null) },
-      { n: 'MSS / CHoCH', d: ms },
-      { n: 'Displacement', d: disp },
-      { n: 'Balayage liq.', d: sweep ? bias : null },
-      { n: 'Liquidité ciblée', d: liqTarget != null ? bias : null },
-      { n: 'DXY', d: dxyVote }
-    ].filter(function (x) { return x.d; });
-
-    var up = concepts.filter(function (x) { return x.d === 'haussier'; }).length;
-    var down = concepts.filter(function (x) { return x.d === 'baissier'; }).length;
-    var aligned = concepts.filter(function (x) { return x.d === bias; }).length;
-    var opposed = concepts.filter(function (x) { return x.d !== bias; }).length;
-
-    // Confiance = pilotée par le vote : chaque concept aligné pèse +, chaque concept opposé pèse -.
-    var conf = clamp(40 + aligned * 6 - opposed * 6 + (poiType === 'FVG' ? 4 : 0), 20, 97);
-    var inZone = price >= Math.min(poi[0], poi[1]) && price <= Math.max(poi[0], poi[1]);
-    var prog = clamp(conf + (inZone ? 8 : -3) + (rr >= 2 ? 4 : 0), 20, 100);
-    var win = clamp(Math.round(conf * 0.82), 40, 85);
-    // Motif = la liste des concepts qui vont dans le sens du trade.
-    var reason = concepts.filter(function (x) { return x.d === bias; }).map(function (x) { return x.n; }).join(' · ') + ' · cible ' + rr + 'R';
-    var conflu = { up: up, down: down, aligned: aligned, opposed: opposed, total: concepts.length, bias: bias, concepts: concepts };
-    chart.entry = entry; chart.sl = sl; chart.tp = tp;
-    return { sym: sym, name: name, cls: cls, price: price, chg: chg, dir: dir, conf: conf, cycle: cyc,
-      entry: entry, sl: sl, tp: tp, rr: rr, win: win, prog: prog, note: reason, conflu: conflu, chart: chart };
-  }
-
-  // ---- Sources --------------------------------------------------------------
-  function fetchJSON(url) {
-    return fetch(url).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
-  }
-  function binance(src, interval, limit) {
-    var path = '/api/v3/klines?symbol=' + src + '&interval=' + interval + '&limit=' + (limit || 150);
-    function tryHost(i) {
-      if (i >= BINANCE.length) return Promise.reject(new Error('Binance injoignable'));
-      return fetchJSON(BINANCE[i] + path).then(function (d) {
-        return d.map(function (k) { return { t: k[0], o: +k[1], h: +k[2], l: +k[3], c: +k[4] }; }).slice(0, -1);
-      }).catch(function () { return tryHost(i + 1); });
-    }
-    return tryHost(0);
-  }
-  // Séries FX quotidiennes depuis Frankfurter (base USD) → DXY + paires.
-  function frankfurter() {
-    var d = new Date(Date.now() - 100 * 86400000);
-    var start = d.toISOString().slice(0, 10);
-    var url = 'https://api.frankfurter.dev/v1/' + start + '..?base=USD&symbols=EUR,JPY,GBP,CAD,CHF,SEK';
-    return fetchJSON(url).then(function (j) {
-      var dates = Object.keys(j.rates).sort();
-      var dxy = [], gbp = [], jpy = [], eurjpy = [];
-      dates.forEach(function (dt) {
-        var r = j.rates[dt];
-        var EURUSD = 1 / r.EUR, GBPUSD = 1 / r.GBP, USDJPY = r.JPY;
-        var v = 50.14348112 * Math.pow(EURUSD, -0.576) * Math.pow(USDJPY, 0.136) * Math.pow(GBPUSD, -0.119) *
-          Math.pow(r.CAD, 0.091) * Math.pow(r.SEK, 0.042) * Math.pow(r.CHF, 0.036);
-        var mk = function (x) { return { t: dt, o: x, h: x, l: x, c: x }; };
-        dxy.push(mk(v)); gbp.push(mk(GBPUSD)); jpy.push(mk(USDJPY)); eurjpy.push(mk(r.JPY / r.EUR));
-      });
-      return { dxy: dxy, gbp: gbp, jpy: jpy, eurjpy: eurjpy };
-    });
-  }
-
-  // ---- Chargement global ----------------------------------------------------
-  function load() {
-    var jobs = {
-      btcD: binance('BTCUSDT', '1d', 120), btcH: binance('BTCUSDT', '4h', 150),
-      ethD: binance('ETHUSDT', '1d', 120), ethH: binance('ETHUSDT', '4h', 150),
-      solD: binance('SOLUSDT', '1d', 120), solH: binance('SOLUSDT', '4h', 150),
-      xrpD: binance('XRPUSDT', '1d', 120), xrpH: binance('XRPUSDT', '4h', 150),
-      bnbD: binance('BNBUSDT', '1d', 120), bnbH: binance('BNBUSDT', '4h', 150),
-      // Forex & or en VRAIES bougies via Binance (EUR/USDT, PAXG/USDT — paires liquides et à jour).
-      // USDT ≈ USD ; la structure/les zones/les niveaux sont fidèles (écart ~0,1 % sur le prix absolu).
-      eurD: binance('EURUSDT', '1d', 120), eurH: binance('EURUSDT', '4h', 150),
-      xauD: binance('PAXGUSDT', '1d', 120), xauH: binance('PAXGUSDT', '4h', 150),
-      fx: frankfurter()
-    };
-    function safe(p) { return p.then(function (v) { return v; }, function () { return null; }); }
-    var keys = Object.keys(jobs);
-    return Promise.all(keys.map(function (k) { return safe(jobs[k]); })).then(function (res) {
-      var r = {}; keys.forEach(function (k, i) { r[k] = res[i]; });
-      var cards = [];
-      // DXY d'abord (contexte pour les cryptos)
-      var dxyBias = 'neutre';
-      if (r.fx) {
-        var dS = swings(r.fx.dxy), dSt = structure(r.fx.dxy, dS); dxyBias = dSt.bias;
-        cards.push(buildCard('Indice dollar', 'DXY', 'forex', r.fx.dxy, r.fx.dxy, null, null, true));
-      }
-      // Chaque paire n'est ajoutée que si ses données sont FRAÎCHES (garde-fou anti-prix figé).
-      function add(name, sym, cls, H, D) { if (H && D && fresh(H)) cards.push(buildCard(name, sym, cls, H, D, dxyBias)); }
-      add('Bitcoin', 'BTC/USD', 'crypto', r.btcH, r.btcD);
-      add('Ethereum', 'ETH/USD', 'crypto', r.ethH, r.ethD);
-      add('Solana', 'SOL/USD', 'crypto', r.solH, r.solD);
-      add('XRP', 'XRP/USD', 'crypto', r.xrpH, r.xrpD);
-      add('BNB', 'BNB/USD', 'crypto', r.bnbH, r.bnbD);
-      // Forex + or : VRAIS trades (bougies réelles). USD au dénominateur -> même logique DXY que la crypto.
-      add('Euro / Dollar', 'EUR/USD', 'forex', r.eurH, r.eurD);
-      add('Or', 'XAU/USD', 'forex', r.xauH, r.xauD);
-      return cards.length ? cards : null;
-    });
-  }
-
-  // Contexte multi-unités (H1 / H4 / D1) pour le Bot IA — alignement top-down.
-  function mtf() {
-    var pairs = [{ sym: 'BTC/USD', src: 'BTCUSDT' }, { sym: 'ETH/USD', src: 'ETHUSDT' }, { sym: 'SOL/USD', src: 'SOLUSDT' },
-      { sym: 'XRP/USD', src: 'XRPUSDT' }, { sym: 'BNB/USD', src: 'BNBUSDT' },
-      { sym: 'EUR/USD', src: 'EURUSDT' }, { sym: 'XAU/USD', src: 'PAXGUSDT' }];
-    var tfs = [{ n: 'D1', i: '1d' }, { n: 'H4', i: '4h' }, { n: 'H1', i: '1h' }];
-    var jobs = [];
-    pairs.forEach(function (p) {
-      tfs.forEach(function (tf) {
-        jobs.push(binance(p.src, tf.i, 150).then(function (c) { return { p: p, tf: tf, c: c }; }, function () { return { p: p, tf: tf, c: null }; }));
-      });
-    });
-    return Promise.all(jobs).then(function (res) {
-      var byPair = {};
-      res.forEach(function (r) {
-        if (!byPair[r.p.sym]) byPair[r.p.sym] = { paire: r.p.sym, unites: {} };
-        if (!r.c || r.c.length < 30) return;
-        var c = r.c, s = swings(c), st = structure(c, s), rr = rng(s), price = c[c.length - 1].c, f = lastFVG(c), ot = ote(c, s), ob = lastOB(c);
-        var round = function (x) { return x == null ? null : +(x.toFixed(x >= 100 ? 2 : 4)); };
-        byPair[r.p.sym].unites[r.tf.n] = {
-          prix: round(price), structure: st.label, biais: st.bias, cycle: cyclePhase(c),
-          zone: rr ? (price < rr.eq ? 'discount' : 'premium') : '—',
-          fvg: f ? { type: f.type, bas: round(f.bottom), haut: round(f.top) } : null,
-          ote: ot ? { type: ot.type, bas: round(ot.bottom), haut: round(ot.top) } : null,
-          ob: ob ? { type: ob.type, bas: round(ob.bottom), haut: round(ob.top) } : null,
-          range: rr ? { haut: round(rr.hi), bas: round(rr.lo) } : null
-        };
-      });
-      return pairs.map(function (p) { return byPair[p.sym]; }).filter(Boolean);
-    });
-  }
-
-  root.LIVE = { load: load, mtf: mtf };
-})(typeof window !== 'undefined' ? window : this);
-
-</script>
-<script>
-/* ---------- Données mock (repli si le direct échoue) ---------- */
-const CYCLE_COLOR = { Accumulation:'#5b8', Manipulation:'var(--wait)', Expansion:'var(--long)', Distribution:'var(--short)', Transition:'var(--faint)' };
-const MOCK = [
-  { sym:'BTC/USD', name:'Bitcoin', cls:'crypto', price:64054, chg:+1.2, dir:'LONG', conf:78, cycle:'Expansion',
-    entry:63120, sl:61980, tp:66850, rr:3.3, win:71, prog:82,
-    note:'Discount + FVG H4 sous le prix, DXY baissier (favorable).' },
-  { sym:'ETH/USD', name:'Ethereum', cls:'crypto', price:1868, chg:+0.6, dir:'LONG', conf:64, cycle:'Accumulation',
-    entry:1841, sl:1802, tp:1955, rr:2.9, win:63, prog:58,
-    note:'Range serré, un mouvement se prépare. On attend le retour en zone.' },
-  { sym:'SOL/USD', name:'Solana', cls:'crypto', price:73.4, chg:-1.8, dir:'SHORT', conf:79, cycle:'Distribution',
-    entry:74.9, sl:77.4, tp:70.5, rr:2.6, win:66, prog:74,
-    note:'Calage en haut de range, premium, structure baissière.' },
-  { sym:'XRP/USD', name:'XRP', cls:'crypto', price:1.03, chg:+2.1, dir:'LONG', conf:63, cycle:'Expansion',
-    entry:1.008, sl:0.982, tp:1.086, rr:3.0, win:60, prog:64,
-    note:'Cassure haussière, retour sur FVG en discount.' },
-  { sym:'BNB/USD', name:'BNB', cls:'crypto', price:604, chg:-0.7, dir:'WAIT', conf:44, cycle:'Transition',
-    entry:null, sl:null, tp:null, rr:null, win:null, prog:36,
-    note:'Range serré — on attend la sortie de zone.' },
-  { sym:'EUR/USD', name:'Euro / Dollar', cls:'forex', price:1.0842, chg:+0.2, dir:'LONG', conf:66, cycle:'Accumulation',
-    entry:1.0808, sl:1.0762, tp:1.0930, rr:2.6, win:62, prog:61,
-    note:'Discount + FVG H4, dollar (DXY) qui faiblit → favorable.' },
-  { sym:'XAU/USD', name:'Or', cls:'forex', price:2418.5, chg:-0.4, dir:'WAIT', conf:41, cycle:'Transition',
-    entry:null, sl:null, tp:null, rr:null, win:null, prog:35,
-    note:'Pas de biais net — on reste à l\'écart tant que la structure n\'est pas claire.' },
-  { sym:'DXY', name:'Indice dollar', cls:'forex', price:99.71, chg:-0.6, dir:'WAIT', conf:58, cycle:'Expansion',
-    entry:null, sl:null, tp:null, rr:null, win:null, prog:55,
-    note:'Boussole du dollar — impulsion baissière, contexte favorable au risque (crypto / or / forex).' },
-];
-let PAIRS = MOCK;
-
 const $ = (s,el=document)=>el.querySelector(s);
 const fmt = n => n==null?'—':(Math.abs(n)>=1000?Math.round(n):+n.toFixed(Math.abs(n)>=10?2:4)).toLocaleString('fr-FR');
 const VERD = { LONG:{c:'v-long',t:'Long'}, SHORT:{c:'v-short',t:'Short'}, WAIT:{c:'v-wait',t:'On attend'} };
@@ -4476,96 +3138,78 @@ function drawChart(canvas, ch){
   level(ch.entry,'rgba(245,245,246,.85)','Entrée'); level(ch.sl,short,'SL'); level(ch.tp,long,'TP');
 }
 
-function card(p){
-  if(!p.chart) p.chart = mockChart(p);
-  const v = VERD[p.dir];
-  const isTrade = p.dir!=='WAIT';
-  const p10 = { risk: eurRisk(), gain: isTrade ? eurGain(p.rr) : 0 };
-  // Réussite : le VRAI taux du bot (journal) dès qu'il y a assez de trades clôturés, sinon une estimation honnête.
-  const jb = (isTrade && window.History) ? History.bilan('Bot règles') : null;
-  const realRate = (jb && jb.total>=5) ? jb.rate : null;
-  const rateVal = realRate!=null ? realRate+'%' : '~'+p.win+'%';
-  const rateKey = realRate!=null ? ('Réussite ('+jb.total+')') : 'Réussite (est.)';
-  const el = document.createElement('article');
-  el.className='card'; el.tabIndex=0; el.dataset.cls=p.cls; el.dataset.signal=isTrade?'1':'0';
-  el.innerHTML = `
-    <div class="c-top">
-      <div class="pair-id"><span class="sym">${p.sym}</span><span class="name">${p.name}</span></div>
-      <div class="price"><div class="p mono">${fmt(p.price)}</div>
-        <div class="chg mono ${p.chg>=0?'up':'down'}">${p.chg>=0?'+':''}${p.chg.toFixed(1)}%</div></div>
-    </div>
-    <div class="c-mid">
-      <span class="verdict ${v.c}"><span class="tri"></span>${v.t}</span>
-      <span class="cycle"><span class="cdot" style="background:${CYCLE_COLOR[p.cycle]}"></span>${p.cycle}</span>
-    </div>
-    <div class="conf">
-      <div class="conf-head"><span>${isTrade?'Progression du setup':'Maturité'}</span><b>${p.prog}%</b></div>
-      <div class="track"><div class="fill" style="background:${COLOR[p.dir]}" data-w="${p.prog}"></div></div>
-    </div>
-    <div class="detail"><div class="detail-in">
-      <div class="sep"></div>
-      <div class="chartbox"><canvas></canvas>
-        <div class="legend">
-          <span><i style="background:rgba(224,166,63,.55)"></i>FVG</span>
-          <span><i style="background:rgba(255,255,255,.25)"></i>Order Block</span>
-          <span><i style="background:rgba(55,196,107,.4)"></i>OTE</span>
-          <span><i style="background:rgba(224,166,63,.55)"></i>Liquidité</span>
-          <span><i style="background:var(--long)"></i>haussière</span>
-          <span><i style="background:var(--short)"></i>baissière</span>
-        </div>
-      </div>
-      ${isTrade ? `
-      <div class="levels">
-        <div class="lvl"><div class="k">Entrée</div><div class="v">${fmt(p.entry)}</div></div>
-        <div class="lvl sl"><div class="k">Stop</div><div class="v">${fmt(p.sl)}</div></div>
-        <div class="lvl tp"><div class="k">Objectif</div><div class="v">${fmt(p.tp)}</div></div>
-      </div>
-      <div class="metrics">
-        <div class="m"><span class="k">Ratio</span><span class="v">${p.rr} R</span></div>
-        <div class="m"><span class="k">${rateKey}</span><span class="v">${rateVal}</span></div>
-        <div class="m"><span class="k">Confluence</span><span class="v">${p.conf}%</span></div>
-        <div class="m"><span class="k">Sur ${capFr()} €</span><span class="v"><span class="gain">+${p10.gain} €</span> / <span class="loss">−${p10.risk} €</span></span></div>
-      </div>` : `
-      <div class="metrics"><div class="m"><span class="k">Confluence</span><span class="v">${p.conf}%</span></div></div>`}
-      ${isTrade && p.conflu ? `
-      <div class="conflu">
-        <div class="conflu-head"><span>Confluence des concepts</span><b>${p.conflu.aligned}/${p.conflu.total} dans le sens ${p.dir==='LONG'?'▲':'▼'}</b></div>
-        <div class="conflu-bar"><span class="up" style="flex:${p.conflu.up||0.001}"></span><span class="down" style="flex:${p.conflu.down||0.001}"></span></div>
-        <div class="conflu-tags">${p.conflu.concepts.map(c=>`<span class="ctag ${c.d==='haussier'?'up':'down'}">${c.d==='haussier'?'▲':'▼'} ${c.n}</span>`).join('')}</div>
-      </div>` : ``}
-      <div class="note">💡 <span>${p.note}</span></div>
-    </div></div>`;
-  function toggle(){
-    const opening = !el.classList.contains('open');
-    el.classList.toggle('open');
-    if(opening){ const cv=el.querySelector('canvas');
-      if(cv && !cv.dataset.drawn){ requestAnimationFrame(()=>{ drawChart(cv,p.chart); cv.dataset.drawn='1'; }); } }
-  }
-  el.addEventListener('click', toggle);
-  el.addEventListener('keydown', e=>{ if(e.key==='Enter'||e.key===' '){e.preventDefault();toggle();} });
-  return el;
+// ---------------------------------------------------------------------------
+// TABLEAU DE BORD MECH : tout ce que le modèle exige pour valider un trade.
+// Une case manquante = pas de trade. Autant que ce soit visible.
+// ---------------------------------------------------------------------------
+let MECH = null;               // dernier instantané NQ / ES
+
+function mechRow(ok, titre, detail){
+  return '<div class="mrow '+(ok===null?'wait':ok?'ok':'no')+'">'+
+    '<span class="mico">'+(ok===null?'…':ok?'✅':'❌')+'</span>'+
+    '<div><b>'+titre+'</b><span>'+detail+'</span></div></div>';
 }
 
-function render(filter='all'){
-  const grid = $('#grid'); grid.innerHTML='';
-  const list = PAIRS.filter(p=> filter==='all' ? true : filter==='signal' ? p.dir!=='WAIT' : filter==='strong' ? (p.dir!=='WAIT' && (p.conf||0)>=70) : p.cls===filter);
-  // Les vrais signaux d'abord, triés par force du setup (progression) décroissante ; les "en attente" ensuite.
-  list.sort((a,b)=>{ const sa=a.dir!=='WAIT'?1:0, sb=b.dir!=='WAIT'?1:0; if(sa!==sb) return sb-sa; return (b.prog||0)-(a.prog||0); });
-  list.forEach(p=> grid.appendChild(card(p)));
-  $('#count').textContent = `${list.length} paire${list.length>1?'s':''}`;
-  requestAnimationFrame(()=> grid.querySelectorAll('.fill').forEach(f=> f.style.width=f.dataset.w+'%'));
+function renderMech(){
+  const el = $('#mech-body'); if(!el) return;
+  const d = MECH, w = window.WINDOW ? WINDOW.state() : null;
+  if(!d){
+    el.innerHTML = '<div class="hist-empty">Flux NQ/ES injoignable. Sans le prix, le PDH/PDL, les gaps et la SMT, '+
+      'le MECH ne peut pas être validé — c\'est une règle du modèle, pas un bug. Réessaie dans un instant.</div>';
+    return;
+  }
+  const g = d.gaps_non_comblés || [];
+  const v = d.nq.variation_pct;
+  let h = '';
+
+  // Prix
+  h += '<div class="nq-grid">';
+  h += '<div class="nq-cell"><span>NQ (Nasdaq)</span><b>'+fmtN(d.nq.prix)+
+       (v!=null?' <i class="'+(v>=0?'up':'dn')+'">'+(v>=0?'+':'')+v+'%</i>':'')+'</b></div>';
+  if(d.es) h += '<div class="nq-cell"><span>ES (S&P 500) · pour la SMT</span><b>'+fmtN(d.es.prix)+'</b></div>';
+  h += '<div class="nq-cell"><span>PDH — plus-haut veille</span><b>'+fmtN(d.pdh)+'</b></div>';
+  h += '<div class="nq-cell"><span>PDL — plus-bas veille</span><b>'+fmtN(d.pdl)+'</b></div>';
+  h += '</div>';
+
+  // Les conditions du modèle, une par une
+  h += '<div class="ai-sec">🔍 Conditions du MECH <span class="sub">une case rouge = pas de trade</span></div>';
+  h += mechRow(w ? w.ouverte : null, 'Fenêtre de trading',
+        w ? (w.texte + ' — ouverture de Wall Street → 17 h 00 heure française') : 'Indéterminée');
+  h += mechRow(g.length>0, 'Cible : un gap non comblé',
+        g.length ? (g.length + ' gap' + (g.length>1?'s':'') + ' disponible' + (g.length>1?'s':'') + ' en M15') :
+                   'Aucun gap non comblé en M15 — le modèle n\'a pas d\'objectif, donc pas de trade');
+  if(d.smt){
+    const libre = d.smt.type === 'aucune';
+    h += mechRow(libre, 'SMT — NQ contre S&P 500',
+          d.smt.detail + (libre ? '' : ' · ' + d.smt.consigne));
+  }
+  h += mechRow(null, 'Structure + inversion',
+        'Se lit sur le graphique : swing low → swing high → lower low qui balaye, puis inversion. Le Bot IA la vérifie à chaque analyse.');
+
+  // Les cibles
+  if(g.length){
+    h += '<div class="ai-sec">🎯 Cibles du modèle <span class="sub">on vise l\'EQ, l\'équilibre du gap</span></div>';
+    g.forEach(x=>{
+      h += '<div class="nq-gap '+(x.sens==='haussier'?'up':'dn')+'">'+
+        '<b>'+x.type+' '+x.sens+'</b><span>zone '+fmtN(x.zone[0])+' – '+fmtN(x.zone[1])+'</span>'+
+        '<em>EQ '+fmtN(x.eq_cible)+'</em></div>';
+    });
+  }
+
+  h += '<div class="mech-cta"><button class="btn btn-primary" id="mech-ai">🤖 Lancer l\'analyse du Bot IA</button>'+
+       '<button class="btn" id="mech-refresh">🔄 Rafraîchir les données</button></div>';
+  h += '<p class="pro-warn" style="margin-top:14px">Données Yahoo Finance (NQ=F, ES=F), rafraîchies toutes les 5 minutes. '+
+       'Pédagogique — pas un conseil financier.</p>';
+  el.innerHTML = h;
 }
 
 function hero(){
-  const signals = PAIRS.filter(p=>p.dir!=='WAIT');
-  const longs = signals.filter(p=>p.dir==='LONG').length, shorts = signals.filter(p=>p.dir==='SHORT').length;
-  const bias = longs>shorts?'Haussier':shorts>longs?'Baissier':'Mixte';
-  const bcol = longs>shorts?'var(--long)':shorts>longs?'var(--short)':'var(--wait)';
-  $('#s-bias').innerHTML = `<span class="dot" style="background:${bcol}"></span>${bias}`;
-  const dxy = PAIRS.find(p=>p.sym==='DXY');
-  if(dxy){ $('#s-dxy').innerHTML = `${fmt(dxy.price)} <span class="chg ${dxy.chg>=0?'up':'down'}" style="font-size:.8rem">${dxy.chg>=0?'+':''}${(dxy.chg||0).toFixed(1)}%</span>`; }
-  else { $('#s-dxy').textContent = '—'; }
-  $('#s-count').textContent = `${signals.length} / ${PAIRS.length}`;
+  const w = window.WINDOW ? WINDOW.state() : null;
+  if(w) $('#s-win').innerHTML = '<span class="dot" style="background:'+(w.ouverte?'var(--long)':'var(--faint)')+'"></span>'+
+    (w.ouverte ? 'Ouverte' : 'Fermée');
+  const d = MECH;
+  $('#s-nq').textContent = d ? fmtN(d.nq.prix) : '—';
+  $('#s-gaps').textContent = d ? String((d.gaps_non_comblés||[]).length) : '—';
 }
 
 function clock(){
@@ -4583,14 +3227,7 @@ function clock(){
   }
 }
 
-let currentFilter='all';
-$('#tabs').addEventListener('click', e=>{
-  const b = e.target.closest('.tab'); if(!b) return;
-  $('#tabs .on').classList.remove('on'); b.classList.add('on');
-  currentFilter=b.dataset.f; render(currentFilter);
-});
-
-$('#cta-signals').addEventListener('click', ()=> $('#grid').scrollIntoView({behavior:'smooth',block:'start'}));
+$('#cta-signals').addEventListener('click', ()=> $('#view-mech').scrollIntoView({behavior:'smooth',block:'start'}));
 
 /* ---------- Fenêtre « Comment ça marche » ---------- */
 const howOverlay=$('#how-overlay');
@@ -4599,7 +3236,7 @@ function closeHow(){ howOverlay.classList.remove('open'); }
 $('#cta-how').addEventListener('click', openHow);
 $('#how-close').addEventListener('click', closeHow);
 howOverlay.addEventListener('click', e=>{ if(e.target===howOverlay) closeHow(); });
-$('#how-signals').addEventListener('click', ()=>{ closeHow(); $('#grid').scrollIntoView({behavior:'smooth',block:'start'}); });
+$('#how-signals').addEventListener('click', ()=>{ closeHow(); $('#view-mech').scrollIntoView({behavior:'smooth',block:'start'}); });
 $('#how-ia').addEventListener('click', ()=>{ closeHow(); openAI(); });
 // Première visite : on ouvre le guide une seule fois pour orienter l'utilisateur.
 try{
@@ -4617,95 +3254,41 @@ function setSource(live){
   if(txt) txt.textContent = live ? 'Données en direct' : 'Mode démo';
 }
 
-function priceMap(){ const m={}; PAIRS.forEach(p=>{ if(p.price!=null) m[p.sym]=p.price; }); return m; }
-function journal(source){ if(!window.History) return;
-  // Hors de la fenêtre Wall Street → 17 h (Paris) : on n'enregistre AUCUNE
-  // nouvelle position. On continue quand même d'évaluer celles déjà ouvertes.
-  const winOpen = window.WINDOW ? WINDOW.isOpen() : true;
-  if(source && winOpen){
-    // SÉLECTIF + orienté RÉUSSITE : forte confluence (>= 70 %) suffit ; on ne
-    // force plus un gros RR (qui baisse le taux de réussite). RR >= 1 seulement.
-    const strong = PAIRS.filter(p=>p && p.dir && p.dir!=='WAIT' && (p.conf||0)>=70 && (p.rr||0)>=1);
-    History.record(strong, source);
-  }
-  History.evaluate(priceMap());
-}
+// Le seul actif suivi est le NQ : la carte des prix sert à évaluer l'historique.
+function priceMap(){ return MECH ? { 'NQ': MECH.nq.prix, 'NQ1!': MECH.nq.prix, 'NQ=F': MECH.nq.prix } : {}; }
 
-async function refreshLive(){
-  if(!window.LIVE) return false;
+// Met à jour l'historique (gagné / perdu) avec le dernier prix connu du NQ.
+function journal(){ if(window.History) History.evaluate(priceMap()); }
+
+async function refreshMech(force){
+  if(!window.NQ) return false;
   try{
-    const data = await LIVE.load();
-    if(data && data.length){ PAIRS=data; hero(); render(currentFilter); setSource(true);
-      journal('Bot règles');            // enregistre les trades du bot à règles + évalue
-      if(aiOverlay && aiOverlay.classList.contains('open')) {} // rien
-      return true; }
-  }catch(e){}
-  return false;
+    const d = await NQ.load(force);
+    MECH = d || null;
+    setSource(!!d);
+    hero(); renderMech(); journal();
+    return !!d;
+  }catch(e){ setSource(false); renderMech(); return false; }
 }
 
 async function boot(){
   clock(); setInterval(clock,1000);
-  hero(); render();               // affichage immédiat (mock) pour ne jamais avoir d'écran vide
-  setSource(false);
-  await refreshLive();            // vraies données + journal
-  setInterval(refreshLive, 300000); // rafraîchit toutes les 5 min (met à jour l'historique)
-  backgroundCompute();            // IA maison + Quant + Pro tournent tout seuls
-  setInterval(backgroundCompute, 30*60000); // re-calcul auto toutes les 30 min
+  hero(); renderMech(); setSource(false);
+  await refreshMech(true);
+  setInterval(()=>refreshMech(true), 300000);   // toutes les 5 min : le MECH travaille en M5/M15
 }
-// Fait tourner TOUS les moteurs en arrière-plan : ils calculent leurs positions
-// et les enregistrent dans l'historique même si l'utilisateur n'ouvre pas leurs onglets.
-function backgroundCompute(){
-  setTimeout(()=>{ try{ loadIA&&loadIA(true); }catch(e){} }, 800);
-  setTimeout(()=>{ try{ loadQuant&&loadQuant(true); }catch(e){} }, 2200);
-  setTimeout(()=>{ try{ loadPro&&loadPro(true); }catch(e){} }, 3600);
-}
+// Boutons du tableau de bord (le contenu est reconstruit, on délègue).
+document.addEventListener('click', e=>{
+  if(e.target.closest('#mech-ai'))      openAI();
+  if(e.target.closest('#mech-refresh')){ $('#mech-body').innerHTML='<div class="hist-empty">🔄 Actualisation…</div>'; refreshMech(true); }
+});
+
 boot();
 
 /* ---------- Analyse IA (Claude) ---------- */
 const aiOverlay=$('#ai-overlay');
-let lastIA=null, lastQuant=null, lastPro=null, lastAI=null; // caches partagés des bots (pour le Consensus)
-function refreshConsensusIfVisible(){ const el=$('#view-cons'); if(el && el.style.display!=='none' && typeof renderConsensus==='function') renderConsensus(); }
+let lastAI=null;   // dernières idées du Bot IA
 
-// Construit « l'avis des autres moteurs du site » pour le donner à Claude (liaison des IA).
-function buildCollab(){
-  const out={};
-  try{
-    if(lastIA && lastIA.signals && lastIA.signals.length){
-      const sig=lastIA.signals.slice().sort((a,b)=>(b.prob||0)-(a.prob||0));
-      out.ia_maison={
-        note:"Modèle ML local (momentum relatif) — probabilité que l'actif SURPERFORME le panier.",
-        plus_forts: sig.slice(0,6).map(s=>({actif:s.sym, prob_surperformance_pct:Math.round((s.prob||0)*100)})),
-        plus_faibles: sig.slice(-4).map(s=>({actif:s.sym, prob_surperformance_pct:Math.round((s.prob||0)*100)})),
-        avantage_mesure: (lastIA.wf&&lastIA.wf.acc!=null)?{precision_pct:lastIA.wf.acc, hasard_pct:lastIA.wf.baseline}:null
-      };
-    }
-  }catch(e){}
-  try{
-    if(lastQuant && lastQuant.longs){
-      out.quant_market_neutral={
-        note:"Panier factoriel long/short — score composite (momentum, tendance, faible vol).",
-        jambe_longue: lastQuant.longs.map(g=>({actif:g.sym, score:g.score})),
-        jambe_courte: (lastQuant.shorts||[]).map(g=>({actif:g.sym, score:g.score})),
-        sharpe_backtest: lastQuant.perf?lastQuant.perf.sharpe:null
-      };
-    }
-  }catch(e){}
-  try{
-    if(lastPro && lastPro.synthese && lastPro.synthese.length){
-      out.strategies_pro={
-        note:"Stratégies systématiques à règles (tendance, cassure, retour à la moyenne) — verdict par actif.",
-        verdicts: lastPro.synthese.filter(s=>s.verdict&&s.verdict!=='neutre').map(s=>({actif:s.sym, verdict:s.verdict}))
-      };
-    }
-  }catch(e){}
-  try{
-    // Signaux ICT/SMC du site (le moteur à règles) : sens + cycle + confluence par actif.
-    const ict=(typeof PAIRS!=='undefined'?PAIRS:[]).filter(p=>p.dir&&p.dir!=='WAIT')
-      .map(p=>({actif:p.sym, sens:p.dir, cycle:p.cycle, confluence_pct:p.conf}));
-    if(ict.length) out.signaux_ict_smc={ note:"Moteur ICT/SMC du site (structure, FVG, OB, liquidité, confluence).", signaux:ict };
-  }catch(e){}
-  return Object.keys(out).length? out : null;
-}
 function renderEcon(){
   try{ const el=$('#econ-note'); if(!el||!window.ECON) return;
     el.innerHTML=ECON.bannerHTML(); // rendu immédiat (cache ou calendrier interne)
@@ -4720,8 +3303,6 @@ function openAI(){
   aiOverlay.classList.add('open');
   renderEcon(); // affiche l'état du calendrier économique
   restoreLastAI(); // réaffiche la dernière analyse mémorisée
-  // Préchauffe TOUS les moteurs du site (IA maison + Quant + Stratégies Pro) pour la centralisation.
-  try{ if($('#ai-link')&&$('#ai-link').checked){ loadIA&&loadIA(); loadQuant&&loadQuant(); loadPro&&loadPro(); } }catch(e){}
 }
 function closeAI(){ aiOverlay.classList.remove('open'); }
 $('#ai-open').addEventListener('click', openAI);
@@ -4741,18 +3322,13 @@ $('#ai-run').addEventListener('click', async ()=>{
   const st=$('#ai-status'), out=$('#ai-out');
   renderEcon(); // met à jour le bandeau annonces éco avant l'analyse
   out.classList.remove('show'); out.innerHTML='';
-  st.textContent='⏳ Le Bot IA récupère les données H1/H4/D1 et analyse…';
+  st.textContent='⏳ Le Bot IA récupère les données NQ / ES et applique le MECH…';
   try{
-    let mtf=null;
-    try{ if(window.LIVE&&LIVE.mtf) mtf=await LIVE.mtf(); }catch(e){}
     try{ if(window.ECON&&ECON.fetchLive) await ECON.fetchLive(); }catch(e){} // calendrier éco live pour le prompt
-    try{ if(window.NQ&&NQ.load) await NQ.load(); }catch(e){}                 // NQ + ES (SMT) : le carburant du MECH
+    await refreshMech(true);                                                // NQ + ES (SMT) : le carburant du MECH
     renderEcon();
-    const linkOn = $('#ai-link') && $('#ai-link').checked;
-    const collab = linkOn ? buildCollab() : null;
-    const r = await AI.analyze(PAIRS, mtf, collab);
-    const linkTxt = linkOn ? (collab ? ' · 🔗 IA maison'+(collab.quant_market_neutral?'+Quant':'')+' liées' : ' · 🔗 (avis des autres IA pas encore prêts)') : '';
-    st.textContent = '✅ Analyse terminée · modèle ' + r.model + (r.usage&&r.usage.output_tokens?(' · '+r.usage.output_tokens+' tokens'):'') + linkTxt;
+    const r = await AI.analyze([], null, null);
+    st.textContent = '✅ Analyse terminée · modèle ' + r.model + (r.usage&&r.usage.output_tokens?(' · '+r.usage.output_tokens+' tokens'):'');
     if(!r.parsed){ out.innerHTML='<div class="ai-summary">'+(r.raw||'Réponse vide.').slice(0,1200)+'</div>'; out.classList.add('show'); return; }
     let html='';
     html+=nqBlockHTML();
@@ -4769,7 +3345,7 @@ $('#ai-run').addEventListener('click', async ()=>{
       ? (r.parsed.idees||[]).filter(i=> (i.rr==null || +i.rr>=1) && (i.confiance==null || +i.confiance>=60))
       : [];
     idees.sort((a,b)=> (+b.rr||0)-(+a.rr||0));
-    lastAI=idees; refreshConsensusIfVisible(); // pour l'onglet Consensus
+    lastAI=idees;
     if(window.History){ const pm=priceMap(); const styl=(window.AI&&AI.getStyle)?AI.getStyle():null; History.record(idees.map(i=>({sym:i.paire,dir:(i.sens||'').toUpperCase(),entry:+i.entree,sl:+i.stop,tp:+i.objectif,rr:+i.rr,note:i.pourquoi||'',tf:i.tf||null,style:styl,price:(pm[i.paire]!=null?pm[i.paire]:null)})),'Bot IA'); History.evaluate(pm); }
     html+='<div class="ai-sec">⚡ Idées de trade <span class="sub">prêtes · clique une carte pour copier</span></div>';
     if(!idees.length) html+= win.ouverte
@@ -5183,122 +3759,14 @@ $('#add-save').addEventListener('click', ()=>{
   toast('✅ Trade ajouté à ton historique (RR '+rr+').');
 });
 
-/* ---------- Stratégies Pro (nouvel onglet) ---------- */
-let proLoaded=false, proLoading=false;
-function proSigCard(g){
-  const cls = g.dir==='LONG'?'long':g.dir==='SHORT'?'short':'wait';
-  const dlabel = g.dir==='LONG'?'▲ LONG':g.dir==='SHORT'?'▼ SHORT':'En attente';
-  const levels = g.dir!=='WAIT'
-    ? `<div class="plvl"><span>Entrée ${fmtN(g.entry)}</span><span class="sl">SL ${fmtN(g.sl)}</span><span class="tp">TP ${fmtN(g.tp)}</span><span>RR ${g.rr}</span></div>
-       <div class="plvl"><span class="tp">+${Math.round(100*g.rr)} € si TP</span><span class="sl">−100 € si SL</span></div>` : '';
-  const fit = (g.dir!=='WAIT' && typeof g.fit==='boolean')
-    ? `<div class="pfit ${g.fit?'ok':'no'}">${g.fit?('✓ adapté au régime · '+(g.regType||'')):('⚠ hors régime · '+(g.regType||'')+' — moins fiable')}</div>` : '';
-  return `<div class="psig ${cls}">
-    <div class="ph"><span class="psym">${g.sym}</span><span class="pdir ${cls}">${dlabel}</span></div>
-    ${levels}${fit}<div class="pnote">${g.note||''}</div></div>`;
-}
-function proRank(list){
-  const max = Math.max(1, ...list.map(r=>Math.abs(r.roc)));
-  return '<div class="pro-rank">'+list.map(r=>{
-    const w = Math.max(2, Math.abs(r.roc)/max*50), up=r.roc>=0;
-    const bar = `<i style="${up?'left:50%':('right:50%;left:auto')};width:${w}%;background:${up?'var(--long)':'var(--short)'}"></i>`;
-    return `<div class="rrow"><span class="rsym">${r.sym}</span><span class="rbar">${bar}</span><span class="rval ${up?'':'neg'}" style="color:${up?'var(--long)':'var(--short)'}">${up?'+':''}${r.roc}%</span></div>`;
-  }).join('')+'</div>';
-}
-function proAlloc(list){
-  const max=Math.max(1,...list.map(r=>r.w));
-  return '<div class="pro-rank">'+list.map(r=>`<div class="rrow"><span class="rsym">${r.sym}</span><span class="rbar"><i style="left:0;width:${Math.max(2,r.w/max*100)}%;background:var(--grad)"></i></span><span class="rval">${r.w}%</span></div>`).join('')+'</div>';
-}
-function proSynth(list){
-  return '<div class="synth-grid">'+list.map(s=>{
-    const vcls = s.verdict==='haussier'?'up':s.verdict==='baissier'?'down':'neu';
-    const vtxt = s.verdict==='haussier'?'consensus haussier':s.verdict==='baissier'?'consensus baissier':'partagé';
-    const reg = s.regime||{type:'—',trend:false};
-    const rcls = reg.trend ? (reg.dir==='haussier'?'up':'down') : 'neu';
-    const chips = s.votes.map(v=>`<span class="ctag ${v.d==='haussier'?'up':'down'}">${v.d==='haussier'?'▲':'▼'} ${v.m}</span>`).join('');
-    const conv = s.conviction||'Faible';
-    const ccls = conv==='Forte'?'strong':conv==='Moyenne'?'mid':'low';
-    const star = conv==='Forte' ? '⭐ ' : '';
-    return `<div class="synth-row${conv==='Forte'?' top':''}">
-      <div class="synth-head">
-        <span class="psym">${star}${s.sym}</span>
-        <span class="regime ${rcls}">${reg.type}</span>
-        <span class="verdict ${vcls}">${vtxt} · ${s.up}▲/${s.down}▼</span>
-        <span class="conv ${ccls}">conviction ${conv}</span>
-      </div>
-      <div class="conflu-tags">${chips||'<span class="ctag">aucune méthode active</span>'}</div>
-    </div>`;
-  }).join('')+'</div>';
-}
-function renderPro(data){
-  const body=$('#pro-body');
-  if(!data){ body.innerHTML='<div class="hist-empty">Impossible de charger les données en direct. Ouvre le fichier depuis ton PC (double-clic) pour les vraies données.</div>'; return; }
-  let html='';
-  if(data.synthese && data.synthese.length){
-    html += `<section class="pro-strat synth"><h3>Synthèse multi-méthodes<span class="stag">consensus</span></h3>
-      <p class="pro-how">Pour chaque actif : combien de méthodes systématiques vont dans le même sens, et le <b>régime</b> du marché (une tendance favorise Tendance/Cassure ; un range favorise le Retour à la moyenne).</p>
-      ${proSynth(data.synthese)}</section>`;
-  }
-  // Meilleure stratégie mesurée (expectancy la plus haute, min 10 trades) → étoile.
-  const withPerf = data.strategies.filter(s=>s.perf&&s.perf.trades>=10).sort((a,b)=>b.perf.expectancy-a.perf.expectancy);
-  const bestKey = withPerf.length ? withPerf[0].key : null;
-  html += `<p class="bt-caveat">📊 Les stats « backtest » ci-dessous sont mesurées sur l'historique réel disponible (~10 mois de bougies journalières, toutes paires). <b>Échantillon court, sans frais ni slippage — c'est indicatif, pas une promesse.</b> Le passé ne garantit pas le futur.</p>`;
-  html += data.strategies.map(s=>{
-    const inner = s.ranking ? proRank(s.ranking) : `<div class="pro-sigs">${s.signals.map(proSigCard).join('')}</div>`;
-    const star = s.key===bestKey ? '<span class="best">⭐ meilleur edge mesuré</span>' : '';
-    return `<section class="pro-strat"><h3>${s.name}<span class="stag">${s.tag}</span>${star}</h3>${perfBadge(s.perf)}<p class="pro-how">${s.how}</p>${inner}</section>`;
-  }).join('');
-  if(data.legends && data.legends.length){
-    html += `<div class="pro-legends-h">🏛️ Légendes de la finance — leurs stratégies</div>`;
-    html += data.legends.map(l=>{
-      const inner = l.signals ? `<div class="pro-sigs">${l.signals.map(proSigCard).join('')}</div>`
-                  : l.alloc ? proAlloc(l.alloc) : '';
-      return `<section class="pro-strat"><h3>${l.name}</h3><div class="legend-who">${l.who}</div>${perfBadge(l.perf)}<p class="pro-how">${l.principle}</p>${inner}</section>`;
-    }).join('');
-  }
-  body.innerHTML = html;
-  // Enregistre dans l'historique les signaux Pro concrets (non-WAIT, avec objectif)
-  if(window.History){
-    const trades=[];
-    (data.strategies||[]).forEach(s=>{ (s.signals||[]).forEach(g=>{
-      if(g && g.dir && g.dir!=='WAIT' && g.rr && g.entry!=null && g.sl!=null && g.tp!=null)
-        trades.push({sym:g.sym,dir:g.dir,entry:+g.entry,sl:+g.sl,tp:+g.tp,rr:+g.rr,note:(s.name+' — '+(g.note||'')).slice(0,180),price:+g.entry});
-    }); });
-    if(trades.length){ History.record(trades,'Stratégies Pro'); const pm=priceMap(); if(Object.keys(pm).length) History.evaluate(pm); }
-  }
-}
-function perfBadge(p){
-  if(!p || !p.trades) return '';
-  const good = p.expectancy>0;
-  return `<div class="perf ${good?'ok':'bad'}"><span class="pk">Backtest</span>`+
-    `<span><b>${p.winRate}%</b> réussite</span>`+
-    `<span><b>${p.expectancy>0?'+':''}${p.expectancy} R</b>/trade</span>`+
-    `<span>PF <b>${p.pf}</b></span>`+
-    `<span>${p.trades} trades</span>`+
-    `<span>pire série <b>−${p.maxDD} R</b></span></div>`;
-}
-function loadPro(force){
-  if((proLoaded&&!force)||proLoading||!window.PRO) return;
-  proLoading=true;
-  PRO.load().then(d=>{ proLoaded=true; proLoading=false; lastPro=d; renderPro(d); refreshConsensusIfVisible(); })
-            .catch(()=>{ proLoading=false; renderPro(null); });
-}
 $('.viewswitch').addEventListener('click', e=>{
   const b=e.target.closest('.vs'); if(!b) return;
   $('.viewswitch .on').classList.remove('on'); b.classList.add('on');
   const v=b.dataset.v;
-  $('#view-ict').style.display   = v==='ict'?'':'none';
-  $('#view-cons').style.display  = v==='cons'?'':'none';
-  $('#view-pro').style.display   = v==='pro'?'':'none';
-  $('#view-ia').style.display    = v==='ia' ?'':'none';
-  $('#view-quant').style.display = v==='quant'?'':'none';
-  $('#view-eco').style.display   = v==='eco'?'':'none';
-  $('#view-kb').style.display    = v==='kb'?'':'none';
-  if(v==='pro') loadPro();
-  if(v==='ia')  loadIA();
-  if(v==='quant') loadQuant();
+  $('#view-mech').style.display = v==='mech'?'':'none';
+  $('#view-eco').style.display  = v==='eco' ?'':'none';
+  $('#view-kb').style.display   = v==='kb'  ?'':'none';
   if(v==='kb')  loadKB();
-  if(v==='cons') loadConsensus();
   if(v==='eco') loadEco();
 });
 
@@ -5352,111 +3820,6 @@ document.addEventListener('click', e=>{
 });
 $('#eco-refresh')&&$('#eco-refresh').addEventListener('click', ()=>{ if(window.ECON&&ECON.fetchLive){ $('#eco-body').innerHTML='<div class="hist-empty">🔄 Actualisation…</div>'; ECON.fetchLive(true).then(()=>renderEco()); } });
 
-/* ---------- Consensus des bots (coordination) ---------- */
-function consVotes(sym){
-  const v={ict:null,pro:null,quant:null,ia:null,botia:null};
-  const p=(typeof PAIRS!=='undefined'?PAIRS:[]).find(x=>x.sym===sym);
-  if(p && p.dir && p.dir!=='WAIT') v.ict=p.dir;
-  if(lastPro && lastPro.synthese){ const s=lastPro.synthese.find(x=>x.sym===sym);
-    if(s){ if(s.verdict==='haussier') v.pro='LONG'; else if(s.verdict==='baissier') v.pro='SHORT'; } }
-  if(lastQuant){ if((lastQuant.longs||[]).some(g=>g.sym===sym)) v.quant='LONG';
-    else if((lastQuant.shorts||[]).some(g=>g.sym===sym)) v.quant='SHORT'; }
-  if(lastIA && lastIA.signals){ const s=lastIA.signals.find(x=>x.sym===sym);
-    if(s){ if(s.dir==='up') v.ia='LONG'; else if(s.dir==='down') v.ia='SHORT'; } }
-  if(lastAI){ const i=lastAI.find(x=>(x.paire||'').toUpperCase()===sym.toUpperCase());
-    if(i){ const d=(i.sens||'').toUpperCase(); if(d==='LONG'||d==='SHORT') v.botia=d; } }
-  return v;
-}
-function consCell(x){ return x==='LONG'?'<td class="hd-long" style="text-align:center">▲</td>'
-  : x==='SHORT'?'<td class="hd-short" style="text-align:center">▼</td>'
-  : '<td style="text-align:center;color:var(--faint)">—</td>'; }
-function renderConsensus(){
-  const body=$('#cons-body'); if(!body) return;
-  const set={};
-  (typeof PAIRS!=='undefined'?PAIRS:[]).forEach(p=>set[p.sym]=1);
-  if(lastPro&&lastPro.synthese) lastPro.synthese.forEach(s=>set[s.sym]=1);
-  if(lastQuant){ (lastQuant.longs||[]).concat(lastQuant.shorts||[],lastQuant.mids||[]).forEach(g=>set[g.sym]=1); }
-  if(lastIA&&lastIA.signals) lastIA.signals.forEach(s=>set[s.sym]=1);
-  if(lastAI) lastAI.forEach(i=>{ if(i.paire) set[i.paire]=1; });
-  const syms=Object.keys(set);
-  const ready=[lastPro?1:0,lastQuant?1:0,lastIA?1:0,lastAI?1:0].reduce((a,b)=>a+b,0)+1; // +1 = ICT toujours là
-  let rows=syms.map(sym=>{ const v=consVotes(sym);
-    const votes=[v.ict,v.pro,v.quant,v.ia,v.botia];
-    const nL=votes.filter(x=>x==='LONG').length, nS=votes.filter(x=>x==='SHORT').length;
-    return {sym,v,nL,nS,n:nL+nS,score:nL-nS};
-  }).filter(r=>r.n>0).sort((a,b)=> Math.abs(b.score)-Math.abs(a.score) || b.n-a.n);
-  if(!rows.length){ body.innerHTML='<div class="hist-empty">Aucun avis chargé. Ouvre les onglets 🧠 IA maison, 🏛️ Quant et ♟️ Stratégies Pro (et lance le 🤖 Bot IA) — puis reviens ici ou clique « Rafraîchir ».</div>'; return; }
-  const alerts=rows.filter(r=>Math.abs(r.score)>=3);
-  let h=`<p class="kb-count">${ready} bot${ready>1?'s':''} avec un avis chargé · ${rows.length} actifs · <b>${alerts.length}</b> à consensus fort (≥3 bots d'accord)</p>`;
-  if(alerts.length){
-    h+='<div class="cons-alerts"><span class="ca-h">🔔 Signaux forts</span>'+
-      alerts.map(r=>{ const buy=r.score>0; return '<button class="cons-alert '+(buy?'buy':'sell')+'" data-sym="'+r.sym+'">'+r.sym+' '+(buy?'▲ ACHAT '+r.nL:'▼ VENTE '+r.nS)+'/'+r.n+'</button>'; }).join('')+
-      '</div>';
-  }
-  h+='<div class="htable-wrap"><table class="htable"><thead><tr>'
-    +'<th>Actif</th><th style="text-align:center">🎯 ICT</th><th style="text-align:center">♟️ Pro</th><th style="text-align:center">🏛️ Quant</th><th style="text-align:center">🧠 IA maison</th><th style="text-align:center">🤖 Bot IA</th><th>Verdict</th></tr></thead><tbody>';
-  rows.forEach(r=>{
-    let verdict, vc;
-    if(r.nL>=2 && r.nL>r.nS){ verdict=(r.nL===r.n?'ACHAT net':'Achat')+' '+r.nL+'/'+r.n; vc='win'; }
-    else if(r.nS>=2 && r.nS>r.nL){ verdict=(r.nS===r.n?'VENTE nette':'Vente')+' '+r.nS+'/'+r.n; vc='loss'; }
-    else { verdict='partagé'; vc='open'; }
-    h+='<tr data-sym="'+r.sym+'"><td><b>'+r.sym+'</b></td>'+consCell(r.v.ict)+consCell(r.v.pro)+consCell(r.v.quant)+consCell(r.v.ia)+consCell(r.v.botia)
-      +'<td><span class="rc '+vc+'">'+verdict+'</span></td></tr>';
-  });
-  h+='</tbody></table></div>';
-  h+='<p class="bt-caveat" style="margin-top:14px">▲ = ce bot dit ACHETER · ▼ = VENDRE · — = neutre/pas d\'avis. Plus il y a de bots d\'accord, plus l\'idée est solide — mais <b>ce n\'est pas une garantie</b>. Certains bots couvrent peu d\'actifs (ICT 8 paires, Pro 7) ; le Quant et l\'IA maison en couvrent ~26. <b>Pédagogique, pas un conseil financier.</b></p>';
-  body.innerHTML=h;
-}
-function loadConsensus(){ if(window.PRO)loadPro(); if(window.IA)loadIA(); if(window.QUANT)loadQuant(); renderConsensus(); }
-$('#cons-refresh').addEventListener('click', ()=>{ if(window.PRO)loadPro(); if(window.IA)loadIA(); if(window.QUANT)loadQuant(); renderConsensus(); });
-// Clic sur une alerte ou une ligne du consensus → fiche actif détaillée
-$('#cons-body').addEventListener('click', e=>{
-  const b=e.target.closest('.cons-alert'); if(b){ openAsset(b.dataset.sym); return; }
-  const tr=e.target.closest('tr[data-sym]'); if(tr) openAsset(tr.dataset.sym);
-});
-
-/* ---------- Fiche actif détaillée ---------- */
-const assetOverlay=$('#asset-overlay');
-function afRow(bot, dir, detail){
-  const cls = dir==='LONG'?'up':dir==='SHORT'?'down':'neu';
-  const lbl = dir==='LONG'?'▲ Acheter':dir==='SHORT'?'▼ Vendre':'— pas d\'avis';
-  return '<div class="af-bot"><span class="nm">'+bot+'</span>'+(detail?'<span class="dt">'+detail+'</span>':'')+'<span class="vd '+cls+'">'+lbl+'</span></div>';
-}
-function openAsset(sym){
-  if(!sym) return;
-  const v=(typeof consVotes==='function')?consVotes(sym):{};
-  const votes=[v.ict,v.pro,v.quant,v.ia,v.botia];
-  const nL=votes.filter(x=>x==='LONG').length, nS=votes.filter(x=>x==='SHORT').length, n=nL+nS;
-  let vtxt,vc;
-  if(nL>=2&&nL>nS){ vtxt=(nL===n?'ACHAT net':'Achat')+' — '+nL+'/'+n+' bots'; vc='buy'; }
-  else if(nS>=2&&nS>nL){ vtxt=(nS===n?'VENTE nette':'Vente')+' — '+nS+'/'+n+' bots'; vc='sell'; }
-  else { vtxt = n? 'Avis partagés ('+nL+'▲ / '+nS+'▼)' : 'Aucun avis chargé'; vc='mix'; }
-  // Détails par bot
-  const p=(typeof PAIRS!=='undefined'?PAIRS:[]).find(x=>x.sym===sym);
-  const ictDetail = (p&&p.dir&&p.dir!=='WAIT'&&p.entry!=null)? ('entrée '+fmtN(p.entry)+' · stop '+fmtN(p.sl)+' · obj '+fmtN(p.tp)+(p.rr?' · RR '+p.rr:'')) : '';
-  const iaSig = (lastIA&&lastIA.signals)? lastIA.signals.find(x=>x.sym===sym):null;
-  const iaDetail = iaSig? (Math.round(iaSig.prob*100)+'% de surperformance · confiance '+iaSig.conf+'%'):'';
-  let quantDetail=''; if(lastQuant){ const g=(lastQuant.longs||[]).concat(lastQuant.shorts||[]).find(x=>x.sym===sym); if(g) quantDetail='score '+(g.score>=0?'+':'')+g.score; }
-  const proSyn = (lastPro&&lastPro.synthese)? lastPro.synthese.find(x=>x.sym===sym):null;
-  const proDetail = proSyn? (proSyn.up+'▲ / '+proSyn.down+'▼ méthodes'+(proSyn.conviction?' · conviction '+proSyn.conviction:'')):'';
-  const aiIdea = lastAI? lastAI.find(x=>(x.paire||'').toUpperCase()===sym.toUpperCase()):null;
-  const aiDetail = aiIdea? ('entrée '+fmtN(+aiIdea.entree)+' · stop '+fmtN(+aiIdea.stop)+' · obj '+fmtN(+aiIdea.objectif)+(aiIdea.rr?' · RR '+aiIdea.rr:'')):'';
-  let html='<div class="af-head"><h2 style="margin:0">'+sym+'</h2><span class="af-verdict '+vc+'">'+vtxt+'</span></div>';
-  html+='<div class="af-bots">'+
-    afRow('🎯 ICT / SMC', v.ict, ictDetail)+
-    afRow('♟️ Stratégies Pro', v.pro, proDetail)+
-    afRow('🏛️ Quant', v.quant, quantDetail)+
-    afRow('🧠 IA maison', v.ia, iaDetail)+
-    afRow('🤖 Bot IA (Claude)', v.botia, aiDetail)+
-    '</div>';
-  if(aiIdea && aiIdea.pourquoi) html+='<div class="why" style="margin-bottom:6px"><b>Claude :</b> '+aiIdea.pourquoi+'</div>';
-  html+='<p class="ai-note" style="margin-top:0">Astuce : ouvre les onglets 🧠 IA maison, 🏛️ Quant, ♟️ Pro (et lance le 🤖 Bot IA) pour que tous les avis soient disponibles ici.</p>';
-  $('#asset-body').innerHTML=html;
-  assetOverlay.classList.add('open');
-}
-$('#asset-close').addEventListener('click', ()=> assetOverlay.classList.remove('open'));
-assetOverlay.addEventListener('click', e=>{ if(e.target===assetOverlay) assetOverlay.classList.remove('open'); });
-
 /* ---------- Bibliothèque (base de connaissances) ---------- */
 let kbInit=false, kbCat='all', kbQuery='';
 function kbEsc(s){ return (s||'').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
@@ -5502,109 +3865,14 @@ function loadKB(){
   });
 }
 
-/* ---------- Quant / Institutionnel (market-neutral factoriel) ---------- */
-let quantLoaded=false, quantLoading=false;
-function qFacRow(lbl, v){
-  const w = Math.min(50, Math.abs(v)/3*50), up=v>=0;
-  const col = up?'var(--long)':'var(--short)';
-  const bar = `<i style="${up?'left:50%':'right:50%;left:auto'};width:${Math.max(2,w)}%;background:${col}"></i>`;
-  return `<div class="row"><span class="lb">${lbl}</span><span class="bar">${bar}</span><span class="val">${v>=0?'+':''}${v.toFixed(1)}</span></div>`;
-}
-function qCard(g, side){
-  return `<div class="qcard ${side}">
-    <div class="qh"><span class="qsym">${g.sym}</span><span class="qscore">${g.score>=0?'+':''}${g.score}</span></div>
-    <div class="qfac">
-      ${qFacRow('Momentum', g.sub.mom)}
-      ${qFacRow('Tendance', g.sub.trend)}
-      ${qFacRow('Faible vol.', g.sub.lowvol)}
-    </div></div>`;
-}
-function renderQuant(d){
-  const body=$('#quant-body');
-  if(!d){ body.innerHTML='<div class="hist-empty">Impossible de charger les vraies données (réseau restreint en aperçu). <b>Ouvre le fichier depuis ton PC</b> pour le panier factoriel.</div>'; return; }
-  const p=d.perf||{};
-  const maj = d.updated ? new Date(d.updated).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}) : '';
-  const goodSharpe = (p.sharpe||0) >= 1;
-  let html = `<section class="ia-brain">
-    <h3>🏛️ Panier market-neutral factoriel <span class="stag">long/short · ${d.assets} actifs${maj?` · maj ${maj}`:''}</span></h3>
-    <div class="q-hero">
-      <div class="q-stat ${goodSharpe?'hi':''}"><div class="k">Sharpe (backtest)</div><div class="v">${p.sharpe!=null?p.sharpe:'—'}</div><div class="s">rendement ÷ risque</div></div>
-      <div class="q-stat"><div class="k">Win rate</div><div class="v">${p.win!=null?p.win+'%':'—'}</div><div class="s">périodes gagnantes</div></div>
-      <div class="q-stat ${(p.ann||0)>0?'hi':'lo'}"><div class="k">Rendement annualisé</div><div class="v">${p.ann!=null?(p.ann>0?'+':'')+p.ann+'%':'—'}</div><div class="s">spread long−short</div></div>
-      <div class="q-stat lo"><div class="k">Pire perte (DD)</div><div class="v">−${p.dd!=null?p.dd:'—'}%</div><div class="s">sur ${p.n||'—'} périodes</div></div>
-    </div>
-    <p class="bt-caveat">📊 Backtest walk-forward du panier long/short (rebalance ~${d.H} j, quintiles). <b>⚠️ Sur seulement ~${p.n||'—'} périodes, ce Sharpe est TRÈS INSTABLE</b> — selon la fenêtre exacte, on l'a mesuré entre ~0,2 et ~1,2 pour la même méthode. J'ai d'ailleurs volontairement gardé <b>3 facteurs</b> : en ajouter gonflait le backtest mais s'effondrait en live (sur-apprentissage). <b>Sans frais ni coût de short, marché haussier — INDICATIF, pas une promesse.</b> Le Sharpe des grands fonds est &gt; 1 durablement ; ici, ne le prends pas au pied de la lettre.</p>
-    <div class="q-pillars">
-      <div class="q-pill"><h4>🎯 Facteurs</h4><p>On note chaque actif sur des primes documentées : momentum, tendance, faible volatilité.</p></div>
-      <div class="q-pill"><h4>🧩 Ensemble</h4><p>On combine ces facteurs (z-scores) en un seul score composite — comme les quants.</p></div>
-      <div class="q-pill"><h4>📊 Cross-section</h4><p>On classe les actifs entre eux : long le top 20 %, short le bottom 20 %.</p></div>
-      <div class="q-pill"><h4>⚖️ Market-neutral</h4><p>Long + short en même temps → on gagne sur l'écart, peu importe le sens du marché.</p></div>
-    </div>
-  </section>`;
-  html += `<div class="q-side"><h3>🟢 Jambe LONGUE <span class="stag" style="font-weight:400">top ${d.longs.length} · à privilégier</span></h3>
-    <p class="sub">Les plus forts du panier (score composite le plus élevé).</p>
-    <div class="q-basket">${d.longs.map(g=>qCard(g,'long')).join('')}</div></div>`;
-  html += `<div class="q-side"><h3>🔴 Jambe COURTE <span class="stag" style="font-weight:400">bottom ${d.shorts.length} · à éviter / short</span></h3>
-    <p class="sub">Les plus faibles du panier. En market-neutral, on les vend à découvert (coût de short réel à prévoir).</p>
-    <div class="q-basket">${d.shorts.map(g=>qCard(g,'short')).join('')}</div></div>`;
-  // Positions concrètes du panier : jambe longue => LONG, jambe courte => SHORT.
-  const qTrades = quantBuildTrades(d.longs, d.shorts);
-  html += `<div class="ia-h" style="margin-top:22px">🎯 Positions <span class="stag" style="font-weight:400">SÉLECTIF · convictions fortes (|score| ≥ 1) · 2 max/côté · RR 1,5 (plus de réussite)</span></div>`;
-  html += qTrades.length
-    ? `<div class="ai-out show" style="margin-top:4px">${qTrades.map(quantTradeCard).join('')}</div>${corrWarnHTML(qTrades)}`
-    : `<div class="hist-empty">Aucune conviction assez forte en ce moment — le Quant préfère ne rien prendre. C'est normal et sain (moins de trades = moins de pertes).</div>`;
-  html += `<p class="bt-caveat" style="margin-top:14px">🔎 Chaque barre montre la force du facteur (z-score vs le panier). Les <b>positions</b> ci-dessus traduisent le panier en trades (long les plus forts, short les plus faibles, stop sur la volatilité, RR 1,5). Elles s'ajoutent à ton <b>historique</b> (bot « Quant »). <b>Market-neutral ≠ sans risque — pédagogique, pas un conseil financier.</b></p>`;
-  if(window.History && qTrades.length){
-    History.record(qTrades.map(t=>({sym:t.sym,dir:t.dir,entry:t.entry,sl:t.sl,tp:t.tp,rr:t.rr,note:t.note,tf:'D1',style:'swing',price:t.entry})),'Quant');
-    const pm=priceMap(); if(Object.keys(pm).length) History.evaluate(pm);
-  }
-  body.innerHTML = html;
-}
-// Construit des positions à partir du panier Quant (mêmes règles que l'IA maison).
-function quantBuildTrades(longs, shorts){
-  function mk(g, long){
-    if(g.price==null) return null;
-    const vol=Math.max(0.005, g.vol||0.02), k=Math.min(0.15, Math.max(0.03, vol*2.5));
-    const entry=g.price, sl=long?entry*(1-k):entry*(1+k), tp=long?entry*(1+1.5*k):entry*(1-1.5*k);
-    return { sym:g.sym, dir:long?'LONG':'SHORT', entry, sl, tp, rr:1.5, score:g.score,
-      note:`Quant — panier factoriel (score ${g.score>=0?'+':''}${g.score})` };
-  }
-  // SÉLECTIF : uniquement les convictions FORTES (|score| >= 1), 2 max par côté.
-  const L = (longs||[]).filter(g=>g.score>=1.0).sort((a,b)=>b.score-a.score).slice(0,2);
-  const S = (shorts||[]).filter(g=>g.score<=-1.0).sort((a,b)=>a.score-b.score).slice(0,2);
-  return L.map(g=>mk(g,true)).filter(Boolean).concat(S.map(g=>mk(g,false)).filter(Boolean));
-}
-function quantTradeCard(t){
-  const long=t.dir==='LONG';
-  const cp=encodeURIComponent(`${t.sym} ${long?'LONG':'SHORT'} D1 | Entrée ${fmtN(t.entry)} | SL ${fmtN(t.sl)} | TP ${fmtN(t.tp)} | RR ${t.rr}`);
-  return `<div class="ai-idea copyable ${long?'long':'short'}" data-copy="${cp}" title="Clique pour copier cette position">
-    <div class="ihead"><span class="isym">${t.sym}</span>
-      <span class="ilvl">${long?'▲ LONG':'▼ SHORT'} · score ${t.score>=0?'+':''}${t.score}</span></div>
-    <div class="inums"><span>Entrée ${fmtN(t.entry)}</span><span class="lo">Stop ${fmtN(t.sl)}</span>
-      <span class="tp">Objectif ${fmtN(t.tp)}</span><span>RR ${t.rr}</span></div>
-    <div class="inums"><span class="tp">Objectif +${(pctMove(t.entry,t.tp,long)||0).toFixed(1)}%</span><span class="lo">Risque ${(pctMove(t.entry,t.sl,long)||0).toFixed(1)}% au stop</span></div>
-    ${netRRLine(t.entry,t.sl,t.tp,long)}
-    <div class="inums"><span class="tp">${capLabel()} : +${eurGain(t.rr)} € si TP</span><span class="lo">−${eurRisk()} € si SL</span></div>
-  </div>`;
-}
-function loadQuant(force){
-  if((quantLoaded&&!force)||quantLoading||!window.QUANT) return;
-  quantLoading=true;
-  QUANT.load().then(d=>{ quantLoaded=true; quantLoading=false; lastQuant=d; renderQuant(d); refreshConsensusIfVisible(); })
-             .catch(()=>{ quantLoading=false; renderQuant(null); });
-}
-
 /* ---------- Sélecteur d'outils (« Mes outils ») ---------- */
 const TOOLS = [
-  { id:'ict',   name:'🎯 Signaux ICT / SMC',   desc:'Le bot à règles : structure, FVG, Order Blocks, liquidité, confluence.', kind:'Onglet', type:'view' },
-  { id:'cons',  name:'🤝 Consensus',           desc:'Coordination : le vote des 5 bots par actif (plusieurs d\'accord = signal plus solide).', kind:'Onglet', type:'view' },
-  { id:'ia',    name:'🧠 IA maison (locale)',   desc:'Modèle ML gratuit entraîné dans ton navigateur — s\'améliore tout seul.',  kind:'Onglet', type:'view' },
-  { id:'quant', name:'🏛️ Quant / Institutionnel', desc:'Panier market-neutral factoriel, à la manière des grands fonds.',      kind:'Onglet', type:'view' },
-  { id:'pro',   name:'♟️ Stratégies Pro',       desc:'Méthodes systématiques des fonds (tendance, cassure…) + backtest.',      kind:'Onglet', type:'view' },
-  { id:'kb',    name:'📚 Bibliothèque',         desc:'Base de connaissances : tous les concepts trading (ICT, SMC, AT, risque…).', kind:'Onglet', type:'view' },
-  { id:'botia', name:'🤖 Bot IA (Claude, externe)', desc:'Intelligence externe via l\'API Anthropic — nécessite ta clé (reste en local).', kind:'Bouton', type:'btn', sel:'#ai-open' },
-  { id:'calc',  name:'🧮 Calculateur de position', desc:'Combien acheter selon ton capital et ton risque (taille, marge, gain/perte).', kind:'Bouton', type:'btn', sel:'#calc-open' },
-  { id:'hist',  name:'Historique',           desc:'Journal des trades proposés par les bots (gagné / perdu).',              kind:'Bouton', type:'btn', sel:'#hist-open' }
+  { id:'mech',  name:'🎯 MECH Model · NQ',    desc:'Le tableau de bord du modèle : prix, PDH/PDL, gaps non comblés, SMT, fenêtre.', kind:'Onglet', type:'view' },
+  { id:'eco',   name:'📅 Économie',            desc:'Calendrier économique complet — les annonces qui cassent un gap-fill.',        kind:'Onglet', type:'view' },
+  { id:'kb',    name:'📚 Bibliothèque',        desc:'Base de connaissances : les concepts sur lesquels le Bot IA raisonne.',        kind:'Onglet', type:'view' },
+  { id:'botia', name:'🤖 Bot IA (Claude, externe)', desc:'Applique le MECH sur le NQ — nécessite ta clé API (elle reste en local).', kind:'Bouton', type:'btn', sel:'#ai-open' },
+  { id:'calc',  name:'🧮 Calculateur de position', desc:'Combien acheter selon ton capital et ton risque.',                          kind:'Bouton', type:'btn', sel:'#calc-open' },
+  { id:'hist',  name:'Historique',             desc:'Journal des trades du Bot IA + tes trades manuels (gagné / perdu).',           kind:'Bouton', type:'btn', sel:'#hist-open' }
 ];
 const TOOLS_KEY='tradeassist.tools.v1';
 function toolsState(){ try{ return Object.assign({}, JSON.parse(localStorage.getItem(TOOLS_KEY)||'{}')); }catch(e){ return {}; } }
@@ -5698,163 +3966,12 @@ calcOverlay.addEventListener('click', e=>{ if(e.target===calcOverlay) calcOverla
   $('#'+id).addEventListener('input', ()=>{ calcRun(); calcSave();
     // Capital/risque = réglages globaux : on rafraîchit les montants € partout.
     if(id==='calc-cap'||id==='calc-risk'){
-      try{ render(currentFilter); }catch(e){}
+      try{ renderMech(); }catch(e){}
       try{ if(histOverlay&&histOverlay.classList.contains('open')) renderHist(); }catch(e){}
     }
   });
 });
 
-/* ---------- IA maison (machine learning dans le navigateur) ---------- */
-let iaLoaded=false, iaLoading=false;
-function iaProb(s){ return Math.round(s.prob*100); }
-function iaSigCard(s){
-  const cls = s.dir==='up'?'up':s.dir==='down'?'down':'neu';
-  const dlabel = s.dir==='up'?'▲ Fort':s.dir==='down'?'▼ Faible':'≈ Neutre';
-  const pct = iaProb(s);
-  const col = s.dir==='up'?'var(--long)':s.dir==='down'?'var(--short)':'var(--wait)';
-  const drv = (s.drivers||[]).map(d=>`<span class="dv ${d.d==='haussier'?'up':'down'}">${d.d==='haussier'?'▲':'▼'} ${d.n}</span>`).join(' · ');
-  return `<div class="iasig ${cls}">
-    <div class="ih"><span class="isym">${s.sym}</span><span class="idir ${cls}">${dlabel}</span></div>
-    <div class="iprob"><span class="big" style="color:${col}">${pct}%</span><span class="lbl">proba. de <b>surperformer le panier</b> à ~${IA_HORIZON} j · confiance ${s.conf}%</span></div>
-    <div class="ibar"><i style="width:${pct}%;background:${col}"></i></div>
-    <div class="idrv">Concepts qui pèsent le plus : ${drv||'—'}</div>
-  </div>`;
-}
-let IA_HORIZON=4;
-// Transforme les prédictions de force relative en VRAIES positions :
-// les plus forts (▲) => LONG, les plus faibles (▼) => SHORT. Le stop est
-// calibré sur la volatilité (ATR) de l'actif, l'objectif à RR 1,5 (cible proche = plus de réussite).
-function iaBuildTrades(sigs){
-  // SÉLECTIF : seulement les convictions FORTES (>= 60 % pour un long, <= 40 %
-  // pour un short), 2 max par côté. Mieux vaut peu de trades solides.
-  const sorted = sigs.slice().sort((a,b)=>(b.prob||0)-(a.prob||0));
-  const ups = sorted.filter(s=>(s.prob||0)>=0.60).slice(0,2);
-  const downs = sorted.filter(s=>(s.prob||0)<=0.40).sort((a,b)=>(a.prob||0)-(b.prob||0)).slice(0,2);
-  function mk(s, long){
-    const vol = Math.max(0.005, s.vol||0.02);
-    const k = Math.min(0.15, Math.max(0.03, vol*2.5)); // distance de stop (3 %..15 %)
-    const entry = s.price;
-    const sl = long ? entry*(1-k) : entry*(1+k);
-    const tp = long ? entry*(1+1.5*k) : entry*(1-1.5*k); // RR 1,5 : cible plus proche = plus de réussite
-    return { sym:s.sym, dir: long?'LONG':'SHORT', entry, sl, tp, rr:1.5,
-      conf:s.conf, prob:Math.round(s.prob*100),
-      note:`IA maison — momentum relatif (${Math.round(s.prob*100)}% de surperformance à ~${IA_HORIZON} j)` };
-  }
-  return ups.map(s=>mk(s,true)).concat(downs.map(s=>mk(s,false)));
-}
-function iaTradeCard(t){
-  const long=t.dir==='LONG';
-  const cp=encodeURIComponent(`${t.sym} ${long?'LONG':'SHORT'} D1 | Entrée ${fmtN(t.entry)} | SL ${fmtN(t.sl)} | TP ${fmtN(t.tp)} | RR ${t.rr}`);
-  return `<div class="ai-idea copyable ${long?'long':'short'}" data-copy="${cp}" title="Clique pour copier cette position">
-    <div class="ihead"><span class="isym">${t.sym}</span>
-      <span class="ilvl">${long?'▲ LONG':'▼ SHORT'} · ~${IA_HORIZON} j · ${t.prob}% · confiance ${t.conf}%</span></div>
-    <div class="inums"><span>Entrée ${fmtN(t.entry)}</span><span class="lo">Stop ${fmtN(t.sl)}</span>
-      <span class="tp">Objectif ${fmtN(t.tp)}</span><span>RR ${t.rr}</span></div>
-    <div class="inums"><span class="tp">Objectif +${(pctMove(t.entry,t.tp,long)||0).toFixed(1)}%</span><span class="lo">Risque ${(pctMove(t.entry,t.sl,long)||0).toFixed(1)}% au stop</span><span>durée cible ~${IA_HORIZON} j</span></div>
-    ${netRRLine(t.entry,t.sl,t.tp,long)}
-    <div class="inums"><span class="tp">${capLabel()} : +${eurGain(t.rr)} € si TP</span><span class="lo">−${eurRisk()} € si SL</span></div>
-  </div>`;
-}
-// Courbe de progression : précision (walk-forward) au fil des entraînements.
-function iaProgressSVG(prog){
-  const pts=(prog||[]).filter(p=>p.acc!=null);
-  if(pts.length<2) return '<div class="eq-empty">Pas encore assez d’entraînements pour tracer la progression — reviens après quelques ouvertures.</div>';
-  const W=680,H=120,pad=8, ys=pts.map(p=>p.acc);
-  const min=Math.min(45,...ys), max=Math.max(60,...ys), span=(max-min)||1;
-  const x=i=>pad+i*(W-2*pad)/(pts.length-1);
-  const y=v=>pad+(1-(v-min)/span)*(H-2*pad);
-  const poly=pts.map((p,i)=>x(i)+','+y(p.acc).toFixed(1)).join(' ');
-  const y50=y(50).toFixed(1);
-  return `<svg class="eq-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Progression de la précision">
-    <line x1="${pad}" x2="${W-pad}" y1="${y50}" y2="${y50}" stroke="var(--border-strong)" stroke-dasharray="3 3"/>
-    <polyline points="${poly}" fill="none" stroke="var(--long)" stroke-width="2" stroke-linejoin="round"/></svg>`;
-}
-function renderIA(d){
-  const body=$('#ia-body');
-  if(!d){ body.innerHTML='<div class="hist-empty">Impossible de charger les vraies données (réseau restreint côté aperçu en ligne). <b>Ouvre le fichier depuis ton PC</b> (double-clic) pour que l\'IA s\'entraîne sur les vraies bougies.</div>'; return; }
-  IA_HORIZON=d.horizon||20;
-  const wf=d.wf, acc=wf?wf.acc:null, accE=wf?wf.accEngaged:null, cov=wf?wf.coverage:null, base=wf?wf.baseline:null;
-  // Cible RELATIVE : la bonne référence n'est pas 50 % mais le choix NAÏF (toujours prédire le
-  // cas le plus fréquent = baseline). L'edge honnête = précision quand engagée − baseline.
-  const ref = accE!=null ? accE : acc;
-  const cmp = base!=null ? base : 50;
-  const edge = ref!=null ? ref-cmp : null;
-  const hasEdge = accE!=null && edge!=null && edge>=3 && accE>52 && (cov==null||cov>=15);
-  const accClass = ref==null?'':(hasEdge?'good':'flat');
-  // Track record réel (prédictions live déjà notées)
-  const tr=d.track, trTxt = (tr&&tr.total>0)? `${tr.rate}% <span class="s">sur ${tr.total} prédiction${tr.total>1?'s':''} notées</span>` : '<span class="s" style="font-size:.9rem">en cours de constitution…</span>';
-  let verdict;
-  if(ref==null) verdict=`<div class="ia-verdict flat">Pas encore assez de données pour mesurer un niveau fiable. L'IA s'entraîne quand même et s'améliorera à chaque ouverture.</div>`;
-  else if(hasEdge) verdict=`<div class="ia-verdict good">✅ <b>Quand elle s'engage, l'IA vise juste ${accE}%</b> du temps (sur ${cov}% des cas) pour repérer qui <b>surperforme le panier</b>, contre <b>${cmp}%</b> pour un choix naïf. Soit un <b>avantage réel de +${edge} points</b>, mesuré sur du jamais-vu (walk-forward strict). C'est <b>modeste mais réel</b> — l'anomalie de momentum relatif. Reste prudent : ça ne remplace pas la gestion du risque.</div>`;
-  else verdict=`<div class="ia-verdict flat">⚠️ <b>Honnêteté totale :</b> testée sans tricher, l'IA fait <b>${ref}%</b> pour ${cmp}% attendu d'un choix naïf — <b>avantage trop faible pour être fiable</b>. J'ai essayé plein d'approches (14 actifs, réseau de neurones, cible relative). Sur les marchés, c'est normal : le signal exploitable est minuscule. <b>Ne mise rien dessus</b> — labo pédagogique, pas une machine à gagner.</div>`;
-  let html = `<section class="ia-brain">
-    <h3>🧠 Cerveau de l'IA maison <span class="stag">force relative · momentum · navigateur</span></h3>
-    <div class="ia-kpis">
-      <div class="ia-kpi ${accClass}"><div class="k">Quand elle s'engage</div><div class="v">${accE!=null?accE+'%':'—'}</div><div class="s">choix naïf = ${cmp}% · sur ${cov!=null?cov+'%':'—'} des cas</div></div>
-      <div class="ia-kpi"><div class="k">Précision globale</div><div class="v" style="font-size:1.1rem">${acc!=null?acc+'%':'—'}</div><div class="s">jamais-vu · strict</div></div>
-      <div class="ia-kpi"><div class="k">Track record réel</div><div class="v" style="font-size:1.1rem">${trTxt}</div></div>
-      <div class="ia-kpi"><div class="k">Exemples appris</div><div class="v" style="font-size:1.1rem">${(d.samples||0).toLocaleString('fr-FR')}</div><div class="s">${d.assets||0} actifs · ${d.sessions||1} entraînements</div></div>
-    </div>
-    ${verdict}
-    ${wf&&wf.ece!=null?`<div class="ia-verdict" style="border-color:color-mix(in srgb,var(--long) 25%,transparent)">🎯 <b>Probabilités calibrées</b> : l'écart moyen entre le « % » affiché et la fréquence réelle est de <b>±${wf.ece}%</b> (mesuré hors échantillon). Autrement dit, quand l'IA affiche 63 %, c'est fiable à ~${wf.ece} points près. Plus c'est bas, mieux c'est.</div>`:''}
-    <div class="ia-mem">
-      <span class="grow">💾 Mémoire sauvegardée automatiquement (IndexedDB). Filet de sécurité : garde une copie de son cerveau.</span>
-      <button class="ai-btn ghost" id="ia-export">⬇️ Exporter le cerveau</button>
-      <button class="ai-btn ghost" id="ia-import-btn">⬆️ Importer</button>
-      <button class="ai-btn ghost" id="ia-reset">Réinitialiser</button>
-    </div>
-  </section>`;
-  // Progression au fil des entraînements
-  html += `<div class="hist-block" style="margin-top:4px"><div class="eq-head">📈 Progression de l'IA <span class="eq-sub">précision (jamais-vu) sur ${d.sessions||1} entraînement${(d.sessions||1)>1?'s':''} · ligne pointillée = 50 %</span></div>${iaProgressSVG(d.progress)}</div>`;
-  // Boussole de rotation : on met en avant les plus FORTS et les plus FAIBLES du panier
-  // (le milieu, indécis, est regroupé). d.signals est déjà trié par force décroissante.
-  const sigs = d.signals, N = sigs.length, K = Math.min(8, Math.floor(N/2));
-  const strong = sigs.slice(0, K), weak = sigs.slice(N-K), mid = sigs.slice(K, N-K);
-  const maj = d.updated ? new Date(d.updated).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}) : '';
-  html += `<div class="ia-h">🟢 Les plus forts du panier <span class="stag" style="font-weight:400">candidats à surperformer${maj?` · maj ${maj}`:''}</span></div>`;
-  html += `<div class="ia-sigs">${strong.map(iaSigCard).join('')}</div>`;
-  html += `<div class="ia-h">🔴 Les plus faibles du panier <span class="stag" style="font-weight:400">candidats à sous-performer</span></div>`;
-  html += `<div class="ia-sigs">${weak.map(iaSigCard).join('')}</div>`;
-  if(mid.length) html += `<details style="margin-top:14px"><summary style="cursor:pointer;color:var(--muted);font-size:.86rem">Voir le milieu du classement (${mid.length} actifs, signal indécis)</summary><div class="ia-sigs" style="margin-top:12px">${mid.map(iaSigCard).join('')}</div></details>`;
-  // Positions concrètes déduites du classement (forts => LONG, faibles => SHORT)
-  const iaTrades = iaBuildTrades(d.signals);
-  html += `<div class="ia-h" style="margin-top:22px">🎯 Positions proposées par l'IA maison <span class="stag" style="font-weight:400">SÉLECTIF · convictions fortes (≥ 60 % / ≤ 40 %) · 2 max/côté · RR 1,5 (plus de réussite)</span></div>`;
-  html += iaTrades.length
-    ? `<div class="ai-out show" style="margin-top:4px">${iaTrades.map(iaTradeCard).join('')}</div>${corrWarnHTML(iaTrades)}`
-    : `<div class="hist-empty">Aucune conviction assez forte pour proposer une position — l'IA maison préfère attendre (moins de trades = moins de pertes).</div>`;
-  html += `<p class="bt-caveat" style="margin-top:14px">🔎 Ces positions traduisent le classement de force relative en trades : les plus forts en <b>LONG</b>, les plus faibles en <b>SHORT</b>, entrée au prix actuel, stop calé sur la volatilité (ATR) et objectif à RR 1,5 sur ~${IA_HORIZON} j. Elles s'ajoutent à ton <b>historique</b> (bot « IA maison ») et sont notées au TP/SL. <b>Avantage statistique modeste — pédagogique, pas un conseil financier.</b></p>`;
-  // Enregistre les positions dans l'historique (source « IA maison »)
-  if(window.History && iaTrades.length){
-    History.record(iaTrades.map(t=>({sym:t.sym,dir:t.dir,entry:t.entry,sl:t.sl,tp:t.tp,rr:t.rr,note:t.note,tf:'D1',style:'swing',price:t.entry})),'IA maison');
-    const pm=priceMap(); if(Object.keys(pm).length) History.evaluate(pm);
-  }
-  body.innerHTML = html;
-  // Câblage mémoire (export / import / reset)
-  $('#ia-export').addEventListener('click', ()=>{
-    if(!window.IA) return;
-    IA.exportBrain().then(()=>{}).catch(err=> alert(err.message));
-  });
-  $('#ia-import-btn').addEventListener('click', ()=> $('#ia-import-file').click());
-  $('#ia-reset').addEventListener('click', ()=>{
-    if(window.IA && confirm('Effacer le cerveau de l\'IA et repartir de zéro ?')){
-      IA.reset().then(()=>{ iaLoaded=false; loadIA(true); });
-    }
-  });
-}
-function loadIA(force){
-  if((iaLoaded&&!force)||iaLoading||!window.IA) return;
-  iaLoading=true;
-  const body=$('#ia-body');
-  if(force) body.innerHTML='<div class="hist-empty">⏳ Ré-entraînement…</div>';
-  IA.load().then(d=>{ iaLoaded=true; iaLoading=false; lastIA=d; renderIA(d); refreshConsensusIfVisible(); })
-           .catch(()=>{ iaLoading=false; renderIA(null); });
-}
-$('#ia-import-file').addEventListener('change', e=>{
-  const f=e.target.files&&e.target.files[0]; if(!f||!window.IA) return;
-  IA.importBrain(f).then(()=>{ iaLoaded=false; loadIA(true); alert('✅ Cerveau importé — l\'IA repart de cette mémoire.'); })
-                   .catch(err=> alert('❌ '+err.message));
-  e.target.value='';
-});
 </script>
 </body>
 </html>

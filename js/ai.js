@@ -31,8 +31,8 @@
 
   var SYSTEM =
     "Tu es le CERVEAU CENTRAL d'un site de trading ICT/SMC, propulsé par Claude (Anthropic). Tu écris en français. " +
-    "Tu centralises TOUTES les données du site — signaux ICT/SMC, IA maison (ML), Quant (market-neutral), Stratégies Pro, " +
-    "calendrier économique et la base de 303 concepts + setups — pour produire LES positions finales unifiées. Rien n'est éparpillé : tout converge vers ta décision. " +
+    "Tu travailles sur UN SEUL actif : le NASDAQ (NQ). Tu reçois ses données réelles (prix, PDH/PDL, gaps non comblés, " +
+    "divergence SMT contre le S&P 500), le calendrier économique et la base de concepts du site. Tout converge vers une seule décision. " +
     "Tu opères sur les unités de temps du STYLE demandé (précisé dans le message : Scalp, Intraday ou Swing). " +
     "Tu raisonnes en TOP-DOWN : le biais vient de l'unité haute du style, tu affines sur l'intermédiaire, tu synchronises l'entrée sur l'unité basse. " +
     "Tu bases tes décisions PRINCIPALEMENT sur les concepts ICT/SMC (structure & BOS/CHoCH, MSS, FVG, order blocks, " +
@@ -97,7 +97,9 @@
     if (mtf && mtf.length) {
       txt += "\n\nDONNÉES MULTI-UNITÉS (D1 → H4 → H1) pour l'alignement top-down :\n" + JSON.stringify(mtf, null, 2);
     }
-    txt += "\n\nRÉSUMÉ par paire (toutes paires, dont DXY/forex) :\n" + JSON.stringify(snap, null, 2);
+    if (snap.length) {
+      txt += "\n\nRÉSUMÉ par paire :\n" + JSON.stringify(snap, null, 2);
+    }
     // Liaison des IA : on donne à Claude l'avis des autres moteurs du site
     // (IA maison ML + Quant market-neutral) comme confluence supplémentaire.
     if (collab) {

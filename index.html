@@ -95,6 +95,16 @@
   .live{display:inline-flex;align-items:center;gap:7px;color:var(--muted)}
   .dot{width:7px;height:7px;border-radius:50%;background:var(--faint);display:inline-block}
   .dot.on{background:var(--long)}
+.mrow{display:flex;gap:11px;align-items:flex-start;padding:11px 13px;border-radius:11px;margin-bottom:7px;
+  border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.03)}
+.mrow.ok{border-color:rgba(34,197,94,.35);background:rgba(34,197,94,.07)}
+.mrow.no{border-color:rgba(248,113,113,.35);background:rgba(248,113,113,.07)}
+.mrow.wait{opacity:.85}
+.mico{font-size:15px;line-height:1.3;flex:none}
+.mrow b{display:block;font-size:13.5px;margin-bottom:2px}
+.mrow span{font-size:12.5px;color:var(--muted);line-height:1.45}
+.mech-cta{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}
+
 .nq-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin:0 0 10px}
 .nq-cell{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:8px 10px}
 .nq-cell span{display:block;font-size:11px;color:var(--muted);margin-bottom:2px}
@@ -614,76 +624,39 @@
   <section class="hero">
     <div class="hero-grid">
       <div class="hero-left">
-        <div class="hero-eyebrow">Signaux ICT / SMC · lecture top-down</div>
-        <h1>Le marché, lu d'un coup d'œil. <em>Puis décidé.</em></h1>
-        <p class="hero-sub">La complexité — DXY, structure, zones institutionnelles — est calculée en coulisses. À l'écran, il ne reste que la décision.</p>
+        <div class="hero-eyebrow">MECH Model · Nasdaq (NQ) · SMT contre le S&amp;P 500</div>
+        <h1>Un seul modèle. <em>Appliqué à la lettre.</em></h1>
+        <p class="hero-sub">Le MECH Model de PB Blake, sur le NQ uniquement : balayage de liquidité, structure, inversion, puis un gap non comblé comme cible. Si une règle manque, il n'y a pas de trade.</p>
         <div class="cta-row">
-          <button class="btn btn-primary" id="cta-signals">Voir les signaux</button>
+          <button class="btn btn-primary" id="cta-signals">Voir les données</button>
           <button class="btn" id="cta-how">Comment ça marche</button>
         </div>
         <div class="hero-stats">
-          <div class="stat"><div class="k">Biais dominant</div><div class="v" id="s-bias">—</div></div>
-          <div class="stat"><div class="k">DXY (dollar)</div><div class="v mono" id="s-dxy">—</div></div>
-          <div class="stat"><div class="k">Paires en signal</div><div class="v mono" id="s-count">—</div></div>
+          <div class="stat"><div class="k">Fenêtre de trading</div><div class="v" id="s-win">—</div></div>
+          <div class="stat"><div class="k">NQ (Nasdaq)</div><div class="v mono" id="s-nq">—</div></div>
+          <div class="stat"><div class="k">Gaps non comblés</div><div class="v mono" id="s-gaps">—</div></div>
         </div>
       </div>
       <div class="hero-visual" aria-hidden="true">
         <span class="ring r1"></span><span class="ring r2"></span><span class="ring r3"></span>
         <div class="orb"></div>
-        <span class="chip-f c1"><span class="d" style="background:var(--long)"></span>BTC ▲ Long</span>
-        <span class="chip-f c2"><span class="d" style="background:var(--wait)"></span>MSS détecté</span>
-        <span class="chip-f c3"><span class="d" style="background:var(--short)"></span>DXY ▼ baissier</span>
-        <span class="chip-f c4"><span class="d" style="background:var(--long)"></span>FVG H4 frais</span>
+        <span class="chip-f c1"><span class="d" style="background:var(--long)"></span>Sweep de liquidité</span>
+        <span class="chip-f c2"><span class="d" style="background:var(--wait)"></span>Inversion confirmée</span>
+        <span class="chip-f c3"><span class="d" style="background:var(--short)"></span>SMT NQ vs ES</span>
+        <span class="chip-f c4"><span class="d" style="background:var(--long)"></span>Gap non comblé</span>
       </div>
     </div>
   </section>
 
   <div class="viewswitch">
-    <button class="vs on" data-v="ict">🎯 Signaux ICT / SMC</button>
-    <button class="vs" data-v="cons">🤝 Consensus</button>
-    <button class="vs" data-v="pro">♟️ Stratégies Pro</button>
-    <button class="vs" data-v="ia">🧠 IA maison <span class="vs-tag local">locale</span></button>
-    <button class="vs" data-v="quant">🏛️ Quant</button>
+    <button class="vs on" data-v="mech">🎯 MECH Model · NQ</button>
     <button class="vs" data-v="eco">📅 Économie</button>
     <button class="vs" data-v="kb">📚 Bibliothèque</button>
   </div>
 
-  <div id="view-cons" style="display:none">
-    <p class="pro-intro">Le <b>consensus des 5 bots</b> : pour chaque actif, on regarde ce que disent l'ICT, les Stratégies Pro, le Quant, l'IA maison et le Bot IA (Claude), et on compte les votes. <span class="pro-warn">Quand plusieurs bots sont d'accord (ex. « 4 sur 5 disent ACHETER »), le signal est bien plus solide qu'un seul bot isolé. Pédagogique, pas un conseil financier.</span></p>
-    <div class="modal-actions" style="margin:0 0 14px"><button class="btn" id="cons-refresh">🔄 Rafraîchir les avis</button></div>
-    <div id="cons-body"><div class="hist-empty">Ouvre une fois les onglets IA maison, Quant et Stratégies Pro pour que leurs avis se chargent, puis reviens ici (ou clique « Rafraîchir »).</div></div>
+  <div id="view-mech">
+    <div id="mech-body"><div class="hist-empty">⏳ Récupération des données NQ et ES…</div></div>
   </div>
-
-  <div id="view-ict">
-    <div class="toolbar">
-      <div class="tabs" id="tabs">
-        <button class="tab on" data-f="all">Toutes</button>
-        <button class="tab" data-f="signal">En signal</button>
-        <button class="tab" data-f="strong">Forts ≥70%</button>
-        <button class="tab" data-f="crypto">Crypto</button>
-        <button class="tab" data-f="forex">Forex / Or</button>
-      </div>
-      <div class="count"><span class="srcbadge off" id="src">● …</span> <span id="count"></span></div>
-    </div>
-    <main class="grid" id="grid"></main>
-  </div>
-
-  <div id="view-pro" style="display:none">
-    <p class="pro-intro">Les méthodes <b>systématiques</b> réellement utilisées par les fonds — calculées sur les vraies bougies journalières. Chaque bloc explique comment la stratégie marche. <span class="pro-warn">Chacune a sa propre logique : elles peuvent être en désaccord, c'est normal.</span></p>
-    <div id="pro-body"><div class="hist-empty">Chargement des stratégies…</div></div>
-  </div>
-
-  <div id="view-ia" style="display:none">
-    <div class="ident local"><span class="ident-badge">🧠 IA maison · locale &amp; gratuite</span> <span class="ident-vs">≠ le 🤖 Bot IA (Claude), qui est une intelligence externe payante</span></div>
-    <p class="pro-intro">Un <b>vrai modèle de machine learning qui tourne chez toi</b>, dans cette page — pas une IA externe. Plutôt que de deviner « ça va monter » (pile ou face), il apprend une question <b>réellement exploitable</b> : <b>quels actifs vont être plus forts que le panier</b> (momentum relatif). <span class="pro-warn">Il s'entraîne tout seul à chaque ouverture sur 14 actifs, se souvient d'une fois sur l'autre, et note ses propres prédictions passées.</span></p>
-    <div id="ia-body"><div class="hist-empty">⏳ L'IA maison récupère les vraies bougies et s'entraîne…</div></div>
-  </div>
-
-  <div id="view-quant" style="display:none">
-    <p class="pro-intro">La façon dont travaillent <b>réellement les grands fonds</b> (Renaissance, Two Sigma, Citadel…). On ne prédit pas la direction (pile ou face) : on construit un panier <b>market-neutral</b> — <b>long</b> les plus forts, <b>short</b> les plus faibles — noté sur des <b>facteurs</b> (momentum, tendance, faible volatilité). <span class="pro-warn">On gagne sur l'écart, peu importe que le marché monte ou baisse. La vraie métrique visée : le <b>Sharpe</b> (rendement ÷ risque), pas le win rate.</span></p>
-    <div id="quant-body"><div class="hist-empty">⏳ Construction du panier factoriel + backtest market-neutral…</div></div>
-  </div>
-
   <div id="view-eco" style="display:none">
     <p class="pro-intro">Le <b>calendrier économique complet de la semaine</b> — <b>toutes les annonces</b>, toutes devises (emploi, inflation, PIB, banques centrales, ventes…), avec prévision et valeur précédente. <span class="pro-warn">Les jours d'annonces à <b>fort impact</b> 🔴, le marché devient erratique : le Bot IA en tient compte et évite d'y ouvrir un trade. Données ForexFactory — pédagogique, vérifie l'officiel avant de trader.</span></p>
     <div class="eco-toolbar">
@@ -713,7 +686,7 @@
 </div>
 
 <footer class="wrap">
-  Données réelles (Binance · Frankfurter/BCE) · les bots produisent des <b>signaux/analyses</b>, ils n'exécutent aucun ordre chez un courtier · <b>pédagogique, pas un conseil financier</b> · risque max 1 % par trade.
+  Données réelles NQ / ES (Yahoo Finance) · calendrier ForexFactory · le bot produit des <b>analyses</b>, il n'exécute aucun ordre chez un courtier · <b>pédagogique, pas un conseil financier</b> · risque max 1 % par trade.
 </footer>
 
 <div class="overlay" id="ai-overlay">
@@ -750,10 +723,6 @@
         <option value="scalp">⚡ Scalp — M1 à M15 · quelques minutes</option>
       </select>
     </div>
-    <label class="ai-link" for="ai-link">
-      <input type="checkbox" id="ai-link" checked>
-      <span><b>🧠 Cerveau central : utiliser TOUTES les données du site</b> — signaux ICT/SMC + IA maison + Quant + Stratégies Pro + calendrier éco + base de 248 concepts + le MECH Model. Claude centralise tout pour décider les positions. <span style="color:var(--faint)">Fortement recommandé.</span></span>
-    </label>
     <div class="modal-actions">
       <button class="btn ai-run" id="ai-run">Analyser le marché</button>
       <button class="btn" id="ai-save">Enregistrer la clé</button>
@@ -891,41 +860,7 @@
 <script src="js/session.js"></script>
   <script src="js/nq.js"></script>
 <script src="js/ai.js"></script>
-<script src="js/pro.js"></script>
-<script src="js/ia.js"></script>
-<script src="js/quant.js"></script>
-<script src="js/live.js"></script>
 <script>
-/* ---------- Données mock (repli si le direct échoue) ---------- */
-const CYCLE_COLOR = { Accumulation:'#5b8', Manipulation:'var(--wait)', Expansion:'var(--long)', Distribution:'var(--short)', Transition:'var(--faint)' };
-const MOCK = [
-  { sym:'BTC/USD', name:'Bitcoin', cls:'crypto', price:64054, chg:+1.2, dir:'LONG', conf:78, cycle:'Expansion',
-    entry:63120, sl:61980, tp:66850, rr:3.3, win:71, prog:82,
-    note:'Discount + FVG H4 sous le prix, DXY baissier (favorable).' },
-  { sym:'ETH/USD', name:'Ethereum', cls:'crypto', price:1868, chg:+0.6, dir:'LONG', conf:64, cycle:'Accumulation',
-    entry:1841, sl:1802, tp:1955, rr:2.9, win:63, prog:58,
-    note:'Range serré, un mouvement se prépare. On attend le retour en zone.' },
-  { sym:'SOL/USD', name:'Solana', cls:'crypto', price:73.4, chg:-1.8, dir:'SHORT', conf:79, cycle:'Distribution',
-    entry:74.9, sl:77.4, tp:70.5, rr:2.6, win:66, prog:74,
-    note:'Calage en haut de range, premium, structure baissière.' },
-  { sym:'XRP/USD', name:'XRP', cls:'crypto', price:1.03, chg:+2.1, dir:'LONG', conf:63, cycle:'Expansion',
-    entry:1.008, sl:0.982, tp:1.086, rr:3.0, win:60, prog:64,
-    note:'Cassure haussière, retour sur FVG en discount.' },
-  { sym:'BNB/USD', name:'BNB', cls:'crypto', price:604, chg:-0.7, dir:'WAIT', conf:44, cycle:'Transition',
-    entry:null, sl:null, tp:null, rr:null, win:null, prog:36,
-    note:'Range serré — on attend la sortie de zone.' },
-  { sym:'EUR/USD', name:'Euro / Dollar', cls:'forex', price:1.0842, chg:+0.2, dir:'LONG', conf:66, cycle:'Accumulation',
-    entry:1.0808, sl:1.0762, tp:1.0930, rr:2.6, win:62, prog:61,
-    note:'Discount + FVG H4, dollar (DXY) qui faiblit → favorable.' },
-  { sym:'XAU/USD', name:'Or', cls:'forex', price:2418.5, chg:-0.4, dir:'WAIT', conf:41, cycle:'Transition',
-    entry:null, sl:null, tp:null, rr:null, win:null, prog:35,
-    note:'Pas de biais net — on reste à l\'écart tant que la structure n\'est pas claire.' },
-  { sym:'DXY', name:'Indice dollar', cls:'forex', price:99.71, chg:-0.6, dir:'WAIT', conf:58, cycle:'Expansion',
-    entry:null, sl:null, tp:null, rr:null, win:null, prog:55,
-    note:'Boussole du dollar — impulsion baissière, contexte favorable au risque (crypto / or / forex).' },
-];
-let PAIRS = MOCK;
-
 const $ = (s,el=document)=>el.querySelector(s);
 const fmt = n => n==null?'—':(Math.abs(n)>=1000?Math.round(n):+n.toFixed(Math.abs(n)>=10?2:4)).toLocaleString('fr-FR');
 const VERD = { LONG:{c:'v-long',t:'Long'}, SHORT:{c:'v-short',t:'Short'}, WAIT:{c:'v-wait',t:'On attend'} };
@@ -982,96 +917,78 @@ function drawChart(canvas, ch){
   level(ch.entry,'rgba(245,245,246,.85)','Entrée'); level(ch.sl,short,'SL'); level(ch.tp,long,'TP');
 }
 
-function card(p){
-  if(!p.chart) p.chart = mockChart(p);
-  const v = VERD[p.dir];
-  const isTrade = p.dir!=='WAIT';
-  const p10 = { risk: eurRisk(), gain: isTrade ? eurGain(p.rr) : 0 };
-  // Réussite : le VRAI taux du bot (journal) dès qu'il y a assez de trades clôturés, sinon une estimation honnête.
-  const jb = (isTrade && window.History) ? History.bilan('Bot règles') : null;
-  const realRate = (jb && jb.total>=5) ? jb.rate : null;
-  const rateVal = realRate!=null ? realRate+'%' : '~'+p.win+'%';
-  const rateKey = realRate!=null ? ('Réussite ('+jb.total+')') : 'Réussite (est.)';
-  const el = document.createElement('article');
-  el.className='card'; el.tabIndex=0; el.dataset.cls=p.cls; el.dataset.signal=isTrade?'1':'0';
-  el.innerHTML = `
-    <div class="c-top">
-      <div class="pair-id"><span class="sym">${p.sym}</span><span class="name">${p.name}</span></div>
-      <div class="price"><div class="p mono">${fmt(p.price)}</div>
-        <div class="chg mono ${p.chg>=0?'up':'down'}">${p.chg>=0?'+':''}${p.chg.toFixed(1)}%</div></div>
-    </div>
-    <div class="c-mid">
-      <span class="verdict ${v.c}"><span class="tri"></span>${v.t}</span>
-      <span class="cycle"><span class="cdot" style="background:${CYCLE_COLOR[p.cycle]}"></span>${p.cycle}</span>
-    </div>
-    <div class="conf">
-      <div class="conf-head"><span>${isTrade?'Progression du setup':'Maturité'}</span><b>${p.prog}%</b></div>
-      <div class="track"><div class="fill" style="background:${COLOR[p.dir]}" data-w="${p.prog}"></div></div>
-    </div>
-    <div class="detail"><div class="detail-in">
-      <div class="sep"></div>
-      <div class="chartbox"><canvas></canvas>
-        <div class="legend">
-          <span><i style="background:rgba(224,166,63,.55)"></i>FVG</span>
-          <span><i style="background:rgba(255,255,255,.25)"></i>Order Block</span>
-          <span><i style="background:rgba(55,196,107,.4)"></i>OTE</span>
-          <span><i style="background:rgba(224,166,63,.55)"></i>Liquidité</span>
-          <span><i style="background:var(--long)"></i>haussière</span>
-          <span><i style="background:var(--short)"></i>baissière</span>
-        </div>
-      </div>
-      ${isTrade ? `
-      <div class="levels">
-        <div class="lvl"><div class="k">Entrée</div><div class="v">${fmt(p.entry)}</div></div>
-        <div class="lvl sl"><div class="k">Stop</div><div class="v">${fmt(p.sl)}</div></div>
-        <div class="lvl tp"><div class="k">Objectif</div><div class="v">${fmt(p.tp)}</div></div>
-      </div>
-      <div class="metrics">
-        <div class="m"><span class="k">Ratio</span><span class="v">${p.rr} R</span></div>
-        <div class="m"><span class="k">${rateKey}</span><span class="v">${rateVal}</span></div>
-        <div class="m"><span class="k">Confluence</span><span class="v">${p.conf}%</span></div>
-        <div class="m"><span class="k">Sur ${capFr()} €</span><span class="v"><span class="gain">+${p10.gain} €</span> / <span class="loss">−${p10.risk} €</span></span></div>
-      </div>` : `
-      <div class="metrics"><div class="m"><span class="k">Confluence</span><span class="v">${p.conf}%</span></div></div>`}
-      ${isTrade && p.conflu ? `
-      <div class="conflu">
-        <div class="conflu-head"><span>Confluence des concepts</span><b>${p.conflu.aligned}/${p.conflu.total} dans le sens ${p.dir==='LONG'?'▲':'▼'}</b></div>
-        <div class="conflu-bar"><span class="up" style="flex:${p.conflu.up||0.001}"></span><span class="down" style="flex:${p.conflu.down||0.001}"></span></div>
-        <div class="conflu-tags">${p.conflu.concepts.map(c=>`<span class="ctag ${c.d==='haussier'?'up':'down'}">${c.d==='haussier'?'▲':'▼'} ${c.n}</span>`).join('')}</div>
-      </div>` : ``}
-      <div class="note">💡 <span>${p.note}</span></div>
-    </div></div>`;
-  function toggle(){
-    const opening = !el.classList.contains('open');
-    el.classList.toggle('open');
-    if(opening){ const cv=el.querySelector('canvas');
-      if(cv && !cv.dataset.drawn){ requestAnimationFrame(()=>{ drawChart(cv,p.chart); cv.dataset.drawn='1'; }); } }
-  }
-  el.addEventListener('click', toggle);
-  el.addEventListener('keydown', e=>{ if(e.key==='Enter'||e.key===' '){e.preventDefault();toggle();} });
-  return el;
+// ---------------------------------------------------------------------------
+// TABLEAU DE BORD MECH : tout ce que le modèle exige pour valider un trade.
+// Une case manquante = pas de trade. Autant que ce soit visible.
+// ---------------------------------------------------------------------------
+let MECH = null;               // dernier instantané NQ / ES
+
+function mechRow(ok, titre, detail){
+  return '<div class="mrow '+(ok===null?'wait':ok?'ok':'no')+'">'+
+    '<span class="mico">'+(ok===null?'…':ok?'✅':'❌')+'</span>'+
+    '<div><b>'+titre+'</b><span>'+detail+'</span></div></div>';
 }
 
-function render(filter='all'){
-  const grid = $('#grid'); grid.innerHTML='';
-  const list = PAIRS.filter(p=> filter==='all' ? true : filter==='signal' ? p.dir!=='WAIT' : filter==='strong' ? (p.dir!=='WAIT' && (p.conf||0)>=70) : p.cls===filter);
-  // Les vrais signaux d'abord, triés par force du setup (progression) décroissante ; les "en attente" ensuite.
-  list.sort((a,b)=>{ const sa=a.dir!=='WAIT'?1:0, sb=b.dir!=='WAIT'?1:0; if(sa!==sb) return sb-sa; return (b.prog||0)-(a.prog||0); });
-  list.forEach(p=> grid.appendChild(card(p)));
-  $('#count').textContent = `${list.length} paire${list.length>1?'s':''}`;
-  requestAnimationFrame(()=> grid.querySelectorAll('.fill').forEach(f=> f.style.width=f.dataset.w+'%'));
+function renderMech(){
+  const el = $('#mech-body'); if(!el) return;
+  const d = MECH, w = window.WINDOW ? WINDOW.state() : null;
+  if(!d){
+    el.innerHTML = '<div class="hist-empty">Flux NQ/ES injoignable. Sans le prix, le PDH/PDL, les gaps et la SMT, '+
+      'le MECH ne peut pas être validé — c\'est une règle du modèle, pas un bug. Réessaie dans un instant.</div>';
+    return;
+  }
+  const g = d.gaps_non_comblés || [];
+  const v = d.nq.variation_pct;
+  let h = '';
+
+  // Prix
+  h += '<div class="nq-grid">';
+  h += '<div class="nq-cell"><span>NQ (Nasdaq)</span><b>'+fmtN(d.nq.prix)+
+       (v!=null?' <i class="'+(v>=0?'up':'dn')+'">'+(v>=0?'+':'')+v+'%</i>':'')+'</b></div>';
+  if(d.es) h += '<div class="nq-cell"><span>ES (S&P 500) · pour la SMT</span><b>'+fmtN(d.es.prix)+'</b></div>';
+  h += '<div class="nq-cell"><span>PDH — plus-haut veille</span><b>'+fmtN(d.pdh)+'</b></div>';
+  h += '<div class="nq-cell"><span>PDL — plus-bas veille</span><b>'+fmtN(d.pdl)+'</b></div>';
+  h += '</div>';
+
+  // Les conditions du modèle, une par une
+  h += '<div class="ai-sec">🔍 Conditions du MECH <span class="sub">une case rouge = pas de trade</span></div>';
+  h += mechRow(w ? w.ouverte : null, 'Fenêtre de trading',
+        w ? (w.texte + ' — ouverture de Wall Street → 17 h 00 heure française') : 'Indéterminée');
+  h += mechRow(g.length>0, 'Cible : un gap non comblé',
+        g.length ? (g.length + ' gap' + (g.length>1?'s':'') + ' disponible' + (g.length>1?'s':'') + ' en M15') :
+                   'Aucun gap non comblé en M15 — le modèle n\'a pas d\'objectif, donc pas de trade');
+  if(d.smt){
+    const libre = d.smt.type === 'aucune';
+    h += mechRow(libre, 'SMT — NQ contre S&P 500',
+          d.smt.detail + (libre ? '' : ' · ' + d.smt.consigne));
+  }
+  h += mechRow(null, 'Structure + inversion',
+        'Se lit sur le graphique : swing low → swing high → lower low qui balaye, puis inversion. Le Bot IA la vérifie à chaque analyse.');
+
+  // Les cibles
+  if(g.length){
+    h += '<div class="ai-sec">🎯 Cibles du modèle <span class="sub">on vise l\'EQ, l\'équilibre du gap</span></div>';
+    g.forEach(x=>{
+      h += '<div class="nq-gap '+(x.sens==='haussier'?'up':'dn')+'">'+
+        '<b>'+x.type+' '+x.sens+'</b><span>zone '+fmtN(x.zone[0])+' – '+fmtN(x.zone[1])+'</span>'+
+        '<em>EQ '+fmtN(x.eq_cible)+'</em></div>';
+    });
+  }
+
+  h += '<div class="mech-cta"><button class="btn btn-primary" id="mech-ai">🤖 Lancer l\'analyse du Bot IA</button>'+
+       '<button class="btn" id="mech-refresh">🔄 Rafraîchir les données</button></div>';
+  h += '<p class="pro-warn" style="margin-top:14px">Données Yahoo Finance (NQ=F, ES=F), rafraîchies toutes les 5 minutes. '+
+       'Pédagogique — pas un conseil financier.</p>';
+  el.innerHTML = h;
 }
 
 function hero(){
-  const signals = PAIRS.filter(p=>p.dir!=='WAIT');
-  const longs = signals.filter(p=>p.dir==='LONG').length, shorts = signals.filter(p=>p.dir==='SHORT').length;
-  const bias = longs>shorts?'Haussier':shorts>longs?'Baissier':'Mixte';
-  const bcol = longs>shorts?'var(--long)':shorts>longs?'var(--short)':'var(--wait)';
-  $('#s-bias').innerHTML = `<span class="dot" style="background:${bcol}"></span>${bias}`;
-  const dxy = PAIRS.find(p=>p.sym==='DXY');
-  if(dxy){ $('#s-dxy').innerHTML = `${fmt(dxy.price)} <span class="chg ${dxy.chg>=0?'up':'down'}" style="font-size:.8rem">${dxy.chg>=0?'+':''}${(dxy.chg||0).toFixed(1)}%</span>`; }
-  else { $('#s-dxy').textContent = '—'; }
-  $('#s-count').textContent = `${signals.length} / ${PAIRS.length}`;
+  const w = window.WINDOW ? WINDOW.state() : null;
+  if(w) $('#s-win').innerHTML = '<span class="dot" style="background:'+(w.ouverte?'var(--long)':'var(--faint)')+'"></span>'+
+    (w.ouverte ? 'Ouverte' : 'Fermée');
+  const d = MECH;
+  $('#s-nq').textContent = d ? fmtN(d.nq.prix) : '—';
+  $('#s-gaps').textContent = d ? String((d.gaps_non_comblés||[]).length) : '—';
 }
 
 function clock(){
@@ -1089,14 +1006,7 @@ function clock(){
   }
 }
 
-let currentFilter='all';
-$('#tabs').addEventListener('click', e=>{
-  const b = e.target.closest('.tab'); if(!b) return;
-  $('#tabs .on').classList.remove('on'); b.classList.add('on');
-  currentFilter=b.dataset.f; render(currentFilter);
-});
-
-$('#cta-signals').addEventListener('click', ()=> $('#grid').scrollIntoView({behavior:'smooth',block:'start'}));
+$('#cta-signals').addEventListener('click', ()=> $('#view-mech').scrollIntoView({behavior:'smooth',block:'start'}));
 
 /* ---------- Fenêtre « Comment ça marche » ---------- */
 const howOverlay=$('#how-overlay');
@@ -1105,7 +1015,7 @@ function closeHow(){ howOverlay.classList.remove('open'); }
 $('#cta-how').addEventListener('click', openHow);
 $('#how-close').addEventListener('click', closeHow);
 howOverlay.addEventListener('click', e=>{ if(e.target===howOverlay) closeHow(); });
-$('#how-signals').addEventListener('click', ()=>{ closeHow(); $('#grid').scrollIntoView({behavior:'smooth',block:'start'}); });
+$('#how-signals').addEventListener('click', ()=>{ closeHow(); $('#view-mech').scrollIntoView({behavior:'smooth',block:'start'}); });
 $('#how-ia').addEventListener('click', ()=>{ closeHow(); openAI(); });
 // Première visite : on ouvre le guide une seule fois pour orienter l'utilisateur.
 try{
@@ -1123,95 +1033,41 @@ function setSource(live){
   if(txt) txt.textContent = live ? 'Données en direct' : 'Mode démo';
 }
 
-function priceMap(){ const m={}; PAIRS.forEach(p=>{ if(p.price!=null) m[p.sym]=p.price; }); return m; }
-function journal(source){ if(!window.History) return;
-  // Hors de la fenêtre Wall Street → 17 h (Paris) : on n'enregistre AUCUNE
-  // nouvelle position. On continue quand même d'évaluer celles déjà ouvertes.
-  const winOpen = window.WINDOW ? WINDOW.isOpen() : true;
-  if(source && winOpen){
-    // SÉLECTIF + orienté RÉUSSITE : forte confluence (>= 70 %) suffit ; on ne
-    // force plus un gros RR (qui baisse le taux de réussite). RR >= 1 seulement.
-    const strong = PAIRS.filter(p=>p && p.dir && p.dir!=='WAIT' && (p.conf||0)>=70 && (p.rr||0)>=1);
-    History.record(strong, source);
-  }
-  History.evaluate(priceMap());
-}
+// Le seul actif suivi est le NQ : la carte des prix sert à évaluer l'historique.
+function priceMap(){ return MECH ? { 'NQ': MECH.nq.prix, 'NQ1!': MECH.nq.prix, 'NQ=F': MECH.nq.prix } : {}; }
 
-async function refreshLive(){
-  if(!window.LIVE) return false;
+// Met à jour l'historique (gagné / perdu) avec le dernier prix connu du NQ.
+function journal(){ if(window.History) History.evaluate(priceMap()); }
+
+async function refreshMech(force){
+  if(!window.NQ) return false;
   try{
-    const data = await LIVE.load();
-    if(data && data.length){ PAIRS=data; hero(); render(currentFilter); setSource(true);
-      journal('Bot règles');            // enregistre les trades du bot à règles + évalue
-      if(aiOverlay && aiOverlay.classList.contains('open')) {} // rien
-      return true; }
-  }catch(e){}
-  return false;
+    const d = await NQ.load(force);
+    MECH = d || null;
+    setSource(!!d);
+    hero(); renderMech(); journal();
+    return !!d;
+  }catch(e){ setSource(false); renderMech(); return false; }
 }
 
 async function boot(){
   clock(); setInterval(clock,1000);
-  hero(); render();               // affichage immédiat (mock) pour ne jamais avoir d'écran vide
-  setSource(false);
-  await refreshLive();            // vraies données + journal
-  setInterval(refreshLive, 300000); // rafraîchit toutes les 5 min (met à jour l'historique)
-  backgroundCompute();            // IA maison + Quant + Pro tournent tout seuls
-  setInterval(backgroundCompute, 30*60000); // re-calcul auto toutes les 30 min
+  hero(); renderMech(); setSource(false);
+  await refreshMech(true);
+  setInterval(()=>refreshMech(true), 300000);   // toutes les 5 min : le MECH travaille en M5/M15
 }
-// Fait tourner TOUS les moteurs en arrière-plan : ils calculent leurs positions
-// et les enregistrent dans l'historique même si l'utilisateur n'ouvre pas leurs onglets.
-function backgroundCompute(){
-  setTimeout(()=>{ try{ loadIA&&loadIA(true); }catch(e){} }, 800);
-  setTimeout(()=>{ try{ loadQuant&&loadQuant(true); }catch(e){} }, 2200);
-  setTimeout(()=>{ try{ loadPro&&loadPro(true); }catch(e){} }, 3600);
-}
+// Boutons du tableau de bord (le contenu est reconstruit, on délègue).
+document.addEventListener('click', e=>{
+  if(e.target.closest('#mech-ai'))      openAI();
+  if(e.target.closest('#mech-refresh')){ $('#mech-body').innerHTML='<div class="hist-empty">🔄 Actualisation…</div>'; refreshMech(true); }
+});
+
 boot();
 
 /* ---------- Analyse IA (Claude) ---------- */
 const aiOverlay=$('#ai-overlay');
-let lastIA=null, lastQuant=null, lastPro=null, lastAI=null; // caches partagés des bots (pour le Consensus)
-function refreshConsensusIfVisible(){ const el=$('#view-cons'); if(el && el.style.display!=='none' && typeof renderConsensus==='function') renderConsensus(); }
+let lastAI=null;   // dernières idées du Bot IA
 
-// Construit « l'avis des autres moteurs du site » pour le donner à Claude (liaison des IA).
-function buildCollab(){
-  const out={};
-  try{
-    if(lastIA && lastIA.signals && lastIA.signals.length){
-      const sig=lastIA.signals.slice().sort((a,b)=>(b.prob||0)-(a.prob||0));
-      out.ia_maison={
-        note:"Modèle ML local (momentum relatif) — probabilité que l'actif SURPERFORME le panier.",
-        plus_forts: sig.slice(0,6).map(s=>({actif:s.sym, prob_surperformance_pct:Math.round((s.prob||0)*100)})),
-        plus_faibles: sig.slice(-4).map(s=>({actif:s.sym, prob_surperformance_pct:Math.round((s.prob||0)*100)})),
-        avantage_mesure: (lastIA.wf&&lastIA.wf.acc!=null)?{precision_pct:lastIA.wf.acc, hasard_pct:lastIA.wf.baseline}:null
-      };
-    }
-  }catch(e){}
-  try{
-    if(lastQuant && lastQuant.longs){
-      out.quant_market_neutral={
-        note:"Panier factoriel long/short — score composite (momentum, tendance, faible vol).",
-        jambe_longue: lastQuant.longs.map(g=>({actif:g.sym, score:g.score})),
-        jambe_courte: (lastQuant.shorts||[]).map(g=>({actif:g.sym, score:g.score})),
-        sharpe_backtest: lastQuant.perf?lastQuant.perf.sharpe:null
-      };
-    }
-  }catch(e){}
-  try{
-    if(lastPro && lastPro.synthese && lastPro.synthese.length){
-      out.strategies_pro={
-        note:"Stratégies systématiques à règles (tendance, cassure, retour à la moyenne) — verdict par actif.",
-        verdicts: lastPro.synthese.filter(s=>s.verdict&&s.verdict!=='neutre').map(s=>({actif:s.sym, verdict:s.verdict}))
-      };
-    }
-  }catch(e){}
-  try{
-    // Signaux ICT/SMC du site (le moteur à règles) : sens + cycle + confluence par actif.
-    const ict=(typeof PAIRS!=='undefined'?PAIRS:[]).filter(p=>p.dir&&p.dir!=='WAIT')
-      .map(p=>({actif:p.sym, sens:p.dir, cycle:p.cycle, confluence_pct:p.conf}));
-    if(ict.length) out.signaux_ict_smc={ note:"Moteur ICT/SMC du site (structure, FVG, OB, liquidité, confluence).", signaux:ict };
-  }catch(e){}
-  return Object.keys(out).length? out : null;
-}
 function renderEcon(){
   try{ const el=$('#econ-note'); if(!el||!window.ECON) return;
     el.innerHTML=ECON.bannerHTML(); // rendu immédiat (cache ou calendrier interne)
@@ -1226,8 +1082,6 @@ function openAI(){
   aiOverlay.classList.add('open');
   renderEcon(); // affiche l'état du calendrier économique
   restoreLastAI(); // réaffiche la dernière analyse mémorisée
-  // Préchauffe TOUS les moteurs du site (IA maison + Quant + Stratégies Pro) pour la centralisation.
-  try{ if($('#ai-link')&&$('#ai-link').checked){ loadIA&&loadIA(); loadQuant&&loadQuant(); loadPro&&loadPro(); } }catch(e){}
 }
 function closeAI(){ aiOverlay.classList.remove('open'); }
 $('#ai-open').addEventListener('click', openAI);
@@ -1247,18 +1101,13 @@ $('#ai-run').addEventListener('click', async ()=>{
   const st=$('#ai-status'), out=$('#ai-out');
   renderEcon(); // met à jour le bandeau annonces éco avant l'analyse
   out.classList.remove('show'); out.innerHTML='';
-  st.textContent='⏳ Le Bot IA récupère les données H1/H4/D1 et analyse…';
+  st.textContent='⏳ Le Bot IA récupère les données NQ / ES et applique le MECH…';
   try{
-    let mtf=null;
-    try{ if(window.LIVE&&LIVE.mtf) mtf=await LIVE.mtf(); }catch(e){}
     try{ if(window.ECON&&ECON.fetchLive) await ECON.fetchLive(); }catch(e){} // calendrier éco live pour le prompt
-    try{ if(window.NQ&&NQ.load) await NQ.load(); }catch(e){}                 // NQ + ES (SMT) : le carburant du MECH
+    await refreshMech(true);                                                // NQ + ES (SMT) : le carburant du MECH
     renderEcon();
-    const linkOn = $('#ai-link') && $('#ai-link').checked;
-    const collab = linkOn ? buildCollab() : null;
-    const r = await AI.analyze(PAIRS, mtf, collab);
-    const linkTxt = linkOn ? (collab ? ' · 🔗 IA maison'+(collab.quant_market_neutral?'+Quant':'')+' liées' : ' · 🔗 (avis des autres IA pas encore prêts)') : '';
-    st.textContent = '✅ Analyse terminée · modèle ' + r.model + (r.usage&&r.usage.output_tokens?(' · '+r.usage.output_tokens+' tokens'):'') + linkTxt;
+    const r = await AI.analyze([], null, null);
+    st.textContent = '✅ Analyse terminée · modèle ' + r.model + (r.usage&&r.usage.output_tokens?(' · '+r.usage.output_tokens+' tokens'):'');
     if(!r.parsed){ out.innerHTML='<div class="ai-summary">'+(r.raw||'Réponse vide.').slice(0,1200)+'</div>'; out.classList.add('show'); return; }
     let html='';
     html+=nqBlockHTML();
@@ -1275,7 +1124,7 @@ $('#ai-run').addEventListener('click', async ()=>{
       ? (r.parsed.idees||[]).filter(i=> (i.rr==null || +i.rr>=1) && (i.confiance==null || +i.confiance>=60))
       : [];
     idees.sort((a,b)=> (+b.rr||0)-(+a.rr||0));
-    lastAI=idees; refreshConsensusIfVisible(); // pour l'onglet Consensus
+    lastAI=idees;
     if(window.History){ const pm=priceMap(); const styl=(window.AI&&AI.getStyle)?AI.getStyle():null; History.record(idees.map(i=>({sym:i.paire,dir:(i.sens||'').toUpperCase(),entry:+i.entree,sl:+i.stop,tp:+i.objectif,rr:+i.rr,note:i.pourquoi||'',tf:i.tf||null,style:styl,price:(pm[i.paire]!=null?pm[i.paire]:null)})),'Bot IA'); History.evaluate(pm); }
     html+='<div class="ai-sec">⚡ Idées de trade <span class="sub">prêtes · clique une carte pour copier</span></div>';
     if(!idees.length) html+= win.ouverte
@@ -1689,122 +1538,14 @@ $('#add-save').addEventListener('click', ()=>{
   toast('✅ Trade ajouté à ton historique (RR '+rr+').');
 });
 
-/* ---------- Stratégies Pro (nouvel onglet) ---------- */
-let proLoaded=false, proLoading=false;
-function proSigCard(g){
-  const cls = g.dir==='LONG'?'long':g.dir==='SHORT'?'short':'wait';
-  const dlabel = g.dir==='LONG'?'▲ LONG':g.dir==='SHORT'?'▼ SHORT':'En attente';
-  const levels = g.dir!=='WAIT'
-    ? `<div class="plvl"><span>Entrée ${fmtN(g.entry)}</span><span class="sl">SL ${fmtN(g.sl)}</span><span class="tp">TP ${fmtN(g.tp)}</span><span>RR ${g.rr}</span></div>
-       <div class="plvl"><span class="tp">+${Math.round(100*g.rr)} € si TP</span><span class="sl">−100 € si SL</span></div>` : '';
-  const fit = (g.dir!=='WAIT' && typeof g.fit==='boolean')
-    ? `<div class="pfit ${g.fit?'ok':'no'}">${g.fit?('✓ adapté au régime · '+(g.regType||'')):('⚠ hors régime · '+(g.regType||'')+' — moins fiable')}</div>` : '';
-  return `<div class="psig ${cls}">
-    <div class="ph"><span class="psym">${g.sym}</span><span class="pdir ${cls}">${dlabel}</span></div>
-    ${levels}${fit}<div class="pnote">${g.note||''}</div></div>`;
-}
-function proRank(list){
-  const max = Math.max(1, ...list.map(r=>Math.abs(r.roc)));
-  return '<div class="pro-rank">'+list.map(r=>{
-    const w = Math.max(2, Math.abs(r.roc)/max*50), up=r.roc>=0;
-    const bar = `<i style="${up?'left:50%':('right:50%;left:auto')};width:${w}%;background:${up?'var(--long)':'var(--short)'}"></i>`;
-    return `<div class="rrow"><span class="rsym">${r.sym}</span><span class="rbar">${bar}</span><span class="rval ${up?'':'neg'}" style="color:${up?'var(--long)':'var(--short)'}">${up?'+':''}${r.roc}%</span></div>`;
-  }).join('')+'</div>';
-}
-function proAlloc(list){
-  const max=Math.max(1,...list.map(r=>r.w));
-  return '<div class="pro-rank">'+list.map(r=>`<div class="rrow"><span class="rsym">${r.sym}</span><span class="rbar"><i style="left:0;width:${Math.max(2,r.w/max*100)}%;background:var(--grad)"></i></span><span class="rval">${r.w}%</span></div>`).join('')+'</div>';
-}
-function proSynth(list){
-  return '<div class="synth-grid">'+list.map(s=>{
-    const vcls = s.verdict==='haussier'?'up':s.verdict==='baissier'?'down':'neu';
-    const vtxt = s.verdict==='haussier'?'consensus haussier':s.verdict==='baissier'?'consensus baissier':'partagé';
-    const reg = s.regime||{type:'—',trend:false};
-    const rcls = reg.trend ? (reg.dir==='haussier'?'up':'down') : 'neu';
-    const chips = s.votes.map(v=>`<span class="ctag ${v.d==='haussier'?'up':'down'}">${v.d==='haussier'?'▲':'▼'} ${v.m}</span>`).join('');
-    const conv = s.conviction||'Faible';
-    const ccls = conv==='Forte'?'strong':conv==='Moyenne'?'mid':'low';
-    const star = conv==='Forte' ? '⭐ ' : '';
-    return `<div class="synth-row${conv==='Forte'?' top':''}">
-      <div class="synth-head">
-        <span class="psym">${star}${s.sym}</span>
-        <span class="regime ${rcls}">${reg.type}</span>
-        <span class="verdict ${vcls}">${vtxt} · ${s.up}▲/${s.down}▼</span>
-        <span class="conv ${ccls}">conviction ${conv}</span>
-      </div>
-      <div class="conflu-tags">${chips||'<span class="ctag">aucune méthode active</span>'}</div>
-    </div>`;
-  }).join('')+'</div>';
-}
-function renderPro(data){
-  const body=$('#pro-body');
-  if(!data){ body.innerHTML='<div class="hist-empty">Impossible de charger les données en direct. Ouvre le fichier depuis ton PC (double-clic) pour les vraies données.</div>'; return; }
-  let html='';
-  if(data.synthese && data.synthese.length){
-    html += `<section class="pro-strat synth"><h3>Synthèse multi-méthodes<span class="stag">consensus</span></h3>
-      <p class="pro-how">Pour chaque actif : combien de méthodes systématiques vont dans le même sens, et le <b>régime</b> du marché (une tendance favorise Tendance/Cassure ; un range favorise le Retour à la moyenne).</p>
-      ${proSynth(data.synthese)}</section>`;
-  }
-  // Meilleure stratégie mesurée (expectancy la plus haute, min 10 trades) → étoile.
-  const withPerf = data.strategies.filter(s=>s.perf&&s.perf.trades>=10).sort((a,b)=>b.perf.expectancy-a.perf.expectancy);
-  const bestKey = withPerf.length ? withPerf[0].key : null;
-  html += `<p class="bt-caveat">📊 Les stats « backtest » ci-dessous sont mesurées sur l'historique réel disponible (~10 mois de bougies journalières, toutes paires). <b>Échantillon court, sans frais ni slippage — c'est indicatif, pas une promesse.</b> Le passé ne garantit pas le futur.</p>`;
-  html += data.strategies.map(s=>{
-    const inner = s.ranking ? proRank(s.ranking) : `<div class="pro-sigs">${s.signals.map(proSigCard).join('')}</div>`;
-    const star = s.key===bestKey ? '<span class="best">⭐ meilleur edge mesuré</span>' : '';
-    return `<section class="pro-strat"><h3>${s.name}<span class="stag">${s.tag}</span>${star}</h3>${perfBadge(s.perf)}<p class="pro-how">${s.how}</p>${inner}</section>`;
-  }).join('');
-  if(data.legends && data.legends.length){
-    html += `<div class="pro-legends-h">🏛️ Légendes de la finance — leurs stratégies</div>`;
-    html += data.legends.map(l=>{
-      const inner = l.signals ? `<div class="pro-sigs">${l.signals.map(proSigCard).join('')}</div>`
-                  : l.alloc ? proAlloc(l.alloc) : '';
-      return `<section class="pro-strat"><h3>${l.name}</h3><div class="legend-who">${l.who}</div>${perfBadge(l.perf)}<p class="pro-how">${l.principle}</p>${inner}</section>`;
-    }).join('');
-  }
-  body.innerHTML = html;
-  // Enregistre dans l'historique les signaux Pro concrets (non-WAIT, avec objectif)
-  if(window.History){
-    const trades=[];
-    (data.strategies||[]).forEach(s=>{ (s.signals||[]).forEach(g=>{
-      if(g && g.dir && g.dir!=='WAIT' && g.rr && g.entry!=null && g.sl!=null && g.tp!=null)
-        trades.push({sym:g.sym,dir:g.dir,entry:+g.entry,sl:+g.sl,tp:+g.tp,rr:+g.rr,note:(s.name+' — '+(g.note||'')).slice(0,180),price:+g.entry});
-    }); });
-    if(trades.length){ History.record(trades,'Stratégies Pro'); const pm=priceMap(); if(Object.keys(pm).length) History.evaluate(pm); }
-  }
-}
-function perfBadge(p){
-  if(!p || !p.trades) return '';
-  const good = p.expectancy>0;
-  return `<div class="perf ${good?'ok':'bad'}"><span class="pk">Backtest</span>`+
-    `<span><b>${p.winRate}%</b> réussite</span>`+
-    `<span><b>${p.expectancy>0?'+':''}${p.expectancy} R</b>/trade</span>`+
-    `<span>PF <b>${p.pf}</b></span>`+
-    `<span>${p.trades} trades</span>`+
-    `<span>pire série <b>−${p.maxDD} R</b></span></div>`;
-}
-function loadPro(force){
-  if((proLoaded&&!force)||proLoading||!window.PRO) return;
-  proLoading=true;
-  PRO.load().then(d=>{ proLoaded=true; proLoading=false; lastPro=d; renderPro(d); refreshConsensusIfVisible(); })
-            .catch(()=>{ proLoading=false; renderPro(null); });
-}
 $('.viewswitch').addEventListener('click', e=>{
   const b=e.target.closest('.vs'); if(!b) return;
   $('.viewswitch .on').classList.remove('on'); b.classList.add('on');
   const v=b.dataset.v;
-  $('#view-ict').style.display   = v==='ict'?'':'none';
-  $('#view-cons').style.display  = v==='cons'?'':'none';
-  $('#view-pro').style.display   = v==='pro'?'':'none';
-  $('#view-ia').style.display    = v==='ia' ?'':'none';
-  $('#view-quant').style.display = v==='quant'?'':'none';
-  $('#view-eco').style.display   = v==='eco'?'':'none';
-  $('#view-kb').style.display    = v==='kb'?'':'none';
-  if(v==='pro') loadPro();
-  if(v==='ia')  loadIA();
-  if(v==='quant') loadQuant();
+  $('#view-mech').style.display = v==='mech'?'':'none';
+  $('#view-eco').style.display  = v==='eco' ?'':'none';
+  $('#view-kb').style.display   = v==='kb'  ?'':'none';
   if(v==='kb')  loadKB();
-  if(v==='cons') loadConsensus();
   if(v==='eco') loadEco();
 });
 
@@ -1858,111 +1599,6 @@ document.addEventListener('click', e=>{
 });
 $('#eco-refresh')&&$('#eco-refresh').addEventListener('click', ()=>{ if(window.ECON&&ECON.fetchLive){ $('#eco-body').innerHTML='<div class="hist-empty">🔄 Actualisation…</div>'; ECON.fetchLive(true).then(()=>renderEco()); } });
 
-/* ---------- Consensus des bots (coordination) ---------- */
-function consVotes(sym){
-  const v={ict:null,pro:null,quant:null,ia:null,botia:null};
-  const p=(typeof PAIRS!=='undefined'?PAIRS:[]).find(x=>x.sym===sym);
-  if(p && p.dir && p.dir!=='WAIT') v.ict=p.dir;
-  if(lastPro && lastPro.synthese){ const s=lastPro.synthese.find(x=>x.sym===sym);
-    if(s){ if(s.verdict==='haussier') v.pro='LONG'; else if(s.verdict==='baissier') v.pro='SHORT'; } }
-  if(lastQuant){ if((lastQuant.longs||[]).some(g=>g.sym===sym)) v.quant='LONG';
-    else if((lastQuant.shorts||[]).some(g=>g.sym===sym)) v.quant='SHORT'; }
-  if(lastIA && lastIA.signals){ const s=lastIA.signals.find(x=>x.sym===sym);
-    if(s){ if(s.dir==='up') v.ia='LONG'; else if(s.dir==='down') v.ia='SHORT'; } }
-  if(lastAI){ const i=lastAI.find(x=>(x.paire||'').toUpperCase()===sym.toUpperCase());
-    if(i){ const d=(i.sens||'').toUpperCase(); if(d==='LONG'||d==='SHORT') v.botia=d; } }
-  return v;
-}
-function consCell(x){ return x==='LONG'?'<td class="hd-long" style="text-align:center">▲</td>'
-  : x==='SHORT'?'<td class="hd-short" style="text-align:center">▼</td>'
-  : '<td style="text-align:center;color:var(--faint)">—</td>'; }
-function renderConsensus(){
-  const body=$('#cons-body'); if(!body) return;
-  const set={};
-  (typeof PAIRS!=='undefined'?PAIRS:[]).forEach(p=>set[p.sym]=1);
-  if(lastPro&&lastPro.synthese) lastPro.synthese.forEach(s=>set[s.sym]=1);
-  if(lastQuant){ (lastQuant.longs||[]).concat(lastQuant.shorts||[],lastQuant.mids||[]).forEach(g=>set[g.sym]=1); }
-  if(lastIA&&lastIA.signals) lastIA.signals.forEach(s=>set[s.sym]=1);
-  if(lastAI) lastAI.forEach(i=>{ if(i.paire) set[i.paire]=1; });
-  const syms=Object.keys(set);
-  const ready=[lastPro?1:0,lastQuant?1:0,lastIA?1:0,lastAI?1:0].reduce((a,b)=>a+b,0)+1; // +1 = ICT toujours là
-  let rows=syms.map(sym=>{ const v=consVotes(sym);
-    const votes=[v.ict,v.pro,v.quant,v.ia,v.botia];
-    const nL=votes.filter(x=>x==='LONG').length, nS=votes.filter(x=>x==='SHORT').length;
-    return {sym,v,nL,nS,n:nL+nS,score:nL-nS};
-  }).filter(r=>r.n>0).sort((a,b)=> Math.abs(b.score)-Math.abs(a.score) || b.n-a.n);
-  if(!rows.length){ body.innerHTML='<div class="hist-empty">Aucun avis chargé. Ouvre les onglets 🧠 IA maison, 🏛️ Quant et ♟️ Stratégies Pro (et lance le 🤖 Bot IA) — puis reviens ici ou clique « Rafraîchir ».</div>'; return; }
-  const alerts=rows.filter(r=>Math.abs(r.score)>=3);
-  let h=`<p class="kb-count">${ready} bot${ready>1?'s':''} avec un avis chargé · ${rows.length} actifs · <b>${alerts.length}</b> à consensus fort (≥3 bots d'accord)</p>`;
-  if(alerts.length){
-    h+='<div class="cons-alerts"><span class="ca-h">🔔 Signaux forts</span>'+
-      alerts.map(r=>{ const buy=r.score>0; return '<button class="cons-alert '+(buy?'buy':'sell')+'" data-sym="'+r.sym+'">'+r.sym+' '+(buy?'▲ ACHAT '+r.nL:'▼ VENTE '+r.nS)+'/'+r.n+'</button>'; }).join('')+
-      '</div>';
-  }
-  h+='<div class="htable-wrap"><table class="htable"><thead><tr>'
-    +'<th>Actif</th><th style="text-align:center">🎯 ICT</th><th style="text-align:center">♟️ Pro</th><th style="text-align:center">🏛️ Quant</th><th style="text-align:center">🧠 IA maison</th><th style="text-align:center">🤖 Bot IA</th><th>Verdict</th></tr></thead><tbody>';
-  rows.forEach(r=>{
-    let verdict, vc;
-    if(r.nL>=2 && r.nL>r.nS){ verdict=(r.nL===r.n?'ACHAT net':'Achat')+' '+r.nL+'/'+r.n; vc='win'; }
-    else if(r.nS>=2 && r.nS>r.nL){ verdict=(r.nS===r.n?'VENTE nette':'Vente')+' '+r.nS+'/'+r.n; vc='loss'; }
-    else { verdict='partagé'; vc='open'; }
-    h+='<tr data-sym="'+r.sym+'"><td><b>'+r.sym+'</b></td>'+consCell(r.v.ict)+consCell(r.v.pro)+consCell(r.v.quant)+consCell(r.v.ia)+consCell(r.v.botia)
-      +'<td><span class="rc '+vc+'">'+verdict+'</span></td></tr>';
-  });
-  h+='</tbody></table></div>';
-  h+='<p class="bt-caveat" style="margin-top:14px">▲ = ce bot dit ACHETER · ▼ = VENDRE · — = neutre/pas d\'avis. Plus il y a de bots d\'accord, plus l\'idée est solide — mais <b>ce n\'est pas une garantie</b>. Certains bots couvrent peu d\'actifs (ICT 8 paires, Pro 7) ; le Quant et l\'IA maison en couvrent ~26. <b>Pédagogique, pas un conseil financier.</b></p>';
-  body.innerHTML=h;
-}
-function loadConsensus(){ if(window.PRO)loadPro(); if(window.IA)loadIA(); if(window.QUANT)loadQuant(); renderConsensus(); }
-$('#cons-refresh').addEventListener('click', ()=>{ if(window.PRO)loadPro(); if(window.IA)loadIA(); if(window.QUANT)loadQuant(); renderConsensus(); });
-// Clic sur une alerte ou une ligne du consensus → fiche actif détaillée
-$('#cons-body').addEventListener('click', e=>{
-  const b=e.target.closest('.cons-alert'); if(b){ openAsset(b.dataset.sym); return; }
-  const tr=e.target.closest('tr[data-sym]'); if(tr) openAsset(tr.dataset.sym);
-});
-
-/* ---------- Fiche actif détaillée ---------- */
-const assetOverlay=$('#asset-overlay');
-function afRow(bot, dir, detail){
-  const cls = dir==='LONG'?'up':dir==='SHORT'?'down':'neu';
-  const lbl = dir==='LONG'?'▲ Acheter':dir==='SHORT'?'▼ Vendre':'— pas d\'avis';
-  return '<div class="af-bot"><span class="nm">'+bot+'</span>'+(detail?'<span class="dt">'+detail+'</span>':'')+'<span class="vd '+cls+'">'+lbl+'</span></div>';
-}
-function openAsset(sym){
-  if(!sym) return;
-  const v=(typeof consVotes==='function')?consVotes(sym):{};
-  const votes=[v.ict,v.pro,v.quant,v.ia,v.botia];
-  const nL=votes.filter(x=>x==='LONG').length, nS=votes.filter(x=>x==='SHORT').length, n=nL+nS;
-  let vtxt,vc;
-  if(nL>=2&&nL>nS){ vtxt=(nL===n?'ACHAT net':'Achat')+' — '+nL+'/'+n+' bots'; vc='buy'; }
-  else if(nS>=2&&nS>nL){ vtxt=(nS===n?'VENTE nette':'Vente')+' — '+nS+'/'+n+' bots'; vc='sell'; }
-  else { vtxt = n? 'Avis partagés ('+nL+'▲ / '+nS+'▼)' : 'Aucun avis chargé'; vc='mix'; }
-  // Détails par bot
-  const p=(typeof PAIRS!=='undefined'?PAIRS:[]).find(x=>x.sym===sym);
-  const ictDetail = (p&&p.dir&&p.dir!=='WAIT'&&p.entry!=null)? ('entrée '+fmtN(p.entry)+' · stop '+fmtN(p.sl)+' · obj '+fmtN(p.tp)+(p.rr?' · RR '+p.rr:'')) : '';
-  const iaSig = (lastIA&&lastIA.signals)? lastIA.signals.find(x=>x.sym===sym):null;
-  const iaDetail = iaSig? (Math.round(iaSig.prob*100)+'% de surperformance · confiance '+iaSig.conf+'%'):'';
-  let quantDetail=''; if(lastQuant){ const g=(lastQuant.longs||[]).concat(lastQuant.shorts||[]).find(x=>x.sym===sym); if(g) quantDetail='score '+(g.score>=0?'+':'')+g.score; }
-  const proSyn = (lastPro&&lastPro.synthese)? lastPro.synthese.find(x=>x.sym===sym):null;
-  const proDetail = proSyn? (proSyn.up+'▲ / '+proSyn.down+'▼ méthodes'+(proSyn.conviction?' · conviction '+proSyn.conviction:'')):'';
-  const aiIdea = lastAI? lastAI.find(x=>(x.paire||'').toUpperCase()===sym.toUpperCase()):null;
-  const aiDetail = aiIdea? ('entrée '+fmtN(+aiIdea.entree)+' · stop '+fmtN(+aiIdea.stop)+' · obj '+fmtN(+aiIdea.objectif)+(aiIdea.rr?' · RR '+aiIdea.rr:'')):'';
-  let html='<div class="af-head"><h2 style="margin:0">'+sym+'</h2><span class="af-verdict '+vc+'">'+vtxt+'</span></div>';
-  html+='<div class="af-bots">'+
-    afRow('🎯 ICT / SMC', v.ict, ictDetail)+
-    afRow('♟️ Stratégies Pro', v.pro, proDetail)+
-    afRow('🏛️ Quant', v.quant, quantDetail)+
-    afRow('🧠 IA maison', v.ia, iaDetail)+
-    afRow('🤖 Bot IA (Claude)', v.botia, aiDetail)+
-    '</div>';
-  if(aiIdea && aiIdea.pourquoi) html+='<div class="why" style="margin-bottom:6px"><b>Claude :</b> '+aiIdea.pourquoi+'</div>';
-  html+='<p class="ai-note" style="margin-top:0">Astuce : ouvre les onglets 🧠 IA maison, 🏛️ Quant, ♟️ Pro (et lance le 🤖 Bot IA) pour que tous les avis soient disponibles ici.</p>';
-  $('#asset-body').innerHTML=html;
-  assetOverlay.classList.add('open');
-}
-$('#asset-close').addEventListener('click', ()=> assetOverlay.classList.remove('open'));
-assetOverlay.addEventListener('click', e=>{ if(e.target===assetOverlay) assetOverlay.classList.remove('open'); });
-
 /* ---------- Bibliothèque (base de connaissances) ---------- */
 let kbInit=false, kbCat='all', kbQuery='';
 function kbEsc(s){ return (s||'').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
@@ -2008,109 +1644,14 @@ function loadKB(){
   });
 }
 
-/* ---------- Quant / Institutionnel (market-neutral factoriel) ---------- */
-let quantLoaded=false, quantLoading=false;
-function qFacRow(lbl, v){
-  const w = Math.min(50, Math.abs(v)/3*50), up=v>=0;
-  const col = up?'var(--long)':'var(--short)';
-  const bar = `<i style="${up?'left:50%':'right:50%;left:auto'};width:${Math.max(2,w)}%;background:${col}"></i>`;
-  return `<div class="row"><span class="lb">${lbl}</span><span class="bar">${bar}</span><span class="val">${v>=0?'+':''}${v.toFixed(1)}</span></div>`;
-}
-function qCard(g, side){
-  return `<div class="qcard ${side}">
-    <div class="qh"><span class="qsym">${g.sym}</span><span class="qscore">${g.score>=0?'+':''}${g.score}</span></div>
-    <div class="qfac">
-      ${qFacRow('Momentum', g.sub.mom)}
-      ${qFacRow('Tendance', g.sub.trend)}
-      ${qFacRow('Faible vol.', g.sub.lowvol)}
-    </div></div>`;
-}
-function renderQuant(d){
-  const body=$('#quant-body');
-  if(!d){ body.innerHTML='<div class="hist-empty">Impossible de charger les vraies données (réseau restreint en aperçu). <b>Ouvre le fichier depuis ton PC</b> pour le panier factoriel.</div>'; return; }
-  const p=d.perf||{};
-  const maj = d.updated ? new Date(d.updated).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}) : '';
-  const goodSharpe = (p.sharpe||0) >= 1;
-  let html = `<section class="ia-brain">
-    <h3>🏛️ Panier market-neutral factoriel <span class="stag">long/short · ${d.assets} actifs${maj?` · maj ${maj}`:''}</span></h3>
-    <div class="q-hero">
-      <div class="q-stat ${goodSharpe?'hi':''}"><div class="k">Sharpe (backtest)</div><div class="v">${p.sharpe!=null?p.sharpe:'—'}</div><div class="s">rendement ÷ risque</div></div>
-      <div class="q-stat"><div class="k">Win rate</div><div class="v">${p.win!=null?p.win+'%':'—'}</div><div class="s">périodes gagnantes</div></div>
-      <div class="q-stat ${(p.ann||0)>0?'hi':'lo'}"><div class="k">Rendement annualisé</div><div class="v">${p.ann!=null?(p.ann>0?'+':'')+p.ann+'%':'—'}</div><div class="s">spread long−short</div></div>
-      <div class="q-stat lo"><div class="k">Pire perte (DD)</div><div class="v">−${p.dd!=null?p.dd:'—'}%</div><div class="s">sur ${p.n||'—'} périodes</div></div>
-    </div>
-    <p class="bt-caveat">📊 Backtest walk-forward du panier long/short (rebalance ~${d.H} j, quintiles). <b>⚠️ Sur seulement ~${p.n||'—'} périodes, ce Sharpe est TRÈS INSTABLE</b> — selon la fenêtre exacte, on l'a mesuré entre ~0,2 et ~1,2 pour la même méthode. J'ai d'ailleurs volontairement gardé <b>3 facteurs</b> : en ajouter gonflait le backtest mais s'effondrait en live (sur-apprentissage). <b>Sans frais ni coût de short, marché haussier — INDICATIF, pas une promesse.</b> Le Sharpe des grands fonds est &gt; 1 durablement ; ici, ne le prends pas au pied de la lettre.</p>
-    <div class="q-pillars">
-      <div class="q-pill"><h4>🎯 Facteurs</h4><p>On note chaque actif sur des primes documentées : momentum, tendance, faible volatilité.</p></div>
-      <div class="q-pill"><h4>🧩 Ensemble</h4><p>On combine ces facteurs (z-scores) en un seul score composite — comme les quants.</p></div>
-      <div class="q-pill"><h4>📊 Cross-section</h4><p>On classe les actifs entre eux : long le top 20 %, short le bottom 20 %.</p></div>
-      <div class="q-pill"><h4>⚖️ Market-neutral</h4><p>Long + short en même temps → on gagne sur l'écart, peu importe le sens du marché.</p></div>
-    </div>
-  </section>`;
-  html += `<div class="q-side"><h3>🟢 Jambe LONGUE <span class="stag" style="font-weight:400">top ${d.longs.length} · à privilégier</span></h3>
-    <p class="sub">Les plus forts du panier (score composite le plus élevé).</p>
-    <div class="q-basket">${d.longs.map(g=>qCard(g,'long')).join('')}</div></div>`;
-  html += `<div class="q-side"><h3>🔴 Jambe COURTE <span class="stag" style="font-weight:400">bottom ${d.shorts.length} · à éviter / short</span></h3>
-    <p class="sub">Les plus faibles du panier. En market-neutral, on les vend à découvert (coût de short réel à prévoir).</p>
-    <div class="q-basket">${d.shorts.map(g=>qCard(g,'short')).join('')}</div></div>`;
-  // Positions concrètes du panier : jambe longue => LONG, jambe courte => SHORT.
-  const qTrades = quantBuildTrades(d.longs, d.shorts);
-  html += `<div class="ia-h" style="margin-top:22px">🎯 Positions <span class="stag" style="font-weight:400">SÉLECTIF · convictions fortes (|score| ≥ 1) · 2 max/côté · RR 1,5 (plus de réussite)</span></div>`;
-  html += qTrades.length
-    ? `<div class="ai-out show" style="margin-top:4px">${qTrades.map(quantTradeCard).join('')}</div>${corrWarnHTML(qTrades)}`
-    : `<div class="hist-empty">Aucune conviction assez forte en ce moment — le Quant préfère ne rien prendre. C'est normal et sain (moins de trades = moins de pertes).</div>`;
-  html += `<p class="bt-caveat" style="margin-top:14px">🔎 Chaque barre montre la force du facteur (z-score vs le panier). Les <b>positions</b> ci-dessus traduisent le panier en trades (long les plus forts, short les plus faibles, stop sur la volatilité, RR 1,5). Elles s'ajoutent à ton <b>historique</b> (bot « Quant »). <b>Market-neutral ≠ sans risque — pédagogique, pas un conseil financier.</b></p>`;
-  if(window.History && qTrades.length){
-    History.record(qTrades.map(t=>({sym:t.sym,dir:t.dir,entry:t.entry,sl:t.sl,tp:t.tp,rr:t.rr,note:t.note,tf:'D1',style:'swing',price:t.entry})),'Quant');
-    const pm=priceMap(); if(Object.keys(pm).length) History.evaluate(pm);
-  }
-  body.innerHTML = html;
-}
-// Construit des positions à partir du panier Quant (mêmes règles que l'IA maison).
-function quantBuildTrades(longs, shorts){
-  function mk(g, long){
-    if(g.price==null) return null;
-    const vol=Math.max(0.005, g.vol||0.02), k=Math.min(0.15, Math.max(0.03, vol*2.5));
-    const entry=g.price, sl=long?entry*(1-k):entry*(1+k), tp=long?entry*(1+1.5*k):entry*(1-1.5*k);
-    return { sym:g.sym, dir:long?'LONG':'SHORT', entry, sl, tp, rr:1.5, score:g.score,
-      note:`Quant — panier factoriel (score ${g.score>=0?'+':''}${g.score})` };
-  }
-  // SÉLECTIF : uniquement les convictions FORTES (|score| >= 1), 2 max par côté.
-  const L = (longs||[]).filter(g=>g.score>=1.0).sort((a,b)=>b.score-a.score).slice(0,2);
-  const S = (shorts||[]).filter(g=>g.score<=-1.0).sort((a,b)=>a.score-b.score).slice(0,2);
-  return L.map(g=>mk(g,true)).filter(Boolean).concat(S.map(g=>mk(g,false)).filter(Boolean));
-}
-function quantTradeCard(t){
-  const long=t.dir==='LONG';
-  const cp=encodeURIComponent(`${t.sym} ${long?'LONG':'SHORT'} D1 | Entrée ${fmtN(t.entry)} | SL ${fmtN(t.sl)} | TP ${fmtN(t.tp)} | RR ${t.rr}`);
-  return `<div class="ai-idea copyable ${long?'long':'short'}" data-copy="${cp}" title="Clique pour copier cette position">
-    <div class="ihead"><span class="isym">${t.sym}</span>
-      <span class="ilvl">${long?'▲ LONG':'▼ SHORT'} · score ${t.score>=0?'+':''}${t.score}</span></div>
-    <div class="inums"><span>Entrée ${fmtN(t.entry)}</span><span class="lo">Stop ${fmtN(t.sl)}</span>
-      <span class="tp">Objectif ${fmtN(t.tp)}</span><span>RR ${t.rr}</span></div>
-    <div class="inums"><span class="tp">Objectif +${(pctMove(t.entry,t.tp,long)||0).toFixed(1)}%</span><span class="lo">Risque ${(pctMove(t.entry,t.sl,long)||0).toFixed(1)}% au stop</span></div>
-    ${netRRLine(t.entry,t.sl,t.tp,long)}
-    <div class="inums"><span class="tp">${capLabel()} : +${eurGain(t.rr)} € si TP</span><span class="lo">−${eurRisk()} € si SL</span></div>
-  </div>`;
-}
-function loadQuant(force){
-  if((quantLoaded&&!force)||quantLoading||!window.QUANT) return;
-  quantLoading=true;
-  QUANT.load().then(d=>{ quantLoaded=true; quantLoading=false; lastQuant=d; renderQuant(d); refreshConsensusIfVisible(); })
-             .catch(()=>{ quantLoading=false; renderQuant(null); });
-}
-
 /* ---------- Sélecteur d'outils (« Mes outils ») ---------- */
 const TOOLS = [
-  { id:'ict',   name:'🎯 Signaux ICT / SMC',   desc:'Le bot à règles : structure, FVG, Order Blocks, liquidité, confluence.', kind:'Onglet', type:'view' },
-  { id:'cons',  name:'🤝 Consensus',           desc:'Coordination : le vote des 5 bots par actif (plusieurs d\'accord = signal plus solide).', kind:'Onglet', type:'view' },
-  { id:'ia',    name:'🧠 IA maison (locale)',   desc:'Modèle ML gratuit entraîné dans ton navigateur — s\'améliore tout seul.',  kind:'Onglet', type:'view' },
-  { id:'quant', name:'🏛️ Quant / Institutionnel', desc:'Panier market-neutral factoriel, à la manière des grands fonds.',      kind:'Onglet', type:'view' },
-  { id:'pro',   name:'♟️ Stratégies Pro',       desc:'Méthodes systématiques des fonds (tendance, cassure…) + backtest.',      kind:'Onglet', type:'view' },
-  { id:'kb',    name:'📚 Bibliothèque',         desc:'Base de connaissances : tous les concepts trading (ICT, SMC, AT, risque…).', kind:'Onglet', type:'view' },
-  { id:'botia', name:'🤖 Bot IA (Claude, externe)', desc:'Intelligence externe via l\'API Anthropic — nécessite ta clé (reste en local).', kind:'Bouton', type:'btn', sel:'#ai-open' },
-  { id:'calc',  name:'🧮 Calculateur de position', desc:'Combien acheter selon ton capital et ton risque (taille, marge, gain/perte).', kind:'Bouton', type:'btn', sel:'#calc-open' },
-  { id:'hist',  name:'Historique',           desc:'Journal des trades proposés par les bots (gagné / perdu).',              kind:'Bouton', type:'btn', sel:'#hist-open' }
+  { id:'mech',  name:'🎯 MECH Model · NQ',    desc:'Le tableau de bord du modèle : prix, PDH/PDL, gaps non comblés, SMT, fenêtre.', kind:'Onglet', type:'view' },
+  { id:'eco',   name:'📅 Économie',            desc:'Calendrier économique complet — les annonces qui cassent un gap-fill.',        kind:'Onglet', type:'view' },
+  { id:'kb',    name:'📚 Bibliothèque',        desc:'Base de connaissances : les concepts sur lesquels le Bot IA raisonne.',        kind:'Onglet', type:'view' },
+  { id:'botia', name:'🤖 Bot IA (Claude, externe)', desc:'Applique le MECH sur le NQ — nécessite ta clé API (elle reste en local).', kind:'Bouton', type:'btn', sel:'#ai-open' },
+  { id:'calc',  name:'🧮 Calculateur de position', desc:'Combien acheter selon ton capital et ton risque.',                          kind:'Bouton', type:'btn', sel:'#calc-open' },
+  { id:'hist',  name:'Historique',             desc:'Journal des trades du Bot IA + tes trades manuels (gagné / perdu).',           kind:'Bouton', type:'btn', sel:'#hist-open' }
 ];
 const TOOLS_KEY='tradeassist.tools.v1';
 function toolsState(){ try{ return Object.assign({}, JSON.parse(localStorage.getItem(TOOLS_KEY)||'{}')); }catch(e){ return {}; } }
@@ -2204,163 +1745,12 @@ calcOverlay.addEventListener('click', e=>{ if(e.target===calcOverlay) calcOverla
   $('#'+id).addEventListener('input', ()=>{ calcRun(); calcSave();
     // Capital/risque = réglages globaux : on rafraîchit les montants € partout.
     if(id==='calc-cap'||id==='calc-risk'){
-      try{ render(currentFilter); }catch(e){}
+      try{ renderMech(); }catch(e){}
       try{ if(histOverlay&&histOverlay.classList.contains('open')) renderHist(); }catch(e){}
     }
   });
 });
 
-/* ---------- IA maison (machine learning dans le navigateur) ---------- */
-let iaLoaded=false, iaLoading=false;
-function iaProb(s){ return Math.round(s.prob*100); }
-function iaSigCard(s){
-  const cls = s.dir==='up'?'up':s.dir==='down'?'down':'neu';
-  const dlabel = s.dir==='up'?'▲ Fort':s.dir==='down'?'▼ Faible':'≈ Neutre';
-  const pct = iaProb(s);
-  const col = s.dir==='up'?'var(--long)':s.dir==='down'?'var(--short)':'var(--wait)';
-  const drv = (s.drivers||[]).map(d=>`<span class="dv ${d.d==='haussier'?'up':'down'}">${d.d==='haussier'?'▲':'▼'} ${d.n}</span>`).join(' · ');
-  return `<div class="iasig ${cls}">
-    <div class="ih"><span class="isym">${s.sym}</span><span class="idir ${cls}">${dlabel}</span></div>
-    <div class="iprob"><span class="big" style="color:${col}">${pct}%</span><span class="lbl">proba. de <b>surperformer le panier</b> à ~${IA_HORIZON} j · confiance ${s.conf}%</span></div>
-    <div class="ibar"><i style="width:${pct}%;background:${col}"></i></div>
-    <div class="idrv">Concepts qui pèsent le plus : ${drv||'—'}</div>
-  </div>`;
-}
-let IA_HORIZON=4;
-// Transforme les prédictions de force relative en VRAIES positions :
-// les plus forts (▲) => LONG, les plus faibles (▼) => SHORT. Le stop est
-// calibré sur la volatilité (ATR) de l'actif, l'objectif à RR 1,5 (cible proche = plus de réussite).
-function iaBuildTrades(sigs){
-  // SÉLECTIF : seulement les convictions FORTES (>= 60 % pour un long, <= 40 %
-  // pour un short), 2 max par côté. Mieux vaut peu de trades solides.
-  const sorted = sigs.slice().sort((a,b)=>(b.prob||0)-(a.prob||0));
-  const ups = sorted.filter(s=>(s.prob||0)>=0.60).slice(0,2);
-  const downs = sorted.filter(s=>(s.prob||0)<=0.40).sort((a,b)=>(a.prob||0)-(b.prob||0)).slice(0,2);
-  function mk(s, long){
-    const vol = Math.max(0.005, s.vol||0.02);
-    const k = Math.min(0.15, Math.max(0.03, vol*2.5)); // distance de stop (3 %..15 %)
-    const entry = s.price;
-    const sl = long ? entry*(1-k) : entry*(1+k);
-    const tp = long ? entry*(1+1.5*k) : entry*(1-1.5*k); // RR 1,5 : cible plus proche = plus de réussite
-    return { sym:s.sym, dir: long?'LONG':'SHORT', entry, sl, tp, rr:1.5,
-      conf:s.conf, prob:Math.round(s.prob*100),
-      note:`IA maison — momentum relatif (${Math.round(s.prob*100)}% de surperformance à ~${IA_HORIZON} j)` };
-  }
-  return ups.map(s=>mk(s,true)).concat(downs.map(s=>mk(s,false)));
-}
-function iaTradeCard(t){
-  const long=t.dir==='LONG';
-  const cp=encodeURIComponent(`${t.sym} ${long?'LONG':'SHORT'} D1 | Entrée ${fmtN(t.entry)} | SL ${fmtN(t.sl)} | TP ${fmtN(t.tp)} | RR ${t.rr}`);
-  return `<div class="ai-idea copyable ${long?'long':'short'}" data-copy="${cp}" title="Clique pour copier cette position">
-    <div class="ihead"><span class="isym">${t.sym}</span>
-      <span class="ilvl">${long?'▲ LONG':'▼ SHORT'} · ~${IA_HORIZON} j · ${t.prob}% · confiance ${t.conf}%</span></div>
-    <div class="inums"><span>Entrée ${fmtN(t.entry)}</span><span class="lo">Stop ${fmtN(t.sl)}</span>
-      <span class="tp">Objectif ${fmtN(t.tp)}</span><span>RR ${t.rr}</span></div>
-    <div class="inums"><span class="tp">Objectif +${(pctMove(t.entry,t.tp,long)||0).toFixed(1)}%</span><span class="lo">Risque ${(pctMove(t.entry,t.sl,long)||0).toFixed(1)}% au stop</span><span>durée cible ~${IA_HORIZON} j</span></div>
-    ${netRRLine(t.entry,t.sl,t.tp,long)}
-    <div class="inums"><span class="tp">${capLabel()} : +${eurGain(t.rr)} € si TP</span><span class="lo">−${eurRisk()} € si SL</span></div>
-  </div>`;
-}
-// Courbe de progression : précision (walk-forward) au fil des entraînements.
-function iaProgressSVG(prog){
-  const pts=(prog||[]).filter(p=>p.acc!=null);
-  if(pts.length<2) return '<div class="eq-empty">Pas encore assez d’entraînements pour tracer la progression — reviens après quelques ouvertures.</div>';
-  const W=680,H=120,pad=8, ys=pts.map(p=>p.acc);
-  const min=Math.min(45,...ys), max=Math.max(60,...ys), span=(max-min)||1;
-  const x=i=>pad+i*(W-2*pad)/(pts.length-1);
-  const y=v=>pad+(1-(v-min)/span)*(H-2*pad);
-  const poly=pts.map((p,i)=>x(i)+','+y(p.acc).toFixed(1)).join(' ');
-  const y50=y(50).toFixed(1);
-  return `<svg class="eq-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Progression de la précision">
-    <line x1="${pad}" x2="${W-pad}" y1="${y50}" y2="${y50}" stroke="var(--border-strong)" stroke-dasharray="3 3"/>
-    <polyline points="${poly}" fill="none" stroke="var(--long)" stroke-width="2" stroke-linejoin="round"/></svg>`;
-}
-function renderIA(d){
-  const body=$('#ia-body');
-  if(!d){ body.innerHTML='<div class="hist-empty">Impossible de charger les vraies données (réseau restreint côté aperçu en ligne). <b>Ouvre le fichier depuis ton PC</b> (double-clic) pour que l\'IA s\'entraîne sur les vraies bougies.</div>'; return; }
-  IA_HORIZON=d.horizon||20;
-  const wf=d.wf, acc=wf?wf.acc:null, accE=wf?wf.accEngaged:null, cov=wf?wf.coverage:null, base=wf?wf.baseline:null;
-  // Cible RELATIVE : la bonne référence n'est pas 50 % mais le choix NAÏF (toujours prédire le
-  // cas le plus fréquent = baseline). L'edge honnête = précision quand engagée − baseline.
-  const ref = accE!=null ? accE : acc;
-  const cmp = base!=null ? base : 50;
-  const edge = ref!=null ? ref-cmp : null;
-  const hasEdge = accE!=null && edge!=null && edge>=3 && accE>52 && (cov==null||cov>=15);
-  const accClass = ref==null?'':(hasEdge?'good':'flat');
-  // Track record réel (prédictions live déjà notées)
-  const tr=d.track, trTxt = (tr&&tr.total>0)? `${tr.rate}% <span class="s">sur ${tr.total} prédiction${tr.total>1?'s':''} notées</span>` : '<span class="s" style="font-size:.9rem">en cours de constitution…</span>';
-  let verdict;
-  if(ref==null) verdict=`<div class="ia-verdict flat">Pas encore assez de données pour mesurer un niveau fiable. L'IA s'entraîne quand même et s'améliorera à chaque ouverture.</div>`;
-  else if(hasEdge) verdict=`<div class="ia-verdict good">✅ <b>Quand elle s'engage, l'IA vise juste ${accE}%</b> du temps (sur ${cov}% des cas) pour repérer qui <b>surperforme le panier</b>, contre <b>${cmp}%</b> pour un choix naïf. Soit un <b>avantage réel de +${edge} points</b>, mesuré sur du jamais-vu (walk-forward strict). C'est <b>modeste mais réel</b> — l'anomalie de momentum relatif. Reste prudent : ça ne remplace pas la gestion du risque.</div>`;
-  else verdict=`<div class="ia-verdict flat">⚠️ <b>Honnêteté totale :</b> testée sans tricher, l'IA fait <b>${ref}%</b> pour ${cmp}% attendu d'un choix naïf — <b>avantage trop faible pour être fiable</b>. J'ai essayé plein d'approches (14 actifs, réseau de neurones, cible relative). Sur les marchés, c'est normal : le signal exploitable est minuscule. <b>Ne mise rien dessus</b> — labo pédagogique, pas une machine à gagner.</div>`;
-  let html = `<section class="ia-brain">
-    <h3>🧠 Cerveau de l'IA maison <span class="stag">force relative · momentum · navigateur</span></h3>
-    <div class="ia-kpis">
-      <div class="ia-kpi ${accClass}"><div class="k">Quand elle s'engage</div><div class="v">${accE!=null?accE+'%':'—'}</div><div class="s">choix naïf = ${cmp}% · sur ${cov!=null?cov+'%':'—'} des cas</div></div>
-      <div class="ia-kpi"><div class="k">Précision globale</div><div class="v" style="font-size:1.1rem">${acc!=null?acc+'%':'—'}</div><div class="s">jamais-vu · strict</div></div>
-      <div class="ia-kpi"><div class="k">Track record réel</div><div class="v" style="font-size:1.1rem">${trTxt}</div></div>
-      <div class="ia-kpi"><div class="k">Exemples appris</div><div class="v" style="font-size:1.1rem">${(d.samples||0).toLocaleString('fr-FR')}</div><div class="s">${d.assets||0} actifs · ${d.sessions||1} entraînements</div></div>
-    </div>
-    ${verdict}
-    ${wf&&wf.ece!=null?`<div class="ia-verdict" style="border-color:color-mix(in srgb,var(--long) 25%,transparent)">🎯 <b>Probabilités calibrées</b> : l'écart moyen entre le « % » affiché et la fréquence réelle est de <b>±${wf.ece}%</b> (mesuré hors échantillon). Autrement dit, quand l'IA affiche 63 %, c'est fiable à ~${wf.ece} points près. Plus c'est bas, mieux c'est.</div>`:''}
-    <div class="ia-mem">
-      <span class="grow">💾 Mémoire sauvegardée automatiquement (IndexedDB). Filet de sécurité : garde une copie de son cerveau.</span>
-      <button class="ai-btn ghost" id="ia-export">⬇️ Exporter le cerveau</button>
-      <button class="ai-btn ghost" id="ia-import-btn">⬆️ Importer</button>
-      <button class="ai-btn ghost" id="ia-reset">Réinitialiser</button>
-    </div>
-  </section>`;
-  // Progression au fil des entraînements
-  html += `<div class="hist-block" style="margin-top:4px"><div class="eq-head">📈 Progression de l'IA <span class="eq-sub">précision (jamais-vu) sur ${d.sessions||1} entraînement${(d.sessions||1)>1?'s':''} · ligne pointillée = 50 %</span></div>${iaProgressSVG(d.progress)}</div>`;
-  // Boussole de rotation : on met en avant les plus FORTS et les plus FAIBLES du panier
-  // (le milieu, indécis, est regroupé). d.signals est déjà trié par force décroissante.
-  const sigs = d.signals, N = sigs.length, K = Math.min(8, Math.floor(N/2));
-  const strong = sigs.slice(0, K), weak = sigs.slice(N-K), mid = sigs.slice(K, N-K);
-  const maj = d.updated ? new Date(d.updated).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}) : '';
-  html += `<div class="ia-h">🟢 Les plus forts du panier <span class="stag" style="font-weight:400">candidats à surperformer${maj?` · maj ${maj}`:''}</span></div>`;
-  html += `<div class="ia-sigs">${strong.map(iaSigCard).join('')}</div>`;
-  html += `<div class="ia-h">🔴 Les plus faibles du panier <span class="stag" style="font-weight:400">candidats à sous-performer</span></div>`;
-  html += `<div class="ia-sigs">${weak.map(iaSigCard).join('')}</div>`;
-  if(mid.length) html += `<details style="margin-top:14px"><summary style="cursor:pointer;color:var(--muted);font-size:.86rem">Voir le milieu du classement (${mid.length} actifs, signal indécis)</summary><div class="ia-sigs" style="margin-top:12px">${mid.map(iaSigCard).join('')}</div></details>`;
-  // Positions concrètes déduites du classement (forts => LONG, faibles => SHORT)
-  const iaTrades = iaBuildTrades(d.signals);
-  html += `<div class="ia-h" style="margin-top:22px">🎯 Positions proposées par l'IA maison <span class="stag" style="font-weight:400">SÉLECTIF · convictions fortes (≥ 60 % / ≤ 40 %) · 2 max/côté · RR 1,5 (plus de réussite)</span></div>`;
-  html += iaTrades.length
-    ? `<div class="ai-out show" style="margin-top:4px">${iaTrades.map(iaTradeCard).join('')}</div>${corrWarnHTML(iaTrades)}`
-    : `<div class="hist-empty">Aucune conviction assez forte pour proposer une position — l'IA maison préfère attendre (moins de trades = moins de pertes).</div>`;
-  html += `<p class="bt-caveat" style="margin-top:14px">🔎 Ces positions traduisent le classement de force relative en trades : les plus forts en <b>LONG</b>, les plus faibles en <b>SHORT</b>, entrée au prix actuel, stop calé sur la volatilité (ATR) et objectif à RR 1,5 sur ~${IA_HORIZON} j. Elles s'ajoutent à ton <b>historique</b> (bot « IA maison ») et sont notées au TP/SL. <b>Avantage statistique modeste — pédagogique, pas un conseil financier.</b></p>`;
-  // Enregistre les positions dans l'historique (source « IA maison »)
-  if(window.History && iaTrades.length){
-    History.record(iaTrades.map(t=>({sym:t.sym,dir:t.dir,entry:t.entry,sl:t.sl,tp:t.tp,rr:t.rr,note:t.note,tf:'D1',style:'swing',price:t.entry})),'IA maison');
-    const pm=priceMap(); if(Object.keys(pm).length) History.evaluate(pm);
-  }
-  body.innerHTML = html;
-  // Câblage mémoire (export / import / reset)
-  $('#ia-export').addEventListener('click', ()=>{
-    if(!window.IA) return;
-    IA.exportBrain().then(()=>{}).catch(err=> alert(err.message));
-  });
-  $('#ia-import-btn').addEventListener('click', ()=> $('#ia-import-file').click());
-  $('#ia-reset').addEventListener('click', ()=>{
-    if(window.IA && confirm('Effacer le cerveau de l\'IA et repartir de zéro ?')){
-      IA.reset().then(()=>{ iaLoaded=false; loadIA(true); });
-    }
-  });
-}
-function loadIA(force){
-  if((iaLoaded&&!force)||iaLoading||!window.IA) return;
-  iaLoading=true;
-  const body=$('#ia-body');
-  if(force) body.innerHTML='<div class="hist-empty">⏳ Ré-entraînement…</div>';
-  IA.load().then(d=>{ iaLoaded=true; iaLoading=false; lastIA=d; renderIA(d); refreshConsensusIfVisible(); })
-           .catch(()=>{ iaLoading=false; renderIA(null); });
-}
-$('#ia-import-file').addEventListener('change', e=>{
-  const f=e.target.files&&e.target.files[0]; if(!f||!window.IA) return;
-  IA.importBrain(f).then(()=>{ iaLoaded=false; loadIA(true); alert('✅ Cerveau importé — l\'IA repart de cette mémoire.'); })
-                   .catch(err=> alert('❌ '+err.message));
-  e.target.value='';
-});
 </script>
 </body>
 </html>
