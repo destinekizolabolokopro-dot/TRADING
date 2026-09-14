@@ -95,6 +95,22 @@
   .live{display:inline-flex;align-items:center;gap:7px;color:var(--muted)}
   .dot{width:7px;height:7px;border-radius:50%;background:var(--faint);display:inline-block}
   .dot.on{background:var(--long)}
+.mtrade{border:1px solid rgba(255,255,255,.1);border-radius:13px;padding:14px 15px;background:rgba(255,255,255,.03)}
+.mtrade.long{border-color:rgba(34,197,94,.4);background:rgba(34,197,94,.06)}
+.mtrade.short{border-color:rgba(248,113,113,.4);background:rgba(248,113,113,.06)}
+.mtrade.off{opacity:.8}
+.mt-head{display:flex;align-items:baseline;gap:12px;margin-bottom:11px}
+.mt-head b{font-size:15px}
+.mt-rr{margin-left:auto;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums}
+.mt-lvls{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:9px;margin-bottom:10px}
+.mt-lvls>div{background:rgba(0,0,0,.25);border-radius:9px;padding:8px 10px}
+.mt-lvls span{display:block;font-size:11px;color:var(--muted);margin-bottom:2px}
+.mt-lvls b{font-size:15px;font-variant-numeric:tabular-nums}
+.mt-lvls i{display:block;font-style:normal;font-size:11px;color:var(--muted);margin-top:2px}
+.mt-sl{color:#f87171}.mt-tp{color:#4ade80}
+.mt-why{font-size:12.5px;color:var(--muted);line-height:1.5;margin-top:5px}
+.mt-eur{margin-top:9px;padding-top:9px;border-top:1px solid rgba(255,255,255,.08);font-size:12.5px;font-weight:600}
+
 .mrow{display:flex;gap:11px;align-items:flex-start;padding:11px 13px;border-radius:11px;margin-bottom:7px;
   border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.03)}
 .mrow.ok{border-color:rgba(34,197,94,.35);background:rgba(34,197,94,.07)}
@@ -978,6 +994,34 @@ function renderMech(){
     h += mechRow(null, 'Structure', 'Non calculée (bougies indisponibles).');
   }
 
+  // Le trade calculé par les règles
+  const tr = d.trade;
+  if(tr){
+    const long = tr.sens === 'LONG';
+    h += '<div class="ai-sec">📐 Le trade <span class="sub">déduit des règles, pas d\'une opinion</span></div>';
+    if(tr.possible){
+      h += '<div class="mtrade '+(long?'long':'short')+'">'+
+        '<div class="mt-head"><b>'+(long?'▲ LONG':'▼ SHORT')+' NQ</b><span class="mt-rr">RR '+tr.rr+'</span></div>'+
+        '<div class="mt-lvls">'+
+          '<div><span>Entrée</span><b>'+fmtN(tr.entree)+'</b></div>'+
+          '<div><span>Stop</span><b class="mt-sl">'+fmtN(tr.sl)+'</b><i>'+tr.risque_points+' pts</i></div>'+
+          '<div><span>Objectif</span><b class="mt-tp">'+fmtN(tr.tp)+'</b><i>'+tr.gain_points+' pts</i></div>'+
+        '</div>'+
+        '<div class="mt-why">'+tr.raison+'</div>'+
+        (tr.cible?'<div class="mt-why">Cible : '+tr.cible+'</div>':'')+
+        '<div class="mt-eur">'+capLabel()+' → gain '+eurGain(tr.rr)+' € / perte '+eurRisk()+' €</div>'+
+      '</div>';
+    } else {
+      h += '<div class="mtrade off"><div class="mt-head"><b>Pas de trade</b>'+
+        (tr.rr!=null?'<span class="mt-rr">RR '+tr.rr+'</span>':'')+'</div>'+
+        '<div class="mt-why">'+tr.raison+'</div>'+
+        (tr.entree!=null&&tr.sl!=null?'<div class="mt-why">Les règles donnaient : entrée '+fmtN(tr.entree)+
+          ' · stop '+fmtN(tr.sl)+(tr.tp!=null?' · objectif '+fmtN(tr.tp):'')+
+          '. Un stop placé au-delà du balayage est parfois très loin de l\'inversion : c\'est ce qui écrase le RR.</div>':'')+
+      '</div>';
+    }
+  }
+
   // Les cibles
   if(g.length){
     h += '<div class="ai-sec">🎯 Cibles du modèle <span class="sub">on vise l\'EQ, l\'équilibre du gap</span></div>';
@@ -1055,13 +1099,24 @@ function priceMap(){ return MECH ? { 'NQ': MECH.nq.prix, 'NQ1!': MECH.nq.prix, '
 // Met à jour l'historique (gagné / perdu) avec le dernier prix connu du NQ.
 function journal(){ if(window.History) History.evaluate(priceMap()); }
 
+// Enregistre le setup MECH dans l'historique — uniquement s'il est VALIDE,
+// que le RR tient, et qu'on est dans la fenêtre de trading. History.record
+// refuse de lui-même un trade dont le prix a déjà dépassé le TP ou le SL.
+function recordMech(){
+  if(!window.History || !MECH || !MECH.trade || !MECH.trade.possible) return;
+  if(window.WINDOW && !WINDOW.isOpen()) return;
+  const t = MECH.trade;
+  History.record([{ sym:'NQ', dir:t.sens, entry:t.entree, sl:t.sl, tp:t.tp, rr:t.rr,
+    note:t.motif, tf:'M15', style:'MECH', price:MECH.nq.prix }], 'MECH');
+}
+
 async function refreshMech(force){
   if(!window.NQ) return false;
   try{
     const d = await NQ.load(force);
     MECH = d || null;
     setSource(!!d);
-    hero(); renderMech(); journal();
+    hero(); renderMech(); recordMech(); journal();
     return !!d;
   }catch(e){ setSource(false); renderMech(); return false; }
 }

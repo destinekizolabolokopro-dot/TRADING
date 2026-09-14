@@ -319,6 +319,63 @@
     return { pdh: y.h, pdl: y.l, date: y.t };
   }
 
+  // ===========================================================================
+  // LE TRADE : entrée, stop, objectif, RR — déduits des règles du MECH.
+  // ---------------------------------------------------------------------------
+  //   ENTRÉE   : le prix de l'inversion (le modèle n'entre PAS sur le balayage).
+  //   STOP     : au-delà de l'extrême balayé, plus un petit tampon.
+  //   OBJECTIF : l'EQ du gap non comblé le plus proche dans le sens du trade.
+  //   RR       : rapport des deux. Sous 1, on ne prend pas.
+  // ===========================================================================
+  var BUFFER_PCT = 0.02;      // tampon du stop, en % du prix
+  var RR_MIN = 1.0;
+
+  function trade(d) {
+    if (!d || !d.structure || !d.structure.valide) return null;
+    var st = d.structure;
+    var long = st.sens === 'LONG';
+    var entree = st.inversion ? st.inversion.prix : d.nq.prix;
+    if (entree == null) return null;
+
+    var buf = entree * BUFFER_PCT / 100;
+    var sl = long ? st.sweep.prix_atteint - buf : st.sweep.prix_atteint + buf;
+
+    // Objectif : l'EQ non comblé le plus proche AU-DELÀ de l'entrée.
+    var tp = null, cible = null;
+    (d.gaps_non_comblés || []).forEach(function (g) {
+      var eq = g.eq_cible;
+      if (long ? eq <= entree : eq >= entree) return;
+      if (tp == null || (long ? eq < tp : eq > tp)) { tp = eq; cible = g; }
+    });
+    if (tp == null) {
+      return { possible: false, sens: st.sens, entree: +entree.toFixed(2), sl: +sl.toFixed(2),
+        raison: "Aucun gap non comblé au-delà de l'entrée : le modèle n'a pas d'objectif, donc pas de trade." };
+    }
+
+    var risque = Math.abs(entree - sl);
+    if (!(risque > 0)) return { possible: false, sens: st.sens, raison: 'Stop confondu avec l\'entrée.' };
+    var rr = Math.abs(tp - entree) / risque;
+
+    return {
+      possible: rr >= RR_MIN,
+      sens: st.sens,
+      entree: +entree.toFixed(2),
+      sl: +sl.toFixed(2),
+      tp: +tp.toFixed(2),
+      rr: +rr.toFixed(2),
+      risque_points: +risque.toFixed(2),
+      gain_points: +Math.abs(tp - entree).toFixed(2),
+      cible: cible ? (cible.type + ' ' + cible.sens + ' — zone ' + cible.zone[0] + '–' + cible.zone[1]) : null,
+      raison: rr >= RR_MIN
+        ? ('Entrée sur l\'inversion à ' + entree.toFixed(2) + ', stop au-delà du balayage (' +
+           st.sweep.prix_atteint.toFixed(2) + '), objectif l\'EQ du gap non comblé le plus proche (' + tp.toFixed(2) + ').')
+        : ('RR de ' + rr.toFixed(2) + ' : sous le minimum de ' + RR_MIN + ', le modèle passe son tour.'),
+      motif: 'MECH — balayage ' + st.sweep.quoi + ' à ' + st.sweep.niveau +
+             ', inversion ' + (st.inversion ? st.inversion.definition : '—') +
+             ' à ' + (st.inversion ? st.inversion.prix : '—') + ', cible EQ ' + tp.toFixed(2) + '.'
+    };
+  }
+
   // Dernier instantané chargé : le prompt du Bot IA peut le relire sans
   // refaire d'appel réseau (même principe que le calendrier économique).
   var CACHE = null, CACHE_T = 0;
@@ -363,6 +420,7 @@
         structure: struct,
         maj: Date.now()
       };
+      out.trade = trade(out);
       CACHE = out;
       CACHE_T = Date.now();
       return out;
@@ -407,6 +465,16 @@
         t += "  • " + g.type + " " + g.sens + " : zone " + g.zone[0] + "–" + g.zone[1] + " · EQ (cible) = " + g.eq_cible + "\n";
       });
     } else { t += "Aucun gap non comblé détecté en M15 — sans cible de gap, le MECH ne donne pas de trade.\n"; }
+    if (d.trade) {
+      var tr = d.trade;
+      if (tr.possible) {
+        t += "TRADE CALCULÉ PAR LES RÈGLES (entrée/stop/objectif déjà déduits — reprends CES chiffres) :\n";
+        t += "  " + tr.sens + " · entrée " + tr.entree + " · stop " + tr.sl + " · objectif " + tr.tp + " · RR " + tr.rr + "\n";
+        t += "  " + tr.raison + "\n";
+      } else {
+        t += "TRADE : impossible — " + tr.raison + "\n";
+      }
+    }
     if (d.smt) {
       t += "SMT (NQ vs S&P 500 / ES) : " + d.smt.type + " — " + d.smt.detail + "\n";
       t += "  ⚠️ " + d.smt.consigne + "\n";
@@ -416,5 +484,6 @@
   }
 
   root.NQ = { load: load, data: data, promptBlock: promptBlock, candles: candles,
-    findGaps: findGaps, smt: smt, swings: swings, structure: structure, sessionPools: sessionPools };
+    findGaps: findGaps, smt: smt, swings: swings, structure: structure,
+    sessionPools: sessionPools, trade: trade };
 })(typeof window !== 'undefined' ? window : this);

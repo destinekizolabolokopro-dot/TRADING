@@ -95,6 +95,22 @@
   .live{display:inline-flex;align-items:center;gap:7px;color:var(--muted)}
   .dot{width:7px;height:7px;border-radius:50%;background:var(--faint);display:inline-block}
   .dot.on{background:var(--long)}
+.mtrade{border:1px solid rgba(255,255,255,.1);border-radius:13px;padding:14px 15px;background:rgba(255,255,255,.03)}
+.mtrade.long{border-color:rgba(34,197,94,.4);background:rgba(34,197,94,.06)}
+.mtrade.short{border-color:rgba(248,113,113,.4);background:rgba(248,113,113,.06)}
+.mtrade.off{opacity:.8}
+.mt-head{display:flex;align-items:baseline;gap:12px;margin-bottom:11px}
+.mt-head b{font-size:15px}
+.mt-rr{margin-left:auto;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums}
+.mt-lvls{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:9px;margin-bottom:10px}
+.mt-lvls>div{background:rgba(0,0,0,.25);border-radius:9px;padding:8px 10px}
+.mt-lvls span{display:block;font-size:11px;color:var(--muted);margin-bottom:2px}
+.mt-lvls b{font-size:15px;font-variant-numeric:tabular-nums}
+.mt-lvls i{display:block;font-style:normal;font-size:11px;color:var(--muted);margin-top:2px}
+.mt-sl{color:#f87171}.mt-tp{color:#4ade80}
+.mt-why{font-size:12.5px;color:var(--muted);line-height:1.5;margin-top:5px}
+.mt-eur{margin-top:9px;padding-top:9px;border-top:1px solid rgba(255,255,255,.08);font-size:12.5px;font-weight:600}
+
 .mrow{display:flex;gap:11px;align-items:flex-start;padding:11px 13px;border-radius:11px;margin-bottom:7px;
   border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.03)}
 .mrow.ok{border-color:rgba(34,197,94,.35);background:rgba(34,197,94,.07)}
@@ -3021,6 +3037,63 @@
     return { pdh: y.h, pdl: y.l, date: y.t };
   }
 
+  // ===========================================================================
+  // LE TRADE : entrée, stop, objectif, RR — déduits des règles du MECH.
+  // ---------------------------------------------------------------------------
+  //   ENTRÉE   : le prix de l'inversion (le modèle n'entre PAS sur le balayage).
+  //   STOP     : au-delà de l'extrême balayé, plus un petit tampon.
+  //   OBJECTIF : l'EQ du gap non comblé le plus proche dans le sens du trade.
+  //   RR       : rapport des deux. Sous 1, on ne prend pas.
+  // ===========================================================================
+  var BUFFER_PCT = 0.02;      // tampon du stop, en % du prix
+  var RR_MIN = 1.0;
+
+  function trade(d) {
+    if (!d || !d.structure || !d.structure.valide) return null;
+    var st = d.structure;
+    var long = st.sens === 'LONG';
+    var entree = st.inversion ? st.inversion.prix : d.nq.prix;
+    if (entree == null) return null;
+
+    var buf = entree * BUFFER_PCT / 100;
+    var sl = long ? st.sweep.prix_atteint - buf : st.sweep.prix_atteint + buf;
+
+    // Objectif : l'EQ non comblé le plus proche AU-DELÀ de l'entrée.
+    var tp = null, cible = null;
+    (d.gaps_non_comblés || []).forEach(function (g) {
+      var eq = g.eq_cible;
+      if (long ? eq <= entree : eq >= entree) return;
+      if (tp == null || (long ? eq < tp : eq > tp)) { tp = eq; cible = g; }
+    });
+    if (tp == null) {
+      return { possible: false, sens: st.sens, entree: +entree.toFixed(2), sl: +sl.toFixed(2),
+        raison: "Aucun gap non comblé au-delà de l'entrée : le modèle n'a pas d'objectif, donc pas de trade." };
+    }
+
+    var risque = Math.abs(entree - sl);
+    if (!(risque > 0)) return { possible: false, sens: st.sens, raison: 'Stop confondu avec l\'entrée.' };
+    var rr = Math.abs(tp - entree) / risque;
+
+    return {
+      possible: rr >= RR_MIN,
+      sens: st.sens,
+      entree: +entree.toFixed(2),
+      sl: +sl.toFixed(2),
+      tp: +tp.toFixed(2),
+      rr: +rr.toFixed(2),
+      risque_points: +risque.toFixed(2),
+      gain_points: +Math.abs(tp - entree).toFixed(2),
+      cible: cible ? (cible.type + ' ' + cible.sens + ' — zone ' + cible.zone[0] + '–' + cible.zone[1]) : null,
+      raison: rr >= RR_MIN
+        ? ('Entrée sur l\'inversion à ' + entree.toFixed(2) + ', stop au-delà du balayage (' +
+           st.sweep.prix_atteint.toFixed(2) + '), objectif l\'EQ du gap non comblé le plus proche (' + tp.toFixed(2) + ').')
+        : ('RR de ' + rr.toFixed(2) + ' : sous le minimum de ' + RR_MIN + ', le modèle passe son tour.'),
+      motif: 'MECH — balayage ' + st.sweep.quoi + ' à ' + st.sweep.niveau +
+             ', inversion ' + (st.inversion ? st.inversion.definition : '—') +
+             ' à ' + (st.inversion ? st.inversion.prix : '—') + ', cible EQ ' + tp.toFixed(2) + '.'
+    };
+  }
+
   // Dernier instantané chargé : le prompt du Bot IA peut le relire sans
   // refaire d'appel réseau (même principe que le calendrier économique).
   var CACHE = null, CACHE_T = 0;
@@ -3065,6 +3138,7 @@
         structure: struct,
         maj: Date.now()
       };
+      out.trade = trade(out);
       CACHE = out;
       CACHE_T = Date.now();
       return out;
@@ -3109,6 +3183,16 @@
         t += "  • " + g.type + " " + g.sens + " : zone " + g.zone[0] + "–" + g.zone[1] + " · EQ (cible) = " + g.eq_cible + "\n";
       });
     } else { t += "Aucun gap non comblé détecté en M15 — sans cible de gap, le MECH ne donne pas de trade.\n"; }
+    if (d.trade) {
+      var tr = d.trade;
+      if (tr.possible) {
+        t += "TRADE CALCULÉ PAR LES RÈGLES (entrée/stop/objectif déjà déduits — reprends CES chiffres) :\n";
+        t += "  " + tr.sens + " · entrée " + tr.entree + " · stop " + tr.sl + " · objectif " + tr.tp + " · RR " + tr.rr + "\n";
+        t += "  " + tr.raison + "\n";
+      } else {
+        t += "TRADE : impossible — " + tr.raison + "\n";
+      }
+    }
     if (d.smt) {
       t += "SMT (NQ vs S&P 500 / ES) : " + d.smt.type + " — " + d.smt.detail + "\n";
       t += "  ⚠️ " + d.smt.consigne + "\n";
@@ -3118,7 +3202,8 @@
   }
 
   root.NQ = { load: load, data: data, promptBlock: promptBlock, candles: candles,
-    findGaps: findGaps, smt: smt, swings: swings, structure: structure, sessionPools: sessionPools };
+    findGaps: findGaps, smt: smt, swings: swings, structure: structure,
+    sessionPools: sessionPools, trade: trade };
 })(typeof window !== 'undefined' ? window : this);
 
 </script>
@@ -3440,6 +3525,34 @@ function renderMech(){
     h += mechRow(null, 'Structure', 'Non calculée (bougies indisponibles).');
   }
 
+  // Le trade calculé par les règles
+  const tr = d.trade;
+  if(tr){
+    const long = tr.sens === 'LONG';
+    h += '<div class="ai-sec">📐 Le trade <span class="sub">déduit des règles, pas d\'une opinion</span></div>';
+    if(tr.possible){
+      h += '<div class="mtrade '+(long?'long':'short')+'">'+
+        '<div class="mt-head"><b>'+(long?'▲ LONG':'▼ SHORT')+' NQ</b><span class="mt-rr">RR '+tr.rr+'</span></div>'+
+        '<div class="mt-lvls">'+
+          '<div><span>Entrée</span><b>'+fmtN(tr.entree)+'</b></div>'+
+          '<div><span>Stop</span><b class="mt-sl">'+fmtN(tr.sl)+'</b><i>'+tr.risque_points+' pts</i></div>'+
+          '<div><span>Objectif</span><b class="mt-tp">'+fmtN(tr.tp)+'</b><i>'+tr.gain_points+' pts</i></div>'+
+        '</div>'+
+        '<div class="mt-why">'+tr.raison+'</div>'+
+        (tr.cible?'<div class="mt-why">Cible : '+tr.cible+'</div>':'')+
+        '<div class="mt-eur">'+capLabel()+' → gain '+eurGain(tr.rr)+' € / perte '+eurRisk()+' €</div>'+
+      '</div>';
+    } else {
+      h += '<div class="mtrade off"><div class="mt-head"><b>Pas de trade</b>'+
+        (tr.rr!=null?'<span class="mt-rr">RR '+tr.rr+'</span>':'')+'</div>'+
+        '<div class="mt-why">'+tr.raison+'</div>'+
+        (tr.entree!=null&&tr.sl!=null?'<div class="mt-why">Les règles donnaient : entrée '+fmtN(tr.entree)+
+          ' · stop '+fmtN(tr.sl)+(tr.tp!=null?' · objectif '+fmtN(tr.tp):'')+
+          '. Un stop placé au-delà du balayage est parfois très loin de l\'inversion : c\'est ce qui écrase le RR.</div>':'')+
+      '</div>';
+    }
+  }
+
   // Les cibles
   if(g.length){
     h += '<div class="ai-sec">🎯 Cibles du modèle <span class="sub">on vise l\'EQ, l\'équilibre du gap</span></div>';
@@ -3517,13 +3630,24 @@ function priceMap(){ return MECH ? { 'NQ': MECH.nq.prix, 'NQ1!': MECH.nq.prix, '
 // Met à jour l'historique (gagné / perdu) avec le dernier prix connu du NQ.
 function journal(){ if(window.History) History.evaluate(priceMap()); }
 
+// Enregistre le setup MECH dans l'historique — uniquement s'il est VALIDE,
+// que le RR tient, et qu'on est dans la fenêtre de trading. History.record
+// refuse de lui-même un trade dont le prix a déjà dépassé le TP ou le SL.
+function recordMech(){
+  if(!window.History || !MECH || !MECH.trade || !MECH.trade.possible) return;
+  if(window.WINDOW && !WINDOW.isOpen()) return;
+  const t = MECH.trade;
+  History.record([{ sym:'NQ', dir:t.sens, entry:t.entree, sl:t.sl, tp:t.tp, rr:t.rr,
+    note:t.motif, tf:'M15', style:'MECH', price:MECH.nq.prix }], 'MECH');
+}
+
 async function refreshMech(force){
   if(!window.NQ) return false;
   try{
     const d = await NQ.load(force);
     MECH = d || null;
     setSource(!!d);
-    hero(); renderMech(); journal();
+    hero(); renderMech(); recordMech(); journal();
     return !!d;
   }catch(e){ setSource(false); renderMech(); return false; }
 }
