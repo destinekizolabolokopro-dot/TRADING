@@ -95,6 +95,20 @@
   .live{display:inline-flex;align-items:center;gap:7px;color:var(--muted)}
   .dot{width:7px;height:7px;border-radius:50%;background:var(--faint);display:inline-block}
   .dot.on{background:var(--long)}
+.tfscan{display:flex;flex-direction:column;gap:5px}
+.tfrow{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline;padding:8px 11px;border-radius:9px;
+  border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.03);font-size:12.5px}
+.tfrow.ok{border-color:rgba(34,197,94,.32);background:rgba(34,197,94,.06)}
+.tfrow.no{opacity:.72}
+.tfrow.ret{box-shadow:inset 0 0 0 1px rgba(124,108,255,.5)}
+.tfrow b{min-width:44px;font-size:13px}
+.tfrow b i{font-style:normal;font-size:10px;font-weight:700;color:#a99cff;letter-spacing:.03em}
+.tfst{color:var(--muted);min-width:130px}
+.tfgap{color:var(--muted);min-width:58px}
+.tfres{margin-left:auto;font-variant-numeric:tabular-nums;text-align:right}
+.tfrow.ok .tfres{color:#4ade80;font-weight:600}
+@media(max-width:700px){.tfres{margin-left:0;text-align:left;width:100%}}
+
 .mtrade{border:1px solid rgba(255,255,255,.1);border-radius:13px;padding:14px 15px;background:rgba(255,255,255,.03)}
 .mtrade.long{border-color:rgba(34,197,94,.4);background:rgba(34,197,94,.06)}
 .mtrade.short{border-color:rgba(248,113,113,.4);background:rgba(248,113,113,.06)}
@@ -955,6 +969,7 @@ function renderMech(){
   }
   const g = d.gaps_non_comblés || [];
   const v = d.nq.variation_pct;
+  const tfLabel = d.tf_retenue || 'M15';
   let h = '';
 
   // Prix
@@ -966,25 +981,50 @@ function renderMech(){
   h += '<div class="nq-cell"><span>PDL — plus-bas veille</span><b>'+fmtN(d.pdl)+'</b></div>';
   h += '</div>';
 
+  // Balayage de toutes les unités de temps
+  const tfs = d.timeframes || [];
+  if(tfs.length){
+    h += '<div class="ai-sec">🔭 Toutes les unités <span class="sub">chaque ligne est calculée, de M1 à H1</span></div>';
+    h += '<div class="tfscan">';
+    tfs.forEach(v=>{
+      const ret = v.tf === d.tf_retenue;
+      if(!v.dispo){ h += '<div class="tfrow off"><b>'+v.tf+'</b><span>indisponible</span></div>'; return; }
+      const t = v.trade;
+      const ok = t && t.possible;
+      h += '<div class="tfrow '+(ok?'ok':'no')+(ret?' ret':'')+'">'+
+        '<b>'+v.tf+(ret?' <i>retenue</i>':'')+'</b>'+
+        '<span class="tfst">'+(v.structure.valide?('structure '+v.structure.sens):'pas de structure')+'</span>'+
+        '<span class="tfgap">'+v.gaps_non_comblés.length+' gap'+(v.gaps_non_comblés.length>1?'s':'')+'</span>'+
+        '<span class="tfres">'+(ok
+          ? (t.sens+' · E '+fmtN(t.entree)+' · SL '+fmtN(t.sl)+' · TP '+fmtN(t.tp)+' · RR '+t.rr)
+          : (t ? t.raison : 'pas de trade'))+'</span>'+
+      '</div>';
+    });
+    h += '</div>';
+    h += '<p class="pro-warn" style="margin:8px 0 4px">On retient l\'unité la <b>plus basse qui valide</b>, pas celle qui affiche le plus gros RR : '+
+         'un RR énorme vient presque toujours d\'un stop trop serré, qui saute au premier mouvement. '+
+         'Un stop plus petit que la moitié de l\'ATR de l\'unité est refusé pour cette raison.</p>';
+  }
+
   // Les conditions du modèle, une par une
-  h += '<div class="ai-sec">🔍 Conditions du MECH <span class="sub">une case rouge = pas de trade</span></div>';
+  h += '<div class="ai-sec">🔍 Conditions du MECH <span class="sub">unité '+(d.tf_retenue||'—')+' · une case rouge = pas de trade</span></div>';
   h += mechRow(w ? w.ouverte : null, 'Fenêtre de trading',
         w ? (w.texte + ' — ouverture de Wall Street → 17 h 00 heure française') : 'Indéterminée');
   h += mechRow(g.length>0, 'Cible : un gap non comblé',
-        g.length ? (g.length + ' gap' + (g.length>1?'s':'') + ' disponible' + (g.length>1?'s':'') + ' en M15') :
-                   'Aucun gap non comblé en M15 — le modèle n\'a pas d\'objectif, donc pas de trade');
+        g.length ? (g.length + ' gap' + (g.length>1?'s':'') + ' disponible' + (g.length>1?'s':'') + ' en ' + tfLabel) :
+                   ('Aucun gap non comblé en ' + tfLabel + ' — le modèle n\'a pas d\'objectif, donc pas de trade'));
   if(d.smt){
     const libre = d.smt.type === 'aucune';
     h += mechRow(libre, 'SMT — NQ contre S&P 500',
           d.smt.detail + (libre ? '' : ' · ' + d.smt.consigne));
   }
-  // Structure : désormais CALCULÉE sur les bougies M15, plus devinée.
+  // Structure : calculée sur les bougies de l'unité retenue, plus devinée.
   const st = d.structure;
   if(st){
     h += mechRow(!!st.sweep, 'Balayage de liquidité',
           st.sweep ? ('✂️ ' + st.sweep.quoi + ' à ' + fmtN(st.sweep.niveau) +
                       ' — le prix est allé jusqu\'à ' + fmtN(st.sweep.prix_atteint) +
-                      ' (il y a ' + st.sweep.bougies_depuis + ' bougies M15)')
+                      ' (il y a ' + st.sweep.bougies_depuis + ' bougies ' + tfLabel + ')')
                    : 'Aucun balayage identifié sur les bougies récentes');
     h += mechRow(!!st.inversion, 'Inversion',
           st.inversion ? ('Confirmée à ' + fmtN(st.inversion.prix) + ' · ' + st.inversion.definition)
@@ -1107,7 +1147,7 @@ function recordMech(){
   if(window.WINDOW && !WINDOW.isOpen()) return;
   const t = MECH.trade;
   History.record([{ sym:'NQ', dir:t.sens, entry:t.entree, sl:t.sl, tp:t.tp, rr:t.rr,
-    note:t.motif, tf:'M15', style:'MECH', price:MECH.nq.prix }], 'MECH');
+    note:t.motif, tf:(MECH.tf_retenue||'M15'), style:'MECH', price:MECH.nq.prix }], 'MECH');
 }
 
 async function refreshMech(force){
@@ -1298,7 +1338,7 @@ function nqBlockHTML(){
       '<b>'+x.type+' '+x.sens+'</b><span>zone '+fmtN(x.zone[0])+' – '+fmtN(x.zone[1])+'</span>'+
       '<em>EQ '+fmtN(x.eq_cible)+'</em></div>'; });
   } else {
-    h+='<div class="nq-sub">Aucun gap non comblé en M15 — sans cible, le MECH ne donne pas de trade.</div>';
+    h+='<div class="nq-sub">Aucun gap non comblé — sans cible, le MECH ne donne pas de trade.</div>';
   }
   if(d.smt){
     const bad = d.smt.type!=='aucune';

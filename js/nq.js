@@ -66,7 +66,10 @@
   //     précédente (ou l'inverse) — typique des futures qui ferment la nuit.
   //  2) FVG (imbalance 3 bougies) : trou laissé par un mouvement rapide.
   // Un gap est NON COMBLÉ tant que le prix n'est pas revenu dedans après coup.
-  function findGaps(cs) {
+  function findGaps(cs, fenetre) {
+    // On ne remonte que les `fenetre` dernières bougies : au-delà, un gap
+    // n'est plus une cible réaliste, et la recherche coûte cher (O(n²)).
+    if (fenetre && cs.length > fenetre) cs = cs.slice(cs.length - fenetre);
     var gaps = [], i;
     function unfilled(lo, hi, from) {        // le prix est-il revenu dans la zone ?
       for (var k = from; k < cs.length; k++) { if (cs[k].l <= hi && cs[k].h >= lo) return false; }
@@ -356,6 +359,15 @@
     if (!(risque > 0)) return { possible: false, sens: st.sens, raison: 'Stop confondu avec l\'entrée.' };
     var rr = Math.abs(tp - entree) / risque;
 
+    // Un stop plus serré que la moitié de l'ATR de l'unité n'est pas un stop :
+    // il sera touché par le bruit normal, et il gonfle artificiellement le RR.
+    if (d.atr && risque < d.atr * 0.5) {
+      return { possible: false, sens: st.sens, entree: +entree.toFixed(2), sl: +sl.toFixed(2),
+        tp: +tp.toFixed(2), rr: +rr.toFixed(2),
+        raison: 'Stop trop serré (' + risque.toFixed(2) + ' pts pour un ATR de ' + d.atr.toFixed(2) +
+          ') : il serait balayé par le bruit, et le RR de ' + rr.toFixed(2) + ' est un mirage.' };
+    }
+
     return {
       possible: rr >= RR_MIN,
       sens: st.sens,
@@ -376,6 +388,71 @@
     };
   }
 
+  // ===========================================================================
+  // BALAYAGE DE TOUTES LES TIMEFRAMES
+  // ---------------------------------------------------------------------------
+  // Le MECH ne vit pas sur une seule unité : la cible se lit en M5/M15, mais
+  // l'inversion peut se confirmer en M1. On analyse donc CHAQUE unité de la
+  // même façon, et on remonte celle qui donne le meilleur trade.
+  //
+  // M1 est plafonné à 2 jours : Yahoo n'autorise que 8 jours de M1 par requête,
+  // et au-delà de quelques centaines de bougies un gap n'est plus une cible.
+  // ===========================================================================
+  var TFS = [
+    { id: 'M1',  iv: '1m',  range: '2d', fenetre: 400, pivots: 5, expire: 60 },
+    { id: 'M5',  iv: '5m',  range: '5d', fenetre: 400, pivots: 5, expire: 40 },
+    { id: 'M15', iv: '15m', range: '5d', fenetre: 400, pivots: 5, expire: 30 },
+    { id: 'M30', iv: '30m', range: '1mo', fenetre: 300, pivots: 5, expire: 24 },
+    { id: 'H1',  iv: '60m', range: '3mo', fenetre: 300, pivots: 5, expire: 20 }
+  ];
+
+  function analyseTF(tf, nqC, esC, niveaux, prix) {
+    if (!nqC || nqC.length < 60) return { tf: tf.id, dispo: false, detail: 'Pas assez de bougies.' };
+    var gaps = findGaps(nqC, tf.fenetre);
+    var pools = sessionPools(nqC);
+    var lv = {
+      pdh: niveaux.pdh, pdl: niveaux.pdl,
+      asiaH: pools.asia.h, asiaL: pools.asia.l,
+      lonH: pools.londres.h, lonL: pools.londres.l
+    };
+    var struct = structure(nqC, lv, { pivots: tf.pivots, expire: tf.expire });
+    var div = esC ? smt(nqC, esC, 20) : null;
+    var vue = {
+      tf: tf.id, dispo: true, bougies: nqC.length,
+      sessions: pools,
+      gaps_non_comblés: gaps.map(function (g) {
+        return { type: g.type === 'fvg' ? 'FVG' : 'gap de session', sens: g.dir,
+          zone: [+g.lo.toFixed(2), +g.hi.toFixed(2)], eq_cible: +g.eq.toFixed(2) };
+      }),
+      smt: div, structure: struct, nq: { prix: prix }, atr: atr(nqC, 14)
+    };
+    vue.trade = trade(vue);
+    // La SMT est un filtre ÉLIMINATOIRE : un trade contre elle n'existe pas.
+    if (vue.trade && vue.trade.possible && div && div.type !== 'aucune') {
+      var contre = (div.type === 'baissière' && vue.trade.sens === 'LONG') ||
+                   (div.type === 'haussière' && vue.trade.sens === 'SHORT');
+      if (contre) {
+        vue.trade.possible = false;
+        vue.trade.raison = 'Refusé par la SMT ' + div.type + ' : ' + div.consigne;
+      }
+    }
+    return vue;
+  }
+
+  // Parmi toutes les unités, laquelle retenir ?
+  // PAS celle qui affiche le plus gros RR : un RR énorme vient presque toujours
+  // d'un stop trop serré, donc d'un trade qui saute. Le MECH vise 1:1 à 1:1,5
+  // avec un TAUX DE RÉUSSITE élevé. On prend donc l'unité la PLUS BASSE qui
+  // valide — c'est là que l'entrée est la plus précise, et la spec dit que
+  // l'inversion M1 suffit.
+  function meilleur(vues) {
+    var ordre = TFS.map(function (t) { return t.id; });
+    var ok = vues.filter(function (v) { return v.dispo && v.trade && v.trade.possible; });
+    if (!ok.length) return null;
+    ok.sort(function (a, b) { return ordre.indexOf(a.tf) - ordre.indexOf(b.tf); });
+    return ok[0];
+  }
+
   // Dernier instantané chargé : le prompt du Bot IA peut le relire sans
   // refaire d'appel réseau (même principe que le calendrier économique).
   var CACHE = null, CACHE_T = 0;
@@ -390,37 +467,45 @@
   }
 
   function loadFresh() {
-    return Promise.all([
-      candles(SYM.nq, '1d', '3mo'),    // contexte + PDH/PDL
-      candles(SYM.nq, '15m', '5d'),    // exécution / gaps (M15)
-      candles(SYM.es, '15m', '5d')     // S&P 500, uniquement pour la SMT
-    ]).then(function (r) {
-      var nqD = r[0], nq15 = r[1], es15 = r[2];
-      if (!nqD || !nq15) return null;
-      var gaps = findGaps(nq15.candles);
-      var div = es15 ? smt(nq15.candles, es15.candles, 20) : null;
+    var req = [candles(SYM.nq, '1d', '3mo')];          // contexte + PDH/PDL
+    TFS.forEach(function (tf) { req.push(candles(SYM.nq, tf.iv, tf.range)); });
+    TFS.forEach(function (tf) { req.push(candles(SYM.es, tf.iv, tf.range)); });
+
+    return Promise.all(req).then(function (r) {
+      var nqD = r[0];
+      if (!nqD) return null;
       var lv = pdhl(nqD.candles);
-      var pools = sessionPools(nq15.candles);
-      var struct = structure(nq15.candles, {
-        pdh: lv ? lv.pdh : null, pdl: lv ? lv.pdl : null,
-        asiaH: pools.asia.h, asiaL: pools.asia.l,
-        lonH: pools.londres.h, lonL: pools.londres.l
-      }, { pivots: 5, expire: 30 });
+      var niveaux = { pdh: lv ? lv.pdh : null, pdl: lv ? lv.pdl : null };
+      var prix = nqD.price;
+
+      var vues = TFS.map(function (tf, i) {
+        var nqC = r[1 + i], esC = r[1 + TFS.length + i];
+        return analyseTF(tf, nqC && nqC.candles, esC && esC.candles, niveaux, prix);
+      });
+      if (!vues.some(function (v) { return v.dispo; })) return null;
+
+      var best = meilleur(vues);
+      // La vue par défaut (affichage principal) : celle qui donne un trade, sinon M15.
+      var base = best || vues.filter(function (v) { return v.dispo && v.tf === 'M15'; })[0]
+                      || vues.filter(function (v) { return v.dispo; })[0];
+      var esPrix = null;
+      for (var k = 0; k < TFS.length; k++) { if (r[1 + TFS.length + k]) { esPrix = r[1 + TFS.length + k].price; break; } }
+
       var out = {
-        nq: { prix: nqD.price, variation_pct: nqD.chg != null ? +nqD.chg.toFixed(2) : null, bougies_m15: nq15.candles.length },
-        es: es15 ? { prix: es15.price } : null,
+        nq: { prix: prix, variation_pct: nqD.chg != null ? +nqD.chg.toFixed(2) : null },
+        es: esPrix != null ? { prix: esPrix } : null,
         pdh: lv ? +lv.pdh.toFixed(2) : null,
         pdl: lv ? +lv.pdl.toFixed(2) : null,
-        gaps_non_comblés: gaps.map(function (g) {
-          return { type: g.type === 'fvg' ? 'FVG' : 'gap de session', sens: g.dir,
-            zone: [+g.lo.toFixed(2), +g.hi.toFixed(2)], eq_cible: +g.eq.toFixed(2) };
-        }),
-        smt: div,
-        sessions: pools,
-        structure: struct,
+        timeframes: vues,
+        tf_retenue: base ? base.tf : null,
+        // Raccourcis vers la vue retenue, pour tout le code existant.
+        gaps_non_comblés: base ? base.gaps_non_comblés : [],
+        smt: base ? base.smt : null,
+        sessions: base ? base.sessions : null,
+        structure: base ? base.structure : null,
+        trade: base ? base.trade : null,
         maj: Date.now()
       };
-      out.trade = trade(out);
       CACHE = out;
       CACHE_T = Date.now();
       return out;
@@ -435,6 +520,22 @@
     var t = "=== DONNÉES NASDAQ (NQ) POUR LE MECH MODEL ===\n";
     t += "NQ : " + d.nq.prix + (d.nq.variation_pct != null ? ' (' + (d.nq.variation_pct >= 0 ? '+' : '') + d.nq.variation_pct + '%)' : '') + "\n";
     t += "PDH (plus-haut veille) : " + d.pdh + " · PDL (plus-bas veille) : " + d.pdl + "\n";
+    if (d.timeframes && d.timeframes.length) {
+      t += "BALAYAGE DE TOUTES LES UNITÉS DE TEMPS (chaque ligne est calculée, pas estimée) :\n";
+      d.timeframes.forEach(function (v) {
+        if (!v.dispo) { t += "  " + v.tf + " : indisponible\n"; return; }
+        var st = v.structure.valide ? ('structure VALIDE ' + v.structure.sens) : 'structure non valide';
+        var tr = v.trade ? (v.trade.possible
+              ? ('TRADE ' + v.trade.sens + ' · entrée ' + v.trade.entree + ' · stop ' + v.trade.sl +
+                 ' · objectif ' + v.trade.tp + ' · RR ' + v.trade.rr)
+              : ('pas de trade — ' + v.trade.raison)) : 'pas de trade';
+        t += "  " + v.tf + " : " + st + " · " + v.gaps_non_comblés.length + " gap(s) non comblé(s) · SMT " +
+             (v.smt ? v.smt.type : '—') + " · " + tr + "\n";
+      });
+      t += "UNITÉ RETENUE : " + (d.tf_retenue || '—') +
+           " — on garde la plus BASSE qui valide (entrée la plus précise), pas celle qui affiche le plus gros RR : " +
+           "un RR énorme vient presque toujours d'un stop trop serré.\n";
+    }
     if (d.sessions) {
       var p = d.sessions;
       t += "Pools de liquidité récents — ASIE : haut " + (p.asia.h != null ? p.asia.h.toFixed(2) : '—') +
@@ -485,5 +586,5 @@
 
   root.NQ = { load: load, data: data, promptBlock: promptBlock, candles: candles,
     findGaps: findGaps, smt: smt, swings: swings, structure: structure,
-    sessionPools: sessionPools, trade: trade };
+    sessionPools: sessionPools, trade: trade, TFS: TFS, analyseTF: analyseTF };
 })(typeof window !== 'undefined' ? window : this);
