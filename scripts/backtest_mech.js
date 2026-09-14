@@ -52,6 +52,66 @@ const ZENTREE= args.zentree || 'mid';    // mid | bord : où poser la limite DAN
 const SLMODE = args.sl || 'zone';        // zone | balayage | large (le plus loin des deux)
 const MOITIE = +(args.moitie || 0);      // 0 = tout · 1 = 1re moitié · 2 = 2e moitié
 const SMTMOD = args.smt || 'elim';       // off | elim (éliminatoire) | conflu (bonus seulement)
+const CSV    = args.csv || null;         // fichier OHLC local, à la place de Yahoo
+const CSVC   = args.csvcorr || null;     // même chose pour l'actif corrélé (SMT)
+
+// ------------------------------------------------------------- lecture CSV --
+// Yahoo plafonne à 60 jours en M5 et 8 jours en M1 : bien trop court pour
+// conclure quoi que ce soit. Cette fonction accepte n'importe quel CSV OHLC
+// (FirstRate, Databento, export de courtier) pour backtester sur des années.
+//
+// Colonnes reconnues, dans n'importe quel ordre, avec ou sans en-tête :
+//   date/time/timestamp/datetime · open · high · low · close · (volume ignoré)
+// Formats de date acceptés : ISO (2024-03-15 14:30:00), epoch secondes,
+// epoch millisecondes. Une date sans fuseau est lue comme de l'UTC.
+const fsMod = require('fs');
+
+function lireCSV(chemin) {
+  const brut = fsMod.readFileSync(chemin, 'utf8').trim();
+  const lignes = brut.split(/\r?\n/).filter(l => l.trim());
+  if (!lignes.length) throw new Error(chemin + ' : fichier vide');
+
+  const sep = (lignes[0].match(/;/g) || []).length > (lignes[0].match(/,/g) || []).length ? ';' : ',';
+  let iT = 0, iO = 1, iH = 2, iL = 3, iC = 4, debut = 0;
+
+  const tete = lignes[0].toLowerCase().split(sep).map(x => x.trim().replace(/^"|"$/g, ''));
+  const estEntete = tete.some(x => /^(date|time|timestamp|datetime|open|high|low|close)$/.test(x));
+  if (estEntete) {
+    const trouve = (...noms) => tete.findIndex(x => noms.includes(x));
+    iT = trouve('timestamp', 'datetime', 'date', 'time');
+    iO = trouve('open'); iH = trouve('high'); iL = trouve('low'); iC = trouve('close');
+    if ([iT, iO, iH, iL, iC].some(x => x < 0))
+      throw new Error(chemin + ' : colonnes manquantes. Attendu date/open/high/low/close, trouvé : ' + tete.join(', '));
+    debut = 1;
+  }
+
+  const out = [];
+  for (let i = debut; i < lignes.length; i++) {
+    const ch = lignes[i].split(sep).map(x => x.trim().replace(/^"|"$/g, ''));
+    const t = parseDate(ch[iT]);
+    const o = parseFloat(ch[iO]), h = parseFloat(ch[iH]), l = parseFloat(ch[iL]), c = parseFloat(ch[iC]);
+    if (t == null || !isFinite(o) || !isFinite(h) || !isFinite(l) || !isFinite(c)) continue;
+    out.push({ t, o, h, l, c });
+  }
+  if (out.length < 100) throw new Error(chemin + ' : seulement ' + out.length + ' bougies lisibles');
+  out.sort((a, b) => a.t - b.t);
+  return out;
+}
+
+function parseDate(v) {
+  if (v == null || v === '') return null;
+  const n = Number(v);
+  if (isFinite(n) && /^\d+$/.test(String(v).trim())) {
+    if (n > 1e12) return n;              // millisecondes
+    if (n > 1e9)  return n * 1000;       // secondes
+    return null;
+  }
+  // « 2024-03-15 14:30:00 » sans fuseau : on la lit comme de l'UTC.
+  let str = String(v).trim().replace(' ', 'T');
+  if (!/[zZ]|[+-]\d{2}:?\d{2}$/.test(str)) str += 'Z';
+  const d = Date.parse(str);
+  return isFinite(d) ? d : null;
+}
 
 // ----------------------------------------------------------------- données --
 async function fetchCandles(sym, interval, range) {
@@ -496,7 +556,7 @@ function pct(n, d) { return d ? (n / d * 100).toFixed(1) + ' %' : '—'; }
 function rapport(trades, cs, TFnom) {
   const n = trades.length;
   console.log('\n' + '='.repeat(74));
-  console.log(`  BACKTEST MECH MODEL — ${SYM} en ${TFnom} · ${cs.length} bougies`);
+  console.log(`  BACKTEST MECH MODEL — ${CSV ? CSV : SYM} en ${CSV ? "données locales" : TFnom} · ${cs.length} bougies`);
   console.log(`  du ${new Date(cs[0].t).toISOString().slice(0, 10)} au ${new Date(cs[cs.length - 1].t).toISOString().slice(0, 10)}`);
   console.log('='.repeat(74));
   if (!n) { console.log('\n  Aucun trade déclenché sur la période.\n'); return; }
@@ -708,11 +768,14 @@ function journal(trades, cs, hs, nJours) {
 }
 
 (async () => {
-  if (!QUIET) console.log(`Récupération ${SYM} et ${CORR} en ${TF} sur ${RANGE}…`);
-  const [nq, es] = await Promise.all([
-    fetchCandles(SYM, TF, RANGE),
-    fetchCandles(CORR, TF, RANGE).catch(() => null)
-  ]);
+  if (!QUIET) console.log(CSV ? `Lecture de ${CSV}` + (CSVC ? ` et ${CSVC}` : ' (pas de SMT)') + '…'
+                                : `Récupération ${SYM} et ${CORR} en ${TF} sur ${RANGE}…`);
+  const [nq, es] = CSV
+    ? [lireCSV(CSV), CSVC ? lireCSV(CSVC) : null]
+    : await Promise.all([
+        fetchCandles(SYM, TF, RANGE),
+        fetchCandles(CORR, TF, RANGE).catch(() => null)
+      ]);
   if (!nq || nq.length < 100) throw new Error('pas assez de bougies');
   if (!QUIET) console.log(`  ${nq.length} bougies ${SYM}` + (es ? `, ${es.length} bougies ${CORR} (SMT active)` : ', pas de SMT'));
   const hs = horaires(nq);
@@ -736,7 +799,7 @@ function journal(trades, cs, hs, nJours) {
     const ic = [moy - 1.96 * se, moy + 1.96 * se];
     // Combien de trades faudrait-il pour que l'intervalle exclue zéro ?
     const requis = moy !== 0 ? Math.ceil(Math.pow(1.96 * sd / Math.abs(moy), 2)) : null;
-    console.log(JSON.stringify({ tf: TF, moitie: MOITIE, sl: SLMODE, zentree: ZENTREE, disp: DISP, partiel: PART, smt: SMTMOD, n: trades.length, gains: g, pertes: p, be: b,
+    console.log(JSON.stringify({ tf: CSV ? "csv" : TF, moitie: MOITIE, sl: SLMODE, zentree: ZENTREE, disp: DISP, partiel: PART, smt: SMTMOD, n: trades.length, gains: g, pertes: p, be: b,
       wr: trades.length ? +(g / trades.length * 100).toFixed(1) : 0,
       esperance: +moy.toFixed(3), ecartType: +sd.toFixed(2),
       ic95: [+ic[0].toFixed(3), +ic[1].toFixed(3)],
