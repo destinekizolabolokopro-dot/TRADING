@@ -43,6 +43,20 @@
     return tryProxy(0);
   }
 
+  // Cache par requête : une bougie H1 ne bouge pas toutes les 5 minutes, et un
+  // relais public gratuit finit par limiter si on le bombarde. Chaque unité a
+  // donc sa propre durée de fraîcheur.
+  var RAW = {};
+  function candlesCached(sym, interval, range, ttl) {
+    var k = sym + '|' + interval + '|' + range;
+    var e = RAW[k];
+    if (e && (Date.now() - e.t) < ttl) return Promise.resolve(e.v);
+    return candles(sym, interval, range).then(function (v) {
+      if (v) RAW[k] = { t: Date.now(), v: v };
+      return v || (e ? e.v : null);      // en cas d'échec, on garde la dernière bonne réponse
+    });
+  }
+
   function fetchOne(u) {
     return fetch(u)
       .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
@@ -399,11 +413,11 @@
   // et au-delà de quelques centaines de bougies un gap n'est plus une cible.
   // ===========================================================================
   var TFS = [
-    { id: 'M1',  iv: '1m',  range: '2d', fenetre: 400, pivots: 5, expire: 60 },
-    { id: 'M5',  iv: '5m',  range: '5d', fenetre: 400, pivots: 5, expire: 40 },
-    { id: 'M15', iv: '15m', range: '5d', fenetre: 400, pivots: 5, expire: 30 },
-    { id: 'M30', iv: '30m', range: '1mo', fenetre: 300, pivots: 5, expire: 24 },
-    { id: 'H1',  iv: '60m', range: '3mo', fenetre: 300, pivots: 5, expire: 20 }
+    { id: 'M1',  iv: '1m',  range: '2d',  fenetre: 400, pivots: 5, expire: 60, ttl: 4 },
+    { id: 'M5',  iv: '5m',  range: '5d',  fenetre: 400, pivots: 5, expire: 40, ttl: 4 },
+    { id: 'M15', iv: '15m', range: '5d',  fenetre: 400, pivots: 5, expire: 30, ttl: 9 },
+    { id: 'M30', iv: '30m', range: '1mo', fenetre: 300, pivots: 5, expire: 24, ttl: 19 },
+    { id: 'H1',  iv: '60m', range: '3mo', fenetre: 300, pivots: 5, expire: 20, ttl: 39 }
   ];
 
   function analyseTF(tf, nqC, esC, niveaux, prix) {
@@ -467,9 +481,11 @@
   }
 
   function loadFresh() {
-    var req = [candles(SYM.nq, '1d', '3mo')];          // contexte + PDH/PDL
-    TFS.forEach(function (tf) { req.push(candles(SYM.nq, tf.iv, tf.range)); });
-    TFS.forEach(function (tf) { req.push(candles(SYM.es, tf.iv, tf.range)); });
+    var MIN = 60 * 1000;
+    // Le PDH/PDL de la veille est figé : inutile de le redemander toutes les 5 min.
+    var req = [candlesCached(SYM.nq, '1d', '3mo', 60 * MIN)];
+    TFS.forEach(function (tf) { req.push(candlesCached(SYM.nq, tf.iv, tf.range, tf.ttl * MIN)); });
+    TFS.forEach(function (tf) { req.push(candlesCached(SYM.es, tf.iv, tf.range, tf.ttl * MIN)); });
 
     return Promise.all(req).then(function (r) {
       var nqD = r[0];
