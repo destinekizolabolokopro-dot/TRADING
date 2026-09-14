@@ -42,6 +42,11 @@ const STRAT  = args.strat || 'mech';     // mech | ifvg
 const ENTREE = args.entree || 'retest';  // retest | cassure
 const TPMODE = args.tp || 'fvg';         // fvg | rr
 const TPRR   = +(args.tprr || 2.0);      // objectif en R si tp=rr
+const CIBLE  = args.cible || 'eq';       // eq (50 % du gap) | bord (première touche)
+const ORDRE  = args.ordre || 'marche';   // marche (clôture) | limite (retour dans la zone)
+const LIMBAR = +(args.limbar || 8);      // validité de l'ordre limite, en bougies
+const HTFOK  = args.htf === '1';         // n'accepter que les trades alignés H1
+const PART   = +(args.partiel || 0);     // % clôturé au 1:1 (0 = désactivé)
 
 // ----------------------------------------------------------------- données --
 async function fetchCandles(sym, interval, range) {
@@ -242,7 +247,7 @@ function backtest(cs, es, hs) {
   const zones = zonesFVG(cs);
 
   const trades = [];
-  let enPos = null;
+  let enPos = null, pendant = null;
 
   // Pour chaque bougie, les pivots CONNUS à cet instant.
   let ih = 0, ib = 0;
@@ -259,13 +264,19 @@ function backtest(cs, es, hs) {
       const toucheTP = L ? c.h >= enPos.tp : c.l <= enPos.tp;
       const toucheBE = L ? c.h >= enPos.be : c.l <= enPos.be;
 
-      if (toucheSL && toucheTP) {                       // indécidable dans la bougie
-        enPos.sortie = 'ambigu'; enPos.r = enPos.beFait ? 0 : -1;
+      // Prise PARTIELLE au 1:1 : on encaisse une fraction, on passe le reste à
+      // l'entrée. Un trade qui touche le 1:1 puis revient devient alors un
+      // petit GAGNANT, plus un simple break-even. C'est vraisemblablement ainsi
+      // que se comptent les taux de réussite annoncés.
+      const frac = PART / 100;
+      const acquis = enPos.beFait ? frac * 1 : 0;     // en R, déjà encaissé
+      if (toucheSL && toucheTP) {
+        enPos.sortie = acquis > 0 ? 'gain partiel' : 'ambigu'; enPos.r = acquis > 0 ? acquis : -1;
       } else if (toucheSL) {
-        enPos.sortie = enPos.beFait ? 'break-even' : 'perte';
-        enPos.r = enPos.beFait ? 0 : -1;
+        enPos.sortie = acquis > 0 ? 'gain partiel' : (enPos.beFait ? 'break-even' : 'perte');
+        enPos.r = acquis > 0 ? acquis : (enPos.beFait ? 0 : -1);
       } else if (toucheTP) {
-        enPos.sortie = 'gain'; enPos.r = enPos.rr;
+        enPos.sortie = 'gain'; enPos.r = acquis + (1 - frac) * enPos.rr;
       } else {
         if (toucheBE && !enPos.beFait) { enPos.beFait = true; enPos.sl = enPos.entree; }  // stop à l'entrée au 1:1
         if (i - enPos.iEntree > 200) {
@@ -278,6 +289,33 @@ function backtest(cs, es, hs) {
       }
       if (enPos.sortie) { enPos.iSortie = i; enPos.duree = i - enPos.iEntree; trades.push(enPos); enPos = null; }
       else continue;                                    // un seul trade à la fois
+    }
+
+    // ---- 1 bis. ordre LIMITE en attente ------------------------------------
+    // Blake : « si la bougie clôture haut, privilégie un ORDRE LIMITE plutôt
+    // que de chasser ». On attend donc que le prix REVIENNE dans la bougie
+    // d'inversion au lieu d'entrer à sa clôture. Entrée meilleure = risque plus
+    // petit = RR plus haut ET objectif plus proche.
+    if (pendant) {
+      const o = pendant, L2 = o.sens === 'LONG';
+      const touche = L2 ? cs[i].l <= o.prix : cs[i].h >= o.prix;
+      if (touche) {
+        const entree = o.prix;
+        const risque = Math.abs(entree - o.sl);
+        const rr = risque > 0 ? Math.abs(o.tp - entree) / risque : 0;
+        pendant = null;
+        if (risque > 0 && risque >= atr[i] * ATRMIN && rr >= RRMIN) {
+          enPos = { sens: o.sens, iEntree: i, t: cs[i].t, entree, sl: o.sl, slInit: o.sl,
+                    tp: o.tp, rr, be: L2 ? entree + risque : entree - risque, beFait: false,
+                    pool: o.pool, src: o.src, mode: INV + '+limite', jour: hs[i].jour,
+                    paris: hs[i].paris, creneau: hs[i].paris < 17 * 60 ? 'après-midi' : 'soirée' };
+        }
+        continue;
+      }
+      // L'objectif atteint avant l'entrée : occasion manquée, on annule.
+      if (L2 ? cs[i].h >= o.tp : cs[i].l <= o.tp) { pendant = null; continue; }
+      if (i - o.iSignal > LIMBAR) { pendant = null; }       // ordre expiré
+      else continue;                                         // on attend encore
     }
 
     // ---- 2. recherche d'un nouveau setup ---------------------------------
@@ -340,6 +378,15 @@ function backtest(cs, es, hs) {
     if (!inv) continue;
 
     if (smtContre(cs, es, i, 20, setup.sens)) continue;          // SMT éliminatoire
+    // Le modèle n'exige pas de biais haute unité, mais la source dit que la
+    // probabilité monte nettement quand le trade va dans le même sens. On peut
+    // donc en faire un filtre, et mesurer ce qu'il coûte et ce qu'il rapporte.
+    if (HTFOK) {
+      const fen = 100;
+      if (i < fen) continue;
+      const debut = cs[i - fen].c, tendance = cs[i].c > debut ? 'LONG' : 'SHORT';
+      if (tendance !== setup.sens) continue;
+    }
 
     // ---- 4. niveaux ------------------------------------------------------
     const entree = cs[i].c;
@@ -356,12 +403,17 @@ function backtest(cs, es, hs) {
       sl = L ? setup.swing.prix - buf : setup.swing.prix + buf; src = 'balayage';
     }
     // cible : un gap NON COMBLÉ À CET INSTANT, au-delà de l'entrée
+    // CIBLE : le milieu du gap (consequent encroachment) ou son BORD le plus
+    // proche. Le bord est touché AVANT le milieu — donc atteint bien plus
+    // souvent, pour un RR plus faible. C'est le principal levier sur le taux
+    // de réussite, et je ne l'avais pas implémenté.
     let tp = null;
     gs.forEach(g => {
       if (g.ne > i) return;                       // pas encore né
       if (g.comble != null && g.comble <= i) return;  // déjà comblé
-      if (L ? g.eq <= entree : g.eq >= entree) return;
-      if (tp == null || (L ? g.eq < tp : g.eq > tp)) tp = g.eq;
+      const niv = CIBLE === 'bord' ? (L ? g.lo : g.hi) : g.eq;
+      if (L ? niv <= entree : niv >= entree) return;
+      if (tp == null || (L ? niv < tp : niv > tp)) tp = niv;
     });
     if (tp == null) continue;
 
@@ -370,10 +422,16 @@ function backtest(cs, es, hs) {
     const rr = Math.abs(tp - entree) / risque;
     if (rr < RRMIN) continue;
 
-    enPos = { sens: setup.sens, iEntree: i, t: cs[i].t, entree, sl, slInit: sl, tp, rr,
-              be: L ? entree + risque : entree - risque, beFait: false,
-              pool: setup.pool[1], src, mode: INV, jour: j, paris: hs[i].paris,
-              creneau: hs[i].paris < 17 * 60 ? 'après-midi' : 'soirée' };
+    if (ORDRE === 'limite') {
+      // Limite au milieu de la bougie d'inversion : on laisse le prix revenir.
+      pendant = { sens: setup.sens, iSignal: i, prix: (cs[i].h + cs[i].l) / 2,
+                  sl, tp, pool: setup.pool[1], src };
+    } else {
+      enPos = { sens: setup.sens, iEntree: i, t: cs[i].t, entree, sl, slInit: sl, tp, rr,
+                be: L ? entree + risque : entree - risque, beFait: false,
+                pool: setup.pool[1], src, mode: INV, jour: j, paris: hs[i].paris,
+                creneau: hs[i].paris < 17 * 60 ? 'après-midi' : 'soirée' };
+    }
   }
   return trades;
 }
@@ -389,7 +447,10 @@ function rapport(trades, cs, TFnom) {
   console.log('='.repeat(74));
   if (!n) { console.log('\n  Aucun trade déclenché sur la période.\n'); return; }
 
-  const gains = trades.filter(t => t.sortie === 'gain');
+  // Un « gain partiel » (1:1 encaissé puis retour à l'entrée) est un GAGNANT :
+  // de l'argent a été pris. Le compter comme un break-even fausse le taux.
+  const gains = trades.filter(t => t.sortie === 'gain' || t.sortie === 'gain partiel');
+  const partiels = trades.filter(t => t.sortie === 'gain partiel');
   const pertes = trades.filter(t => t.sortie === 'perte');
   const be = trades.filter(t => t.sortie === 'break-even');
   const amb = trades.filter(t => t.sortie === 'ambigu');
@@ -403,6 +464,7 @@ function rapport(trades, cs, TFnom) {
   console.log('\n  RÉSULTATS');
   console.log(`    Trades déclenchés .......... ${n}`);
   console.log(`    Gagnants ................... ${gains.length}  (${pct(gains.length, n)})`);
+  if (partiels.length) console.log(`      dont gains partiels ...... ${partiels.length}  (1:1 encaissé puis retour à l'entrée)`);
   console.log(`    Perdants ................... ${pertes.length}  (${pct(pertes.length, n)})`);
   console.log(`    Sortis au break-even ....... ${be.length}  (${pct(be.length, n)})   ← ni gain ni perte`);
   console.log(`    Ambigus (SL+TP même bougie)  ${amb.length}  (${pct(amb.length, n)})   ← comptés PERDANTS`);
@@ -605,11 +667,11 @@ function journal(trades, cs, hs, nJours) {
   const trades = STRAT === 'ifvg' ? backtestIFVG(nq, al ? al.serie : null, hs)
                                   : backtest(nq, al ? al.serie : null, hs);
   if (QUIET) {
-    const g = trades.filter(t => t.sortie === 'gain').length;
+    const g = trades.filter(t => t.sortie === 'gain' || t.sortie === 'gain partiel').length;
     const p = trades.filter(t => t.sortie === 'perte' || t.sortie === 'ambigu').length;
     const b = trades.filter(t => t.sortie === 'break-even').length;
     const R = trades.reduce((s, t) => s + t.r, 0);
-    console.log(JSON.stringify({ strat: STRAT, tf: TF, inv: STRAT === 'ifvg' ? ENTREE : INV, tp: TPMODE, n: trades.length, gains: g, pertes: p, be: b,
+    console.log(JSON.stringify({ strat: STRAT, tf: TF, ordre: ORDRE, cible: CIBLE, partiel: PART, n: trades.length, gains: g, pertes: p, be: b,
       wr: trades.length ? +(g / trades.length * 100).toFixed(1) : 0,
       esperance: trades.length ? +(R / trades.length).toFixed(3) : 0, cumulR: +R.toFixed(1) }));
   } else { rapport(trades, nq, TF); if (JOURS) journal(trades, nq, hs, JOURS); }
