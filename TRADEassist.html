@@ -2834,9 +2834,9 @@
       "Réponds UNIQUEMENT avec un objet JSON valide, sans texte autour, de la forme :\n" +
       '{"marche":"résumé global en 1-2 phrases",' +
       '"amd":[{"paire":"BTC/USD","phase":"Accumulation|Manipulation|Distribution|Expansion","note":"courte explication"}],' +
-      '"preshot":[{"paire":"ETH/USD","sens":"LONG|SHORT","tf":"H1|H4|D1","setup":"nom du setup (ex. Sweep+MSS, STRIKE, Unicorn…)",' +
+      '"preshot":[{"paire":"NQ","sens":"LONG|SHORT","tf":"M5|M15","setup":"étape du MECH atteinte (ex. sweep de liquidité, structure valide, attente d\'inversion)",' +
       '"zone":"zone/niveau à surveiller","manque":"ce qui manque pour valider","declencheur":"le signal précis qui validera l\'entrée","confiance":0}],' +
-      '"idees":[{"paire":"BTC/USD","sens":"LONG|SHORT","tf":"H1|H4|D1","strategie":"nom de la stratégie enregistrée utilisée, ou \'ICT/SMC + indicateurs\'",' +
+      '"idees":[{"paire":"NQ","sens":"LONG|SHORT","tf":"M5|M15","strategie":"MECH Model (précise l\'entrée : inversion M1 / order block / FVG)",' +
       '"entree":00,"stop":00,"objectif":00,"rr":0.0,"confiance":0,"pourquoi":"déclencheur + confirmations + confluence indicateurs, en français"}]}\n' +
       "Si rien n'atteint au moins 1 RR, renvoie \"idees\": []. Renvoie \"amd\": [] et \"preshot\": [] si tu n'as rien à signaler.";
     if (mtf && mtf.length) {
