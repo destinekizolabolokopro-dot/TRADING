@@ -111,8 +111,20 @@
     return { pdh: y.h, pdl: y.l, date: y.t };
   }
 
+  // Dernier instantané chargé : le prompt du Bot IA peut le relire sans
+  // refaire d'appel réseau (même principe que le calendrier économique).
+  var CACHE = null, CACHE_T = 0;
+  var TTL = 5 * 60 * 1000;   // 5 minutes : le MECH travaille en M5/M15
+
+  function data() { return CACHE; }
+
   // Charge tout ce dont le MECH a besoin.
-  function load() {
+  function load(force) {
+    if (!force && CACHE && (Date.now() - CACHE_T) < TTL) return Promise.resolve(CACHE);
+    return loadFresh();
+  }
+
+  function loadFresh() {
     return Promise.all([
       candles(SYM.nq, '1d', '3mo'),    // contexte + PDH/PDL
       candles(SYM.nq, '15m', '5d'),    // exécution / gaps (M15)
@@ -123,7 +135,7 @@
       var gaps = findGaps(nq15.candles);
       var div = es15 ? smt(nq15.candles, es15.candles, 20) : null;
       var lv = pdhl(nqD.candles);
-      return {
+      var out = {
         nq: { prix: nqD.price, variation_pct: nqD.chg != null ? +nqD.chg.toFixed(2) : null, bougies_m15: nq15.candles.length },
         es: es15 ? { prix: es15.price } : null,
         pdh: lv ? +lv.pdh.toFixed(2) : null,
@@ -135,12 +147,17 @@
         smt: div,
         maj: Date.now()
       };
+      CACHE = out;
+      CACHE_T = Date.now();
+      return out;
     }).catch(function () { return null; });
   }
 
   // Bloc texte injecté dans le prompt du Bot IA.
   function promptBlock(d) {
-    if (!d) return "DONNÉES NQ indisponibles pour le moment (flux non joignable).";
+    if (d === undefined) d = CACHE;
+    if (!d) return "=== DONNÉES NASDAQ (NQ) ===\nFlux NQ/ES injoignable pour le moment : tu n'as NI les gaps non comblés, NI le PDH/PDL, NI la SMT. "
+      + "Sans ces données le MECH Model ne peut PAS être validé — renvoie \"idees\": [] et explique-le dans \"marche\".";
     var t = "=== DONNÉES NASDAQ (NQ) POUR LE MECH MODEL ===\n";
     t += "NQ : " + d.nq.prix + (d.nq.variation_pct != null ? ' (' + (d.nq.variation_pct >= 0 ? '+' : '') + d.nq.variation_pct + '%)' : '') + "\n";
     t += "PDH (plus-haut veille) : " + d.pdh + " · PDL (plus-bas veille) : " + d.pdl + "\n";
@@ -158,5 +175,5 @@
     return t;
   }
 
-  root.NQ = { load: load, promptBlock: promptBlock, candles: candles, findGaps: findGaps, smt: smt };
+  root.NQ = { load: load, data: data, promptBlock: promptBlock, candles: candles, findGaps: findGaps, smt: smt };
 })(typeof window !== 'undefined' ? window : this);

@@ -89,6 +89,24 @@
   .live{display:inline-flex;align-items:center;gap:7px;color:var(--muted)}
   .dot{width:7px;height:7px;border-radius:50%;background:var(--faint);display:inline-block}
   .dot.on{background:var(--long)}
+.nq-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin:0 0 10px}
+.nq-cell{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:8px 10px}
+.nq-cell span{display:block;font-size:11px;color:var(--muted);margin-bottom:2px}
+.nq-cell b{font-size:15px;font-variant-numeric:tabular-nums}
+.nq-cell i{font-style:normal;font-size:12px;font-weight:700}
+.nq-cell i.up{color:#4ade80}.nq-cell i.dn{color:#f87171}
+.nq-sub{font-size:12px;color:var(--muted);margin:8px 0 6px}
+.nq-gap{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline;padding:7px 10px;border-radius:9px;margin-bottom:5px;border-left:3px solid}
+.nq-gap.up{background:rgba(34,197,94,.08);border-color:#22c55e}
+.nq-gap.dn{background:rgba(248,113,113,.08);border-color:#f87171}
+.nq-gap b{font-size:12.5px}.nq-gap span{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.nq-gap em{font-style:normal;font-size:12.5px;font-weight:700;margin-left:auto;font-variant-numeric:tabular-nums}
+.nq-smt{padding:8px 10px;border-radius:9px;margin:8px 0 2px;font-size:12.5px}
+.nq-smt b{display:block;margin-bottom:2px}
+.nq-smt span{color:var(--muted)}
+.nq-smt.ok{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08)}
+.nq-smt.warn{background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.35)}
+
 .winbadge{font-size:11px;font-weight:700;letter-spacing:.02em;padding:4px 9px;border-radius:999px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);color:#9aa4b2;white-space:nowrap}
 .winbadge.on{border-color:rgba(34,197,94,.45);background:rgba(34,197,94,.12);color:#4ade80}
 @media(max-width:820px){.winbadge{display:none}}
@@ -2820,8 +2838,20 @@
     return { pdh: y.h, pdl: y.l, date: y.t };
   }
 
+  // Dernier instantané chargé : le prompt du Bot IA peut le relire sans
+  // refaire d'appel réseau (même principe que le calendrier économique).
+  var CACHE = null, CACHE_T = 0;
+  var TTL = 5 * 60 * 1000;   // 5 minutes : le MECH travaille en M5/M15
+
+  function data() { return CACHE; }
+
   // Charge tout ce dont le MECH a besoin.
-  function load() {
+  function load(force) {
+    if (!force && CACHE && (Date.now() - CACHE_T) < TTL) return Promise.resolve(CACHE);
+    return loadFresh();
+  }
+
+  function loadFresh() {
     return Promise.all([
       candles(SYM.nq, '1d', '3mo'),    // contexte + PDH/PDL
       candles(SYM.nq, '15m', '5d'),    // exécution / gaps (M15)
@@ -2832,7 +2862,7 @@
       var gaps = findGaps(nq15.candles);
       var div = es15 ? smt(nq15.candles, es15.candles, 20) : null;
       var lv = pdhl(nqD.candles);
-      return {
+      var out = {
         nq: { prix: nqD.price, variation_pct: nqD.chg != null ? +nqD.chg.toFixed(2) : null, bougies_m15: nq15.candles.length },
         es: es15 ? { prix: es15.price } : null,
         pdh: lv ? +lv.pdh.toFixed(2) : null,
@@ -2844,12 +2874,17 @@
         smt: div,
         maj: Date.now()
       };
+      CACHE = out;
+      CACHE_T = Date.now();
+      return out;
     }).catch(function () { return null; });
   }
 
   // Bloc texte injecté dans le prompt du Bot IA.
   function promptBlock(d) {
-    if (!d) return "DONNÉES NQ indisponibles pour le moment (flux non joignable).";
+    if (d === undefined) d = CACHE;
+    if (!d) return "=== DONNÉES NASDAQ (NQ) ===\nFlux NQ/ES injoignable pour le moment : tu n'as NI les gaps non comblés, NI le PDH/PDL, NI la SMT. "
+      + "Sans ces données le MECH Model ne peut PAS être validé — renvoie \"idees\": [] et explique-le dans \"marche\".";
     var t = "=== DONNÉES NASDAQ (NQ) POUR LE MECH MODEL ===\n";
     t += "NQ : " + d.nq.prix + (d.nq.variation_pct != null ? ' (' + (d.nq.variation_pct >= 0 ? '+' : '') + d.nq.variation_pct + '%)' : '') + "\n";
     t += "PDH (plus-haut veille) : " + d.pdh + " · PDL (plus-bas veille) : " + d.pdl + "\n";
@@ -2867,7 +2902,7 @@
     return t;
   }
 
-  root.NQ = { load: load, promptBlock: promptBlock, candles: candles, findGaps: findGaps, smt: smt };
+  root.NQ = { load: load, data: data, promptBlock: promptBlock, candles: candles, findGaps: findGaps, smt: smt };
 })(typeof window !== 'undefined' ? window : this);
 
 </script>
@@ -2945,6 +2980,11 @@
     // aucune analyse ne peut déboucher sur une position.
     if (root.WINDOW && typeof root.WINDOW.promptBlock === 'function') {
       txt += root.WINDOW.promptBlock() + "\n\n";
+    }
+    // LES DONNÉES DU MECH : NQ (exécution) + ES (SMT). Sans elles, pas de modèle.
+    // Elles passent juste après la fenêtre, avant toute autre information.
+    if (root.NQ && typeof root.NQ.promptBlock === 'function') {
+      txt += root.NQ.promptBlock() + "\n\n";
     }
     txt += "STYLE DEMANDÉ : " + st.nom.toUpperCase() + " — travaille sur les unités " + st.tfs +
       " (biais sur " + st.htf + ", entrée sur " + st.ltf + "), horizon ~" + st.horizon + ". " +
@@ -4700,6 +4740,7 @@ $('#ai-run').addEventListener('click', async ()=>{
     let mtf=null;
     try{ if(window.LIVE&&LIVE.mtf) mtf=await LIVE.mtf(); }catch(e){}
     try{ if(window.ECON&&ECON.fetchLive) await ECON.fetchLive(); }catch(e){} // calendrier éco live pour le prompt
+    try{ if(window.NQ&&NQ.load) await NQ.load(); }catch(e){}                 // NQ + ES (SMT) : le carburant du MECH
     renderEcon();
     const linkOn = $('#ai-link') && $('#ai-link').checked;
     const collab = linkOn ? buildCollab() : null;
@@ -4708,6 +4749,7 @@ $('#ai-run').addEventListener('click', async ()=>{
     st.textContent = '✅ Analyse terminée · modèle ' + r.model + (r.usage&&r.usage.output_tokens?(' · '+r.usage.output_tokens+' tokens'):'') + linkTxt;
     if(!r.parsed){ out.innerHTML='<div class="ai-summary">'+(r.raw||'Réponse vide.').slice(0,1200)+'</div>'; out.classList.add('show'); return; }
     let html='';
+    html+=nqBlockHTML();
     if(r.parsed.marche) html+='<div class="ai-summary">'+r.parsed.marche+'</div>';
     html+=amdBlockHTML(r.parsed.amd);
     html+=preshotBlockHTML(r.parsed.preshot);
@@ -4801,6 +4843,36 @@ function amdColor(ph){ const p=(ph||'').toLowerCase();
   if(p.indexOf('distrib')>=0) return '#3ddc84';    // distribution = vrai move (vert)
   if(p.indexOf('expans')>=0) return '#6ea8ff';     // expansion (bleu)
   return '#9aa0aa';                                 // accumulation (gris)
+}
+// Panneau « données MECH » : ce que le modèle a réellement sous les yeux.
+// Sans gap non comblé ni SMT, le MECH ne peut pas valider un trade — autant
+// que ce soit visible plutôt que caché dans le prompt.
+function nqBlockHTML(){
+  const d = (window.NQ && NQ.data) ? NQ.data() : null;
+  if(!d) return '<div class="ai-sec">📊 Données MECH <span class="sub">NQ + ES</span></div>'+
+    '<div class="ai-summary">Flux NQ/ES injoignable — sans les gaps, le PDH/PDL et la SMT, le MECH ne peut pas valider de trade.</div>';
+  const v = d.nq.variation_pct;
+  let h='<div class="ai-sec">📊 Données MECH <span class="sub">NQ (exécution) + ES (SMT)</span></div>';
+  h+='<div class="nq-grid">';
+  h+='<div class="nq-cell"><span>NQ</span><b>'+fmtN(d.nq.prix)+(v!=null?' <i class="'+(v>=0?'up':'dn')+'">'+(v>=0?'+':'')+v+'%</i>':'')+'</b></div>';
+  if(d.es) h+='<div class="nq-cell"><span>ES (S&P 500)</span><b>'+fmtN(d.es.prix)+'</b></div>';
+  h+='<div class="nq-cell"><span>PDH (veille)</span><b>'+fmtN(d.pdh)+'</b></div>';
+  h+='<div class="nq-cell"><span>PDL (veille)</span><b>'+fmtN(d.pdl)+'</b></div>';
+  h+='</div>';
+  const g=d.gaps_non_comblés||[];
+  if(g.length){
+    h+='<div class="nq-sub">Gaps non comblés — ce sont les CIBLES du modèle (on vise l’EQ)</div>';
+    g.forEach(x=>{ h+='<div class="nq-gap '+(x.sens==='haussier'?'up':'dn')+'">'+
+      '<b>'+x.type+' '+x.sens+'</b><span>zone '+fmtN(x.zone[0])+' – '+fmtN(x.zone[1])+'</span>'+
+      '<em>EQ '+fmtN(x.eq_cible)+'</em></div>'; });
+  } else {
+    h+='<div class="nq-sub">Aucun gap non comblé en M15 — sans cible, le MECH ne donne pas de trade.</div>';
+  }
+  if(d.smt){
+    const bad = d.smt.type!=='aucune';
+    h+='<div class="nq-smt '+(bad?'warn':'ok')+'"><b>SMT NQ vs ES : '+d.smt.type+'</b><span>'+d.smt.detail+'</span></div>';
+  }
+  return h;
 }
 function amdBlockHTML(amd){
   if(!Array.isArray(amd)||!amd.length) return '';

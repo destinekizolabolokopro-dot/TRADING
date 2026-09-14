@@ -72,6 +72,11 @@
     if (root.WINDOW && typeof root.WINDOW.promptBlock === 'function') {
       txt += root.WINDOW.promptBlock() + "\n\n";
     }
+    // LES DONNÉES DU MECH : NQ (exécution) + ES (SMT). Sans elles, pas de modèle.
+    // Elles passent juste après la fenêtre, avant toute autre information.
+    if (root.NQ && typeof root.NQ.promptBlock === 'function') {
+      txt += root.NQ.promptBlock() + "\n\n";
+    }
     txt += "STYLE DEMANDÉ : " + st.nom.toUpperCase() + " — travaille sur les unités " + st.tfs +
       " (biais sur " + st.htf + ", entrée sur " + st.ltf + "), horizon ~" + st.horizon + ". " +
       "Adapte tes entrées/stops/objectifs à ce style (en scalp, stops et objectifs plus serrés).\n\n" +
