@@ -33,7 +33,11 @@ const BUF    = +(args.buffer || 0.02);   // % du prix
 const RRMIN  = +(args.rrmin || 1.0);
 const ATRMIN = +(args.atrmin || 0.5);    // stop minimum, en fraction d'ATR
 const DISP   = +(args.disp || 1.0);      // displacement : corps > ATR x DISP
+const INV    = args.inv || 'cisd';       // cisd | ifvg | ifvg-retest | mss | engulf
+const IFVGAGE= +(args.ifvgage || 120);   // âge max d'un FVG pour pouvoir s'inverser
 const QUIET  = args.quiet === '1';
+const JOURS  = +(args.jours || 0);       // journal des N derniers jours de bourse
+const COUT   = +(args.cout || 0.06);     // coût aller-retour estimé, en R
 
 // ----------------------------------------------------------------- données --
 async function fetchCandles(sym, interval, range) {
@@ -154,11 +158,24 @@ function poolsParJour(cs, hs) {
   return { veille, asia, lon };
 }
 
+// Aligne la série corrélée sur les horodatages de la série principale : sans
+// ça, une bougie manquante d'un côté décale tout et la SMT compare n'importe quoi.
+function aligner(nq, es) {
+  if (!es) return null;
+  const m = new Map();
+  es.forEach(c => m.set(c.t, c));
+  let manquants = 0;
+  const out = nq.map(c => { const x = m.get(c.t); if (!x) manquants++; return x || null; });
+  // On bouche les trous avec la dernière bougie connue, faute de mieux.
+  for (let i = 1; i < out.length; i++) if (!out[i]) out[i] = out[i - 1];
+  return { serie: out, manquants };
+}
+
 function smtContre(nq, es, i, n, sens) {
   if (!es || i < 2 * n) return false;
   const mx = (a, s, e) => Math.max(...a.slice(s, e).map(x => x.h));
   const mn = (a, s, e) => Math.min(...a.slice(s, e).map(x => x.l));
-  if (i >= es.length) return false;
+  if (i >= es.length || !es[i] || !es[i - 2 * n]) return false;
   const nHH = mx(nq, i - n, i + 1) > mx(nq, i - 2 * n, i - n);
   const eHH = mx(es, i - n, i + 1) > mx(es, i - 2 * n, i - n);
   const nLL = mn(nq, i - n, i + 1) < mn(nq, i - 2 * n, i - n);
@@ -168,12 +185,57 @@ function smtContre(nq, es, i, n, sens) {
   return false;
 }
 
+// ---------------------------------------------------------------- IFVG -----
+// L'INVERSION, version mécanique : un FVG qui se fait TRAVERSER change de camp.
+//   FVG baissier (résistance) dont le prix CLÔTURE au-dessus  -> IFVG HAUSSIER
+//   FVG haussier (support)    dont le prix CLÔTURE en dessous -> IFVG BAISSIER
+// C'est la seule définition d'« inversion » qui soit entièrement mécanique :
+// pas de seuil arbitraire, pas d'appréciation. La zone inversée devient un
+// support (ou une résistance) et l'entrée se fait dessus.
+function zonesFVG(cs) {
+  const z = [];
+  for (let i = 2; i < cs.length; i++) {
+    if (cs[i].l > cs[i - 2].h)      z.push({ bas: cs[i - 2].h, haut: cs[i].l, haussier: true,  ne: i, casse: null });
+    else if (cs[i].h < cs[i - 2].l) z.push({ bas: cs[i].h,     haut: cs[i - 2].l, haussier: false, ne: i, casse: null });
+  }
+  // Date de cassure : première CLÔTURE au-delà de la zone, du mauvais côté.
+  z.forEach(x => {
+    for (let k = x.ne + 1; k < cs.length; k++) {
+      if (k - x.ne > IFVGAGE) break;
+      if (x.haussier ? cs[k].c < x.bas : cs[k].c > x.haut) { x.casse = k; break; }
+    }
+  });
+  return z;
+}
+
+// Y a-t-il une inversion IFVG dans le sens voulu, à la bougie i ?
+function inversionIFVG(cs, zones, i, long, retest) {
+  for (const z of zones) {
+    if (z.casse == null) continue;
+    // Un FVG BAISSIER cassé vers le HAUT donne une inversion HAUSSIÈRE.
+    if (long !== !z.haussier) continue;
+    if (retest) {
+      // Entrée au RETEST : la zone a été cassée avant, et le prix y revient.
+      if (z.casse >= i) continue;
+      if (i - z.casse > IFVGAGE) continue;
+      const touche = long ? (cs[i].l <= z.haut && cs[i].c > z.bas)
+                          : (cs[i].h >= z.bas && cs[i].c < z.haut);
+      const rejet  = long ? cs[i].c > cs[i].o : cs[i].c < cs[i].o;
+      if (touche && rejet) return z;
+    } else if (z.casse === i) {
+      return z;                       // entrée sur la bougie de cassure
+    }
+  }
+  return null;
+}
+
 // ------------------------------------------------------------- la marche ----
 function backtest(cs, es, hs) {
   const piv = pivots(cs, PIVOTS);
   const gs = gaps(cs);
   const atr = atrSerie(cs, 14);
   const { veille, asia, lon } = poolsParJour(cs, hs);
+  const zones = zonesFVG(cs);
 
   const trades = [];
   let enPos = null;
@@ -202,7 +264,13 @@ function backtest(cs, es, hs) {
         enPos.sortie = 'gain'; enPos.r = enPos.rr;
       } else {
         if (toucheBE && !enPos.beFait) { enPos.beFait = true; enPos.sl = enPos.entree; }  // stop à l'entrée au 1:1
-        if (i - enPos.iEntree > 200) { enPos.sortie = 'expiré'; enPos.r = enPos.beFait ? 0 : -0.5; }
+        if (i - enPos.iEntree > 200) {
+          // Sortie au marché : on calcule le R RÉELLEMENT obtenu, on n'invente pas.
+          const risque = Math.abs(enPos.entree - enPos.slInit);
+          enPos.sortie = 'expiré';
+          enPos.r = ((L ? c.c - enPos.entree : enPos.entree - c.c) / risque);
+          enPos.r = Math.max(-1, Math.min(enPos.rr, enPos.r));
+        }
       }
       if (enPos.sortie) { enPos.iSortie = i; enPos.duree = i - enPos.iEntree; trades.push(enPos); enPos = null; }
       else continue;                                    // un seul trade à la fois
@@ -244,14 +312,27 @@ function backtest(cs, es, hs) {
     }
     if (!setup) continue;
 
-    // ---- 3. inversion SUR la bougie courante (CISD + displacement) --------
+    // ---- 3. inversion SUR la bougie courante ------------------------------
     const L = setup.sens === 'LONG';
     if (i <= setup.swing.i) continue;
-    const corps = Math.abs(cs[i].c - cs[i].o);
-    if (!atr[i] || corps <= atr[i] * DISP) continue;             // displacement
-    let ext = cs[i - 1].o;
-    for (let k = Math.max(0, i - 5); k < i; k++) ext = L ? Math.max(ext, cs[k].o) : Math.min(ext, cs[k].o);
-    const inv = L ? (cs[i].c > ext && cs[i].c > cs[i].o) : (cs[i].c < ext && cs[i].c < cs[i].o);
+    let inv = false, zoneInv = null;
+    if (INV === 'ifvg' || INV === 'ifvg-retest') {
+      zoneInv = inversionIFVG(cs, zones, i, L, INV === 'ifvg-retest');
+      inv = !!zoneInv;
+    } else {
+      const corps = Math.abs(cs[i].c - cs[i].o);
+      if (!atr[i] || corps <= atr[i] * DISP) continue;           // displacement
+      if (INV === 'mss') {
+        const ref = L ? Math.max(...hautsVus.slice(-1).map(x => x.prix)) : Math.min(...basVus.slice(-1).map(x => x.prix));
+        inv = L ? cs[i].c > ref : cs[i].c < ref;
+      } else if (INV === 'engulf') {
+        inv = L ? (cs[i].c > cs[i].o && cs[i].c > cs[i - 1].h) : (cs[i].c < cs[i].o && cs[i].c < cs[i - 1].l);
+      } else {                                                    // cisd
+        let ext = cs[i - 1].o;
+        for (let k = Math.max(0, i - 5); k < i; k++) ext = L ? Math.max(ext, cs[k].o) : Math.min(ext, cs[k].o);
+        inv = L ? (cs[i].c > ext && cs[i].c > cs[i].o) : (cs[i].c < ext && cs[i].c < cs[i].o);
+      }
+    }
     if (!inv) continue;
 
     if (smtContre(cs, es, i, 20, setup.sens)) continue;          // SMT éliminatoire
@@ -263,6 +344,10 @@ function backtest(cs, es, hs) {
     for (let k = Math.max(0, i - 2); k <= i; k++) { bas = Math.min(bas, cs[k].l); haut = Math.max(haut, cs[k].h); }
     let sl = L ? bas - buf : haut + buf;
     let src = "structure de l'inversion";
+    if (zoneInv) {                    // le stop se pose sous/au-dessus de la zone inversée
+      sl = L ? Math.min(bas, zoneInv.bas) - buf : Math.max(haut, zoneInv.haut) + buf;
+      src = 'zone IFVG';
+    }
     if (Math.abs(entree - sl) < atr[i] * ATRMIN) {                // trop serré -> on recule au balayage
       sl = L ? setup.swing.prix - buf : setup.swing.prix + buf; src = 'balayage';
     }
@@ -283,7 +368,7 @@ function backtest(cs, es, hs) {
 
     enPos = { sens: setup.sens, iEntree: i, t: cs[i].t, entree, sl, slInit: sl, tp, rr,
               be: L ? entree + risque : entree - risque, beFait: false,
-              pool: setup.pool[1], src, jour: j, paris: hs[i].paris,
+              pool: setup.pool[1], src, mode: INV, jour: j, paris: hs[i].paris,
               creneau: hs[i].paris < 17 * 60 ? 'après-midi' : 'soirée' };
   }
   return trades;
@@ -365,6 +450,52 @@ function rapport(trades, cs, TFnom) {
   console.log('');
 }
 
+// ------------------------------------------------- journal d'une semaine ---
+// Ce que tu vivrais réellement : tu arrives à 15 h 30, tu regardes, tu prends
+// ou pas ; tu reviens à 19 h, pareil. Le reste de la journée n'existe pas.
+function journal(trades, cs, hs, nJours) {
+  const jours = [...new Set(hs.map(h => h.jour))].filter(j => {
+    const d = hs.find(h => h.jour === j);
+    return d.dow >= 1 && d.dow <= 5;
+  }).sort();
+  const derniers = jours.slice(-nJours);
+  const parJour = {};
+  trades.forEach(t => { (parJour[t.jour] || (parJour[t.jour] = [])).push(t); });
+
+  console.log('\n' + '='.repeat(74));
+  console.log(`  JOURNAL — les ${derniers.length} dernières séances, créneau par créneau`);
+  console.log('='.repeat(74));
+
+  let cumul = 0, nb = 0, g = 0, p = 0, be = 0;
+  derniers.forEach(j => {
+    const l = (parJour[j] || []).sort((a, b) => a.iEntree - b.iEntree);
+    console.log(`\n  ${j}`);
+    ['après-midi', 'soirée'].forEach(cr => {
+      const h = cr === 'après-midi' ? '15 h 30 → 17 h 00' : '19 h 00 → 21 h 00';
+      const ts = l.filter(t => t.creneau === cr);
+      if (!ts.length) { console.log(`    ${h}   —  aucun setup valide`); return; }
+      ts.forEach(t => {
+        nb++; cumul += t.r;
+        if (t.sortie === 'gain') g++; else if (t.sortie === 'break-even') be++; else p++;
+        const heure = String(Math.floor(t.paris / 60)).padStart(2, '0') + 'h' + String(t.paris % 60).padStart(2, '0');
+        const ico = t.sortie === 'gain' ? '✅' : t.sortie === 'break-even' ? '➖' : '❌';
+        console.log(`    ${h}   ${ico} ${heure} ${t.sens.padEnd(5)} ` +
+          `entrée ${t.entree.toFixed(2)} · stop ${t.slInit.toFixed(2)} · cible ${t.tp.toFixed(2)} · RR ${t.rr.toFixed(2)}`);
+        console.log(`                        balayage ${t.pool} · stop sur ${t.src} · sortie : ${t.sortie} (${t.r >= 0 ? '+' : ''}${t.r.toFixed(2)} R)`);
+      });
+    });
+  });
+
+  const net = cumul - nb * COUT;
+  console.log('\n  ' + '-'.repeat(70));
+  console.log(`  BILAN DE LA PÉRIODE : ${nb} trade(s) · ${g} gagnant(s) · ${be} break-even · ${p} perdant(s)`);
+  console.log(`  Résultat brut ......... ${cumul >= 0 ? '+' : ''}${cumul.toFixed(2)} R`);
+  console.log(`  Frais estimés ......... -${(nb * COUT).toFixed(2)} R  (${COUT} R par trade : commission + slippage)`);
+  console.log(`  RÉSULTAT NET .......... ${net >= 0 ? '+' : ''}${net.toFixed(2)} R`);
+  console.log(`  Sur un compte de 10 000 € à 1 % de risque : ${net >= 0 ? '+' : ''}${Math.round(net * 100)} €`);
+  console.log('');
+}
+
 (async () => {
   if (!QUIET) console.log(`Récupération ${SYM} et ${CORR} en ${TF} sur ${RANGE}…`);
   const [nq, es] = await Promise.all([
@@ -374,14 +505,16 @@ function rapport(trades, cs, TFnom) {
   if (!nq || nq.length < 100) throw new Error('pas assez de bougies');
   if (!QUIET) console.log(`  ${nq.length} bougies ${SYM}` + (es ? `, ${es.length} bougies ${CORR} (SMT active)` : ', pas de SMT'));
   const hs = horaires(nq);
-  const trades = backtest(nq, es, hs);
+  const al = aligner(nq, es);
+  if (al && al.manquants && !QUIET) console.log(`  ⚠️ ${al.manquants} bougies ${CORR} manquantes, comblées par la précédente`);
+  const trades = backtest(nq, al ? al.serie : null, hs);
   if (QUIET) {
     const g = trades.filter(t => t.sortie === 'gain').length;
     const p = trades.filter(t => t.sortie === 'perte' || t.sortie === 'ambigu').length;
     const b = trades.filter(t => t.sortie === 'break-even').length;
     const R = trades.reduce((s, t) => s + t.r, 0);
-    console.log(JSON.stringify({ tf: TF, disp: DISP, n: trades.length, gains: g, pertes: p, be: b,
+    console.log(JSON.stringify({ tf: TF, inv: INV, disp: DISP, n: trades.length, gains: g, pertes: p, be: b,
       wr: trades.length ? +(g / trades.length * 100).toFixed(1) : 0,
       esperance: trades.length ? +(R / trades.length).toFixed(3) : 0, cumulR: +R.toFixed(1) }));
-  } else rapport(trades, nq, TF);
+  } else { rapport(trades, nq, TF); if (JOURS) journal(trades, nq, hs, JOURS); }
 })().catch(e => { console.error('ERREUR :', e.message); process.exit(1); });

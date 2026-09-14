@@ -3011,6 +3011,47 @@
     return sum / n;
   }
 
+  // --- INVERSION, version IFVG (la plus mécanique) ---------------------------
+  // Un FVG qui se fait TRAVERSER change de camp : le prix clôture au-delà, et
+  // la zone devient support (ou résistance) dans l'autre sens.
+  //   FVG baissier dont le prix CLÔTURE au-dessus  -> inversion HAUSSIÈRE
+  //   FVG haussier dont le prix CLÔTURE en dessous -> inversion BAISSIÈRE
+  // Aucun seuil arbitraire, aucune appréciation : c'est la seule définition
+  // d'« inversion » entièrement mécanique. Le backtest 60 jours la place devant
+  // le CISD, le MSS et l'engulfing — c'est pour ça qu'elle est utilisée par défaut.
+  var IFVG_AGE = 120;
+
+  function zonesFVG(cs) {
+    var z = [], i, k;
+    for (i = 2; i < cs.length; i++) {
+      if (cs[i].l > cs[i - 2].h) z.push({ bas: cs[i - 2].h, haut: cs[i].l, haussier: true, ne: i, casse: null });
+      else if (cs[i].h < cs[i - 2].l) z.push({ bas: cs[i].h, haut: cs[i - 2].l, haussier: false, ne: i, casse: null });
+    }
+    z.forEach(function (x) {
+      for (k = x.ne + 1; k < cs.length; k++) {
+        if (k - x.ne > IFVG_AGE) break;
+        if (x.haussier ? cs[k].c < x.bas : cs[k].c > x.haut) { x.casse = k; break; }
+      }
+    });
+    return z;
+  }
+
+  // Première inversion IFVG dans le bon sens, après la bougie `from`.
+  function inversionIFVG(cs, from, haussiere) {
+    var z = zonesFVG(cs), best = null;
+    z.forEach(function (x) {
+      if (x.casse == null || x.casse <= from) return;
+      if (haussiere !== !x.haussier) return;      // FVG baissier cassé au-dessus = inversion haussière
+      if (best == null || x.casse < best.casse) best = x;
+    });
+    if (!best) return null;
+    var i = best.casse;
+    return { i: i, t: cs[i].t, prix: cs[i].c,
+      bas: Math.min(cs[i].l, best.bas), haut: Math.max(cs[i].h, best.haut),
+      zone: [+best.bas.toFixed(2), +best.haut.toFixed(2)],
+      definition: 'IFVG (FVG traversé, la zone change de camp)' };
+  }
+
   // INVERSION (définition CISD + displacement) cherchée APRÈS la bougie du sweep.
   function inversion(cs, from, haussiere, look, a) {
     look = look || 5;
@@ -3044,9 +3085,13 @@
     var expire = opts.expire || 30;      // le setup meurt s'il n'y a pas d'inversion
     var sw = swings(cs, len);
     var a = atr(cs, 14);
+    var mode = opts.inversion || 'ifvg';
     var out = {
       sens: null, valide: false, sweep: null, inversion: null,
-      definition_inversion: 'CISD (clôture au-delà des opens opposés) + corps > ATR(14)',
+      mode_inversion: mode,
+      definition_inversion: mode === 'ifvg'
+        ? 'IFVG : un FVG traversé change de camp et devient support/résistance'
+        : 'CISD (clôture au-delà des opens opposés) + corps > ATR(14)',
       detail: ''
     };
     if (sw.bas.length < 2 || sw.hauts.length < 2) {
@@ -3113,7 +3158,8 @@
       out.sweep = { niveau: +choix.pool.prix.toFixed(2), quoi: choix.pool.quoi,
                     prix_atteint: +choix.swing.prix.toFixed(2), t: choix.swing.t,
                     bougies_depuis: fin - choix.swing.i };
-      var inv = inversion(cs, choix.swing.i, haussier, 5, a);
+      var inv = mode === 'ifvg' ? inversionIFVG(cs, choix.swing.i, haussier)
+                                : inversion(cs, choix.swing.i, haussier, 5, a);
       if (inv && inv.i - choix.swing.i <= expire) {
         out.inversion = inv;
         out.valide = true;
@@ -3511,7 +3557,8 @@
 
   root.NQ = { load: load, data: data, promptBlock: promptBlock, candles: candles,
     findGaps: findGaps, smt: smt, swings: swings, structure: structure,
-    sessionPools: sessionPools, trade: trade, TFS: TFS, analyseTF: analyseTF };
+    sessionPools: sessionPools, trade: trade, TFS: TFS, analyseTF: analyseTF,
+    zonesFVG: zonesFVG, inversionIFVG: inversionIFVG };
 })(typeof window !== 'undefined' ? window : this);
 
 </script>
