@@ -47,6 +47,9 @@ const ORDRE  = args.ordre || 'marche';   // marche (clôture) | limite (retour d
 const LIMBAR = +(args.limbar || 8);      // validité de l'ordre limite, en bougies
 const HTFOK  = args.htf === '1';         // n'accepter que les trades alignés H1
 const PART   = +(args.partiel || 0);     // % clôturé au 1:1 (0 = désactivé)
+const UNIQUE = args.unique === '1';      // refuser si plusieurs FVG dans la jambe
+const ZENTREE= args.zentree || 'mid';    // mid | bord : où poser la limite DANS la zone IFVG
+const SLMODE = args.sl || 'zone';        // zone | balayage | large (le plus loin des deux)
 
 // ----------------------------------------------------------------- données --
 async function fetchCandles(sym, interval, range) {
@@ -361,6 +364,12 @@ function backtest(cs, es, hs) {
     if (INV === 'ifvg' || INV === 'ifvg-retest') {
       zoneInv = inversionIFVG(cs, zones, i, L, INV === 'ifvg-retest');
       inv = !!zoneInv;
+      // « Multiple FVGs in the leg reduce accuracy » : on peut exiger que la
+      // jambe entre le balayage et l'inversion ne contienne QU'UN seul FVG.
+      if (inv && UNIQUE) {
+        const dans = zones.filter(z => z.ne > setup.swing.i && z.ne <= i).length;
+        if (dans > 1) { inv = false; zoneInv = null; }
+      }
     } else {
       const corps = Math.abs(cs[i].c - cs[i].o);
       if (!atr[i] || corps <= atr[i] * DISP) continue;           // displacement
@@ -395,9 +404,15 @@ function backtest(cs, es, hs) {
     for (let k = Math.max(0, i - 2); k <= i; k++) { bas = Math.min(bas, cs[k].l); haut = Math.max(haut, cs[k].h); }
     let sl = L ? bas - buf : haut + buf;
     let src = "structure de l'inversion";
-    if (zoneInv) {                    // le stop se pose sous/au-dessus de la zone inversée
-      sl = L ? Math.min(bas, zoneInv.bas) - buf : Math.max(haut, zoneInv.haut) + buf;
-      src = 'zone IFVG';
+    // « Stop just below the FVG OR the swing low created by the sweep » : la
+    // source donne les DEUX. Le bord de zone est serré, le swing du balayage
+    // est large. On les compare au lieu d'en supposer un.
+    if (zoneInv) {
+      const zs = L ? zoneInv.bas - buf : zoneInv.haut + buf;
+      const bs = L ? setup.swing.prix - buf : setup.swing.prix + buf;
+      if (SLMODE === 'balayage')  { sl = bs; src = 'swing du balayage'; }
+      else if (SLMODE === 'large'){ sl = L ? Math.min(zs, bs) : Math.max(zs, bs); src = 'le plus large des deux'; }
+      else                        { sl = zs; src = 'zone IFVG'; }
     }
     if (Math.abs(entree - sl) < atr[i] * ATRMIN) {                // trop serré -> on recule au balayage
       sl = L ? setup.swing.prix - buf : setup.swing.prix + buf; src = 'balayage';
@@ -407,14 +422,27 @@ function backtest(cs, es, hs) {
     // proche. Le bord est touché AVANT le milieu — donc atteint bien plus
     // souvent, pour un RR plus faible. C'est le principal levier sur le taux
     // de réussite, et je ne l'avais pas implémenté.
+    // CIBLE. La source donne comme PREMIER objectif « Internal Liquidity
+    // (recent high/low) », pas un gap. Un plus-haut récent est bien plus proche
+    // qu'un gap non comblé : c'est le principal écart qui me restait.
     let tp = null;
-    gs.forEach(g => {
-      if (g.ne > i) return;                       // pas encore né
-      if (g.comble != null && g.comble <= i) return;  // déjà comblé
-      const niv = CIBLE === 'bord' ? (L ? g.lo : g.hi) : g.eq;
-      if (L ? niv <= entree : niv >= entree) return;
-      if (tp == null || (L ? niv < tp : niv > tp)) tp = niv;
-    });
+    if (CIBLE === 'liq') {
+      const liste = L ? hautsVus : basVus;
+      for (let n = liste.length - 1; n >= 0; n--) {
+        const v = liste[n].prix;
+        if (L ? v <= entree : v >= entree) continue;
+        if (tp == null || (L ? v < tp : v > tp)) tp = v;
+        if (liste.length - n >= 6) break;          // on reste sur la liquidité RÉCENTE
+      }
+    } else {
+      gs.forEach(g => {
+        if (g.ne > i) return;                       // pas encore né
+        if (g.comble != null && g.comble <= i) return;  // déjà comblé
+        const niv = CIBLE === 'bord' ? (L ? g.lo : g.hi) : g.eq;
+        if (L ? niv <= entree : niv >= entree) return;
+        if (tp == null || (L ? niv < tp : niv > tp)) tp = niv;
+      });
+    }
     if (tp == null) continue;
 
     const risque = Math.abs(entree - sl);
@@ -424,8 +452,15 @@ function backtest(cs, es, hs) {
 
     if (ORDRE === 'limite') {
       // Limite au milieu de la bougie d'inversion : on laisse le prix revenir.
-      pendant = { sens: setup.sens, iSignal: i, prix: (cs[i].h + cs[i].l) / 2,
-                  sl, tp, pool: setup.pool[1], src };
+      // « Entry on a return to the IFVG » : la limite se pose DANS la zone
+      // inversée (son milieu, ou son bord le plus proche), pas au milieu de la
+      // bougie d'inversion comme je le faisais.
+      let px = (cs[i].h + cs[i].l) / 2;
+      if (zoneInv) {
+        px = ZENTREE === 'bord' ? (L ? zoneInv.haut : zoneInv.bas)
+                                : (zoneInv.bas + zoneInv.haut) / 2;
+      }
+      pendant = { sens: setup.sens, iSignal: i, prix: px, sl, tp, pool: setup.pool[1], src };
     } else {
       enPos = { sens: setup.sens, iEntree: i, t: cs[i].t, entree, sl, slInit: sl, tp, rr,
                 be: L ? entree + risque : entree - risque, beFait: false,
