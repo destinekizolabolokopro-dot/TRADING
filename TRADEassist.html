@@ -2718,18 +2718,35 @@
 (function (root) {
   'use strict';
 
-  var PROXY = 'https://api.allorigins.win/raw?url=';
+  // Plusieurs relais : un proxy public gratuit tombe régulièrement (j'ai eu des
+  // erreurs 520/522 en le testant). On essaie les suivants avant d'abandonner.
+  var PROXIES = [
+    'https://api.allorigins.win/raw?url=',
+    'https://corsproxy.io/?url=',
+    'https://api.codetabs.com/v1/proxy/?quest='
+  ];
   var YF = 'https://query1.finance.yahoo.com/v8/finance/chart/';
   var SYM = { nq: 'NQ=F', es: 'ES=F' };   // Nasdaq 100 futures / S&P 500 futures
 
-  function url(sym, interval, range) {
-    return PROXY + encodeURIComponent(YF + encodeURIComponent(sym) + '?interval=' + interval + '&range=' + range);
+  function url(proxy, sym, interval, range) {
+    return proxy + encodeURIComponent(YF + encodeURIComponent(sym) + '?interval=' + interval + '&range=' + range);
   }
 
-  // Récupère les bougies OHLC d'un symbole.
+  // Récupère les bougies OHLC d'un symbole, en essayant chaque relais à son tour.
   function candles(sym, interval, range) {
     if (typeof fetch === 'undefined') return Promise.resolve(null);
-    return fetch(url(sym, interval, range))
+
+    function tryProxy(i) {
+      if (i >= PROXIES.length) return Promise.resolve(null);
+      return fetchOne(url(PROXIES[i], sym, interval, range))
+        .then(function (r) { return r || tryProxy(i + 1); })
+        .catch(function () { return tryProxy(i + 1); });
+    }
+    return tryProxy(0);
+  }
+
+  function fetchOne(u) {
+    return fetch(u)
       .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
       .then(function (j) {
         var res = j && j.chart && j.chart.result && j.chart.result[0];
@@ -2806,6 +2823,197 @@
       consigne: 'Pas de divergence SMT — ce filtre ne bloque aucun sens.' };
   }
 
+  // ===========================================================================
+  // STRUCTURE DU MECH : SWEEP → SÉQUENCE → INVERSION
+  // ---------------------------------------------------------------------------
+  // C'est le DÉCLENCHEUR du modèle. Avant, le site ne le calculait pas : il
+  // donnait les cibles (gaps) et les filtres (SMT) mais laissait le bot DEVINER
+  // la structure. Maintenant elle est calculée sur les vraies bougies, comme
+  // dans le script Pine — donc vérifiable, et non-repeinte.
+  //
+  // ⚠️ HONNÊTETÉ : « inversion » n'a pas de définition universelle. Celle codée
+  // ici est le CISD (clôture au-delà des opens opposés) + displacement. C'est UN
+  // choix, indiqué tel quel dans les sorties — pas « la » définition officielle.
+  // ===========================================================================
+
+  // Heure de New York d'un timestamp (les sessions du MECH sont définies en ET).
+  var _etFmt = null;
+  function etParts(ts) {
+    if (!_etFmt) _etFmt = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/New_York', hour12: false,
+      year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'
+    });
+    var o = {};
+    _etFmt.formatToParts(new Date(ts)).forEach(function (p) { o[p.type] = p.value; });
+    var h = parseInt(o.hour, 10); if (h === 24) h = 0;
+    return { jour: o.year + '-' + o.month + '-' + o.day, min: h * 60 + parseInt(o.minute, 10) };
+  }
+
+  // Extrêmes des sessions ASIE et LONDRES sur les dernières 48 h : ce sont des
+  // POOLS DE LIQUIDITÉ, donc des niveaux susceptibles d'être balayés.
+  function sessionPools(cs) {
+    var cut = cs.length ? cs[cs.length - 1].t - 48 * 3600 * 1000 : 0;
+    var asia = { h: null, l: null }, lon = { h: null, l: null };
+    cs.forEach(function (c) {
+      if (c.t < cut) return;
+      var e = etParts(c.t);
+      // Asie : 20 h 00 → minuit (ET). Londres : 03 h 00 → 06 h 00 (ET).
+      var inAsia = e.min >= 20 * 60;
+      var inLon = e.min >= 3 * 60 && e.min < 6 * 60;
+      if (inAsia) {
+        asia.h = asia.h == null ? c.h : Math.max(asia.h, c.h);
+        asia.l = asia.l == null ? c.l : Math.min(asia.l, c.l);
+      }
+      if (inLon) {
+        lon.h = lon.h == null ? c.h : Math.max(lon.h, c.h);
+        lon.l = lon.l == null ? c.l : Math.min(lon.l, c.l);
+      }
+    });
+    return { asia: asia, londres: lon };
+  }
+
+  // Swings CONFIRMÉS : un pivot n'existe qu'après `len` bougies de chaque côté.
+  // Il ne peut donc jamais apparaître puis disparaître (anti-repeint).
+  function swings(cs, len) {
+    len = len || 5;
+    var hi = [], lo = [], i, k, ok;
+    for (i = len; i < cs.length - len; i++) {
+      ok = true;
+      for (k = i - len; k <= i + len; k++) { if (k !== i && cs[k].h >= cs[i].h) { ok = false; break; } }
+      if (ok) hi.push({ prix: cs[i].h, i: i, t: cs[i].t });
+      ok = true;
+      for (k = i - len; k <= i + len; k++) { if (k !== i && cs[k].l <= cs[i].l) { ok = false; break; } }
+      if (ok) lo.push({ prix: cs[i].l, i: i, t: cs[i].t });
+    }
+    return { hauts: hi, bas: lo };
+  }
+
+  function atr(cs, n) {
+    n = n || 14;
+    if (cs.length < n + 1) return null;
+    var sum = 0;
+    for (var i = cs.length - n; i < cs.length; i++) {
+      var pc = cs[i - 1].c;
+      sum += Math.max(cs[i].h - cs[i].l, Math.abs(cs[i].h - pc), Math.abs(cs[i].l - pc));
+    }
+    return sum / n;
+  }
+
+  // INVERSION (définition CISD + displacement) cherchée APRÈS la bougie du sweep.
+  function inversion(cs, from, haussiere, look, a) {
+    look = look || 5;
+    for (var i = Math.max(from + 1, look); i < cs.length; i++) {
+      var corps = Math.abs(cs[i].c - cs[i].o);
+      var disp = a ? corps > a : true;          // mouvement franc, pas une bougie molle
+      var ext = cs[i - 1].o;
+      for (var k = i - look; k < i; k++) {
+        if (k < 0) continue;
+        ext = haussiere ? Math.max(ext, cs[k].o) : Math.min(ext, cs[k].o);
+      }
+      var ok = haussiere ? (cs[i].c > ext && cs[i].c > cs[i].o)
+                         : (cs[i].c < ext && cs[i].c < cs[i].o);
+      if (ok && disp) return { i: i, t: cs[i].t, prix: cs[i].c, definition: 'CISD + displacement' };
+    }
+    return null;
+  }
+
+  // La séquence complète du MECH.
+  //   LONG  : swing low → swing high → LOWER LOW qui balaye une liquidité → inversion haussière
+  //   SHORT : swing high → swing low → HIGHER HIGH qui balaye une liquidité → inversion baissière
+  function structure(cs, niveaux, opts) {
+    opts = opts || {};
+    var len = opts.pivots || 5;
+    var expire = opts.expire || 30;      // le setup meurt s'il n'y a pas d'inversion
+    var sw = swings(cs, len);
+    var a = atr(cs, 14);
+    var out = {
+      sens: null, valide: false, sweep: null, inversion: null,
+      definition_inversion: 'CISD (clôture au-delà des opens opposés) + corps > ATR(14)',
+      detail: ''
+    };
+    if (sw.bas.length < 2 || sw.hauts.length < 2) {
+      out.detail = 'Pas assez de swings confirmés sur les bougies disponibles.';
+      return out;
+    }
+
+    // Quels niveaux comptent comme liquidité ?
+    function pools(bas) {
+      var p = [];
+      function add(v, nom) { if (v != null) p.push({ prix: v, quoi: nom }); }
+      if (bas) {
+        add(niveaux.pdl, 'PDL (plus-bas de la veille)');
+        add(niveaux.asiaL, "plus-bas de la session ASIE");
+        add(niveaux.lonL, 'plus-bas de la session LONDRES');
+        add(sw.bas.length >= 2 ? sw.bas[sw.bas.length - 2].prix : null, 'swing low précédent');
+      } else {
+        add(niveaux.pdh, 'PDH (plus-haut de la veille)');
+        add(niveaux.asiaH, "plus-haut de la session ASIE");
+        add(niveaux.lonH, 'plus-haut de la session LONDRES');
+        add(sw.hauts.length >= 2 ? sw.hauts[sw.hauts.length - 2].prix : null, 'swing high précédent');
+      }
+      return p;
+    }
+
+    var fin = cs.length - 1;
+
+    // On ne regarde pas QUE le dernier swing : un setup armé il y a 20 bougies
+    // est encore vivant tant qu'il n'a pas expiré. On remonte donc les swings
+    // récents et on garde le plus récent qui coche la séquence complète.
+    function chercher(bas) {
+      var liste = bas ? sw.bas : sw.hauts;
+      var autre = bas ? sw.hauts : sw.bas;
+      var p = pools(bas);
+      for (var n = liste.length - 1; n >= 1; n--) {
+        var cur = liste[n], prec = liste[n - 1];
+        if (fin - cur.i > expire) break;                       // trop vieux : setup mort
+        var casse = bas ? (cur.prix < prec.prix) : (cur.prix > prec.prix);
+        if (!casse) continue;                                   // pas un lower low / higher high
+        var entre = autre.filter(function (x) { return x.i > prec.i && x.i < cur.i; }).length > 0;
+        if (!entre) continue;                                   // séquence incomplète
+        var pris = null;
+        p.forEach(function (x) {
+          var touche = bas ? (cur.prix <= x.prix) : (cur.prix >= x.prix);
+          if (!touche) return;
+          if (!pris) { pris = x; return; }
+          // le pool le plus "proche" du prix balayé est le plus significatif
+          if (bas ? x.prix > pris.prix : x.prix < pris.prix) pris = x;
+        });
+        if (pris) return { swing: cur, pool: pris };
+      }
+      return null;
+    }
+
+    var L = chercher(true), S = chercher(false);
+    var choix = null, sens = null;
+    if (L && S) { choix = L.swing.i >= S.swing.i ? L : S; sens = (choix === L) ? 'LONG' : 'SHORT'; }
+    else if (L) { choix = L; sens = 'LONG'; }
+    else if (S) { choix = S; sens = 'SHORT'; }
+
+    if (choix) {
+      var haussier = sens === 'LONG';
+      out.sens = sens;
+      out.sweep = { niveau: +choix.pool.prix.toFixed(2), quoi: choix.pool.quoi,
+                    prix_atteint: +choix.swing.prix.toFixed(2), t: choix.swing.t,
+                    bougies_depuis: fin - choix.swing.i };
+      var inv = inversion(cs, choix.swing.i, haussier, 5, a);
+      if (inv && inv.i - choix.swing.i <= expire) {
+        out.inversion = inv;
+        out.valide = true;
+        out.detail = 'Séquence ' + sens + ' complète : balayage du ' + choix.pool.quoi + ' à ' +
+          choix.pool.prix.toFixed(2) + ' (prix descendu/monté à ' + choix.swing.prix.toFixed(2) +
+          '), puis inversion ' + (haussier ? 'haussière' : 'baissière') + ' confirmée à ' + inv.prix.toFixed(2) + '.';
+      } else {
+        out.detail = 'Balayage du ' + choix.pool.quoi + ' à ' + choix.pool.prix.toFixed(2) +
+          ' constaté il y a ' + (fin - choix.swing.i) + ' bougies, mais AUCUNE inversion ' +
+          (haussier ? 'haussière' : 'baissière') + ' confirmée depuis. On attend — on n\'entre jamais sur le balayage lui-même.';
+      }
+      return out;
+    }
+
+    out.detail = 'Aucun balayage de liquidité suivi d\'une structure valide sur les bougies récentes.';
+    return out;
+  }
+
   // PDH / PDL : plus-haut et plus-bas de la veille (bougie D1 précédente).
   function pdhl(daily) {
     if (!daily || daily.length < 2) return null;
@@ -2837,6 +3045,12 @@
       var gaps = findGaps(nq15.candles);
       var div = es15 ? smt(nq15.candles, es15.candles, 20) : null;
       var lv = pdhl(nqD.candles);
+      var pools = sessionPools(nq15.candles);
+      var struct = structure(nq15.candles, {
+        pdh: lv ? lv.pdh : null, pdl: lv ? lv.pdl : null,
+        asiaH: pools.asia.h, asiaL: pools.asia.l,
+        lonH: pools.londres.h, lonL: pools.londres.l
+      }, { pivots: 5, expire: 30 });
       var out = {
         nq: { prix: nqD.price, variation_pct: nqD.chg != null ? +nqD.chg.toFixed(2) : null, bougies_m15: nq15.candles.length },
         es: es15 ? { prix: es15.price } : null,
@@ -2847,6 +3061,8 @@
             zone: [+g.lo.toFixed(2), +g.hi.toFixed(2)], eq_cible: +g.eq.toFixed(2) };
         }),
         smt: div,
+        sessions: pools,
+        structure: struct,
         maj: Date.now()
       };
       CACHE = out;
@@ -2863,6 +3079,30 @@
     var t = "=== DONNÉES NASDAQ (NQ) POUR LE MECH MODEL ===\n";
     t += "NQ : " + d.nq.prix + (d.nq.variation_pct != null ? ' (' + (d.nq.variation_pct >= 0 ? '+' : '') + d.nq.variation_pct + '%)' : '') + "\n";
     t += "PDH (plus-haut veille) : " + d.pdh + " · PDL (plus-bas veille) : " + d.pdl + "\n";
+    if (d.sessions) {
+      var p = d.sessions;
+      t += "Pools de liquidité récents — ASIE : haut " + (p.asia.h != null ? p.asia.h.toFixed(2) : '—') +
+        " / bas " + (p.asia.l != null ? p.asia.l.toFixed(2) : '—') +
+        " · LONDRES : haut " + (p.londres.h != null ? p.londres.h.toFixed(2) : '—') +
+        " / bas " + (p.londres.l != null ? p.londres.l.toFixed(2) : '—') + "\n";
+    }
+    if (d.structure) {
+      var st = d.structure;
+      t += "STRUCTURE (calculée sur les bougies M15, pas estimée) :\n";
+      t += "  Séquence : " + (st.valide ? "✅ VALIDE — sens " + st.sens : "❌ NON valide") + "\n";
+      if (st.sweep) {
+        t += "  Balayage : " + st.sweep.quoi + " à " + st.sweep.niveau +
+          " (le prix est allé jusqu'à " + st.sweep.prix_atteint + ")\n";
+      } else { t += "  Balayage : aucun balayage de liquidité identifié.\n"; }
+      t += "  Inversion : " + (st.inversion ? "confirmée à " + st.inversion.prix + " (" + st.inversion.definition + ")"
+                                            : "PAS encore confirmée") + "\n";
+      t += "  Lecture : " + st.detail + "\n";
+      t += "  ⚠️ La définition d'inversion utilisée ici est : " + st.definition_inversion +
+        ". Il n'existe pas de définition universelle — ne présente pas celle-ci comme officielle.\n";
+      if (!st.valide) {
+        t += "  ⛔ Sans séquence valide (balayage + structure + inversion), le MECH INTERDIT le trade : renvoie \"idees\": [].\n";
+      }
+    }
     if (d.gaps_non_comblés.length) {
       t += "GAPS NON COMBLÉS sur NQ (M15) — ce sont TES CIBLES (vise l'EQ) :\n";
       d.gaps_non_comblés.forEach(function (g) {
@@ -2877,7 +3117,8 @@
     return t;
   }
 
-  root.NQ = { load: load, data: data, promptBlock: promptBlock, candles: candles, findGaps: findGaps, smt: smt };
+  root.NQ = { load: load, data: data, promptBlock: promptBlock, candles: candles,
+    findGaps: findGaps, smt: smt, swings: swings, structure: structure, sessionPools: sessionPools };
 })(typeof window !== 'undefined' ? window : this);
 
 </script>
@@ -3183,8 +3424,21 @@ function renderMech(){
     h += mechRow(libre, 'SMT — NQ contre S&P 500',
           d.smt.detail + (libre ? '' : ' · ' + d.smt.consigne));
   }
-  h += mechRow(null, 'Structure + inversion',
-        'Se lit sur le graphique : swing low → swing high → lower low qui balaye, puis inversion. Le Bot IA la vérifie à chaque analyse.');
+  // Structure : désormais CALCULÉE sur les bougies M15, plus devinée.
+  const st = d.structure;
+  if(st){
+    h += mechRow(!!st.sweep, 'Balayage de liquidité',
+          st.sweep ? ('✂️ ' + st.sweep.quoi + ' à ' + fmtN(st.sweep.niveau) +
+                      ' — le prix est allé jusqu\'à ' + fmtN(st.sweep.prix_atteint) +
+                      ' (il y a ' + st.sweep.bougies_depuis + ' bougies M15)')
+                   : 'Aucun balayage identifié sur les bougies récentes');
+    h += mechRow(!!st.inversion, 'Inversion',
+          st.inversion ? ('Confirmée à ' + fmtN(st.inversion.prix) + ' · ' + st.inversion.definition)
+                       : 'Pas encore confirmée — on n\'entre jamais sur le balayage lui-même');
+    h += mechRow(st.valide, 'Séquence complète' + (st.sens ? ' — sens ' + st.sens : ''), st.detail);
+  } else {
+    h += mechRow(null, 'Structure', 'Non calculée (bougies indisponibles).');
+  }
 
   // Les cibles
   if(g.length){
@@ -3199,6 +3453,9 @@ function renderMech(){
   h += '<div class="mech-cta"><button class="btn btn-primary" id="mech-ai">🤖 Lancer l\'analyse du Bot IA</button>'+
        '<button class="btn" id="mech-refresh">🔄 Rafraîchir les données</button></div>';
   h += '<p class="pro-warn" style="margin-top:14px">Données Yahoo Finance (NQ=F, ES=F), rafraîchies toutes les 5 minutes. '+
+       'Swings détectés sur pivots confirmés (5 bougies de chaque côté) : un signal affiché ne peut pas disparaître ensuite. '+
+       (d.structure ? '<br>⚠️ « Inversion » n\'a pas de définition universelle. Celle utilisée ici est : '+
+         d.structure.definition_inversion+'. C\'est un choix, pas une règle officielle. ' : '')+
        'Pédagogique — pas un conseil financier.</p>';
   el.innerHTML = h;
 }

@@ -962,8 +962,21 @@ function renderMech(){
     h += mechRow(libre, 'SMT — NQ contre S&P 500',
           d.smt.detail + (libre ? '' : ' · ' + d.smt.consigne));
   }
-  h += mechRow(null, 'Structure + inversion',
-        'Se lit sur le graphique : swing low → swing high → lower low qui balaye, puis inversion. Le Bot IA la vérifie à chaque analyse.');
+  // Structure : désormais CALCULÉE sur les bougies M15, plus devinée.
+  const st = d.structure;
+  if(st){
+    h += mechRow(!!st.sweep, 'Balayage de liquidité',
+          st.sweep ? ('✂️ ' + st.sweep.quoi + ' à ' + fmtN(st.sweep.niveau) +
+                      ' — le prix est allé jusqu\'à ' + fmtN(st.sweep.prix_atteint) +
+                      ' (il y a ' + st.sweep.bougies_depuis + ' bougies M15)')
+                   : 'Aucun balayage identifié sur les bougies récentes');
+    h += mechRow(!!st.inversion, 'Inversion',
+          st.inversion ? ('Confirmée à ' + fmtN(st.inversion.prix) + ' · ' + st.inversion.definition)
+                       : 'Pas encore confirmée — on n\'entre jamais sur le balayage lui-même');
+    h += mechRow(st.valide, 'Séquence complète' + (st.sens ? ' — sens ' + st.sens : ''), st.detail);
+  } else {
+    h += mechRow(null, 'Structure', 'Non calculée (bougies indisponibles).');
+  }
 
   // Les cibles
   if(g.length){
@@ -978,6 +991,9 @@ function renderMech(){
   h += '<div class="mech-cta"><button class="btn btn-primary" id="mech-ai">🤖 Lancer l\'analyse du Bot IA</button>'+
        '<button class="btn" id="mech-refresh">🔄 Rafraîchir les données</button></div>';
   h += '<p class="pro-warn" style="margin-top:14px">Données Yahoo Finance (NQ=F, ES=F), rafraîchies toutes les 5 minutes. '+
+       'Swings détectés sur pivots confirmés (5 bougies de chaque côté) : un signal affiché ne peut pas disparaître ensuite. '+
+       (d.structure ? '<br>⚠️ « Inversion » n\'a pas de définition universelle. Celle utilisée ici est : '+
+         d.structure.definition_inversion+'. C\'est un choix, pas une règle officielle. ' : '')+
        'Pédagogique — pas un conseil financier.</p>';
   el.innerHTML = h;
 }
