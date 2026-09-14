@@ -63,10 +63,11 @@ lonSess  = input.session("0300-0600", "Londres", group = gSess)
 amSess   = input.session("0930-1100", "AM (NY)", group = gSess)
 macro1   = input.session("0930-1100", "Macro 1 — fenêtre de trade", group = gSess)
 macro2   = input.session("1300-1500", "Macro 2 — fenêtre de trade", group = gSess)
-useWallSt  = input.bool(true, "Fenêtre : ouverture Wall Street → 17 h 00 heure de Paris", group = gSess,
-     tooltip = "Les deux fuseaux sont lus séparément : la France et les USA ne changent pas d'heure les mêmes semaines, donc l'ouverture tombe à 14 h 30 ou 15 h 30 à Paris selon la période. Le filtre reste juste toute l'année.")
+useWallSt  = input.bool(true, "Filtrer par les fenêtres de trading", group = gSess,
+     tooltip = "Deux créneaux : ouverture de Wall Street → 17 h 00 (Paris), et 19 h 00 → 21 h 00 (Paris). Les deux fuseaux sont lus séparément : la France et les USA ne changent pas d'heure les mêmes semaines, donc l'ouverture tombe à 14 h 30 ou 15 h 30 à Paris selon la période. Le filtre reste juste toute l'année.")
 nyOpenSess = input.session("0930-1600", "Séance New York (fuseau NY)", group = gSess)
-parisCut   = input.session("0000-1700", "Coupure (fuseau Paris)", group = gSess)
+parisCut   = input.session("0000-1700", "Fenêtre 1 — coupure (fuseau Paris)", group = gSess)
+parisSoir  = input.session("1900-2100", "Fenêtre 2 — soirée (fuseau Paris)", group = gSess)
 useMacro = input.bool(true, "N'autoriser les entrées que dans les macros", group = gSess)
 flatEOD  = input.bool(true, "Tout clôturer en fin de journée", group = gSess)
 eodSess  = input.session("1555-1600", "Fenêtre de clôture forcée", group = gSess)
@@ -124,7 +125,10 @@ inAM    = inSess(amSess)
 inMacro = inSess(macro1) or inSess(macro2)
 inNYopen     = not na(time(timeframe.period, nyOpenSess, "America/New_York"))
 inParisCut   = not na(time(timeframe.period, parisCut,   "Europe/Paris"))
-inWallWindow = inNYopen and inParisCut
+inParisSoir  = not na(time(timeframe.period, parisSoir,  "Europe/Paris"))
+// Fenêtre 1 : de l'ouverture de New York jusqu'à 17 h à Paris.
+// Fenêtre 2 : 19 h → 21 h à Paris, soit la macro de l'après-midi à New York.
+inWallWindow = (inNYopen and inParisCut) or inParisSoir
 inEOD   = inSess(eodSess)
 inWindow = not useWindow or (time >= startDate and time <= endDate)
 
@@ -340,7 +344,7 @@ NO_TRADE_REASON = not (longArmed or shortArmed) ? "Pas de structure + sweep" :
      not (invBull or invBear) ? "Pas d'inversion confirmée" :
      (longArmed and na(drawUp)) or (shortArmed and na(drawDown)) ? "Aucun FVG non mitigé comme cible" :
      (blockLong or blockShort) ? "SMT à contre-sens" :
-     not (not useWallSt or inWallWindow) ? "Hors fenêtre Wall Street → 17 h Paris" :
+     not (not useWallSt or inWallWindow) ? "Hors fenêtres (WS→17 h / 19 h→21 h Paris)" :
      not macroOK ? "Hors fenêtre macro" :
      not limitOK ? "Limite journalière atteinte" :
      (longArmed and longRR < minRR) or (shortArmed and shortRR < minRR) ? "RR insuffisant" : "OK"

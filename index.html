@@ -641,7 +641,7 @@
     <div class="status">
       <span class="live"><span class="dot" id="live-dot"></span><span id="live-txt">Connexion…</span></span>
       <span class="clock" id="clock">--:--:--</span>
-      <span class="winbadge" id="winbadge" title="Le bot ne prend de position qu’entre l’ouverture de Wall Street et 17 h 00 heure française">—</span>
+      <span class="winbadge" id="winbadge" title="Le bot ne prend de position que pendant ses créneaux : ouverture de Wall Street → 17 h, et 19 h → 21 h (heure française)">—</span>
       <button class="ai-btn ghost" id="calc-open">🧮&nbsp;Calc</button>
       <button class="ai-btn ghost" id="tools-open">⚙️&nbsp;Mes&nbsp;outils</button>
       <button class="ai-btn ghost" id="hist-open">Historique</button>
@@ -1009,7 +1009,7 @@ function renderMech(){
   // Les conditions du modèle, une par une
   h += '<div class="ai-sec">🔍 Conditions du MECH <span class="sub">unité '+(d.tf_retenue||'—')+' · une case rouge = pas de trade</span></div>';
   h += mechRow(w ? w.ouverte : null, 'Fenêtre de trading',
-        w ? (w.texte + ' — ouverture de Wall Street → 17 h 00 heure française') : 'Indéterminée');
+        w ? (w.texte + ' — créneaux : ' + w.creneaux.map(c=>c.debut+' → '+c.fin).join('  ·  ') + ' (heure de Paris)') : 'Indéterminée');
   h += mechRow(g.length>0, 'Cible : un gap non comblé',
         g.length ? (g.length + ' gap' + (g.length>1?'s':'') + ' disponible' + (g.length>1?'s':'') + ' en ' + tfLabel) :
                    ('Aucun gap non comblé en ' + tfLabel + ' — le modèle n\'a pas d\'objectif, donc pas de trade'));
@@ -1096,7 +1096,7 @@ function clock(){
   const t = d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',second:'2-digit',timeZone:'Europe/Paris'});
   $('#clock').textContent = t + ' Paris';
   // Pastille fenêtre de trading : on voit d'un coup d'œil si le bot a le droit
-  // de prendre une position (ouverture de Wall Street → 17 h 00 à Paris).
+  // de prendre une position (Wall Street → 17 h, puis 19 h → 21 h à Paris).
   const b = $('#winbadge');
   if(b && window.WINDOW){
     const w = WINDOW.state();
@@ -1240,7 +1240,7 @@ $('#ai-run').addEventListener('click', async ()=>{
     html+='<div class="ai-sec">⚡ Idées de trade <span class="sub">prêtes · clique une carte pour copier</span></div>';
     if(!idees.length) html+= win.ouverte
       ? '<div class="ai-summary">Aucune idée ≥ 1 RR pour l’instant — le Bot IA préfère attendre.</div>'
-      : '<div class="ai-summary">⛔ Hors fenêtre de trading ('+win.texte+'). Le bot ne prend de position qu’entre l’ouverture de Wall Street et 17 h 00 heure française. L’analyse (AMD, preshot) reste affichée.</div>';
+      : '<div class="ai-summary">⛔ Hors fenêtre de trading ('+win.texte+'). Créneaux : '+win.creneaux.map(c=>c.debut+' → '+c.fin).join('  ·  ')+' (heure de Paris). L’analyse (AMD, preshot) reste affichée.</div>';
     idees.forEach(i=>{
       const long=(i.sens||'').toUpperCase()==='LONG';
       const cp=encodeURIComponent((i.paire||'')+' '+(long?'LONG':'SHORT')+(i.tf?' '+i.tf:'')+' | Entrée '+fmtN(i.entree)+' | SL '+fmtN(i.stop)+' | TP '+fmtN(i.objectif)+' | RR '+(i.rr!=null?i.rr:'—'));
