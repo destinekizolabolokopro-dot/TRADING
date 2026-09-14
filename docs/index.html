@@ -2714,7 +2714,12 @@
     var ouvrable = ny.dow >= 1 && ny.dow <= 5;   // Wall Street : lundi → vendredi
 
     // Chaque borne ramenée à l'heure de PARIS, pour pouvoir tout comparer.
-    var ecart = pa.min - ny.min;                  // décalage réel du jour (5 h ou 6 h)
+    // L'écart doit être ramené dans [-12 h, +12 h] : à 20 h à New York il est
+    // 02 h à Paris, et une soustraction brute donne -18 h au lieu de +6 h — ce
+    // qui ouvrait la fenêtre en pleine nuit.
+    var ecart = pa.min - ny.min;
+    if (ecart < -720) ecart += 1440;
+    if (ecart > 720) ecart -= 1440;
     function enParis(borne) {
       return borne.tz === PARIS ? borne.min : borne.min + ecart;
     }
