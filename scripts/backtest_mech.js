@@ -38,6 +38,10 @@ const IFVGAGE= +(args.ifvgage || 120);   // âge max d'un FVG pour pouvoir s'inv
 const QUIET  = args.quiet === '1';
 const JOURS  = +(args.jours || 0);       // journal des N derniers jours de bourse
 const COUT   = +(args.cout || 0.06);     // coût aller-retour estimé, en R
+const STRAT  = args.strat || 'mech';     // mech | ifvg
+const ENTREE = args.entree || 'retest';  // retest | cassure
+const TPMODE = args.tp || 'fvg';         // fvg | rr
+const TPRR   = +(args.tprr || 2.0);      // objectif en R si tp=rr
 
 // ----------------------------------------------------------------- données --
 async function fetchCandles(sym, interval, range) {
@@ -450,6 +454,97 @@ function rapport(trades, cs, TFnom) {
   console.log('');
 }
 
+// ===========================================================================
+// STRATÉGIE IFVG — autonome, sans la structure du MECH
+// ---------------------------------------------------------------------------
+//   FVG → le prix le TRAVERSE en clôture (invalidation) → la zone s'inverse
+//   → RETEST de la zone → entrée dans le sens de l'inversion
+//   → stop de l'autre côté de la zone → objectif → break-even au 1:1
+//
+// Différence avec le MECH : ici on n'exige NI balayage de liquidité, NI
+// séquence de swings. C'est le modèle complet à lui seul, comme dans la spec.
+// ===========================================================================
+function backtestIFVG(cs, es, hs) {
+  const zones = zonesFVG(cs);
+  const gs = gaps(cs);
+  const atr = atrSerie(cs, 14);
+  const trades = [];
+  let enPos = null;
+
+  for (let i = 0; i < cs.length; i++) {
+    // ---- gestion de la position ------------------------------------------
+    if (enPos) {
+      const c = cs[i], L = enPos.sens === 'LONG';
+      const sl = L ? c.l <= enPos.sl : c.h >= enPos.sl;
+      const tp = L ? c.h >= enPos.tp : c.l <= enPos.tp;
+      const be = L ? c.h >= enPos.be : c.l <= enPos.be;
+      if (sl && tp)      { enPos.sortie = 'ambigu'; enPos.r = enPos.beFait ? 0 : -1; }
+      else if (sl)       { enPos.sortie = enPos.beFait ? 'break-even' : 'perte'; enPos.r = enPos.beFait ? 0 : -1; }
+      else if (tp)       { enPos.sortie = 'gain'; enPos.r = enPos.rr; }
+      else {
+        if (be && !enPos.beFait) { enPos.beFait = true; enPos.sl = enPos.entree; }
+        if (i - enPos.iEntree > 200) {
+          const risque = Math.abs(enPos.entree - enPos.slInit);
+          enPos.sortie = 'expiré';
+          enPos.r = Math.max(-1, Math.min(enPos.rr, (L ? c.c - enPos.entree : enPos.entree - c.c) / risque));
+        }
+      }
+      if (enPos.sortie) { enPos.iSortie = i; enPos.duree = i - enPos.iEntree; trades.push(enPos); enPos = null; }
+      else continue;
+    }
+
+    if (!dansFenetre(hs[i]) || !atr[i]) continue;
+
+    // ---- recherche d'une zone inversée exploitable -------------------------
+    for (const z of zones) {
+      if (z.casse == null) continue;
+      const L = !z.haussier;                    // FVG baissier traversé vers le haut => LONG
+      let declencheur = false;
+      if (ENTREE === 'cassure') {
+        declencheur = (z.casse === i);
+      } else {
+        if (z.casse >= i || i - z.casse > IFVGAGE) continue;
+        // Le prix revient DANS la zone et la rejette (clôture du bon côté).
+        const touche = L ? (cs[i].l <= z.haut && cs[i].l >= z.bas) : (cs[i].h >= z.bas && cs[i].h <= z.haut);
+        const rejet  = L ? (cs[i].c > z.haut || (cs[i].c > cs[i].o && cs[i].c > z.bas))
+                         : (cs[i].c < z.bas  || (cs[i].c < cs[i].o && cs[i].c < z.haut));
+        declencheur = touche && rejet;
+      }
+      if (!declencheur) continue;
+      if (smtContre(cs, es, i, 20, L ? 'LONG' : 'SHORT')) continue;
+
+      const entree = cs[i].c;
+      const buf = entree * BUF / 100;
+      const sl = L ? z.bas - buf : z.haut + buf;
+      const risque = Math.abs(entree - sl);
+      if (!(risque > 0) || risque < atr[i] * ATRMIN) continue;
+
+      let tp = null;
+      if (TPMODE === 'rr') {
+        tp = L ? entree + risque * TPRR : entree - risque * TPRR;
+      } else {
+        gs.forEach(g => {
+          if (g.ne > i) return;
+          if (g.comble != null && g.comble <= i) return;
+          if (L ? g.eq <= entree : g.eq >= entree) return;
+          if (tp == null || (L ? g.eq < tp : g.eq > tp)) tp = g.eq;
+        });
+      }
+      if (tp == null) continue;
+      const rr = Math.abs(tp - entree) / risque;
+      if (rr < RRMIN) continue;
+
+      enPos = { sens: L ? 'LONG' : 'SHORT', iEntree: i, t: cs[i].t, entree, sl, slInit: sl, tp, rr,
+                be: L ? entree + risque : entree - risque, beFait: false,
+                pool: 'zone IFVG ' + z.bas.toFixed(2) + '–' + z.haut.toFixed(2),
+                src: 'zone IFVG', mode: 'ifvg-' + ENTREE, jour: hs[i].jour, paris: hs[i].paris,
+                creneau: hs[i].paris < 17 * 60 ? 'après-midi' : 'soirée' };
+      break;
+    }
+  }
+  return trades;
+}
+
 // ------------------------------------------------- journal d'une semaine ---
 // Ce que tu vivrais réellement : tu arrives à 15 h 30, tu regardes, tu prends
 // ou pas ; tu reviens à 19 h, pareil. Le reste de la journée n'existe pas.
@@ -507,13 +602,14 @@ function journal(trades, cs, hs, nJours) {
   const hs = horaires(nq);
   const al = aligner(nq, es);
   if (al && al.manquants && !QUIET) console.log(`  ⚠️ ${al.manquants} bougies ${CORR} manquantes, comblées par la précédente`);
-  const trades = backtest(nq, al ? al.serie : null, hs);
+  const trades = STRAT === 'ifvg' ? backtestIFVG(nq, al ? al.serie : null, hs)
+                                  : backtest(nq, al ? al.serie : null, hs);
   if (QUIET) {
     const g = trades.filter(t => t.sortie === 'gain').length;
     const p = trades.filter(t => t.sortie === 'perte' || t.sortie === 'ambigu').length;
     const b = trades.filter(t => t.sortie === 'break-even').length;
     const R = trades.reduce((s, t) => s + t.r, 0);
-    console.log(JSON.stringify({ tf: TF, inv: INV, disp: DISP, n: trades.length, gains: g, pertes: p, be: b,
+    console.log(JSON.stringify({ strat: STRAT, tf: TF, inv: STRAT === 'ifvg' ? ENTREE : INV, tp: TPMODE, n: trades.length, gains: g, pertes: p, be: b,
       wr: trades.length ? +(g / trades.length * 100).toFixed(1) : 0,
       esperance: trades.length ? +(R / trades.length).toFixed(3) : 0, cumulR: +R.toFixed(1) }));
   } else { rapport(trades, nq, TF); if (JOURS) journal(trades, nq, hs, JOURS); }
