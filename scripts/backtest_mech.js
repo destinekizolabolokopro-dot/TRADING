@@ -50,6 +50,8 @@ const PART   = +(args.partiel || 0);     // % clôturé au 1:1 (0 = désactivé)
 const UNIQUE = args.unique === '1';      // refuser si plusieurs FVG dans la jambe
 const ZENTREE= args.zentree || 'mid';    // mid | bord : où poser la limite DANS la zone IFVG
 const SLMODE = args.sl || 'zone';        // zone | balayage | large (le plus loin des deux)
+const MOITIE = +(args.moitie || 0);      // 0 = tout · 1 = 1re moitié · 2 = 2e moitié
+const SMTMOD = args.smt || 'elim';       // off | elim (éliminatoire) | conflu (bonus seulement)
 
 // ----------------------------------------------------------------- données --
 async function fetchCandles(sym, interval, range) {
@@ -322,6 +324,8 @@ function backtest(cs, es, hs) {
     }
 
     // ---- 2. recherche d'un nouveau setup ---------------------------------
+    if (MOITIE === 1 && i > cs.length / 2) continue;
+    if (MOITIE === 2 && i <= cs.length / 2) continue;
     if (!dansFenetre(hs[i])) continue;
     if (basVus.length < 2 || hautsVus.length < 2) continue;
 
@@ -364,6 +368,14 @@ function backtest(cs, es, hs) {
     if (INV === 'ifvg' || INV === 'ifvg-retest') {
       zoneInv = inversionIFVG(cs, zones, i, L, INV === 'ifvg-retest');
       inv = !!zoneInv;
+      // « Entry on candle closure through IFVG IF THERE IS CLEAR DISPLACEMENT » :
+      // le displacement s'applique aussi à la bougie qui traverse la zone. Il ne
+      // l'était pas — le paramètre était mort en mode IFVG.
+      if (inv && zoneInv) {
+        const k = zoneInv.casse;
+        const corps = Math.abs(cs[k].c - cs[k].o);
+        if (!atr[k] || corps <= atr[k] * DISP) { inv = false; zoneInv = null; }
+      }
       // « Multiple FVGs in the leg reduce accuracy » : on peut exiger que la
       // jambe entre le balayage et l'inversion ne contienne QU'UN seul FVG.
       if (inv && UNIQUE) {
@@ -386,7 +398,13 @@ function backtest(cs, es, hs) {
     }
     if (!inv) continue;
 
-    if (smtContre(cs, es, i, 20, setup.sens)) continue;          // SMT éliminatoire
+    // SMT : les sources se contredisent, on rend le comportement explicite.
+    //   elim   — divergence à contre-sens = pas de trade
+    //   conflu — on exige au contraire une divergence FAVORABLE
+    //   off    — on ignore la SMT
+    const smtBloque = smtContre(cs, es, i, 20, setup.sens);
+    if (SMTMOD === 'elim'   && smtBloque) continue;
+    if (SMTMOD === 'conflu' && !smtContre(cs, es, i, 20, setup.sens === 'LONG' ? 'SHORT' : 'LONG')) continue;
     // Le modèle n'exige pas de biais haute unité, mais la source dit que la
     // probabilité monte nettement quand le trade va dans le même sens. On peut
     // donc en faire un filtre, et mesurer ce qu'il coûte et ce qu'il rapporte.
@@ -457,8 +475,9 @@ function backtest(cs, es, hs) {
       // bougie d'inversion comme je le faisais.
       let px = (cs[i].h + cs[i].l) / 2;
       if (zoneInv) {
-        px = ZENTREE === 'bord' ? (L ? zoneInv.haut : zoneInv.bas)
-                                : (zoneInv.bas + zoneInv.haut) / 2;
+        px = ZENTREE === 'bord' ? (L ? zoneInv.haut : zoneInv.bas)      // 0 % — première touche
+           : ZENTREE === 'loin' ? (L ? zoneInv.bas : zoneInv.haut)      // 100 % — remplissage complet
+           : (zoneInv.bas + zoneInv.haut) / 2;                          // 50 % — midpoint
       }
       pendant = { sens: setup.sens, iSignal: i, prix: px, sl, tp, pool: setup.pool[1], src };
     } else {
@@ -706,7 +725,7 @@ function journal(trades, cs, hs, nJours) {
     const p = trades.filter(t => t.sortie === 'perte' || t.sortie === 'ambigu').length;
     const b = trades.filter(t => t.sortie === 'break-even').length;
     const R = trades.reduce((s, t) => s + t.r, 0);
-    console.log(JSON.stringify({ strat: STRAT, tf: TF, ordre: ORDRE, cible: CIBLE, partiel: PART, n: trades.length, gains: g, pertes: p, be: b,
+    console.log(JSON.stringify({ tf: TF, moitie: MOITIE, sl: SLMODE, zentree: ZENTREE, disp: DISP, partiel: PART, smt: SMTMOD, n: trades.length, gains: g, pertes: p, be: b,
       wr: trades.length ? +(g / trades.length * 100).toFixed(1) : 0,
       esperance: trades.length ? +(R / trades.length).toFixed(3) : 0, cumulR: +R.toFixed(1) }));
   } else { rapport(trades, nq, TF); if (JOURS) journal(trades, nq, hs, JOURS); }
