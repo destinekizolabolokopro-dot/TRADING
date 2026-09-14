@@ -1118,15 +1118,20 @@
       "Unités : lecture M5/M15, entrée M1-M5 (éviter les grandes unités sauf si expérimenté). GRADE : A+ (le modèle unique du site).",
     biais:'directionnel — sens du rejet, vers le gap non comblé' });
 
-  add({ id:'mech-entree', nom:'MECH MODEL — Entrée (inversion / OB / FVG)', alias:['mech entrée','inversion m1','mech entry','entrée mech'], cat:'setup', tags:['mech','entrée','inversion','order block','a+'],
-    def:"Le DÉCLENCHEUR d'entrée du MECH Model. L'entrée se fait sur une INVERSION, repérée dans la plus haute unité de temps de la jambe de prix en cours. " +
-      "Le « setup d'inversion M1 » suffit à obtenir un bon RR sans exiger de confirmation supplémentaire en unité supérieure. " +
+  add({ id:'mech-entree', nom:'MECH MODEL — L’INVERSION (= IFVG), le déclencheur', alias:['mech entrée','inversion','inversion m1','ifvg','ifvg model','mech entry','entrée mech','fvg inversé'], cat:'setup', tags:['mech','entrée','inversion','ifvg','order block','a+'],
+    def:"Le DÉCLENCHEUR d'entrée du MECH Model. L'inversion N'EST PAS un modèle séparé : « IFVG model » et « inversion du MECH » désignent LA MÊME CHOSE. " +
+      "Un FVG que le prix TRAVERSE en clôture échoue : la zone change de camp et devient support (si elle était résistance) ou résistance (si elle était support). " +
+      "C'est exactement ce que décrit la source : « un échec de continuation après la prise de liquidité, qui laisse une inefficience ». " +
+      "FVG baissier traversé vers le HAUT = inversion HAUSSIÈRE. FVG haussier traversé vers le BAS = inversion BAISSIÈRE. " +
+      "Elle se repère dans la plus haute unité de la jambe en cours ; le setup d'inversion M1 suffit. " +
       "Entrée alternative sur ORDER BLOCK : un OB haussier = une bougie ROUGE encadrée par deux vertes (et l'inverse pour un OB baissier).",
-    usage:"ENTRÉE : sur l'inversion (M1) après le rejet du niveau clé, ou sur l'order block / le FVG. " +
-      "Tenir compte des CLÔTURES de bougie : si la bougie clôture haut, utiliser un ORDRE LIMITE plutôt que de chasser le prix. " +
-      "STOP : au swing low du gap ou de l'OB ; on peut utiliser toute la structure de la bougie de l'order block, ou le bas du FVG (selon la structure). " +
+    usage:"⚠️ L'inversion ne vient JAMAIS seule : elle n'a de valeur qu'APRÈS un balayage de liquidité et une structure valide. " +
+      "Un IFVG sans balayage préalable n'est pas un setup MECH — c'est un signal isolé, et il ne tient pas. " +
+      "ENTRÉE : sur l'inversion (la zone IFVG) après le rejet du niveau clé, ou sur l'order block. " +
+      "Tenir compte des CLÔTURES : si la bougie clôture haut, utiliser un ORDRE LIMITE plutôt que de chasser le prix. " +
+      "STOP : de l'autre côté de la zone inversée (ou sous la structure de la bougie d'inversion) — PAS au niveau balayé, qui est bien trop loin. " +
       "Unités : entrée M1-M5 sur une lecture M5/M15.",
-    biais:'déclencheur — valide l’entrée dans le sens du rejet' });
+    biais:'déclencheur — l’IFVG est l’inversion, et l’inversion est le déclencheur du MECH' });
 
   add({ id:'mech-filtres', nom:'MECH MODEL — Stop, cibles, break-even & filtres', alias:['mech filtres','mech règles','smt filtre','break even mech','mech stop'], cat:'setup', tags:['mech','filtre','smt','break-even','gestion','stop'],
     def:"Les règles de gestion du MECH Model, celles qui font le taux de réussite annoncé (>80 %). "+
