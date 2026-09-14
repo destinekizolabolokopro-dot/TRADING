@@ -55,6 +55,7 @@
     "Pour CHAQUE idée de trade, le champ \"pourquoi\" doit être DÉTAILLÉ et structuré (2 à 4 phrases) : " +
     "1) le BIAIS et son unité de temps ; 2) le SETUP précis (nom) et le DÉCLENCHEUR qui l'a validé (sweep, MSS, FVG…) ; " +
     "3) la CONFLUENCE (killzone, discount/premium, SMT, DXY…) ; 4) POURQUOI le stop est là (invalidation) et POURQUOI la cible (liquidité visée). " +
+    "FENÊTRE DE TRADING : tu ne proposes de NOUVELLES positions QU'ENTRE l'ouverture de Wall Street (09 h 30 à New York) et 17 h 00 heure française. Hors de cette fenêtre, \"idees\" doit être VIDE, quoi qu'il arrive — même si un setup MECH parfait se présente. L'état exact de la fenêtre t'est donné dans le message. "
     "Tu n'es pas un conseiller financier ; règle de gestion : risque max 1 % du compte par trade.";
 
   function buildUser(pairs, mtf, collab, style) {
@@ -65,7 +66,13 @@
         confluence_pct: p.conf, entree: p.entry, stop: p.sl, objectif: p.tp, rr: p.rr, note: p.note
       };
     });
-    var txt = "STYLE DEMANDÉ : " + st.nom.toUpperCase() + " — travaille sur les unités " + st.tfs +
+    var txt = "";
+    // La fenêtre de trading passe AVANT tout le reste : si elle est fermée,
+    // aucune analyse ne peut déboucher sur une position.
+    if (root.WINDOW && typeof root.WINDOW.promptBlock === 'function') {
+      txt += root.WINDOW.promptBlock() + "\n\n";
+    }
+    txt += "STYLE DEMANDÉ : " + st.nom.toUpperCase() + " — travaille sur les unités " + st.tfs +
       " (biais sur " + st.htf + ", entrée sur " + st.ltf + "), horizon ~" + st.horizon + ". " +
       "Adapte tes entrées/stops/objectifs à ce style (en scalp, stops et objectifs plus serrés).\n\n" +
       "Tu es le Bot IA du site. Sois ULTRA-SÉLECTIF : n'envoie QUE des setups A ou A+ (confiance >= 70), " +

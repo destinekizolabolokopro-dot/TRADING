@@ -50,6 +50,10 @@ lonSess  = input.session("0300-0600", "Londres", group = gSess)
 amSess   = input.session("0930-1100", "AM (NY)", group = gSess)
 macro1   = input.session("0930-1100", "Macro 1 — fenêtre de trade", group = gSess)
 macro2   = input.session("1300-1500", "Macro 2 — fenêtre de trade", group = gSess)
+useWallSt  = input.bool(true, "Fenêtre : ouverture Wall Street → 17 h 00 heure de Paris", group = gSess,
+     tooltip = "Les deux fuseaux sont lus séparément : la France et les USA ne changent pas d'heure les mêmes semaines, donc l'ouverture tombe à 14 h 30 ou 15 h 30 à Paris selon la période. Le filtre reste juste toute l'année.")
+nyOpenSess = input.session("0930-1600", "Séance New York (fuseau NY)", group = gSess)
+parisCut   = input.session("0000-1700", "Coupure (fuseau Paris)", group = gSess)
 useMacro = input.bool(true, "N'autoriser les entrées que dans les macros (évite le lunch)", group = gSess)
 
 gInv = "④ INVERSION — à tester séparément"
@@ -91,6 +95,9 @@ inAsia = inSess(asiaSess)
 inLon  = inSess(lonSess)
 inAM   = inSess(amSess)
 inMacro = inSess(macro1) or inSess(macro2)
+inNYopen     = not na(time(timeframe.period, nyOpenSess, "America/New_York"))
+inParisCut   = not na(time(timeframe.period, parisCut,   "Europe/Paris"))
+inWallWindow = inNYopen and inParisCut
 
 // --- Extrêmes de session (reset au début de chaque session)
 var float asiaH = na, asiaL = na, lonH = na, lonL = na, amH = na, amL = na
@@ -292,7 +299,7 @@ if ta.change(time("D")) != 0
 limitOK = tradesToday < maxTrades and lossesToday < maxLosses
 
 // ====================== CONDITIONS FINALES (§16-17) ==========================
-macroOK = not useMacro or inMacro
+macroOK = (not useMacro or inMacro) and (not useWallSt or inWallWindow)
 buf = close * slBufPct / 100.0
 
 longSL  = nz(sweepLow, low) - buf
@@ -310,6 +317,7 @@ NO_TRADE_REASON = not (longArmed or shortArmed) ? "Pas de structure + sweep" :
      not (invBull or invBear) ? "Pas d'inversion confirmée" :
      (longArmed and na(drawUp)) or (shortArmed and na(drawDown)) ? "Aucun FVG non mitigé comme cible" :
      (blockLong or blockShort) ? "SMT à contre-sens" :
+     not (not useWallSt or inWallWindow) ? "Hors fenêtre Wall Street → 17 h Paris" :
      not macroOK ? "Hors fenêtre macro" :
      not limitOK ? "Limite journalière atteinte" :
      (longArmed and longRR < minRR) or (shortArmed and shortRR < minRR) ? "RR insuffisant" : "OK"

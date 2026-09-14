@@ -76,7 +76,7 @@ Et la ligne **fiabilité** :
 |---|---|
 | **① Structure & liquidité** | Détecte les swings avec `ta.pivothigh/pivotlow`. Un swing n'existe qu'après `pivLen` bougies → aucun signal ne peut disparaître après coup. |
 | **② Sources de liquidité** | Ce qui peut être « sweepé » : PDH/PDL, extrêmes de session (Asie, Londres, NY AM), swings, equal highs/lows. Chacun activable séparément. |
-| **③ Sessions & macros** | Les entrées ne sont autorisées que dans 09:30–11:00 et 13:00–15:00 EST. Le lunch est exclu. Clôture forcée en fin de séance. |
+| **③ Sessions & macros** | Deux filtres cumulés. **(a)** La fenêtre principale : de l'**ouverture de Wall Street** (09:30 NY) à **17 h 00 heure de Paris**. Les deux fuseaux sont lus séparément, donc le filtre reste juste même pendant les semaines où la France et les USA ne changent pas d'heure en même temps (l'ouverture tombe alors à 14 h 30 à Paris au lieu de 15 h 30). **(b)** Les macros 09:30–11:00 et 13:00–15:00 EST, qui excluent le lunch. Clôture forcée en fin de séance. |
 | **④ Inversion** | **4 définitions au choix** (CISD / MSS / Engulfing+displacement / création de FVG). Aucune n'est « la » bonne : tu les testes une par une. |
 | **⑤ FVG** | Le FVG **n'est pas** la liquidité : c'est la **cible**. Le script garde la liste des FVG non mitigés et prend le plus proche dans le sens du trade. |
 | **⑥ SMT** | Divergence contre un actif corrélé (ES pour le NQ). Contre-sens = **pas de trade**. Définition également paramétrable. |

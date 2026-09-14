@@ -89,6 +89,10 @@
   .live{display:inline-flex;align-items:center;gap:7px;color:var(--muted)}
   .dot{width:7px;height:7px;border-radius:50%;background:var(--faint);display:inline-block}
   .dot.on{background:var(--long)}
+.winbadge{font-size:11px;font-weight:700;letter-spacing:.02em;padding:4px 9px;border-radius:999px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);color:#9aa4b2;white-space:nowrap}
+.winbadge.on{border-color:rgba(34,197,94,.45);background:rgba(34,197,94,.12);color:#4ade80}
+@media(max-width:820px){.winbadge{display:none}}
+
   .clock{font-family:var(--mono);font-size:.8rem}
   @media (max-width:600px){.clock{display:none}}
 
@@ -573,6 +577,7 @@
     <div class="status">
       <span class="live"><span class="dot" id="live-dot"></span><span id="live-txt">Connexion…</span></span>
       <span class="clock" id="clock">--:--:--</span>
+      <span class="winbadge" id="winbadge" title="Le bot ne prend de position qu’entre l’ouverture de Wall Street et 17 h 00 heure française">—</span>
       <button class="ai-btn ghost" id="calc-open">🧮&nbsp;Calc</button>
       <button class="ai-btn ghost" id="tools-open">⚙️&nbsp;Mes&nbsp;outils</button>
       <button class="ai-btn ghost" id="hist-open">Historique</button>
@@ -2591,6 +2596,118 @@
 </script>
 <script>
 /*
+ * session.js — FENÊTRE DE TRADING DU BOT
+ * -----------------------------------------------------------------------------
+ * Règle voulue par l'utilisateur :
+ *   le bot ne prend de position QU'ENTRE l'ouverture de Wall Street
+ *   (09 h 30 à New York) et 17 h 00 heure française.
+ *
+ * Pourquoi on calcule les DEUX fuseaux au lieu de coder « 15 h 30 – 17 h 00 » :
+ * la France et les États-Unis ne changent PAS d'heure les mêmes semaines
+ * (mi-mars et fin octobre). Pendant ces quelques semaines l'écart passe de
+ * 6 h à 5 h : l'ouverture de Wall Street tombe alors à 14 h 30 à Paris, pas
+ * 15 h 30. On lit donc l'heure réelle dans chaque fuseau, et la fenêtre reste
+ * juste toute l'année, sans rien toucher.
+ *
+ * Hors fenêtre : AUCUNE nouvelle position. Les positions déjà ouvertes
+ * continuent d'être suivies (on ne coupe rien de force ici).
+ */
+(function (root) {
+  'use strict';
+
+  var NY = 'America/New_York';
+  var PARIS = 'Europe/Paris';
+  var OPEN_NY_MIN = 9 * 60 + 30;   // 09 h 30 à New York = ouverture de Wall Street
+  var CLOSE_PARIS_MIN = 17 * 60;   // 17 h 00 à Paris = fin de la fenêtre
+
+  // Lit l'heure d'une date dans un fuseau donné (sans dépendre du fuseau du PC).
+  function parts(date, tz) {
+    var f = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz, hour12: false, weekday: 'short',
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit'
+    }).formatToParts(date);
+    var o = {};
+    f.forEach(function (p) { o[p.type] = p.value; });
+    var dows = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+    var h = parseInt(o.hour, 10); if (h === 24) h = 0;   // minuit s'écrit "24" chez certains moteurs
+    return {
+      y: +o.year, m: +o.month, d: +o.day,
+      h: h, mi: parseInt(o.minute, 10),
+      dow: dows[o.weekday],
+      min: h * 60 + parseInt(o.minute, 10)
+    };
+  }
+
+  function fmt(mins) {
+    if (mins <= 0) return '0 min';
+    var h = Math.floor(mins / 60), m = mins % 60;
+    return h ? (h + ' h' + (m ? ' ' + m + ' min' : '')) : (m + ' min');
+  }
+
+  // État complet de la fenêtre à un instant donné.
+  function state(date) {
+    var now = date || new Date();
+    var ny = parts(now, NY);
+    var pa = parts(now, PARIS);
+    var weekday = ny.dow >= 1 && ny.dow <= 5;          // Wall Street : lundi → vendredi
+    var afterOpen = ny.min >= OPEN_NY_MIN;
+    var beforeClose = pa.min < CLOSE_PARIS_MIN;
+    var open = weekday && afterOpen && beforeClose;
+
+    var raison = open ? 'Fenêtre de trading OUVERTE'
+      : !weekday ? 'Week-end — Wall Street est fermé'
+      : !afterOpen ? 'Avant l’ouverture de Wall Street (09 h 30 à New York)'
+      : 'Après 17 h 00 heure française';
+
+    var resteMin = open ? (CLOSE_PARIS_MIN - pa.min) : null;
+    var dansMin = (!open && weekday && !afterOpen) ? (OPEN_NY_MIN - ny.min) : null;
+
+    return {
+      ouverte: open,
+      raison: raison,
+      heure_ny: (ny.h < 10 ? '0' : '') + ny.h + ':' + (ny.mi < 10 ? '0' : '') + ny.mi,
+      heure_paris: (pa.h < 10 ? '0' : '') + pa.h + ':' + (pa.mi < 10 ? '0' : '') + pa.mi,
+      // L'heure parisienne à laquelle Wall Street ouvre AUJOURD'HUI (14 h 30 ou 15 h 30
+      // selon la semaine) : c'est l'écart réel entre les deux fuseaux, pas une constante.
+      ouverture_paris_min: OPEN_NY_MIN + (pa.min - ny.min),
+      reste_min: resteMin,
+      dans_min: dansMin,
+      texte: open ? ('Ouverte — fermeture dans ' + fmt(resteMin))
+        : (dansMin != null ? ('Fermée — ouverture dans ' + fmt(dansMin)) : 'Fermée — ' + raison)
+    };
+  }
+
+  function isOpen(date) { return state(date).ouverte; }
+
+  // Bloc injecté dans le prompt du Bot IA.
+  function promptBlock(date) {
+    var s = state(date);
+    var ouvParis = s.ouverture_paris_min;
+    var oh = Math.floor(ouvParis / 60), om = ouvParis % 60;
+    var t = '=== FENÊTRE DE TRADING (RÈGLE ÉLIMINATOIRE) ===\n';
+    t += 'Le bot ne prend de position QU\'ENTRE l\'ouverture de Wall Street (09 h 30 à New York) ';
+    t += 'et 17 h 00 heure française.\n';
+    t += 'Aujourd\'hui, cela correspond à ' + oh + ' h ' + (om < 10 ? '0' : '') + om + ' → 17 h 00 heure de Paris.\n';
+    t += 'Il est actuellement ' + s.heure_paris + ' à Paris (' + s.heure_ny + ' à New York).\n';
+    t += 'ÉTAT : ' + (s.ouverte ? 'FENÊTRE OUVERTE' : 'FENÊTRE FERMÉE') + ' — ' + s.raison + '.\n';
+    if (s.ouverte) {
+      t += 'Il reste ' + fmt(s.reste_min) + ' avant la fermeture. ';
+      t += 'N\'ouvre AUCUNE position dont l\'objectif ne peut raisonnablement pas être atteint dans ce délai : ';
+      t += 'à moins de 30 minutes de la fermeture, ne propose plus de nouvelle entrée.\n';
+    } else {
+      t += '⛔ INTERDICTION ABSOLUE : renvoie "idees": [] — AUCUNE nouvelle position hors de cette fenêtre. ';
+      t += 'Tu peux en revanche remplir "amd" et "preshot" pour préparer la prochaine ouverture.\n';
+    }
+    return t;
+  }
+
+  root.WINDOW = { state: state, isOpen: isOpen, promptBlock: promptBlock, parts: parts };
+})(typeof window !== 'undefined' ? window : this);
+
+</script>
+  <script>
+/*
  * nq.js — MECH MODEL sur le NASDAQ (NQ) avec SMT contre le S&P 500 (ES)
  * -----------------------------------------------------------------------------
  * Le MECH Model de PB Blake se trade sur le Nasdaq futures (NQ/MNQ). Ce module
@@ -2812,6 +2929,7 @@
     "Pour CHAQUE idée de trade, le champ \"pourquoi\" doit être DÉTAILLÉ et structuré (2 à 4 phrases) : " +
     "1) le BIAIS et son unité de temps ; 2) le SETUP précis (nom) et le DÉCLENCHEUR qui l'a validé (sweep, MSS, FVG…) ; " +
     "3) la CONFLUENCE (killzone, discount/premium, SMT, DXY…) ; 4) POURQUOI le stop est là (invalidation) et POURQUOI la cible (liquidité visée). " +
+    "FENÊTRE DE TRADING : tu ne proposes de NOUVELLES positions QU'ENTRE l'ouverture de Wall Street (09 h 30 à New York) et 17 h 00 heure française. Hors de cette fenêtre, \"idees\" doit être VIDE, quoi qu'il arrive — même si un setup MECH parfait se présente. L'état exact de la fenêtre t'est donné dans le message. "
     "Tu n'es pas un conseiller financier ; règle de gestion : risque max 1 % du compte par trade.";
 
   function buildUser(pairs, mtf, collab, style) {
@@ -2822,7 +2940,13 @@
         confluence_pct: p.conf, entree: p.entry, stop: p.sl, objectif: p.tp, rr: p.rr, note: p.note
       };
     });
-    var txt = "STYLE DEMANDÉ : " + st.nom.toUpperCase() + " — travaille sur les unités " + st.tfs +
+    var txt = "";
+    // La fenêtre de trading passe AVANT tout le reste : si elle est fermée,
+    // aucune analyse ne peut déboucher sur une position.
+    if (root.WINDOW && typeof root.WINDOW.promptBlock === 'function') {
+      txt += root.WINDOW.promptBlock() + "\n\n";
+    }
+    txt += "STYLE DEMANDÉ : " + st.nom.toUpperCase() + " — travaille sur les unités " + st.tfs +
       " (biais sur " + st.htf + ", entrée sur " + st.ltf + "), horizon ~" + st.horizon + ". " +
       "Adapte tes entrées/stops/objectifs à ce style (en scalp, stops et objectifs plus serrés).\n\n" +
       "Tu es le Bot IA du site. Sois ULTRA-SÉLECTIF : n'envoie QUE des setups A ou A+ (confiance >= 70), " +
@@ -4402,6 +4526,15 @@ function clock(){
   const d = new Date();
   const t = d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',second:'2-digit',timeZone:'Europe/Paris'});
   $('#clock').textContent = t + ' Paris';
+  // Pastille fenêtre de trading : on voit d'un coup d'œil si le bot a le droit
+  // de prendre une position (ouverture de Wall Street → 17 h 00 à Paris).
+  const b = $('#winbadge');
+  if(b && window.WINDOW){
+    const w = WINDOW.state();
+    b.textContent = (w.ouverte ? '🟢 ' : '⛔ ') + w.texte;
+    b.className = 'winbadge' + (w.ouverte ? ' on' : '');
+    b.title = w.raison + ' · ' + w.heure_paris + ' Paris / ' + w.heure_ny + ' New York';
+  }
 }
 
 let currentFilter='all';
@@ -4440,7 +4573,10 @@ function setSource(live){
 
 function priceMap(){ const m={}; PAIRS.forEach(p=>{ if(p.price!=null) m[p.sym]=p.price; }); return m; }
 function journal(source){ if(!window.History) return;
-  if(source){
+  // Hors de la fenêtre Wall Street → 17 h (Paris) : on n'enregistre AUCUNE
+  // nouvelle position. On continue quand même d'évaluer celles déjà ouvertes.
+  const winOpen = window.WINDOW ? WINDOW.isOpen() : true;
+  if(source && winOpen){
     // SÉLECTIF + orienté RÉUSSITE : forte confluence (>= 70 %) suffit ; on ne
     // force plus un gros RR (qui baisse le taux de réussite). RR >= 1 seulement.
     const strong = PAIRS.filter(p=>p && p.dir && p.dir!=='WAIT' && (p.conf||0)>=70 && (p.rr||0)>=1);
@@ -4577,12 +4713,20 @@ $('#ai-run').addEventListener('click', async ()=>{
     html+=preshotBlockHTML(r.parsed.preshot);
     // Sécurité : on n'affiche que les trades >= 1 RR, meilleurs ratios d'abord
     // SÉLECTIF : on n'affiche que les idées >= 1 RR ET confiance >= 60 (les A/A+).
-    let idees=(r.parsed.idees||[]).filter(i=> (i.rr==null || +i.rr>=1) && (i.confiance==null || +i.confiance>=60));
+    // GARDE-FOU MATÉRIEL : hors de la fenêtre Wall Street → 17 h (Paris), on
+    // jette les idées même si l'IA en a renvoyé. La consigne du prompt ne suffit pas :
+    // ici, c'est le code qui décide, pas le modèle.
+    const win = (window.WINDOW ? WINDOW.state() : {ouverte:true, texte:''});
+    let idees = win.ouverte
+      ? (r.parsed.idees||[]).filter(i=> (i.rr==null || +i.rr>=1) && (i.confiance==null || +i.confiance>=60))
+      : [];
     idees.sort((a,b)=> (+b.rr||0)-(+a.rr||0));
     lastAI=idees; refreshConsensusIfVisible(); // pour l'onglet Consensus
     if(window.History){ const pm=priceMap(); const styl=(window.AI&&AI.getStyle)?AI.getStyle():null; History.record(idees.map(i=>({sym:i.paire,dir:(i.sens||'').toUpperCase(),entry:+i.entree,sl:+i.stop,tp:+i.objectif,rr:+i.rr,note:i.pourquoi||'',tf:i.tf||null,style:styl,price:(pm[i.paire]!=null?pm[i.paire]:null)})),'Bot IA'); History.evaluate(pm); }
     html+='<div class="ai-sec">⚡ Idées de trade <span class="sub">prêtes · clique une carte pour copier</span></div>';
-    if(!idees.length) html+='<div class="ai-summary">Aucune idée ≥ 1 RR pour l’instant — le Bot IA préfère attendre.</div>';
+    if(!idees.length) html+= win.ouverte
+      ? '<div class="ai-summary">Aucune idée ≥ 1 RR pour l’instant — le Bot IA préfère attendre.</div>'
+      : '<div class="ai-summary">⛔ Hors fenêtre de trading ('+win.texte+'). Le bot ne prend de position qu’entre l’ouverture de Wall Street et 17 h 00 heure française. L’analyse (AMD, preshot) reste affichée.</div>';
     idees.forEach(i=>{
       const long=(i.sens||'').toUpperCase()==='LONG';
       const cp=encodeURIComponent((i.paire||'')+' '+(long?'LONG':'SHORT')+(i.tf?' '+i.tf:'')+' | Entrée '+fmtN(i.entree)+' | SL '+fmtN(i.stop)+' | TP '+fmtN(i.objectif)+' | RR '+(i.rr!=null?i.rr:'—'));
