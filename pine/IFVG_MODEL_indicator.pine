@@ -1,0 +1,261 @@
+//@version=6
+// =============================================================================
+// IFVG MODEL — INDICATEUR (visuel + alertes)  |  Pine Script v6
+// =============================================================================
+// Même logique que "IFVG_MODEL_strategy.pine", sans passage d'ordres :
+//   FVG → INVALIDATION → IFVG → RETEST → CONFIRMATION → ENTRÉE → SL → TP → BE
+//
+// Source des règles : la spécification fournie par l'utilisateur.
+// Toute règle ambiguë est un PARAMÈTRE (aucune valeur "optimale" imposée).
+// Anti-repaint : voir la section en bas du fichier.
+// =============================================================================
+
+indicator("IFVG Model — Indicateur", "IFVG", overlay = true,
+     max_boxes_count = 500, max_labels_count = 500, max_lines_count = 500)
+
+// ============================ PARAMÈTRES =====================================
+gF = "① FVG / IFVG"
+fvgMinPct  = input.float(0.02, "Taille min du FVG (%)", minval = 0.0, step = 0.01, group = gF)
+fvgMaxAge  = input.int(500, "Âge max d'un FVG (bougies)", minval = 10, group = gF)
+ifvgMaxAge = input.int(200, "Âge max d'un IFVG", minval = 5, group = gF,
+     tooltip = "[AMBIGU] durée de validité non définie : paramètre.")
+breakMode  = input.string("Close", "Confirmation de cassure (FVG -> IFVG)",
+     options = ["Wick", "Close", "Full displacement"], group = gF)
+
+gR = "② Retest"
+needRetest = input.bool(true, "Exiger un retest", group = gR)
+retestMode = input.string("Touche la zone", "Mode de retest",
+     options = ["Touche la zone", "50% de la zone", "Extrémité opposée"], group = gR)
+
+gC = "③ Filtres (optionnels)"
+useStruct   = input.bool(false, "Filtre STRUCTURE (MSS)", group = gC)
+pivLen      = input.int(5, "Longueur des pivots", minval = 2, group = gC)
+useLiq      = input.bool(false, "Filtre LIQUIDITÉ (sweep)", group = gC)
+liqLookback = input.int(30, "Fenêtre du sweep (bougies)", minval = 3, group = gC)
+useDisp     = input.bool(false, "Filtre DISPLACEMENT", group = gC)
+dispMode    = input.string("ATR", "Mesure", options = ["ATR", "% de la range", "Clôture près de l'extrémité"], group = gC)
+dispAtrMult = input.float(1.0, "Corps > ATR(14) ×", minval = 0.1, step = 0.1, group = gC)
+dispBodyPct = input.float(60.0, "Corps >= % de la range", minval = 1.0, maxval = 100.0, group = gC)
+
+gS = "④ SL / TP"
+slMode    = input.string("Derrière l'IFVG", "Mode de SL", options = ["Derrière l'IFVG", "Derrière le swing", "Derrière le sweep", "ATR"], group = gS)
+slAtrMult = input.float(1.5, "SL ATR ×", minval = 0.1, step = 0.1, group = gS)
+slBufTicks= input.int(2, "Buffer SL (ticks)", minval = 0, group = gS)
+tpMode    = input.string("R:R fixe", "Mode de TP", options = ["R:R fixe", "Prochaine liquidité", "Prochain swing"], group = gS)
+rrFixed   = input.float(2.0, "R:R fixe", minval = 0.1, step = 0.1, group = gS)
+minRR     = input.float(1.0, "RR minimum", minval = 0.1, step = 0.1, group = gS)
+beAtR     = input.float(1.0, "Break-even à (R)", minval = 0.1, step = 0.1, group = gS)
+
+gSes = "⑤ Session"
+useSession = input.bool(false, "Filtre de session", group = gSes)
+tz         = input.string("America/New_York", "Fuseau", group = gSes)
+sessWin    = input.session("0930-1600", "Fenêtre", group = gSes)
+
+gV = "⑥ Affichage"
+showZones = input.bool(true, "Afficher FVG / IFVG", group = gV)
+showLvls  = input.bool(true, "Afficher Entrée / SL / TP / BE", group = gV)
+showTable = input.bool(true, "Tableau de bord", group = gV)
+
+// ============================ OUTILS =========================================
+atr14   = ta.atr(14)
+tickBuf = slBufTicks * syminfo.mintick
+inSess  = not useSession or not na(time(timeframe.period, sessWin, tz))
+
+phv = ta.pivothigh(high, pivLen, pivLen)
+plv = ta.pivotlow(low,  pivLen, pivLen)
+var float lastSwH = na, lastSwL = na
+if not na(phv)
+    lastSwH := phv
+if not na(plv)
+    lastSwL := plv
+
+rng  = high - low
+body = math.abs(close - open)
+dispOK = switch dispMode
+    "ATR"           => body > atr14 * dispAtrMult
+    "% de la range" => rng > 0 and (body / rng) * 100.0 >= dispBodyPct
+    => (close > open ? (high - close) : (close - low)) <= rng * 0.25
+
+// ============================ FVG / IFVG =====================================
+type Zone
+    float top
+    float bot
+    bool  origBull
+    int   born
+    int   invBar
+    int   state       // 0 = FVG actif | 1 = IFVG | 2 = mort
+    bool  retested
+
+var array<Zone> zones = array.new<Zone>()
+minAbs  = close * fvgMinPct / 100.0
+newBull = low > high[2] and (low - high[2]) >= minAbs
+newBear = high < low[2] and (low[2] - high) >= minAbs
+if barstate.isconfirmed
+    if newBull
+        array.push(zones, Zone.new(low, high[2], true, bar_index, na, 0, false))
+    if newBear
+        array.push(zones, Zone.new(low[2], high, false, bar_index, na, 0, false))
+
+var bool freshBullIfvg = false, freshBearIfvg = false
+freshBullIfvg := false
+freshBearIfvg := false
+
+if array.size(zones) > 0
+    for i = array.size(zones) - 1 to 0
+        z = array.get(zones, i)
+        if z.state == 0
+            brokeDown = switch breakMode
+                "Wick"  => low < z.bot
+                "Close" => close < z.bot
+                => close < z.bot and dispOK
+            brokeUp = switch breakMode
+                "Wick"  => high > z.top
+                "Close" => close > z.top
+                => close > z.top and dispOK
+            if z.origBull and brokeDown
+                z.state  := 1
+                z.invBar := bar_index
+                freshBearIfvg := true
+            else if not z.origBull and brokeUp
+                z.state  := 1
+                z.invBar := bar_index
+                freshBullIfvg := true
+            if bar_index - z.born > fvgMaxAge
+                z.state := 2
+        else if z.state == 1
+            touched = low <= z.top and high >= z.bot
+            mid     = (z.top + z.bot) / 2.0
+            hit = switch retestMode
+                "Touche la zone" => touched
+                "50% de la zone" => low <= mid and high >= mid
+                => (z.origBull ? low <= z.bot : high >= z.top)
+            if hit
+                z.retested := true
+            if bar_index - z.invBar > ifvgMaxAge
+                z.state := 2
+        array.set(zones, i, z)
+
+f_pickIfvg(bool wantBull) =>
+    float t = na, b = na
+    if array.size(zones) > 0
+        for i = array.size(zones) - 1 to 0
+            z = array.get(zones, i)
+            isBullIfvg = z.state == 1 and not z.origBull
+            isBearIfvg = z.state == 1 and z.origBull
+            if (wantBull ? isBullIfvg : isBearIfvg) and (not needRetest or z.retested)
+                t := z.top
+                b := z.bot
+                break
+    [t, b]
+
+[bullT, bullB] = f_pickIfvg(true)
+[bearT, bearB] = f_pickIfvg(false)
+hasBullIfvg = not na(bullT)
+hasBearIfvg = not na(bearT)
+
+// ============================ FILTRES ========================================
+mssBull   = not na(lastSwH) and close > lastSwH
+mssBear   = not na(lastSwL) and close < lastSwL
+structOKL = not useStruct or mssBull
+structOKS = not useStruct or mssBear
+
+sweptLow  = low  <= ta.lowest(low[1],  liqLookback)
+sweptHigh = high >= ta.highest(high[1], liqLookback)
+var int lastSwpLowBar = na, lastSwpHighBar = na
+if sweptLow
+    lastSwpLowBar := bar_index
+if sweptHigh
+    lastSwpHighBar := bar_index
+liqOKL = not useLiq or (not na(lastSwpLowBar)  and bar_index - lastSwpLowBar  <= liqLookback)
+liqOKS = not useLiq or (not na(lastSwpHighBar) and bar_index - lastSwpHighBar <= liqLookback)
+
+dispOKL = not useDisp or (dispOK and close > open)
+dispOKS = not useDisp or (dispOK and close < open)
+
+// ============================ NIVEAUX ========================================
+f_sl(bool isLong, float t, float b) =>
+    float s = switch slMode
+        "Derrière l'IFVG"   => isLong ? b : t
+        "Derrière le swing" => isLong ? nz(lastSwL, low) : nz(lastSwH, high)
+        "Derrière le sweep" => isLong ? ta.lowest(low, liqLookback) : ta.highest(high, liqLookback)
+        => isLong ? close - atr14 * slAtrMult : close + atr14 * slAtrMult
+    isLong ? s - tickBuf : s + tickBuf
+
+f_tp(bool isLong, float e, float s) =>
+    float risk = math.abs(e - s)
+    switch tpMode
+        "R:R fixe"            => isLong ? e + risk * rrFixed : e - risk * rrFixed
+        "Prochaine liquidité" => isLong ? ta.highest(high, 50) : ta.lowest(low, 50)
+        => isLong ? nz(lastSwH, e + risk * rrFixed) : nz(lastSwL, e - risk * rrFixed)
+
+lSL = f_sl(true,  bullT, bullB)
+sSL = f_sl(false, bearT, bearB)
+lTP = f_tp(true,  close, lSL)
+sTP = f_tp(false, close, sSL)
+lRisk = close - lSL
+sRisk = sSL - close
+lRR = lRisk > 0 ? (lTP - close) / lRisk : 0.0
+sRR = sRisk > 0 ? (close - sTP) / sRisk : 0.0
+
+LONG_SETUP  = hasBullIfvg and structOKL and liqOKL and dispOKL and inSess and lRR >= minRR
+SHORT_SETUP = hasBearIfvg and structOKS and liqOKS and dispOKS and inSess and sRR >= minRR
+
+// ============================ AFFICHAGE ======================================
+if showZones and barstate.islast and array.size(zones) > 0
+    for i = 0 to array.size(zones) - 1
+        z = array.get(zones, i)
+        if z.state == 0
+            box.new(z.born, z.top, bar_index + 2, z.bot,
+                 border_color = color.new(z.origBull ? color.green : color.red, 75),
+                 bgcolor      = color.new(z.origBull ? color.green : color.red, 93))
+        else if z.state == 1
+            box.new(z.invBar, z.top, bar_index + 2, z.bot,
+                 border_color = color.new(z.origBull ? color.red : color.green, 15),
+                 bgcolor      = color.new(z.origBull ? color.red : color.green, 78))
+
+plotshape(LONG_SETUP,  "LONG",  shape.labelup,   location.belowbar, color.new(color.green, 0), text = "🟢 LONG",  textcolor = color.white, size = size.small)
+plotshape(SHORT_SETUP, "SHORT", shape.labeldown, location.abovebar, color.new(color.red, 0),   text = "🔴 SHORT", textcolor = color.white, size = size.small)
+plotshape(freshBullIfvg, "IFVG+", shape.circle, location.belowbar, color.new(color.lime, 30),    size = size.tiny)
+plotshape(freshBearIfvg, "IFVG-", shape.circle, location.abovebar, color.new(color.fuchsia, 30), size = size.tiny)
+
+plot(showLvls and LONG_SETUP  ? lSL : na, "SL long",  color.new(color.red, 0),   1, plot.style_linebr)
+plot(showLvls and LONG_SETUP  ? lTP : na, "TP long",  color.new(color.green, 0), 1, plot.style_linebr)
+plot(showLvls and LONG_SETUP  ? close + (close - lSL) * beAtR : na, "BE long", color.new(color.gray, 0), 1, plot.style_linebr)
+plot(showLvls and SHORT_SETUP ? sSL : na, "SL short", color.new(color.red, 0),   1, plot.style_linebr)
+plot(showLvls and SHORT_SETUP ? sTP : na, "TP short", color.new(color.green, 0), 1, plot.style_linebr)
+
+ok(bool c) => c ? "✅ VALID" : "❌ INVALID"
+if showTable and barstate.islast
+    var table t = table.new(position.top_right, 2, 11, border_width = 1)
+    table.cell(t, 0, 0,  "IFVG MODEL", bgcolor = color.new(color.blue, 70), text_color = color.white)
+    table.cell(t, 1, 0,  LONG_SETUP ? "LONG" : SHORT_SETUP ? "SHORT" : "—", bgcolor = color.new(color.blue, 70), text_color = color.white)
+    table.cell(t, 0, 1,  "FVG");           table.cell(t, 1, 1, ok(array.size(zones) > 0))
+    table.cell(t, 0, 2,  "IFVG");          table.cell(t, 1, 2, ok(hasBullIfvg or hasBearIfvg))
+    table.cell(t, 0, 3,  "Retest");        table.cell(t, 1, 3, ok(not needRetest or hasBullIfvg or hasBearIfvg))
+    table.cell(t, 0, 4,  "Liquidité");     table.cell(t, 1, 4, ok(liqOKL or liqOKS))
+    table.cell(t, 0, 5,  "Structure");     table.cell(t, 1, 5, ok(structOKL or structOKS))
+    table.cell(t, 0, 6,  "Displacement");  table.cell(t, 1, 6, ok(dispOKL or dispOKS))
+    table.cell(t, 0, 7,  "Entrée");        table.cell(t, 1, 7, (LONG_SETUP or SHORT_SETUP) ? str.tostring(close, format.mintick) : "—")
+    table.cell(t, 0, 8,  "SL");            table.cell(t, 1, 8, LONG_SETUP ? str.tostring(lSL, format.mintick) : SHORT_SETUP ? str.tostring(sSL, format.mintick) : "—")
+    table.cell(t, 0, 9,  "TP");            table.cell(t, 1, 9, LONG_SETUP ? str.tostring(lTP, format.mintick) : SHORT_SETUP ? str.tostring(sTP, format.mintick) : "—")
+    table.cell(t, 0, 10, "RR");            table.cell(t, 1, 10, str.tostring(math.max(lRR, sRR), "#.##"))
+
+// ============================ ALERTES ========================================
+alertcondition(newBull or newBear, "FVG CREATED",  "IFVG : nouveau FVG")
+alertcondition(freshBullIfvg, "IFVG CREATED (bull)", "IFVG haussier créé")
+alertcondition(freshBearIfvg, "IFVG CREATED (bear)", "IFVG baissier créé")
+alertcondition(LONG_SETUP,  "LONG SETUP / ENTRY",  "IFVG : setup LONG")
+alertcondition(SHORT_SETUP, "SHORT SETUP / ENTRY", "IFVG : setup SHORT")
+if LONG_SETUP or SHORT_SETUP
+    alert(syminfo.ticker + " | " + (LONG_SETUP ? "LONG" : "SHORT") + " | TF " + timeframe.period +
+         " | Entrée " + str.tostring(close, format.mintick) +
+         " | SL " + str.tostring(LONG_SETUP ? lSL : sSL, format.mintick) +
+         " | TP " + str.tostring(LONG_SETUP ? lTP : sTP, format.mintick) +
+         " | RR " + str.tostring(LONG_SETUP ? lRR : sRR, "#.##"), alert.freq_once_per_bar_close)
+
+// ============================ ANTI-REPAINT ===================================
+// • Aucun request.security() : pas de fuite multi-timeframe.
+// • FVG enregistrés uniquement sur barstate.isconfirmed.
+// • Swings via ta.pivothigh/ta.pivotlow : confirmés après pivLen bougies.
+// • Alertes sur clôture (alert.freq_once_per_bar_close).
+// => Aucun signal historique n'est réécrit après coup.
