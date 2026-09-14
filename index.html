@@ -122,6 +122,10 @@
 .mt-lvls b{font-size:15px;font-variant-numeric:tabular-nums}
 .mt-lvls i{display:block;font-style:normal;font-size:11px;color:var(--muted);margin-top:2px}
 .mt-sl{color:#f87171}.mt-tp{color:#4ade80}
+.mt-htf{font-size:12.5px;padding:7px 10px;border-radius:8px;margin-bottom:8px;line-height:1.45}
+.mt-htf.ok{background:rgba(34,197,94,.1);color:#86efac}
+.mt-htf.no{background:rgba(251,191,36,.1);color:#fcd34d}
+
 .mt-why{font-size:12.5px;color:var(--muted);line-height:1.5;margin-top:5px}
 .mt-eur{margin-top:9px;padding-top:9px;border-top:1px solid rgba(255,255,255,.08);font-size:12.5px;font-weight:600}
 
@@ -1044,9 +1048,14 @@ function renderMech(){
         '<div class="mt-head"><b>'+(long?'▲ LONG':'▼ SHORT')+' NQ</b><span class="mt-rr">RR '+tr.rr+'</span></div>'+
         '<div class="mt-lvls">'+
           '<div><span>Entrée</span><b>'+fmtN(tr.entree)+'</b></div>'+
-          '<div><span>Stop</span><b class="mt-sl">'+fmtN(tr.sl)+'</b><i>'+tr.risque_points+' pts</i></div>'+
-          '<div><span>Objectif</span><b class="mt-tp">'+fmtN(tr.tp)+'</b><i>'+tr.gain_points+' pts</i></div>'+
+          '<div><span>Stop</span><b class="mt-sl">'+fmtN(tr.sl)+'</b><i>'+tr.risque_points+' pts · '+tr.sl_source+'</i></div>'+
+          '<div><span>Objectif</span><b class="mt-tp">'+fmtN(tr.tp)+'</b><i>'+tr.gain_points+' pts · '+tr.cible_tf+'</i></div>'+
+          '<div><span>Break-even (1:1)</span><b>'+fmtN(tr.be)+'</b><i>stop ramené à l\'entrée</i></div>'+
+          (tr.runner!=null?'<div><span>Runner</span><b>'+fmtN(tr.runner)+'</b><i>liquidité externe</i></div>':'')+
         '</div>'+
+        (tr.htf_aligne!=null?'<div class="mt-htf '+(tr.htf_aligne?'ok':'no')+'">'+
+          (tr.htf_aligne?'✅ Biais H1 aligné — le modèle n\'exige pas de biais haute unité, mais sa probabilité monte nettement quand il est dans le même sens.'
+                        :'⚠️ Biais H1 opposé — le setup reste valable selon les règles, mais la probabilité baisse. À toi de juger.')+'</div>':'')+
         '<div class="mt-why">'+tr.raison+'</div>'+
         (tr.cible?'<div class="mt-why">Cible : '+tr.cible+'</div>':'')+
         '<div class="mt-eur">'+capLabel()+' → gain '+eurGain(tr.rr)+' € / perte '+eurRisk()+' €</div>'+

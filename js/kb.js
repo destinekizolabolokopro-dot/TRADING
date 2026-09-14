@@ -1128,15 +1128,23 @@
       "Unités : entrée M1-M5 sur une lecture M5/M15.",
     biais:'déclencheur — valide l’entrée dans le sens du rejet' });
 
-  add({ id:'mech-filtres', nom:'MECH MODEL — Filtres, cibles & gestion', alias:['mech filtres','mech règles','smt filtre','break even mech'], cat:'setup', tags:['mech','filtre','smt','break-even','gestion'],
-    def:"Les RÈGLES qui font le taux de réussite du MECH Model. FILTRES : ne JAMAIS trader contre une divergence SMT (c'est ce qui améliore le plus le win rate) ; " +
-      "ne pas trader contre la tendance dominante ; éviter les entrées avec un déplacement au-dessus du buy-side / sell-side. " +
-      "Le rejet de liquidité renforce la probabilité sans être toujours obligatoire ; la configuration la plus forte est quand le REJET DE LIQUIDITÉ et le REJET DE PÉRIODE s'alignent. " +
-      "Le modèle fonctionne même en plus-hauts historiques, là où le biais classique est flou.",
-    usage:"CIBLES : d'abord l'EQ (équilibre) du gap non comblé, puis 1:1 ; runner possible vers la liquidité externe. " +
-      "BREAK-EVEN : remonter le stop au point d'entrée une fois le gap comblé OU le 1:1 atteint (seulement quand ces conditions sont remplies). " +
-      "RR visé : 1:1 à 1:1,5 — on privilégie la RÉGULARITÉ (70-80 % de réussite) au gros gain. Si un filtre est violé (SMT contraire, contre-tendance) : PAS DE TRADE.",
-    biais:'gestion — protège le taux de réussite' });
+  add({ id:'mech-filtres', nom:'MECH MODEL — Stop, cibles, break-even & filtres', alias:['mech filtres','mech règles','smt filtre','break even mech','mech stop'], cat:'setup', tags:['mech','filtre','smt','break-even','gestion','stop'],
+    def:"Les règles de gestion du MECH Model, celles qui font le taux de réussite annoncé (>80 %). "+
+      "STOP : sous le bas de la BOUGIE D'INVERSION (ou d'un order block proche) pour un long, au-dessus du haut pour un short — "+
+      "PAS au niveau balayé. C'est le point le plus important : un stop posé au balayage est souvent 5 à 10 fois plus loin, "+
+      "ce qui écrase le RR et fait refuser des setups valides. "+
+      "CIBLE INTERNE : un gap non comblé (FVG) d'unité basse — M1, M3, M5, M15 — jamais encore touché ni mitigé ; "+
+      "à choisir sur la plus haute de ces unités quand plusieurs sont disponibles. "+
+      "CIBLE EXTERNE : les pools de liquidité (PDH/PDL, extrêmes de session), visés par le RUNNER seulement après le break-even.",
+    usage:"BREAK-EVEN : dès que le 1:1 est atteint (ou dès que le gap interne est touché), le stop remonte au prix d'entrée. "+
+      "C'est CE mécanisme qui produit le taux de réussite : au pire on sort à zéro, jamais en perte. Ensuite on laisse courir vers la liquidité externe. "+
+      "SMT : ne prends PAS le trade s'il y a une divergence claire CONTRE ton sens. Seule exception citée : un contexte haute unité très fort. "+
+      "BIAIS HAUTE UNITÉ : le modèle n'en exige AUCUN (il fonctionne même à l'ATH), mais son efficacité et sa probabilité montent nettement "+
+      "quand le trade va dans le sens du contexte haute unité. "+
+      "HORAIRES : environ 09 h 30 – 11 h 00 et 13 h 00 – 15 h 00 EST. On évite l'heure du déjeuner. "+
+      "⚠️ Source : contenu PB Trading Premium. « Inversion » n'y reçoit pas de définition formelle unique — le site utilise le CISD + displacement, "+
+      "qui est UN choix parmi d'autres, pas une règle officielle.",
+    biais:'gestion — c’est le break-even au 1:1 qui fait le win rate, pas la taille du RR' });
 
   // ---------------------------------------------------------------------------
   // MOTEUR DE RECHERCHE + API

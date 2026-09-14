@@ -122,6 +122,10 @@
 .mt-lvls b{font-size:15px;font-variant-numeric:tabular-nums}
 .mt-lvls i{display:block;font-style:normal;font-size:11px;color:var(--muted);margin-top:2px}
 .mt-sl{color:#f87171}.mt-tp{color:#4ade80}
+.mt-htf{font-size:12.5px;padding:7px 10px;border-radius:8px;margin-bottom:8px;line-height:1.45}
+.mt-htf.ok{background:rgba(34,197,94,.1);color:#86efac}
+.mt-htf.no{background:rgba(251,191,36,.1);color:#fcd34d}
+
 .mt-why{font-size:12.5px;color:var(--muted);line-height:1.5;margin-top:5px}
 .mt-eur{margin-top:9px;padding-top:9px;border-top:1px solid rgba(255,255,255,.08);font-size:12.5px;font-weight:600}
 
@@ -2145,15 +2149,23 @@
       "Unités : entrée M1-M5 sur une lecture M5/M15.",
     biais:'déclencheur — valide l’entrée dans le sens du rejet' });
 
-  add({ id:'mech-filtres', nom:'MECH MODEL — Filtres, cibles & gestion', alias:['mech filtres','mech règles','smt filtre','break even mech'], cat:'setup', tags:['mech','filtre','smt','break-even','gestion'],
-    def:"Les RÈGLES qui font le taux de réussite du MECH Model. FILTRES : ne JAMAIS trader contre une divergence SMT (c'est ce qui améliore le plus le win rate) ; " +
-      "ne pas trader contre la tendance dominante ; éviter les entrées avec un déplacement au-dessus du buy-side / sell-side. " +
-      "Le rejet de liquidité renforce la probabilité sans être toujours obligatoire ; la configuration la plus forte est quand le REJET DE LIQUIDITÉ et le REJET DE PÉRIODE s'alignent. " +
-      "Le modèle fonctionne même en plus-hauts historiques, là où le biais classique est flou.",
-    usage:"CIBLES : d'abord l'EQ (équilibre) du gap non comblé, puis 1:1 ; runner possible vers la liquidité externe. " +
-      "BREAK-EVEN : remonter le stop au point d'entrée une fois le gap comblé OU le 1:1 atteint (seulement quand ces conditions sont remplies). " +
-      "RR visé : 1:1 à 1:1,5 — on privilégie la RÉGULARITÉ (70-80 % de réussite) au gros gain. Si un filtre est violé (SMT contraire, contre-tendance) : PAS DE TRADE.",
-    biais:'gestion — protège le taux de réussite' });
+  add({ id:'mech-filtres', nom:'MECH MODEL — Stop, cibles, break-even & filtres', alias:['mech filtres','mech règles','smt filtre','break even mech','mech stop'], cat:'setup', tags:['mech','filtre','smt','break-even','gestion','stop'],
+    def:"Les règles de gestion du MECH Model, celles qui font le taux de réussite annoncé (>80 %). "+
+      "STOP : sous le bas de la BOUGIE D'INVERSION (ou d'un order block proche) pour un long, au-dessus du haut pour un short — "+
+      "PAS au niveau balayé. C'est le point le plus important : un stop posé au balayage est souvent 5 à 10 fois plus loin, "+
+      "ce qui écrase le RR et fait refuser des setups valides. "+
+      "CIBLE INTERNE : un gap non comblé (FVG) d'unité basse — M1, M3, M5, M15 — jamais encore touché ni mitigé ; "+
+      "à choisir sur la plus haute de ces unités quand plusieurs sont disponibles. "+
+      "CIBLE EXTERNE : les pools de liquidité (PDH/PDL, extrêmes de session), visés par le RUNNER seulement après le break-even.",
+    usage:"BREAK-EVEN : dès que le 1:1 est atteint (ou dès que le gap interne est touché), le stop remonte au prix d'entrée. "+
+      "C'est CE mécanisme qui produit le taux de réussite : au pire on sort à zéro, jamais en perte. Ensuite on laisse courir vers la liquidité externe. "+
+      "SMT : ne prends PAS le trade s'il y a une divergence claire CONTRE ton sens. Seule exception citée : un contexte haute unité très fort. "+
+      "BIAIS HAUTE UNITÉ : le modèle n'en exige AUCUN (il fonctionne même à l'ATH), mais son efficacité et sa probabilité montent nettement "+
+      "quand le trade va dans le sens du contexte haute unité. "+
+      "HORAIRES : environ 09 h 30 – 11 h 00 et 13 h 00 – 15 h 00 EST. On évite l'heure du déjeuner. "+
+      "⚠️ Source : contenu PB Trading Premium. « Inversion » n'y reçoit pas de définition formelle unique — le site utilise le CISD + displacement, "+
+      "qui est UN choix parmi d'autres, pas une règle officielle.",
+    biais:'gestion — c’est le break-even au 1:1 qui fait le win rate, pas la taille du RR' });
 
   // ---------------------------------------------------------------------------
   // MOTEUR DE RECHERCHE + API
@@ -3007,7 +3019,13 @@
       }
       var ok = haussiere ? (cs[i].c > ext && cs[i].c > cs[i].o)
                          : (cs[i].c < ext && cs[i].c < cs[i].o);
-      if (ok && disp) return { i: i, t: cs[i].t, prix: cs[i].c, definition: 'CISD + displacement' };
+      if (ok && disp) {
+        // La bougie d'inversion et les deux qui la précèdent = « la structure de
+        // l'inversion ». C'est LÀ que se place le stop (voir trade()).
+        var lo = cs[i].l, hi = cs[i].h;
+        for (var j = Math.max(0, i - 2); j <= i; j++) { lo = Math.min(lo, cs[j].l); hi = Math.max(hi, cs[j].h); }
+        return { i: i, t: cs[i].t, prix: cs[i].c, bas: lo, haut: hi, definition: 'CISD + displacement' };
+      }
     }
     return null;
   }
@@ -3127,7 +3145,8 @@
   var BUFFER_PCT = 0.02;      // tampon du stop, en % du prix
   var RR_MIN = 1.0;
 
-  function trade(d) {
+  function trade(d, opts) {
+    opts = opts || {};
     if (!d || !d.structure || !d.structure.valide) return null;
     var st = d.structure;
     var long = st.sens === 'LONG';
@@ -3135,31 +3154,71 @@
     if (entree == null) return null;
 
     var buf = entree * BUFFER_PCT / 100;
-    var sl = long ? st.sweep.prix_atteint - buf : st.sweep.prix_atteint + buf;
 
-    // Objectif : l'EQ non comblé le plus proche AU-DELÀ de l'entrée.
+    // --- STOP : sous/au-dessus de la STRUCTURE DE L'INVERSION (règle de Blake),
+    // et non au balayage. C'est la différence qui change tout : un stop au
+    // balayage est souvent 5 à 10 fois plus loin, ce qui écrase le RR et fait
+    // refuser des setups parfaitement valides.
+    var slInv = null;
+    if (st.inversion && st.inversion.bas != null) {
+      slInv = long ? st.inversion.bas - buf : st.inversion.haut + buf;
+    }
+    var slBal = long ? st.sweep.prix_atteint - buf : st.sweep.prix_atteint + buf;
+    var sl = slInv != null ? slInv : slBal;
+    var slSource = slInv != null ? "structure de l'inversion" : 'balayage';
+
+    // Un stop plus serré que la moitié de l'ATR serait balayé par le bruit :
+    // dans ce cas on recule jusqu'au balayage, comme le permet la règle
+    // (« sous le bas de l'inversion, ou sous l'order block/la structure »).
+    if (d.atr && Math.abs(entree - sl) < d.atr * 0.5) {
+      sl = slBal;
+      slSource = 'balayage (l’inversion était trop serrée pour l’ATR)';
+    }
+
+    // --- OBJECTIF : un gap NON COMBLÉ, en privilégiant l'unité la PLUS HAUTE
+    // disponible (règle de Blake : « preference for higher timeframe gaps »).
+    var candidats = opts.gaps || (d.gaps_non_comblés || []).map(function (g) {
+      return { tf: d.tf || '?', rang: 0, eq: g.eq_cible, sens: g.sens, zone: g.zone, type: g.type };
+    });
     var tp = null, cible = null;
-    (d.gaps_non_comblés || []).forEach(function (g) {
-      var eq = g.eq_cible;
-      if (long ? eq <= entree : eq >= entree) return;
-      if (tp == null || (long ? eq < tp : eq > tp)) { tp = eq; cible = g; }
+    candidats.forEach(function (g) {
+      if (long ? g.eq <= entree : g.eq >= entree) return;
+      if (!cible) { cible = g; tp = g.eq; return; }
+      // unité plus haute d'abord ; à unité égale, le gap le plus proche
+      if (g.rang > cible.rang || (g.rang === cible.rang && (long ? g.eq < cible.eq : g.eq > cible.eq))) {
+        cible = g; tp = g.eq;
+      }
     });
     if (tp == null) {
       return { possible: false, sens: st.sens, entree: +entree.toFixed(2), sl: +sl.toFixed(2),
-        raison: "Aucun gap non comblé au-delà de l'entrée : le modèle n'a pas d'objectif, donc pas de trade." };
+        sl_source: slSource,
+        raison: "Aucun gap non comblé au-delà de l'entrée, sur aucune unité : le modèle n'a pas d'objectif, donc pas de trade." };
     }
 
     var risque = Math.abs(entree - sl);
     if (!(risque > 0)) return { possible: false, sens: st.sens, raison: 'Stop confondu avec l\'entrée.' };
     var rr = Math.abs(tp - entree) / risque;
 
-    // Un stop plus serré que la moitié de l'ATR de l'unité n'est pas un stop :
-    // il sera touché par le bruit normal, et il gonfle artificiellement le RR.
     if (d.atr && risque < d.atr * 0.5) {
       return { possible: false, sens: st.sens, entree: +entree.toFixed(2), sl: +sl.toFixed(2),
-        tp: +tp.toFixed(2), rr: +rr.toFixed(2),
+        tp: +tp.toFixed(2), rr: +rr.toFixed(2), sl_source: slSource,
         raison: 'Stop trop serré (' + risque.toFixed(2) + ' pts pour un ATR de ' + d.atr.toFixed(2) +
           ') : il serait balayé par le bruit, et le RR de ' + rr.toFixed(2) + ' est un mirage.' };
+    }
+
+    // --- BREAK-EVEN au 1:1 (règle de Blake : stop à l'entrée une fois le 1:1
+    // atteint, ou dès que le gap interne est touché). C'est le mécanisme qui
+    // fait le taux de réussite : au pire on sort à zéro.
+    var be = long ? entree + risque : entree - risque;
+
+    // --- RUNNER : après le break-even, la liquidité EXTERNE.
+    var runner = null;
+    if (opts.liquidite) {
+      opts.liquidite.forEach(function (n) {
+        if (n == null) return;
+        if (long ? n <= tp : n >= tp) return;
+        if (runner == null || (long ? n < runner : n > runner)) runner = n;
+      });
     }
 
     return {
@@ -3167,18 +3226,27 @@
       sens: st.sens,
       entree: +entree.toFixed(2),
       sl: +sl.toFixed(2),
+      sl_source: slSource,
       tp: +tp.toFixed(2),
+      be: +be.toFixed(2),
+      runner: runner != null ? +runner.toFixed(2) : null,
       rr: +rr.toFixed(2),
       risque_points: +risque.toFixed(2),
       gain_points: +Math.abs(tp - entree).toFixed(2),
-      cible: cible ? (cible.type + ' ' + cible.sens + ' — zone ' + cible.zone[0] + '–' + cible.zone[1]) : null,
+      cible: cible ? ((cible.type || 'gap') + ' ' + cible.sens + ' en ' + cible.tf +
+                      ' — zone ' + cible.zone[0] + '–' + cible.zone[1]) : null,
+      cible_tf: cible ? cible.tf : null,
+      htf_aligne: opts.htf == null ? null : (opts.htf === st.sens),
       raison: rr >= RR_MIN
-        ? ('Entrée sur l\'inversion à ' + entree.toFixed(2) + ', stop au-delà du balayage (' +
-           st.sweep.prix_atteint.toFixed(2) + '), objectif l\'EQ du gap non comblé le plus proche (' + tp.toFixed(2) + ').')
+        ? ('Entrée sur l\'inversion à ' + entree.toFixed(2) + ', stop sous la ' + slSource +
+           ' (' + sl.toFixed(2) + '), objectif le gap non comblé de plus haute unité (' +
+           (cible ? cible.tf : '?') + ') à ' + tp.toFixed(2) + '. Break-even au 1:1 = ' + be.toFixed(2) + '.')
         : ('RR de ' + rr.toFixed(2) + ' : sous le minimum de ' + RR_MIN + ', le modèle passe son tour.'),
       motif: 'MECH — balayage ' + st.sweep.quoi + ' à ' + st.sweep.niveau +
              ', inversion ' + (st.inversion ? st.inversion.definition : '—') +
-             ' à ' + (st.inversion ? st.inversion.prix : '—') + ', cible EQ ' + tp.toFixed(2) + '.'
+             ' à ' + (st.inversion ? st.inversion.prix : '—') +
+             ', stop sur ' + slSource + ', cible EQ ' + tp.toFixed(2) +
+             (cible ? ' (' + cible.tf + ')' : '') + ', BE au 1:1 à ' + be.toFixed(2) + '.'
     };
   }
 
@@ -3220,6 +3288,7 @@
       }),
       smt: div, structure: struct, nq: { prix: prix }, atr: atr(nqC, 14)
     };
+    vue.tf = tf.id;
     vue.trade = trade(vue);
     // La SMT est un filtre ÉLIMINATOIRE : un trade contre elle n'existe pas.
     if (vue.trade && vue.trade.possible && div && div.type !== 'aucune') {
@@ -3280,6 +3349,54 @@
       });
       if (!vues.some(function (v) { return v.dispo; })) return null;
 
+      // ---- DEUXIÈME PASSAGE ----
+      // Blake privilégie le gap non comblé de la PLUS HAUTE unité disponible.
+      // On rassemble donc les cibles de toutes les unités, puis on recalcule
+      // chaque trade avec ce vivier commun (et pas seulement ses propres gaps).
+      // La source distingue deux niveaux de cible :
+      //   INTERNE — un gap non comblé d'unité BASSE (M1 à M15). C'est l'objectif
+      //             réel, celui qui est atteint souvent : c'est lui qui fait le
+      //             taux de réussite.
+      //   EXTERNE — la liquidité et les gaps d'unité haute, visés seulement par
+      //             le runner, APRÈS le passage au break-even.
+      // Viser directement un gap H1 depuis une entrée M1 gonfle le RR affiché
+      // et écroule le taux de réussite : exactement l'inverse du but.
+      var INTERNES = ['M1', 'M5', 'M15'];
+      var gapsGlobaux = [], gapsExternes = [];
+      vues.forEach(function (v, i) {
+        if (!v.dispo) return;
+        var interne = INTERNES.indexOf(v.tf) >= 0;
+        v.gaps_non_comblés.forEach(function (g) {
+          var o = { tf: v.tf, rang: i, eq: g.eq_cible, sens: g.sens, zone: g.zone, type: g.type };
+          if (interne) gapsGlobaux.push(o); else gapsExternes.push(g.eq_cible);
+        });
+      });
+
+      // Biais de l'unité haute : le modèle n'en exige pas, mais sa probabilité
+      // monte nettement quand le trade va dans le même sens.
+      var vueH1 = vues.filter(function (v) { return v.dispo && v.tf === 'H1'; })[0];
+      var htf = vueH1 && vueH1.structure && vueH1.structure.valide ? vueH1.structure.sens : null;
+
+      // Liquidité externe = destination du runner après le break-even.
+      var liq = [niveaux.pdh, niveaux.pdl].concat(gapsExternes);
+      vues.forEach(function (v) {
+        if (!v.dispo || !v.sessions) return;
+        liq.push(v.sessions.asia.h, v.sessions.asia.l, v.sessions.londres.h, v.sessions.londres.l);
+      });
+
+      vues.forEach(function (v) {
+        if (!v.dispo) return;
+        v.trade = trade(v, { gaps: gapsGlobaux, htf: htf, liquidite: liq });
+        if (v.trade && v.trade.possible && v.smt && v.smt.type !== 'aucune') {
+          var contre = (v.smt.type === 'baissière' && v.trade.sens === 'LONG') ||
+                       (v.smt.type === 'haussière' && v.trade.sens === 'SHORT');
+          if (contre) {
+            v.trade.possible = false;
+            v.trade.raison = 'Refusé par la SMT ' + v.smt.type + ' : ' + v.smt.consigne;
+          }
+        }
+      });
+
       var best = meilleur(vues);
       // La vue par défaut (affichage principal) : celle qui donne un trade, sinon M15.
       var base = best || vues.filter(function (v) { return v.dispo && v.tf === 'M15'; })[0]
@@ -3294,6 +3411,7 @@
         pdl: lv ? +lv.pdl.toFixed(2) : null,
         timeframes: vues,
         tf_retenue: base ? base.tf : null,
+        biais_htf: htf,
         // Raccourcis vers la vue retenue, pour tout le code existant.
         gaps_non_comblés: base ? base.gaps_non_comblés : [],
         smt: base ? base.smt : null,
@@ -3366,7 +3484,13 @@
       var tr = d.trade;
       if (tr.possible) {
         t += "TRADE CALCULÉ PAR LES RÈGLES (entrée/stop/objectif déjà déduits — reprends CES chiffres) :\n";
-        t += "  " + tr.sens + " · entrée " + tr.entree + " · stop " + tr.sl + " · objectif " + tr.tp + " · RR " + tr.rr + "\n";
+        t += "  " + tr.sens + " · entrée " + tr.entree + " · stop " + tr.sl + " (" + tr.sl_source + ")" +
+             " · objectif " + tr.tp + " (" + tr.cible_tf + ") · RR " + tr.rr + "\n";
+        t += "  Break-even au 1:1 = " + tr.be + (tr.runner != null ? " · runner (liquidité externe) = " + tr.runner : "") + "\n";
+        if (tr.htf_aligne != null) {
+          t += "  Biais H1 : " + (tr.htf_aligne ? "ALIGNÉ avec le trade (la probabilité monte nettement)"
+                                                : "OPPOSÉ au trade (le modèle reste valable mais la probabilité baisse)") + "\n";
+        }
         t += "  " + tr.raison + "\n";
       } else {
         t += "TRADE : impossible — " + tr.raison + "\n";
@@ -3740,9 +3864,14 @@ function renderMech(){
         '<div class="mt-head"><b>'+(long?'▲ LONG':'▼ SHORT')+' NQ</b><span class="mt-rr">RR '+tr.rr+'</span></div>'+
         '<div class="mt-lvls">'+
           '<div><span>Entrée</span><b>'+fmtN(tr.entree)+'</b></div>'+
-          '<div><span>Stop</span><b class="mt-sl">'+fmtN(tr.sl)+'</b><i>'+tr.risque_points+' pts</i></div>'+
-          '<div><span>Objectif</span><b class="mt-tp">'+fmtN(tr.tp)+'</b><i>'+tr.gain_points+' pts</i></div>'+
+          '<div><span>Stop</span><b class="mt-sl">'+fmtN(tr.sl)+'</b><i>'+tr.risque_points+' pts · '+tr.sl_source+'</i></div>'+
+          '<div><span>Objectif</span><b class="mt-tp">'+fmtN(tr.tp)+'</b><i>'+tr.gain_points+' pts · '+tr.cible_tf+'</i></div>'+
+          '<div><span>Break-even (1:1)</span><b>'+fmtN(tr.be)+'</b><i>stop ramené à l\'entrée</i></div>'+
+          (tr.runner!=null?'<div><span>Runner</span><b>'+fmtN(tr.runner)+'</b><i>liquidité externe</i></div>':'')+
         '</div>'+
+        (tr.htf_aligne!=null?'<div class="mt-htf '+(tr.htf_aligne?'ok':'no')+'">'+
+          (tr.htf_aligne?'✅ Biais H1 aligné — le modèle n\'exige pas de biais haute unité, mais sa probabilité monte nettement quand il est dans le même sens.'
+                        :'⚠️ Biais H1 opposé — le setup reste valable selon les règles, mais la probabilité baisse. À toi de juger.')+'</div>':'')+
         '<div class="mt-why">'+tr.raison+'</div>'+
         (tr.cible?'<div class="mt-why">Cible : '+tr.cible+'</div>':'')+
         '<div class="mt-eur">'+capLabel()+' → gain '+eurGain(tr.rr)+' € / perte '+eurRisk()+' €</div>'+
