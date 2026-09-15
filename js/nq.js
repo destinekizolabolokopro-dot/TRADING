@@ -30,9 +30,38 @@
     return proxy + encodeURIComponent(YF + encodeURIComponent(sym) + '?interval=' + interval + '&range=' + range);
   }
 
-  // Récupère les bougies OHLC d'un symbole, en essayant chaque relais à son tour.
+  // Combien de bougies demander au CFD pour couvrir la même profondeur que
+  // la plage Yahoo correspondante.
+  var PROFONDEUR = { '1m': 2000, '2m': 2000, '5m': 2500, '15m': 2000,
+                     '30m': 1500, '60m': 1500, '1h': 1500, '1d': 400 };
+
+  // Récupère les bougies OHLC d'un symbole.
+  //
+  // Quand un jeton CFD est enregistré, ce flux PRIME sur Yahoo : il est en
+  // temps réel là où Yahoo accuse une dizaine de minutes de retard sur le NQ.
+  // Si le CFD échoue — jeton expiré, réseau, instrument sans équivalent — on
+  // retombe silencieusement sur Yahoo plutôt que de ne rien afficher.
   function candles(sym, interval, range) {
     if (typeof fetch === 'undefined') return Promise.resolve(null);
+
+    if (typeof CFD !== 'undefined' && CFD.actif() && CFD.MAP[sym]) {
+      return CFD.candles(interval, PROFONDEUR[interval] || 1000, sym)
+        .then(function (cs) {
+          if (!cs || cs.length < 60) return yahoo(sym, interval, range);
+          // On rend EXACTEMENT la forme attendue par le reste du module :
+          // { sym, price, chg, candles }. Le prix est la dernière clôture —
+          // le CFD ne fournit pas de « regularMarketPrice » séparé.
+          var d = cs[cs.length - 1], v = cs.length > 1 ? cs[0] : null;
+          return { sym: CFD.MAP[sym], source: 'cfd',
+                   price: d.c, chg: v ? (d.c / v.c - 1) * 100 : null,
+                   tz: 'UTC', candles: cs };
+        })
+        .catch(function () { return yahoo(sym, interval, range); });
+    }
+    return yahoo(sym, interval, range);
+  }
+
+  function yahoo(sym, interval, range) {
 
     function tryProxy(i) {
       if (i >= PROXIES.length) return Promise.resolve(null);
@@ -765,6 +794,8 @@
   }
 
   root.NQ = { load: load, data: data, promptBlock: promptBlock, candles: candles,
+    // accès direct à Yahoo, sans passer par le CFD : sert à comparer les deux
+    brut: yahoo,
     findGaps: findGaps, smt: smt, swings: swings, structure: structure,
     sessionPools: sessionPools, trade: trade, TFS: TFS, analyseTF: analyseTF,
     zonesFVG: zonesFVG, inversionIFVG: inversionIFVG };

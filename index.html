@@ -742,6 +742,32 @@
       <input type="password" id="ai-key" placeholder="sk-ant-..." autocomplete="off">
     </div>
     </div>
+
+    <div class="ai-card" id="cfd-card">
+    <h3 style="margin:0 0 6px">📡 Flux temps réel (CFD OANDA)</h3>
+    <p class="pro-warn" style="margin:0 0 10px">
+      Yahoo sert le NQ avec <b>environ 10 minutes de retard</b> — mesuré. Un CFD NAS100
+      est dérivé du future lui-même et coté en continu : branché ici, le site travaille
+      en temps réel. Le jeton part <b>directement chez OANDA</b>, sans relais, et reste
+      dans ce navigateur.<br>
+      <b>Utilise un compte PRATIQUE (démo), jamais un compte réel.</b>
+    </p>
+    <div class="ai-steps">
+      <span class="ai-step"><b>1</b> Compte démo sur <a href="https://www.oanda.com/demo-account/tpa/personal_token" target="_blank" rel="noopener">oanda.com&nbsp;↗</a></span>
+      <span class="ai-step"><b>2</b> Génère un jeton personnel</span>
+      <span class="ai-step"><b>3</b> Colle-le, teste, vérifie la corrélation</span>
+    </div>
+    <div class="field">
+      <label>Jeton OANDA (compte pratique)</label>
+      <input type="password" id="cfd-token" placeholder="xxxxxxxx-xxxxxxxxxxxxxxxx" autocomplete="off">
+    </div>
+    <div class="mech-cta">
+      <button class="btn btn-primary" id="cfd-save">Enregistrer &amp; tester</button>
+      <button class="btn" id="cfd-corr">📊 Mesurer la corrélation avec le NQ</button>
+      <button class="btn" id="cfd-clear">Retirer le jeton</button>
+    </div>
+    <div id="cfd-state" style="margin-top:10px;font-size:13.5px;color:var(--muted)"></div>
+    </div>
     <div id="ai-keystate" style="display:none;margin:2px 0 14px;font-size:13.5px;color:var(--muted)">🔑 Clé API enregistrée ✓ <a id="ai-editkey" style="color:var(--ink);text-decoration:underline;cursor:pointer;margin-left:6px">Modifier</a></div>
     <div class="field">
       <label>Modèle <span style="color:var(--faint);font-weight:400">— commence par Haiku (le moins cher)</span></label>
@@ -894,6 +920,7 @@
 <script src="js/kb.js"></script>
 <script src="js/econcal.js"></script>
 <script src="js/session.js"></script>
+  <script src="js/cfd.js"></script>
   <script src="js/nq.js"></script>
   <script src="js/notif.js"></script>
 <script src="js/ai.js"></script>
@@ -1180,6 +1207,44 @@ async function refreshMech(force){
   }catch(e){ setSource(false); renderMech(); return false; }
 }
 
+/* ---------- Flux temps réel CFD ---------- */
+function cfdEtat(txt){ const e=$('#cfd-state'); if(e) e.innerHTML = txt; }
+
+function cfdInit(){
+  const inp=$('#cfd-token'); if(!inp) return;
+  if(window.CFD && CFD.actif()){ inp.value=''; inp.placeholder='jeton enregistré ✓'; cfdEtat('🔑 Jeton enregistré. Le site utilise le flux temps réel.'); }
+  const sv=$('#cfd-save'), cl=$('#cfd-clear'), co=$('#cfd-corr');
+  if(sv) sv.addEventListener('click', ()=>{
+    const v=(inp.value||'').trim();
+    if(v) CFD.setToken(v);
+    if(!CFD.actif()){ cfdEtat('⚠️ Colle d\'abord un jeton.'); return; }
+    cfdEtat('⏳ Test en cours…');
+    CFD.tester().then(r=>{
+      if(!r.ok){ cfdEtat('❌ '+r.msg); return; }
+      inp.value=''; inp.placeholder='jeton enregistré ✓';
+      cfdEtat('✅ '+r.msg+'<br>Le site bascule sur ce flux au prochain rafraîchissement.');
+      refreshMech(true);
+    });
+  });
+  if(cl) cl.addEventListener('click', ()=>{ CFD.setToken(''); inp.value=''; inp.placeholder='xxxxxxxx-xxxxxxxxxxxxxxxx'; cfdEtat('Jeton retiré — retour aux données Yahoo différées.'); refreshMech(true); });
+  if(co) co.addEventListener('click', ()=>{
+    if(!CFD.actif()){ cfdEtat('⚠️ Enregistre un jeton d\'abord.'); return; }
+    cfdEtat('⏳ Comparaison du CFD et du NQ sur les bougies 5 min…');
+    // On compare les VARIATIONS, pas les niveaux : c'est ce qui décide si le
+    // flux est utilisable. QQQ donnait 0,924 et ce n'était pas assez.
+    Promise.all([ CFD.candles('5m', 500), NQ.brut('NQ=F','5m','5d') ]).then(([a,b])=>{
+      const r = CFD.correlation(a,b);
+      if(!r || r.r==null){ cfdEtat('❌ Pas assez de bougies communes pour conclure.'); return; }
+      const v=r.r.toFixed(4);
+      const verdict = r.r>=0.985 ? '✅ excellent — utilisable tel quel'
+                    : r.r>=0.96  ? '🟡 correct — surveille les écarts'
+                    : '❌ insuffisant — QQQ faisait 0,924 et l\'avantage y disparaissait';
+      cfdEtat('Corrélation des variations sur '+r.n+' bougies 5 min : <b>'+v+'</b><br>'+verdict+
+              '<br>Base NQ / CFD actuelle : '+(r.ratio? r.ratio.toFixed(4):'—'));
+    }).catch(()=>cfdEtat('❌ Comparaison impossible (réseau).'));
+  });
+}
+
 function majBoutonNotif(){
   const b=$('#mech-notif'); if(!b) return;
   if(!window.Notif || !Notif.supporte()){ b.textContent='🔔 Indisponible'; b.disabled=true; return; }
@@ -1190,7 +1255,7 @@ function majBoutonNotif(){
 
 async function boot(){
   clock(); setInterval(clock,1000);
-  majBoutonNotif();
+  majBoutonNotif(); cfdInit();
   hero(); renderMech(); setSource(false);
   await refreshMech(true);
   setInterval(()=>refreshMech(true), 300000);   // toutes les 5 min : le MECH travaille en M5/M15

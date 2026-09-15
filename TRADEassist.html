@@ -742,6 +742,32 @@
       <input type="password" id="ai-key" placeholder="sk-ant-..." autocomplete="off">
     </div>
     </div>
+
+    <div class="ai-card" id="cfd-card">
+    <h3 style="margin:0 0 6px">📡 Flux temps réel (CFD OANDA)</h3>
+    <p class="pro-warn" style="margin:0 0 10px">
+      Yahoo sert le NQ avec <b>environ 10 minutes de retard</b> — mesuré. Un CFD NAS100
+      est dérivé du future lui-même et coté en continu : branché ici, le site travaille
+      en temps réel. Le jeton part <b>directement chez OANDA</b>, sans relais, et reste
+      dans ce navigateur.<br>
+      <b>Utilise un compte PRATIQUE (démo), jamais un compte réel.</b>
+    </p>
+    <div class="ai-steps">
+      <span class="ai-step"><b>1</b> Compte démo sur <a href="https://www.oanda.com/demo-account/tpa/personal_token" target="_blank" rel="noopener">oanda.com&nbsp;↗</a></span>
+      <span class="ai-step"><b>2</b> Génère un jeton personnel</span>
+      <span class="ai-step"><b>3</b> Colle-le, teste, vérifie la corrélation</span>
+    </div>
+    <div class="field">
+      <label>Jeton OANDA (compte pratique)</label>
+      <input type="password" id="cfd-token" placeholder="xxxxxxxx-xxxxxxxxxxxxxxxx" autocomplete="off">
+    </div>
+    <div class="mech-cta">
+      <button class="btn btn-primary" id="cfd-save">Enregistrer &amp; tester</button>
+      <button class="btn" id="cfd-corr">📊 Mesurer la corrélation avec le NQ</button>
+      <button class="btn" id="cfd-clear">Retirer le jeton</button>
+    </div>
+    <div id="cfd-state" style="margin-top:10px;font-size:13.5px;color:var(--muted)"></div>
+    </div>
     <div id="ai-keystate" style="display:none;margin:2px 0 14px;font-size:13.5px;color:var(--muted)">🔑 Clé API enregistrée ✓ <a id="ai-editkey" style="color:var(--ink);text-decoration:underline;cursor:pointer;margin-left:6px">Modifier</a></div>
     <div class="field">
       <label>Modèle <span style="color:var(--faint);font-weight:400">— commence par Haiku (le moins cher)</span></label>
@@ -2802,6 +2828,126 @@
 
 </script>
   <script>
+'use strict';
+/**
+ * FLUX TEMPS RÉEL PAR CFD — OANDA (compte démo gratuit)
+ *
+ * POURQUOI. Yahoo sert le NQ avec environ 10 minutes de retard : mesuré, pas
+ * supposé. Les indices QQQ et ^NDX sont bien en temps réel mais ne le
+ * remplacent pas — corrélation des variations en 5 min de 0,92 et 0,91, et
+ * l'avantage de la stratégie tombe de +0,262 R à +0,013 R puis −0,075 R.
+ *
+ * Un CFD « NAS100 » est différent : il n'est pas calculé sur l'indice cash, il
+ * est dérivé du FUTURE lui-même et coté 23 h sur 24. Il devrait donc suivre le
+ * NQ de bien plus près. « Devrait » : le module fournit `correlation()` pour le
+ * VÉRIFIER au lieu de le croire, en comparant au NQ de Yahoo.
+ *
+ * SÉCURITÉ. L'API d'OANDA autorise l'appel direct depuis le navigateur — elle
+ * renvoie `access-control-allow-origin` et accepte l'en-tête `Authorization`.
+ * Aucun relais tiers n'est utilisé : le jeton ne transite par personne d'autre
+ * qu'OANDA. Il reste dans le localStorage du navigateur et n'est jamais écrit
+ * dans le dépôt.
+ *
+ * Utiliser un compte PRATIQUE (démo). Le jeton d'un compte réel n'a rien à
+ * faire dans un navigateur.
+ */
+var CFD = (function () {
+
+  var API = 'https://api-fxpractice.oanda.com/v3';
+  var CLE = 'cfd.oanda.token';
+  var INSTR = 'NAS100_USD';
+  // Correspondance avec les symboles Yahoo utilisés par le reste du site.
+  // Le S&P est gardé : c'est lui qui sert à la divergence SMT.
+  var MAP = { 'NQ=F': 'NAS100_USD', 'ES=F': 'SPX500_USD' };
+
+  function token()      { try { return localStorage.getItem(CLE) || ''; } catch (e) { return ''; } }
+  function setToken(t)  { try { localStorage.setItem(CLE, (t || '').trim()); } catch (e) {} }
+  function actif()      { return !!token(); }
+
+  // OANDA : M1, M2, M5, M15, M30, H1, H4, D
+  var GRAN = { '1m': 'M1', '2m': 'M2', '5m': 'M5', '15m': 'M15', '30m': 'M30',
+               '60m': 'H1', '1h': 'H1', '4h': 'H4', '1d': 'D' };
+
+  /**
+   * Bougies OHLC, au même format que le reste du site : { t, o, h, l, c }.
+   * @param interval clé de GRAN
+   * @param count    nombre de bougies (max 5000 chez OANDA)
+   */
+  function candles(interval, count, sym) {
+    var tk = token();
+    if (!tk || typeof fetch === 'undefined') return Promise.resolve(null);
+    var inst = sym ? MAP[sym] : INSTR;
+    if (!inst) return Promise.resolve(null);          // symbole sans équivalent CFD
+    var g = GRAN[interval] || 'M5';
+    var u = API + '/instruments/' + inst + '/candles?granularity=' + g +
+            '&count=' + (count || 500) + '&price=M';
+    return fetch(u, { headers: { 'Authorization': 'Bearer ' + tk,
+                                 'Accept-Datetime-Format': 'UNIX' } })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (j) {
+        if (!j || !j.candles) return null;
+        var out = [];
+        j.candles.forEach(function (c) {
+          // `complete: false` = bougie en cours. On l'écarte : toutes les
+          // décisions du modèle se prennent sur clôture.
+          if (!c.complete || !c.mid) return;
+          out.push({ t: Math.round(parseFloat(c.time) * 1000),
+                     o: +c.mid.o, h: +c.mid.h, l: +c.mid.l, c: +c.mid.c });
+        });
+        return out.length ? out : null;
+      })
+      .catch(function () { return null; });
+  }
+
+  /** Âge de la dernière bougie close, en minutes. */
+  function fraicheur(cs) {
+    if (!cs || !cs.length) return null;
+    return Math.round((Date.now() - cs[cs.length - 1].t) / 60000);
+  }
+
+  /**
+   * Corrélation des VARIATIONS entre le CFD et le NQ de Yahoo, sur les bougies
+   * de même horodatage. C'est la mesure qui décide si ce flux est utilisable :
+   * QQQ donnait 0,924 et ce n'était pas assez.
+   * @return { n, r, ratio } ou null
+   */
+  function correlation(cfdCs, nqCs) {
+    if (!cfdCs || !nqCs) return null;
+    var m = {}; nqCs.forEach(function (x) { m[x.t] = x.c; });
+    var pa = [], pb = [];
+    cfdCs.forEach(function (x) { if (m[x.t] != null) { pa.push(x.c); pb.push(m[x.t]); } });
+    if (pa.length < 30) return null;
+    var ra = [], rb = [];
+    for (var i = 1; i < pa.length; i++) { ra.push(pa[i] / pa[i - 1] - 1); rb.push(pb[i] / pb[i - 1] - 1); }
+    var moy = function (v) { return v.reduce(function (a, b) { return a + b; }, 0) / v.length; };
+    var ma = moy(ra), mb = moy(rb), cov = 0, sa = 0, sb = 0;
+    for (var k = 0; k < ra.length; k++) {
+      cov += (ra[k] - ma) * (rb[k] - mb); sa += Math.pow(ra[k] - ma, 2); sb += Math.pow(rb[k] - mb, 2);
+    }
+    var r = (sa > 0 && sb > 0) ? cov / Math.sqrt(sa * sb) : null;
+    return { n: pa.length, r: r,
+             ratio: pb[pb.length - 1] / pa[pa.length - 1] };   // NQ / CFD : la base
+  }
+
+  /** Vérifie que le jeton fonctionne et renvoie un diagnostic lisible. */
+  function tester() {
+    if (!actif()) return Promise.resolve({ ok: false, msg: 'Aucun jeton enregistré.' });
+    return candles('5m', 60).then(function (cs) {
+      if (!cs) return { ok: false, msg: 'Jeton refusé ou instrument indisponible.' };
+      var age = fraicheur(cs);
+      return { ok: true, n: cs.length, age: age, prix: cs[cs.length - 1].c,
+               msg: cs.length + ' bougies · dernière close il y a ' + age + ' min · ' + cs[cs.length - 1].c };
+    });
+  }
+
+  return { actif: actif, token: token, setToken: setToken, candles: candles,
+           fraicheur: fraicheur, correlation: correlation, tester: tester,
+           INSTR: INSTR, MAP: MAP };
+})();
+if (typeof window !== 'undefined') window.CFD = CFD;
+
+</script>
+  <script>
 /*
  * nq.js — MECH MODEL sur le NASDAQ (NQ) avec SMT contre le S&P 500 (ES)
  * -----------------------------------------------------------------------------
@@ -2834,9 +2980,38 @@
     return proxy + encodeURIComponent(YF + encodeURIComponent(sym) + '?interval=' + interval + '&range=' + range);
   }
 
-  // Récupère les bougies OHLC d'un symbole, en essayant chaque relais à son tour.
+  // Combien de bougies demander au CFD pour couvrir la même profondeur que
+  // la plage Yahoo correspondante.
+  var PROFONDEUR = { '1m': 2000, '2m': 2000, '5m': 2500, '15m': 2000,
+                     '30m': 1500, '60m': 1500, '1h': 1500, '1d': 400 };
+
+  // Récupère les bougies OHLC d'un symbole.
+  //
+  // Quand un jeton CFD est enregistré, ce flux PRIME sur Yahoo : il est en
+  // temps réel là où Yahoo accuse une dizaine de minutes de retard sur le NQ.
+  // Si le CFD échoue — jeton expiré, réseau, instrument sans équivalent — on
+  // retombe silencieusement sur Yahoo plutôt que de ne rien afficher.
   function candles(sym, interval, range) {
     if (typeof fetch === 'undefined') return Promise.resolve(null);
+
+    if (typeof CFD !== 'undefined' && CFD.actif() && CFD.MAP[sym]) {
+      return CFD.candles(interval, PROFONDEUR[interval] || 1000, sym)
+        .then(function (cs) {
+          if (!cs || cs.length < 60) return yahoo(sym, interval, range);
+          // On rend EXACTEMENT la forme attendue par le reste du module :
+          // { sym, price, chg, candles }. Le prix est la dernière clôture —
+          // le CFD ne fournit pas de « regularMarketPrice » séparé.
+          var d = cs[cs.length - 1], v = cs.length > 1 ? cs[0] : null;
+          return { sym: CFD.MAP[sym], source: 'cfd',
+                   price: d.c, chg: v ? (d.c / v.c - 1) * 100 : null,
+                   tz: 'UTC', candles: cs };
+        })
+        .catch(function () { return yahoo(sym, interval, range); });
+    }
+    return yahoo(sym, interval, range);
+  }
+
+  function yahoo(sym, interval, range) {
 
     function tryProxy(i) {
       if (i >= PROXIES.length) return Promise.resolve(null);
@@ -3569,6 +3744,8 @@
   }
 
   root.NQ = { load: load, data: data, promptBlock: promptBlock, candles: candles,
+    // accès direct à Yahoo, sans passer par le CFD : sert à comparer les deux
+    brut: yahoo,
     findGaps: findGaps, smt: smt, swings: swings, structure: structure,
     sessionPools: sessionPools, trade: trade, TFS: TFS, analyseTF: analyseTF,
     zonesFVG: zonesFVG, inversionIFVG: inversionIFVG };
@@ -4146,6 +4323,44 @@ async function refreshMech(force){
   }catch(e){ setSource(false); renderMech(); return false; }
 }
 
+/* ---------- Flux temps réel CFD ---------- */
+function cfdEtat(txt){ const e=$('#cfd-state'); if(e) e.innerHTML = txt; }
+
+function cfdInit(){
+  const inp=$('#cfd-token'); if(!inp) return;
+  if(window.CFD && CFD.actif()){ inp.value=''; inp.placeholder='jeton enregistré ✓'; cfdEtat('🔑 Jeton enregistré. Le site utilise le flux temps réel.'); }
+  const sv=$('#cfd-save'), cl=$('#cfd-clear'), co=$('#cfd-corr');
+  if(sv) sv.addEventListener('click', ()=>{
+    const v=(inp.value||'').trim();
+    if(v) CFD.setToken(v);
+    if(!CFD.actif()){ cfdEtat('⚠️ Colle d\'abord un jeton.'); return; }
+    cfdEtat('⏳ Test en cours…');
+    CFD.tester().then(r=>{
+      if(!r.ok){ cfdEtat('❌ '+r.msg); return; }
+      inp.value=''; inp.placeholder='jeton enregistré ✓';
+      cfdEtat('✅ '+r.msg+'<br>Le site bascule sur ce flux au prochain rafraîchissement.');
+      refreshMech(true);
+    });
+  });
+  if(cl) cl.addEventListener('click', ()=>{ CFD.setToken(''); inp.value=''; inp.placeholder='xxxxxxxx-xxxxxxxxxxxxxxxx'; cfdEtat('Jeton retiré — retour aux données Yahoo différées.'); refreshMech(true); });
+  if(co) co.addEventListener('click', ()=>{
+    if(!CFD.actif()){ cfdEtat('⚠️ Enregistre un jeton d\'abord.'); return; }
+    cfdEtat('⏳ Comparaison du CFD et du NQ sur les bougies 5 min…');
+    // On compare les VARIATIONS, pas les niveaux : c'est ce qui décide si le
+    // flux est utilisable. QQQ donnait 0,924 et ce n'était pas assez.
+    Promise.all([ CFD.candles('5m', 500), NQ.brut('NQ=F','5m','5d') ]).then(([a,b])=>{
+      const r = CFD.correlation(a,b);
+      if(!r || r.r==null){ cfdEtat('❌ Pas assez de bougies communes pour conclure.'); return; }
+      const v=r.r.toFixed(4);
+      const verdict = r.r>=0.985 ? '✅ excellent — utilisable tel quel'
+                    : r.r>=0.96  ? '🟡 correct — surveille les écarts'
+                    : '❌ insuffisant — QQQ faisait 0,924 et l\'avantage y disparaissait';
+      cfdEtat('Corrélation des variations sur '+r.n+' bougies 5 min : <b>'+v+'</b><br>'+verdict+
+              '<br>Base NQ / CFD actuelle : '+(r.ratio? r.ratio.toFixed(4):'—'));
+    }).catch(()=>cfdEtat('❌ Comparaison impossible (réseau).'));
+  });
+}
+
 function majBoutonNotif(){
   const b=$('#mech-notif'); if(!b) return;
   if(!window.Notif || !Notif.supporte()){ b.textContent='🔔 Indisponible'; b.disabled=true; return; }
@@ -4156,7 +4371,7 @@ function majBoutonNotif(){
 
 async function boot(){
   clock(); setInterval(clock,1000);
-  majBoutonNotif();
+  majBoutonNotif(); cfdInit();
   hero(); renderMech(); setSource(false);
   await refreshMech(true);
   setInterval(()=>refreshMech(true), 300000);   // toutes les 5 min : le MECH travaille en M5/M15
