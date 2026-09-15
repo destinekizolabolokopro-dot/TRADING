@@ -1,6 +1,22 @@
 #!/usr/bin/env node
 'use strict';
 /**
+ * ╔═══════════════════════════════════════════════════════════════════════╗
+ * ║  MECH — reconstruction autour du pipeline de référence                ║
+ * ║                                                                       ║
+ * ║  HTF BIAS + DOL → KEY LEVEL → TOUCH/MANIPULATION → IFVG PLUS HAUTE    ║
+ * ║  UNITÉ → CLÔTURE DE CORPS CONFIRMÉE → ENTRÉE                          ║
+ * ║                                                                       ║
+ * ║  --v sélectionne la version, de façon CUMULATIVE. Une seule variable  ║
+ * ║  expérimentale change d'une version à la suivante :                   ║
+ * ║                                                                       ║
+ * ║     --v 0   comportement de BASELINE_V0, à l'identique (contrôle)     ║
+ * ║     --v 1   + vrai biais HTF par respect des FVG 1D/4H/1H/15M         ║
+ * ║                                                                       ║
+ * ║  Les versions suivantes s'ajouteront ici, une par une.                ║
+ * ║  Détail et sources : scripts/SPEC_PIPELINE.md                         ║
+ * ╚═══════════════════════════════════════════════════════════════════════╝
+ *
  * PB BLAKE — MODÈLE COMPLET (architecture en 4 étapes)
  * ===========================================================================
  *   WAIT BIAS → WAIT KEY → WAIT TOUCH → WAIT IFVG CLOSE → ENTRÉE
@@ -24,6 +40,7 @@
  *        [--golden 1] [--maxsig 2] [--ifvgtf auto|1m|2m|5m]
  */
 
+const ST = require('./lib/structure.js');
 const YF = 'https://query1.finance.yahoo.com/v8/finance/chart/';
 const args = {};
 process.argv.slice(2).forEach((a, i, arr) => { if (a.startsWith('--')) args[a.slice(2)] = arr[i + 1]; });
@@ -55,6 +72,23 @@ const SCOREMIN= +(args.score || 0);           // confluence minimale exigée
 const CONF    = args.conf || '';              // liste de critères exigés, ex. amd,ifvgHaut
 const MOITIE  = +(args.moitie || 0);          // 0 = tout · 1 = 1re moitié · 2 = 2e
 const COUT    = +(args.cout || 0.06);
+
+// ── VERSION ────────────────────────────────────────────────────────────────
+const VERSION = +(args.v == null ? 0 : args.v);
+
+// ── V1 · biais HTF par respect des FVG ────────────────────────────── [COMM]
+// La source dit : « détermine si le marché est haussier ou baissier en
+// regardant comment les FVG Daily, 4H, 1H et 15M sont respectés ou non », avec
+// un score minimum absolu réglable, par défaut 2.
+//
+// Ce que la source NE dit PAS, et qui est donc de nous :
+//   · ce que « respecté » et « non respecté » veulent dire exactement ;
+//   · le poids de chaque unité ;
+//   · combien de FVG récents comptent par unité.
+// UNCONFIRMED ASSUMPTION — les trois sont des paramètres.
+const SEUIL   = +(args.seuil || 2);              // [COMM] défaut 2
+const POIDS   = (args.poids || '1,1,1,1').split(',').map(Number);   // 1D,4H,1H,15M
+const FVGN    = +(args.fvgn || 1);               // [HYP] FVG résolus pris en compte par unité
 // ── STACKED POWER OF THREE ────────────────────────────────────────[BLAKE]
 // Les derniers schémas montrent DEUX PD Arrays empilés : le prix entre dans le
 // premier, repart (expansion), puis vient chercher un SECOND PD Array plus haut
@@ -232,7 +266,59 @@ function estLRL(zones, idx, de, vers, seuil) {
 // ═══════════════════════════════════════════════════════════════════════════
 // LE MODÈLE
 // ═══════════════════════════════════════════════════════════════════════════
-function backtest(m1, m2, m5, m15, d1) {
+// ═══════════════════════════════════════════════════════════════════════════
+// V1 · BIAIS HAUTE UNITÉ PAR RESPECT DES FVG                          [COMM]
+// ---------------------------------------------------------------------------
+// Définitions de travail — [HYP], la source emploie les mots sans les définir :
+//
+//   RESPECTÉ      le prix est entré dans le FVG et en est ressorti du bon côté,
+//                 sans qu'une bougie CLÔTURE au-delà de la zone
+//   NON RESPECTÉ  une bougie a clôturé au-delà, du côté opposé
+//   EN ATTENTE    pas encore d'interaction — ne vote pas
+//
+// Contribution d'un FVG résolu :
+//     haussier respecté      → +1        haussier non respecté  → −1
+//     baissier non respecté  → +1        baissier respecté      → −1
+//
+// Chaque unité vote −1, 0 ou +1 (signe de la somme de ses FVGN derniers FVG
+// résolus). Le score est la somme pondérée des votes, de −4 à +4 à poids égaux.
+//
+//   score ≥ +SEUIL → BULLISH      score ≤ −SEUIL → BEARISH
+//   sinon          → NEUTRAL, et NEUTRAL veut dire : aucune position.
+//
+// C'est une différence de nature avec BASELINE_V0, qui trouvait toujours une
+// direction quelle que soit la lisibilité du marché.
+// ═══════════════════════════════════════════════════════════════════════════
+function prepareBiais(series) {
+  // series = [{ cs, zs }] dans l'ordre 1D, 4H, 1H, 15M
+  return series.map(x => {
+    const res = [];                                  // FVG résolus, par date de résolution
+    x.zs.forEach(z => {
+      const iRes = z.casse != null ? z.casse : z.touche;
+      if (iRes == null) return;
+      const respecte = z.casse == null || z.touche != null && z.touche < z.casse;
+      const etat = z.casse != null ? 'non-respecte' : 'respecte';
+      res.push({ t: x.cs[iRes].t, contrib: (z.haussier ? 1 : -1) * (etat === 'respecte' ? 1 : -1) });
+    });
+    res.sort((a, b) => a.t - b.t);
+    return res;
+  });
+}
+function biaisHTF(prep, t) {
+  const votes = [];
+  let score = 0;
+  for (let k = 0; k < prep.length; k++) {
+    const dispo = prep[k].filter(r => r.t <= t);
+    const derniers = dispo.slice(-FVGN);
+    const somme = derniers.reduce((a, r) => a + r.contrib, 0);
+    const vote = somme > 0 ? 1 : somme < 0 ? -1 : 0;
+    votes.push(vote);
+    score += vote * (POIDS[k] == null ? 1 : POIDS[k]);
+  }
+  return { score, votes, dir: score >= SEUIL ? 1 : score <= -SEUIL ? -1 : 0 };
+}
+
+function backtest(m1, m2, m5, m15, d1, h1) {
   // L'horloge décide de la longueur du backtest. M1 ne couvre que 8 jours chez
   // Yahoo : cadencer dessus réduit l'échantillon à presque rien. M2 couvre 39
   // jours, M5 en couvre 60.
@@ -256,6 +342,20 @@ function backtest(m1, m2, m5, m15, d1) {
     while (lo <= hi) { const m = (lo + hi) >> 1; if (serie[m].t <= t) { r = m; lo = m + 1; } else hi = m - 1; }
     return r;
   }
+
+  // V1 : séries hautes unités pour le biais. Le 4H est agrégé depuis le 1H,
+  // Yahoo ne le servant pas directement.
+  const h4 = h1 ? ST.agreger(h1, 4) : [];
+  const prepB = VERSION >= 1 && h1 ? prepareBiais([
+    { cs: d1,  zs: ST.fvgs(d1)  },
+    { cs: h4,  zs: ST.fvgs(h4)  },
+    { cs: h1,  zs: ST.fvgs(h1)  },
+    { cs: m15, zs: ST.fvgs(m15) }
+  ]) : null;
+
+  // ENTONNOIR — combien de setups meurent à chaque étape.
+  const E = { barres: 0, biais: 0, neutre: 0, dolAtteint: 0, niveauTrouve: 0,
+              touche: 0, ifvgTrouve: 0, rrInsuffisant: 0, entrees: 0 };
 
   const trades = [];
   let ouvertes = [], parJour = {}, premier = {};
@@ -320,7 +420,14 @@ function backtest(m1, m2, m5, m15, d1) {
     const v = veille[e.jour];
     if (!v) continue;
 
-    if (BIAIS === 'amd') {
+    E.barres++;
+    if (VERSION >= 1) {
+      // ── V1 ───────────────────────────────────────────────────────────────
+      const b = biaisHTF(prepB, bar.t);
+      if (b.dir === 0) { E.neutre++; continue; }        // NEUTRAL = pas de trade
+      dir = b.dir;
+      E.biais++;
+    } else if (BIAIS === 'amd') {
       // [kintt.fx] Le biais du jour vient du balayage de Londres. Il est connu
       // avant l'ouverture de New York et ne change plus de la séance.
       const b = amd[e.jour];
@@ -361,9 +468,11 @@ function backtest(m1, m2, m5, m15, d1) {
       else continue;
     }
 
+    if (VERSION < 1) E.biais++;
+
     // DOL : la liquidité DANS LE SENS DU BIAIS, pas la plus proche des deux.
     const dol = dir > 0 ? v.h : v.l;
-    if (dir > 0 ? px >= dol : px <= dol) continue;        // le draw est déjà atteint
+    if (dir > 0 ? px >= dol : px <= dol) { E.dolAtteint++; continue; }   // draw déjà atteint
     if (etat === 'WAIT_BIAS') etat = 'WAIT_KEY';
 
     // ── 2. WAIT KEY — un niveau clé valide, FVG 5M ou supérieur ─────────[BLAKE]
@@ -407,7 +516,7 @@ function backtest(m1, m2, m5, m15, d1) {
       });
       scan(z15, m15, i15, 'M15');
       scan(z5,  m5,  i5,  'M5');
-      if (best) { key = best; etat = 'WAIT_TOUCH'; }
+      if (best) { key = best; etat = 'WAIT_TOUCH'; E.niveauTrouve++; }
     }
 
     // ── 3. WAIT TOUCH — le prix atteint le niveau, la manipulation commence ──
@@ -419,7 +528,7 @@ function backtest(m1, m2, m5, m15, d1) {
         // schéma « Dont Align »), puis REVIENT : c'est ce second contact qui
         // marque le départ. Sans --touche2, on garde l'ancien comportement.
         if (TOUCHE2 && !key.sorti) { key.touche1 = true; }
-        else { etat = 'WAIT_IFVG'; tTouche = bar.t; legDeb = i; }
+        else { etat = 'WAIT_IFVG'; tTouche = bar.t; legDeb = i; E.touche++; }
       } else if (TOUCHE2 && key.touche1) {
         // sortie franche de la zone entre les deux contacts
         const ep = (key.z.haut - key.z.bas) * SORTIEZ;
@@ -451,6 +560,7 @@ function backtest(m1, m2, m5, m15, d1) {
         if (choisi) break;                                   // plus haut TF trouvé : on s'arrête
       }
       if (choisi) {
+        E.ifvgTrouve++;
         const L = dir > 0;
         const entree = px;
         const buf = entree * BUF / 100;
@@ -558,13 +668,14 @@ function backtest(m1, m2, m5, m15, d1) {
             ouvertes.push(pos);
             if (!premier[e.jour]) premier[e.jour] =
               { t: bar.t, dir, keyBas: key.z.bas, keyHaut: key.z.haut, entree };
-            parJour[e.jour]++;
+            parJour[e.jour]++;  E.entrees++;
             etat = 'WAIT_KEY'; key = null;
           }
         }
       }
     }
   }
+  trades.entonnoir = E;
   return trades;
 }
 
@@ -580,24 +691,25 @@ function stats(t) {
 
 (async () => {
   if (!QUIET && !DUMP) console.log(`Récupération ${SYM} en M1, M2, M5, M15 et D1…`);
-  const [m1, m2, m5, m15, d1] = await Promise.all([
+  const [m1, m2, m5, m15, d1, h1] = await Promise.all([
     fetchCandles(SYM, '1m', '8d'),
     fetchCandles(SYM, '2m', RANGE),
     fetchCandles(SYM, '5m', RANGE),
     fetchCandles(SYM, '15m', RANGE),
-    fetchCandles(SYM, '1d', '3mo')
+    fetchCandles(SYM, '1d', '1y'),
+    fetchCandles(SYM, '1h', '6mo')
   ]);
   if (!QUIET && !DUMP)
     console.log(`  M1 ${m1.length} · M2 ${m2.length} · M5 ${m5.length} · M15 ${m15.length} · D1 ${d1.length}`);
 
   // La série M1 ne couvre que 8 jours : c'est elle qui borne le backtest.
-  const trades = backtest(m1, m2, m5, m15, d1);
+  const trades = backtest(m1, m2, m5, m15, d1, h1);
   const s = stats(trades);
 
   if (DUMP) {
-    console.log(JSON.stringify(trades.map(x => ({ r: +x.r.toFixed(4), s: x.score, c: x.crit, j: x.jambe, h: x.minET, d: x.jour, o: x.sortie,
+    console.log(JSON.stringify({ entonnoir: trades.entonnoir, trades: trades.map(x => ({ r: +x.r.toFixed(4), s: x.score, c: x.crit, j: x.jambe, h: x.minET, d: x.jour, o: x.sortie,
       sens: x.sens, e: +x.entree.toFixed(2), sl: +x.sl0.toFixed(2), tp: +x.tp.toFixed(2),
-      risq: +Math.abs(x.entree - x.sl0).toFixed(2), rr: +x.rr.toFixed(3), t: x.t, tf: x.tfIFVG }))));
+      risq: +Math.abs(x.entree - x.sl0).toFixed(2), rr: +x.rr.toFixed(3), t: x.t, tf: x.tfIFVG })) }));
     return;
   }
   if (QUIET) {

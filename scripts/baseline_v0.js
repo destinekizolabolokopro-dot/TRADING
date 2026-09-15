@@ -1,6 +1,18 @@
 #!/usr/bin/env node
 'use strict';
 /**
+ * ╔═══════════════════════════════════════════════════════════════════════╗
+ * ║  BASELINE_V0 — VERSION GELÉE. NE PLUS MODIFIER.                       ║
+ * ║                                                                       ║
+ * ║  Copie conforme du moteur au moment où la reconstruction commence.    ║
+ * ║  Elle sert de point de comparaison à toutes les versions suivantes :  ║
+ * ║  si on la touche, on perd la référence et les A/B ne veulent plus     ║
+ * ║  rien dire.                                                           ║
+ * ║                                                                       ║
+ * ║  Le nouveau pipeline vit dans scripts/mech.js.                        ║
+ * ║  Écarts connus avec le modèle de référence : scripts/SPEC_PIPELINE.md ║
+ * ╚═══════════════════════════════════════════════════════════════════════╝
+ *
  * PB BLAKE — MODÈLE COMPLET (architecture en 4 étapes)
  * ===========================================================================
  *   WAIT BIAS → WAIT KEY → WAIT TOUCH → WAIT IFVG CLOSE → ENTRÉE
