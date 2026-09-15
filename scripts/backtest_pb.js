@@ -31,6 +31,8 @@ process.argv.slice(2).forEach((a, i, arr) => { if (a.startsWith('--')) args[a.sl
 const SYM     = args.sym || 'NQ=F';
 const RANGE   = args.range || '60d';
 const GOLDEN  = args.golden !== '0';          // [SCRIPT] 09 h 30 – 11 h 00 ET
+const GHDEB   = args.ghdeb || '09:30';        // début de la fenêtre, heure de New York
+const GHFIN   = args.ghfin || '11:00';        // fin de la fenêtre
 const MAXSIG  = +(args.maxsig || 2);          // [SCRIPT] deux signaux par séance
 const IFVGTF  = args.ifvgtf || 'auto';        // [SCRIPT] auto = le plus haut dispo M1→M5
 const BUF     = +(args.buffer || 0.02);       // [MOI] tampon du stop, en % du prix
@@ -81,7 +83,11 @@ function heure(t) {
   return { jour: `${o.year}-${o.month}-${o.day}`, dow: DOW[o.weekday], min: h * 60 + (+o.minute) };
 }
 // [SCRIPT] Golden Hour : 09 h 30 → 11 h 00, heure de New York.
-const GH_DEB = 9 * 60 + 30, GH_FIN = 11 * 60;
+// Les schémas du Mech Model portent des repères horaires précis — 10 h 00 et
+// 10 h 15 — bien plus serrés que la Golden Hour de 09 h 30 à 11 h 00 du script
+// communautaire. La fenêtre est donc devenue un paramètre, pour les comparer.
+const hhmm = t => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+const GH_DEB = hhmm(GHDEB), GH_FIN = hhmm(GHFIN);
 function dansGolden(e) { return e.dow >= 1 && e.dow <= 5 && e.min >= GH_DEB && e.min < GH_FIN; }
 
 // ───────────────────────────────────────────────────────── outils prix ─────
