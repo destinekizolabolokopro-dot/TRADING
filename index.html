@@ -217,7 +217,8 @@
   .tab:hover{color:var(--ink)}
   .tab.on{background:var(--surface-3);color:var(--ink)}
   .count{font-size:.82rem;color:var(--faint);display:flex;align-items:center;gap:10px}
-  .srcbadge{font-size:.76rem;font-weight:600}
+  .btn-on{border-color:#2dd4bf;color:#2dd4bf}
+.srcbadge{font-size:.76rem;font-weight:600}
   .srcbadge.on{color:var(--long)} .srcbadge.off{color:var(--faint)}
 
   /* ---------- Grille de cartes ---------- */
@@ -646,6 +647,7 @@
       <span class="live"><span class="dot" id="live-dot"></span><span id="live-txt">Connexion…</span></span>
       <span class="clock" id="clock">--:--:--</span>
       <span class="winbadge" id="winbadge" title="Le bot ne prend de position que pendant ses créneaux : ouverture de Wall Street → 17 h, et 19 h → 21 h (heure française)">—</span>
+      <button class="ai-btn ghost" id="mech-notif" title="Recevoir une notification quand un setup MECH est armé. Attention : les données Yahoo ont environ 10 minutes de retard sur le NQ.">🔕&nbsp;Alertes</button>
       <button class="ai-btn ghost" id="calc-open">🧮&nbsp;Calc</button>
       <button class="ai-btn ghost" id="tools-open">⚙️&nbsp;Mes&nbsp;outils</button>
       <button class="ai-btn ghost" id="hist-open">Historique</button>
@@ -893,6 +895,7 @@
 <script src="js/econcal.js"></script>
 <script src="js/session.js"></script>
   <script src="js/nq.js"></script>
+  <script src="js/notif.js"></script>
 <script src="js/ai.js"></script>
 <script>
 const $ = (s,el=document)=>el.querySelector(s);
@@ -1135,11 +1138,17 @@ try{
 }catch(e){}
 
 function setSource(live){
+  // Yahoo sert le NQ avec ~10 minutes de retard : c'est mesuré. Afficher
+  // « En direct » serait mensonger, donc on affiche l'âge réel de la donnée.
+  const age = (live && window.Notif && MECH) ? Notif.ageMin(MECH) : null;
+  const lbl = !live ? '● Démo' : age == null ? '● Données reçues' : '● Donnée de −' + age + ' min';
   const s=$('#src');
-  if(s){ s.textContent = live ? '● En direct' : '● Démo'; s.className = 'srcbadge ' + (live?'on':'off'); }
+  if(s){ s.textContent = lbl; s.className = 'srcbadge ' + (live?'on':'off'); }
   const dot=$('#live-dot'), txt=$('#live-txt');
   if(dot) dot.className = 'dot' + (live?' on':'');
-  if(txt) txt.textContent = live ? 'Données en direct' : 'Mode démo';
+  if(txt) txt.textContent = !live ? 'Mode démo'
+        : age == null ? 'Données reçues'
+        : 'Données différées de ' + age + ' min (Yahoo)';
 }
 
 // Le seul actif suivi est le NQ : la carte des prix sert à évaluer l'historique.
@@ -1166,12 +1175,22 @@ async function refreshMech(force){
     MECH = d || null;
     setSource(!!d);
     hero(); renderMech(); recordMech(); journal();
+    if(window.Notif && MECH) Notif.verifier(MECH);   // prévient si un setup est armé
     return !!d;
   }catch(e){ setSource(false); renderMech(); return false; }
 }
 
+function majBoutonNotif(){
+  const b=$('#mech-notif'); if(!b) return;
+  if(!window.Notif || !Notif.supporte()){ b.textContent='🔔 Indisponible'; b.disabled=true; return; }
+  const on = Notif.actif() && Notif.permis();
+  b.innerHTML = on ? '🔔&nbsp;Alertes' : '🔕&nbsp;Alertes';
+  b.className = 'ai-btn ghost' + (on ? ' btn-on' : '');
+}
+
 async function boot(){
   clock(); setInterval(clock,1000);
+  majBoutonNotif();
   hero(); renderMech(); setSource(false);
   await refreshMech(true);
   setInterval(()=>refreshMech(true), 300000);   // toutes les 5 min : le MECH travaille en M5/M15
@@ -1180,6 +1199,12 @@ async function boot(){
 document.addEventListener('click', e=>{
   if(e.target.closest('#mech-ai'))      openAI();
   if(e.target.closest('#mech-refresh')){ $('#mech-body').innerHTML='<div class="hist-empty">🔄 Actualisation…</div>'; refreshMech(true); }
+  const bn = e.target.closest('#mech-notif');
+  if(bn){
+    if(!Notif.supporte()){ bn.title='Ce navigateur ne gère pas les notifications.'; return; }
+    if(Notif.actif()){ Notif.desactiver(); majBoutonNotif(); }
+    else Notif.activer().then(majBoutonNotif);
+  }
 });
 
 boot();

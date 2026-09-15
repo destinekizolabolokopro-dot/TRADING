@@ -217,7 +217,8 @@
   .tab:hover{color:var(--ink)}
   .tab.on{background:var(--surface-3);color:var(--ink)}
   .count{font-size:.82rem;color:var(--faint);display:flex;align-items:center;gap:10px}
-  .srcbadge{font-size:.76rem;font-weight:600}
+  .btn-on{border-color:#2dd4bf;color:#2dd4bf}
+.srcbadge{font-size:.76rem;font-weight:600}
   .srcbadge.on{color:var(--long)} .srcbadge.off{color:var(--faint)}
 
   /* ---------- Grille de cartes ---------- */
@@ -646,6 +647,7 @@
       <span class="live"><span class="dot" id="live-dot"></span><span id="live-txt">Connexion…</span></span>
       <span class="clock" id="clock">--:--:--</span>
       <span class="winbadge" id="winbadge" title="Le bot ne prend de position que pendant ses créneaux : ouverture de Wall Street → 17 h, et 19 h → 21 h (heure française)">—</span>
+      <button class="ai-btn ghost" id="mech-notif" title="Recevoir une notification quand un setup MECH est armé. Attention : les données Yahoo ont environ 10 minutes de retard sur le NQ.">🔕&nbsp;Alertes</button>
       <button class="ai-btn ghost" id="calc-open">🧮&nbsp;Calc</button>
       <button class="ai-btn ghost" id="tools-open">⚙️&nbsp;Mes&nbsp;outils</button>
       <button class="ai-btn ghost" id="hist-open">Historique</button>
@@ -3337,6 +3339,8 @@
     var div = esC ? smt(nqC, esC, 20) : null;
     var vue = {
       tf: tf.id, dispo: true, bougies: nqC.length,
+      // horodatage de la dernière bougie : sert à afficher l'âge réel de la donnée
+      derniere_bougie: nqC[nqC.length - 1] ? nqC[nqC.length - 1].t : null,
       sessions: pools,
       gaps_non_comblés: gaps.map(function (g) {
         return { type: g.type === 'fvg' ? 'FVG' : 'gap de session', sens: g.dir,
@@ -3474,6 +3478,10 @@
         sessions: base ? base.sessions : null,
         structure: base ? base.structure : null,
         trade: base ? base.trade : null,
+        // Date de la DERNIÈRE bougie reçue, pas de l'appel réseau : c'est elle
+        // qui dit à quel point la donnée est fraîche. Yahoo sert le NQ avec
+        // environ 10 minutes de retard.
+        derniere_bougie: base && base.derniere_bougie ? base.derniere_bougie : null,
         maj: Date.now()
       };
       CACHE = out;
@@ -3565,6 +3573,94 @@
     sessionPools: sessionPools, trade: trade, TFS: TFS, analyseTF: analyseTF,
     zonesFVG: zonesFVG, inversionIFVG: inversionIFVG };
 })(typeof window !== 'undefined' ? window : this);
+
+</script>
+  <script>
+'use strict';
+/**
+ * NOTIFICATIONS — le site prévient au lieu d'attendre qu'on le regarde.
+ *
+ * ⚠️ HONNÊTETÉ SUR LE DÉLAI. Yahoo Finance sert le NQ avec environ 10 minutes
+ * de retard : c'est mesuré, pas supposé. Une notification d'ici n'est donc PAS
+ * un signal d'entrée en temps réel — c'est une alerte de surveillance. Le
+ * temps réel demande TradingView (pine/MECH_LIVE.pine) ou le flux Rithmic /
+ * Tradovate d'un compte prop firm.
+ *
+ * Le module affiche systématiquement l'âge de la donnée dans la notification,
+ * pour qu'on ne puisse pas se tromper là-dessus.
+ */
+var Notif = (function () {
+
+  var CLE_ETAT = 'notif.actif';
+  var CLE_VUS  = 'notif.vus';
+
+  function supporte() { return typeof Notification !== 'undefined'; }
+  function actif()    { try { return localStorage.getItem(CLE_ETAT) === '1'; } catch (e) { return false; } }
+  function permis()   { return supporte() && Notification.permission === 'granted'; }
+
+  function activer() {
+    if (!supporte()) return Promise.resolve(false);
+    return Notification.requestPermission().then(function (p) {
+      var ok = p === 'granted';
+      try { localStorage.setItem(CLE_ETAT, ok ? '1' : '0'); } catch (e) {}
+      return ok;
+    });
+  }
+  function desactiver() { try { localStorage.setItem(CLE_ETAT, '0'); } catch (e) {} }
+
+  // Mémoire des signaux déjà notifiés, pour ne pas sonner à chaque rafraîchissement.
+  function dejaVu(id) {
+    try {
+      var v = JSON.parse(localStorage.getItem(CLE_VUS) || '[]');
+      if (v.indexOf(id) >= 0) return true;
+      v.push(id);
+      if (v.length > 60) v = v.slice(-60);
+      localStorage.setItem(CLE_VUS, JSON.stringify(v));
+      return false;
+    } catch (e) { return false; }
+  }
+
+  /** Âge de la dernière bougie reçue, en minutes. */
+  function ageMin(d) {
+    if (!d || !d.derniere_bougie) return null;
+    return Math.round((Date.now() - d.derniere_bougie) / 60000);
+  }
+
+  /**
+   * Notifie s'il y a un trade possible non encore signalé.
+   * @param d instantané renvoyé par NQ.load()
+   */
+  function verifier(d) {
+    if (!d || !d.trade || !d.trade.possible) return null;
+    if (window.WINDOW && !WINDOW.isOpen()) return null;     // hors fenêtre de trading
+
+    var t = d.trade;
+    // identité d'un signal : sens + entrée + unité + jour. Deux rafraîchissements
+    // du même setup donnent le même identifiant.
+    var id = [new Date().toISOString().slice(0, 10), t.sens, t.entree, d.tf_retenue].join('|');
+    if (dejaVu(id)) return null;
+
+    var age = ageMin(d);
+    var retard = age == null ? 'retard inconnu' : 'donnée vieille de ' + age + ' min';
+    var corps = t.sens + ' NQ · entrée ' + t.entree + ' · stop ' + t.sl +
+                ' · objectif ' + t.tp + ' (RR ' + t.rr + ')\n' +
+                d.tf_retenue + ' — ' + retard + ', vérifie le graphique avant d\'agir.';
+
+    if (permis() && actif()) {
+      try {
+        new Notification('Signal MECH — ' + t.sens + ' NQ', {
+          body: corps, tag: id, requireInteraction: false
+        });
+      } catch (e) {}
+    }
+    return { id: id, sens: t.sens, corps: corps, age: age };
+  }
+
+  return { supporte: supporte, actif: actif, permis: permis,
+           activer: activer, desactiver: desactiver,
+           verifier: verifier, ageMin: ageMin };
+})();
+if (typeof window !== 'undefined') window.Notif = Notif;
 
 </script>
 <script>
@@ -4008,11 +4104,17 @@ try{
 }catch(e){}
 
 function setSource(live){
+  // Yahoo sert le NQ avec ~10 minutes de retard : c'est mesuré. Afficher
+  // « En direct » serait mensonger, donc on affiche l'âge réel de la donnée.
+  const age = (live && window.Notif && MECH) ? Notif.ageMin(MECH) : null;
+  const lbl = !live ? '● Démo' : age == null ? '● Données reçues' : '● Donnée de −' + age + ' min';
   const s=$('#src');
-  if(s){ s.textContent = live ? '● En direct' : '● Démo'; s.className = 'srcbadge ' + (live?'on':'off'); }
+  if(s){ s.textContent = lbl; s.className = 'srcbadge ' + (live?'on':'off'); }
   const dot=$('#live-dot'), txt=$('#live-txt');
   if(dot) dot.className = 'dot' + (live?' on':'');
-  if(txt) txt.textContent = live ? 'Données en direct' : 'Mode démo';
+  if(txt) txt.textContent = !live ? 'Mode démo'
+        : age == null ? 'Données reçues'
+        : 'Données différées de ' + age + ' min (Yahoo)';
 }
 
 // Le seul actif suivi est le NQ : la carte des prix sert à évaluer l'historique.
@@ -4039,12 +4141,22 @@ async function refreshMech(force){
     MECH = d || null;
     setSource(!!d);
     hero(); renderMech(); recordMech(); journal();
+    if(window.Notif && MECH) Notif.verifier(MECH);   // prévient si un setup est armé
     return !!d;
   }catch(e){ setSource(false); renderMech(); return false; }
 }
 
+function majBoutonNotif(){
+  const b=$('#mech-notif'); if(!b) return;
+  if(!window.Notif || !Notif.supporte()){ b.textContent='🔔 Indisponible'; b.disabled=true; return; }
+  const on = Notif.actif() && Notif.permis();
+  b.innerHTML = on ? '🔔&nbsp;Alertes' : '🔕&nbsp;Alertes';
+  b.className = 'ai-btn ghost' + (on ? ' btn-on' : '');
+}
+
 async function boot(){
   clock(); setInterval(clock,1000);
+  majBoutonNotif();
   hero(); renderMech(); setSource(false);
   await refreshMech(true);
   setInterval(()=>refreshMech(true), 300000);   // toutes les 5 min : le MECH travaille en M5/M15
@@ -4053,6 +4165,12 @@ async function boot(){
 document.addEventListener('click', e=>{
   if(e.target.closest('#mech-ai'))      openAI();
   if(e.target.closest('#mech-refresh')){ $('#mech-body').innerHTML='<div class="hist-empty">🔄 Actualisation…</div>'; refreshMech(true); }
+  const bn = e.target.closest('#mech-notif');
+  if(bn){
+    if(!Notif.supporte()){ bn.title='Ce navigateur ne gère pas les notifications.'; return; }
+    if(Notif.actif()){ Notif.desactiver(); majBoutonNotif(); }
+    else Notif.activer().then(majBoutonNotif);
+  }
 });
 
 boot();

@@ -535,6 +535,8 @@
     var div = esC ? smt(nqC, esC, 20) : null;
     var vue = {
       tf: tf.id, dispo: true, bougies: nqC.length,
+      // horodatage de la dernière bougie : sert à afficher l'âge réel de la donnée
+      derniere_bougie: nqC[nqC.length - 1] ? nqC[nqC.length - 1].t : null,
       sessions: pools,
       gaps_non_comblés: gaps.map(function (g) {
         return { type: g.type === 'fvg' ? 'FVG' : 'gap de session', sens: g.dir,
@@ -672,6 +674,10 @@
         sessions: base ? base.sessions : null,
         structure: base ? base.structure : null,
         trade: base ? base.trade : null,
+        // Date de la DERNIÈRE bougie reçue, pas de l'appel réseau : c'est elle
+        // qui dit à quel point la donnée est fraîche. Yahoo sert le NQ avec
+        // environ 10 minutes de retard.
+        derniere_bougie: base && base.derniere_bougie ? base.derniere_bougie : null,
         maj: Date.now()
       };
       CACHE = out;
