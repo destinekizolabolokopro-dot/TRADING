@@ -48,6 +48,9 @@ const HRL     = args.hrl === '1';             // filtre HRL/LRL sur le stop et l
 const CONTGAP = args.contgap === '1';         // exiger un gap de continuation
 const LRLMAX  = +(args.lrlmax || 0);          // obstacles tolérés pour rester « LRL »
 const HRLMIN  = +(args.hrlmin || 1);          // obstacles exigés derrière le stop
+const SCOREMIN= +(args.score || 0);           // confluence minimale exigée
+const CONF    = args.conf || '';              // liste de critères exigés, ex. amd,ifvgHaut
+const MOITIE  = +(args.moitie || 0);          // 0 = tout · 1 = 1re moitié · 2 = 2e
 const COUT    = +(args.cout || 0.06);
 
 // ───────────────────────────────────────────────────────────── données ─────
@@ -253,6 +256,8 @@ function backtest(m1, m2, m5, m15, d1) {
 
     // ── réinitialisation à chaque séance ──────────────────────────────────
     if (!parJour[e.jour]) { parJour[e.jour] = 0; etat = 'WAIT_BIAS'; dir = 0; key = null; }
+    if (MOITIE === 1 && i > clock.length / 2) continue;
+    if (MOITIE === 2 && i <= clock.length / 2) continue;
     if (GOLDEN && !dansGolden(e)) continue;                         // [SCRIPT]
     if (parJour[e.jour] >= MAXSIG) continue;                        // [SCRIPT]
 
@@ -396,29 +401,52 @@ function backtest(m1, m2, m5, m15, d1) {
           // en « LRL vs LRL » : la source montre cette configuration résolue
           // une fois à la hausse et une fois à la baisse — elle ne se tranche
           // pas, donc on ne la trade pas.
-          let okHRL = true, etiq = '';
-          if (HRL) {
-            const zs = z5.concat(z15);
-            const obsCible = obstacles(zs, i5, entree, tp);
-            const obsStop  = obstacles(zs, i5, entree, sl);
-            if (obsCible > LRLMAX)      { okHRL = false; etiq = 'objectif en HRL (' + obsCible + ' obstacles)'; }
-            else if (obsStop < HRLMIN)  { okHRL = false; etiq = 'LRL vs LRL — indécidable'; }
-            else                        { etiq = 'HRL au stop (' + obsStop + '), LRL à l\'objectif (' + obsCible + ')'; }
-          }
+          // ═══ CONFLUENCE ═══════════════════════════════════════════════
+          // Le modèle ne fonctionne pas comme une suite de barrières mais par
+          // CONVERGENCE : plusieurs éléments doivent pointer dans le même sens.
+          // On ne bloque donc plus rien ici — on RELÈVE chaque critère sur le
+          // signal, et on trie ensuite par niveau d'accord. C'est la seule
+          // façon de savoir si la confluence apporte vraiment quelque chose.
+          const zs = z5.concat(z15);
+          const obsCible = obstacles(zs, i5, entree, tp);
+          const obsStop  = obstacles(zs, i5, entree, sl);
+
+          const crit = {};
+          // 1. le profil AMD du jour va-t-il dans le même sens ?
+          const bAmd = amd[e.jour];
+          crit.amd = !!(bAmd && bAmd.dir === dir);
+          // 2. la séquence HH+HL (ou LH+LL) confirme-t-elle ?
+          const hs2 = piv15.hauts.filter(x => x.vu <= bar.t).slice(-2);
+          const bs2 = piv15.bas.filter(x => x.vu <= bar.t).slice(-2);
+          crit.sequence = hs2.length === 2 && bs2.length === 2 &&
+            (dir > 0 ? (hs2[1].prix > hs2[0].prix && bs2[1].prix > bs2[0].prix)
+                     : (hs2[1].prix < hs2[0].prix && bs2[1].prix < bs2[0].prix));
+          // 3. l'objectif est-il dégagé par rapport au stop ? (lecture relative
+          //    du HRL/LRL : ce qui compte est le CONTRASTE entre les deux côtés,
+          //    pas un nombre absolu d'obstacles)
+          crit.lrl = obsCible < obsStop;
+          // 4. un gap de continuation s'est-il formé depuis la touche ?
+          const zc = HORLOGE === '1m' ? zIF['1m'] : HORLOGE === '2m' ? zIF['2m'] : zIF['5m'];
+          crit.contgap = zc.some(z => z.t >= tTouche && z.t <= bar.t && z.haussier === (dir > 0));
+          // 5. le niveau clé est-il sur l'unité la plus haute ?
+          crit.niveauHaut = key.tf === 'M15';
+          // 6. l'IFVG retenu est-il sur l'unité la plus haute disponible ?
+          crit.ifvgHaut = choisi.tf === '5m';
+
+          const score = Object.values(crit).filter(Boolean).length;
+          const etiq = Object.keys(crit).filter(k => crit[k]).join('+') || 'aucun';
+          let okHRL = true;
+          if (HRL) okHRL = obsCible <= LRLMAX && obsStop >= HRLMIN;
           // [kintt.fx] gap de continuation : une inefficience laissée sur le
           // mouvement de départ, après la prise de liquidité au niveau clé.
-          let okCont = true;
-          if (CONTGAP) {
-            // On le cherche sur l'unité de l'horloge : chercher en M1 quand le
-            // backtest tourne en M5 ne marche pas, Yahoo ne donne que 8 jours de M1.
-            const zc = HORLOGE === '1m' ? zIF['1m'] : HORLOGE === '2m' ? zIF['2m'] : zIF['5m'];
-            okCont = zc.some(z => z.t >= tTouche && z.t <= bar.t && z.haussier === (dir > 0));
-          }
           const rr = Math.abs(tp - entree) / risq;
-          if (rr >= RRMIN && okHRL && okCont) {
+          // Confluence exigée : liste explicite de critères qui doivent être vrais.
+          const confOK = !CONF || CONF.split(',').every(k => crit[k.trim()]);
+          if (rr >= RRMIN && okHRL && (!CONTGAP || crit.contgap) && score >= SCOREMIN && confOK) {
             pos = { sens: L ? 'LONG' : 'SHORT', i, t: bar.t, entree, sl, sl0: sl, tp, rr,
                     be: L ? entree + risq : entree - risq, beFait: false,
-                    tfIFVG: choisi.tf, niveau: key.tf, jour: e.jour, minET: e.min, hrl: etiq,
+                    tfIFVG: choisi.tf, niveau: key.tf, jour: e.jour, minET: e.min,
+                    score, crit, etiq, obsCible, obsStop,
                     zone: [+choisi.z.bas.toFixed(2), +choisi.z.haut.toFixed(2)] };
             parJour[e.jour]++;
             etat = 'WAIT_KEY'; key = null;
@@ -456,7 +484,10 @@ function stats(t) {
   const trades = backtest(m1, m2, m5, m15, d1);
   const s = stats(trades);
 
-  if (DUMP) { console.log(JSON.stringify(trades.map(x => +x.r.toFixed(4)))); return; }
+  if (DUMP) {
+    console.log(JSON.stringify(trades.map(x => ({ r: +x.r.toFixed(4), s: x.score, c: x.crit }))));
+    return;
+  }
   if (QUIET) {
     console.log(JSON.stringify(s ? { sym: SYM, n: s.n, wr: +(s.g / s.n * 100).toFixed(1),
       esperance: +s.moy.toFixed(3), ic95: [+s.ic[0].toFixed(3), +s.ic[1].toFixed(3)],
