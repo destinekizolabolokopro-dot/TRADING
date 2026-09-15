@@ -43,6 +43,7 @@ const DUMP    = args.dump === '1';
 const JOURS   = +(args.jours || 0);
 const HORLOGE = args.horloge || '2m';         // série qui cadence le backtest
 const CIBLE   = args.cible || 'interne';      // interne (swing récent) | draw (PDH/PDL)
+const BIAIS   = args.biais || 'bos';          // bos (cassure de structure HTF) | proche (ancien, faux)
 const COUT    = +(args.cout || 0.06);
 
 // ───────────────────────────────────────────────────────────── données ─────
@@ -176,15 +177,45 @@ function backtest(m1, m2, m5, m15, d1) {
 
     const px = bar.c;
 
-    // ── 1. WAIT BIAS — direction et draw on liquidity ────────────────────[BLAKE]
-    // Règle mécanique retenue : la liquidité NON PRISE la plus proche donne le
-    // sens. Si le PDH est intact et plus proche que le PDL, le draw est haussier.
+    // ── 1. WAIT BIAS puis DOL — dans CET ordre ──────────────────────────[BLAKE]
+    // L'ordre compte : c'est la STRUCTURE haute unité qui donne le contexte, et
+    // le draw on liquidity en découle. Je faisais l'inverse — je déduisais le
+    // sens de la liquidité la plus proche, ce qui revient à choisir la direction
+    // au hasard quand le prix est au milieu de la veille.
+    //
+    // Règle mécanique du biais : la dernière CASSURE DE STRUCTURE en M15. Le
+    // prix clôture au-dessus du dernier swing high confirmé → contexte haussier ;
+    // en dessous du dernier swing low → baissier. Le contexte tient jusqu'à la
+    // cassure suivante.
     const v = veille[e.jour];
     if (!v) continue;
-    const distH = v.h - px, distL = px - v.l;
-    if (distH > 0 && (distL <= 0 || distH <= distL)) dir = +1;
-    else if (distL > 0) dir = -1;
-    else { continue; }
+
+    if (BIAIS === 'bos') {
+      const i15b = idxA(m15, bar.t);
+      if (i15b < 20) continue;
+      let dernierHaut = null, dernierBas = null;
+      for (let k = piv15.hauts.length - 1; k >= 0; k--) if (piv15.hauts[k].vu <= bar.t) { dernierHaut = piv15.hauts[k]; break; }
+      for (let k = piv15.bas.length - 1; k >= 0; k--)   if (piv15.bas[k].vu   <= bar.t) { dernierBas   = piv15.bas[k];   break; }
+      if (!dernierHaut || !dernierBas) continue;
+      // on cherche la cassure la PLUS RÉCENTE des deux
+      let tHaussier = -1, tBaissier = -1;
+      for (let k = i15b; k > Math.max(0, i15b - 200); k--) {
+        if (tHaussier < 0 && m15[k].c > dernierHaut.prix && m15[k].t > dernierHaut.vu) tHaussier = m15[k].t;
+        if (tBaissier < 0 && m15[k].c < dernierBas.prix   && m15[k].t > dernierBas.vu)   tBaissier = m15[k].t;
+        if (tHaussier >= 0 && tBaissier >= 0) break;
+      }
+      if (tHaussier < 0 && tBaissier < 0) continue;      // pas de contexte lisible
+      dir = tHaussier >= tBaissier ? +1 : -1;
+    } else {
+      const distH = v.h - px, distL = px - v.l;
+      if (distH > 0 && (distL <= 0 || distH <= distL)) dir = +1;
+      else if (distL > 0) dir = -1;
+      else continue;
+    }
+
+    // DOL : la liquidité DANS LE SENS DU BIAIS, pas la plus proche des deux.
+    const dol = dir > 0 ? v.h : v.l;
+    if (dir > 0 ? px >= dol : px <= dol) continue;        // le draw est déjà atteint
     if (etat === 'WAIT_BIAS') etat = 'WAIT_KEY';
 
     // ── 2. WAIT KEY — un niveau clé valide, FVG 5M ou supérieur ─────────[BLAKE]
@@ -248,7 +279,7 @@ function backtest(m1, m2, m5, m15, d1) {
           // 50 qui ne sont jamais atteints. La source distingue une PREMIÈRE
           // cible interne — un plus-haut ou plus-bas récent — du draw final.
           let tp;
-          if (CIBLE === 'draw') tp = L ? v.h : v.l;
+          if (CIBLE === 'draw') tp = dol;
           else {
             const liste = L ? piv15.hauts : piv15.bas;
             tp = null;
@@ -258,7 +289,7 @@ function backtest(m1, m2, m5, m15, d1) {
               if (L ? q <= entree : q >= entree) continue;
               if (tp == null || (L ? q < tp : q > tp)) tp = q;
             }
-            if (tp == null) tp = L ? v.h : v.l;                // repli sur le draw
+            if (tp == null) tp = dol;                          // repli sur le draw
           }
           const rr = Math.abs(tp - entree) / risq;
           if (rr >= RRMIN) {
