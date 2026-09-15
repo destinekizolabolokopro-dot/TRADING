@@ -1,0 +1,348 @@
+#!/usr/bin/env node
+'use strict';
+/**
+ * PB BLAKE — MODÈLE COMPLET (architecture en 4 étapes)
+ * ===========================================================================
+ *   WAIT BIAS → WAIT KEY → WAIT TOUCH → WAIT IFVG CLOSE → ENTRÉE
+ *
+ * ATTRIBUTION DES RÈGLES — à garder en tête, elles n'ont pas le même poids :
+ *
+ *  [BLAKE]  contexte New York AM · draw on liquidity · niveau clé haute unité,
+ *           souvent un FVG 5M ou supérieur · l'IFVG se cherche DANS la jambe de
+ *           manipulation, après la réaction au niveau clé.
+ *
+ *  [SCRIPT] sélection du PLUS HAUT timeframe d'IFVG disponible entre M1 et M5
+ *           (au lieu de prendre M1 d'office) · Golden Hour 09 h 30 – 11 h 00 ET
+ *           · maximum deux signaux par séance · la machine à états elle-même.
+ *           Ces règles viennent d'une implémentation publique, pas de Blake.
+ *
+ *  [MOI]    tout ce qui est marqué AMBIGU ci-dessous : les sources ne les
+ *           définissent pas, j'ai dû choisir pour que le code tourne.
+ *
+ * Usage :
+ *   node scripts/backtest_pb.js [--sym NQ=F] [--range 60d] [--jours 5]
+ *        [--golden 1] [--maxsig 2] [--ifvgtf auto|1m|2m|5m]
+ */
+
+const YF = 'https://query1.finance.yahoo.com/v8/finance/chart/';
+const args = {};
+process.argv.slice(2).forEach((a, i, arr) => { if (a.startsWith('--')) args[a.slice(2)] = arr[i + 1]; });
+
+const SYM     = args.sym || 'NQ=F';
+const RANGE   = args.range || '60d';
+const GOLDEN  = args.golden !== '0';          // [SCRIPT] 09 h 30 – 11 h 00 ET
+const MAXSIG  = +(args.maxsig || 2);          // [SCRIPT] deux signaux par séance
+const IFVGTF  = args.ifvgtf || 'auto';        // [SCRIPT] auto = le plus haut dispo M1→M5
+const BUF     = +(args.buffer || 0.02);       // [MOI] tampon du stop, en % du prix
+const RRMIN   = +(args.rrmin || 0.3);         // [MOI]
+const ATRMIN  = +(args.atrmin || 0.5);        // [MOI] stop minimum, en fraction d'ATR
+const REACT   = +(args.react || 12);          // [AMBIGU] bougies M1 max entre touche et IFVG
+const KEYAGE  = +(args.keyage || 400);        // [AMBIGU] âge max d'un niveau clé, en bougies M5
+const QUIET   = args.quiet === '1';
+const DUMP    = args.dump === '1';
+const JOURS   = +(args.jours || 0);
+const HORLOGE = args.horloge || '2m';         // série qui cadence le backtest
+const CIBLE   = args.cible || 'interne';      // interne (swing récent) | draw (PDH/PDL)
+const COUT    = +(args.cout || 0.06);
+
+// ───────────────────────────────────────────────────────────── données ─────
+async function fetchCandles(sym, interval, range) {
+  const r = await fetch(`${YF}${encodeURIComponent(sym)}?interval=${interval}&range=${range}`,
+    { headers: { 'User-Agent': 'Mozilla/5.0' } });
+  if (!r.ok) throw new Error(`${sym} ${interval} : HTTP ${r.status}`);
+  const j = await r.json();
+  const res = j.chart && j.chart.result && j.chart.result[0];
+  if (!res) throw new Error(`${sym} ${interval} : ${(j.chart.error || {}).description || 'vide'}`);
+  const q = res.indicators.quote[0], out = [];
+  for (let i = 0; i < res.timestamp.length; i++) {
+    if (q.open[i] == null || q.close[i] == null) continue;
+    out.push({ t: res.timestamp[i] * 1000, o: q.open[i], h: q.high[i], l: q.low[i], c: q.close[i] });
+  }
+  return out;
+}
+
+// ───────────────────────────────────────────────────────────── horaires ────
+const fmtET = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour12: false,
+  weekday: 'short', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+const DOW = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+
+function heure(t) {
+  const o = {}; fmtET.formatToParts(new Date(t)).forEach(p => o[p.type] = p.value);
+  let h = +o.hour; if (h === 24) h = 0;
+  return { jour: `${o.year}-${o.month}-${o.day}`, dow: DOW[o.weekday], min: h * 60 + (+o.minute) };
+}
+// [SCRIPT] Golden Hour : 09 h 30 → 11 h 00, heure de New York.
+const GH_DEB = 9 * 60 + 30, GH_FIN = 11 * 60;
+function dansGolden(e) { return e.dow >= 1 && e.dow <= 5 && e.min >= GH_DEB && e.min < GH_FIN; }
+
+// ───────────────────────────────────────────────────────── outils prix ─────
+function fvgs(cs) {                       // zones + date de naissance et de cassure
+  const z = [];
+  for (let i = 2; i < cs.length; i++) {
+    if (cs[i].l > cs[i - 2].h)      z.push({ bas: cs[i - 2].h, haut: cs[i].l, haussier: true,  ne: i, t: cs[i].t, casse: null, tCasse: null });
+    else if (cs[i].h < cs[i - 2].l) z.push({ bas: cs[i].h,     haut: cs[i - 2].l, haussier: false, ne: i, t: cs[i].t, casse: null, tCasse: null });
+  }
+  // cassure = CLÔTURE DU CORPS au-delà de la zone, du côté opposé  [BLAKE/ICT]
+  z.forEach(x => {
+    for (let k = x.ne + 1; k < cs.length; k++) {
+      if (x.haussier ? cs[k].c < x.bas : cs[k].c > x.haut) { x.casse = k; x.tCasse = cs[k].t; break; }
+    }
+  });
+  return z;
+}
+function atrSerie(cs, n = 14) {
+  const a = new Array(cs.length).fill(null); let s = 0;
+  for (let i = 1; i < cs.length; i++) {
+    const pc = cs[i - 1].c;
+    s += Math.max(cs[i].h - cs[i].l, Math.abs(cs[i].h - pc), Math.abs(cs[i].l - pc));
+    if (i > n) { const p = cs[i - n], pc2 = cs[i - n - 1].c;
+      s -= Math.max(p.h - p.l, Math.abs(p.h - pc2), Math.abs(p.l - pc2)); }
+    if (i >= n) a[i] = s / n;
+  }
+  return a;
+}
+function pivots(cs, L) {
+  const hauts = [], bas = [];
+  for (let i = L; i < cs.length - L; i++) {
+    let ok = true;
+    for (let k = i - L; k <= i + L; k++) if (k !== i && cs[k].h >= cs[i].h) { ok = false; break; }
+    if (ok) hauts.push({ i, prix: cs[i].h, t: cs[i].t, vu: cs[i + L].t });
+    ok = true;
+    for (let k = i - L; k <= i + L; k++) if (k !== i && cs[k].l <= cs[i].l) { ok = false; break; }
+    if (ok) bas.push({ i, prix: cs[i].l, t: cs[i].t, vu: cs[i + L].t });
+  }
+  return { hauts, bas };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// LE MODÈLE
+// ═══════════════════════════════════════════════════════════════════════════
+function backtest(m1, m2, m5, m15, d1) {
+  // L'horloge décide de la longueur du backtest. M1 ne couvre que 8 jours chez
+  // Yahoo : cadencer dessus réduit l'échantillon à presque rien. M2 couvre 39
+  // jours, M5 en couvre 60.
+  const clock = HORLOGE === '1m' ? m1 : HORLOGE === '5m' ? m5 : m2;
+
+  const z5 = fvgs(m5), z15 = fvgs(m15);
+  const zIF = { '1m': fvgs(m1), '2m': fvgs(m2), '5m': z5 };   // pour l'IFVG d'exécution
+  const atrC = atrSerie(HORLOGE === '1m' ? m1 : HORLOGE === '5m' ? m5 : m2, 14);
+  const piv15 = pivots(m15, 5);
+
+  // PDH / PDL par jour ET — le « draw on liquidity » de base           [BLAKE]
+  const jourEx = {};
+  d1.forEach(c => { const e = heure(c.t); jourEx[e.jour] = { h: c.h, l: c.l }; });
+  const joursTries = Object.keys(jourEx).sort();
+  const veille = {}; joursTries.forEach((j, k) => { if (k) veille[j] = jourEx[joursTries[k - 1]]; });
+
+  // index temporel : pour un instant t, la dernière bougie CLÔTURÉE de chaque série
+  function idxA(serie, t) {
+    let lo = 0, hi = serie.length - 1, r = -1;
+    while (lo <= hi) { const m = (lo + hi) >> 1; if (serie[m].t <= t) { r = m; lo = m + 1; } else hi = m - 1; }
+    return r;
+  }
+
+  const trades = [];
+  let pos = null, parJour = {};
+
+  // état de la machine, réinitialisé à chaque séance
+  let etat = 'WAIT_BIAS', dir = 0, key = null, tTouche = null, legDeb = null;
+
+  for (let i = 30; i < clock.length; i++) {
+    const bar = clock[i], e = heure(bar.t);
+
+    // ── gestion d'une position ouverte ────────────────────────────────────
+    if (pos) {
+      const L = pos.sens === 'LONG';
+      const sl = L ? bar.l <= pos.sl : bar.h >= pos.sl;
+      const tp = L ? bar.h >= pos.tp : bar.l <= pos.tp;
+      const be = L ? bar.h >= pos.be : bar.l <= pos.be;
+      if (sl && tp)  { pos.sortie = pos.beFait ? 'gain partiel' : 'ambigu'; pos.r = pos.beFait ? 0.3 : -1; }
+      else if (sl)   { pos.sortie = pos.beFait ? 'gain partiel' : 'perte';  pos.r = pos.beFait ? 0.3 : -1; }
+      else if (tp)   { pos.sortie = 'gain'; pos.r = 0.3 + 0.7 * pos.rr; }
+      else {
+        if (be && !pos.beFait) { pos.beFait = true; pos.sl = pos.entree; }
+        if (i - pos.i > 400) { const risq = Math.abs(pos.entree - pos.sl0);
+          pos.sortie = 'expiré';
+          pos.r = Math.max(-1, Math.min(pos.rr, (L ? bar.c - pos.entree : pos.entree - bar.c) / risq)); }
+      }
+      if (pos.sortie) { trades.push(pos); pos = null; }
+      else continue;
+    }
+
+    // ── réinitialisation à chaque séance ──────────────────────────────────
+    if (!parJour[e.jour]) { parJour[e.jour] = 0; etat = 'WAIT_BIAS'; dir = 0; key = null; }
+    if (GOLDEN && !dansGolden(e)) continue;                         // [SCRIPT]
+    if (parJour[e.jour] >= MAXSIG) continue;                        // [SCRIPT]
+
+    const px = bar.c;
+
+    // ── 1. WAIT BIAS — direction et draw on liquidity ────────────────────[BLAKE]
+    // Règle mécanique retenue : la liquidité NON PRISE la plus proche donne le
+    // sens. Si le PDH est intact et plus proche que le PDL, le draw est haussier.
+    const v = veille[e.jour];
+    if (!v) continue;
+    const distH = v.h - px, distL = px - v.l;
+    if (distH > 0 && (distL <= 0 || distH <= distL)) dir = +1;
+    else if (distL > 0) dir = -1;
+    else { continue; }
+    if (etat === 'WAIT_BIAS') etat = 'WAIT_KEY';
+
+    // ── 2. WAIT KEY — un niveau clé valide, FVG 5M ou supérieur ─────────[BLAKE]
+    // On prend le FVG non mitigé le plus proche, sur M5 ou M15, DANS le sens
+    // opposé au draw (c'est là que le prix va chercher avant de repartir).
+    const i5 = idxA(m5, bar.t), i15 = idxA(m15, bar.t);
+    if (etat === 'WAIT_KEY') {
+      let best = null;
+      const scan = (zs, serie, idx, tf) => zs.forEach(z => {
+        if (z.ne > idx || idx - z.ne > KEYAGE) return;
+        if (z.casse != null && z.casse <= idx) return;       // déjà invalidé
+        if (dir > 0 && !z.haussier) return;                  // draw haussier → on cherche un support
+        if (dir < 0 && z.haussier) return;
+        const d = dir > 0 ? px - z.haut : z.bas - px;
+        if (d < 0) return;                                   // le prix l'a déjà dépassé
+        if (!best || d < best.d) best = { z, d, tf };
+      });
+      scan(z15, m15, i15, 'M15');
+      scan(z5,  m5,  i5,  'M5');
+      if (best) { key = best; etat = 'WAIT_TOUCH'; }
+    }
+
+    // ── 3. WAIT TOUCH — le prix atteint le niveau, la manipulation commence ──
+    if (etat === 'WAIT_TOUCH' && key) {
+      const dedans = bar.l <= key.z.haut && bar.h >= key.z.bas;
+      if (dedans) { etat = 'WAIT_IFVG'; tTouche = bar.t; legDeb = i; }
+      // le niveau est traversé sans réaction → il n'était pas valide
+      else if (dir > 0 ? bar.c < key.z.bas : bar.c > key.z.haut) { key = null; etat = 'WAIT_KEY'; }
+    }
+
+    // ── 4. WAIT IFVG CLOSE — dans la jambe de manipulation ──────[BLAKE+SCRIPT]
+    // [SCRIPT] on prend le PLUS HAUT timeframe qui offre un IFVG, de M5 vers M1,
+    // au lieu de descendre d'office en M1.
+    if (etat === 'WAIT_IFVG' && key) {
+      if (i - legDeb > REACT) { etat = 'WAIT_KEY'; key = null; continue; }  // réaction expirée
+      const ordre = IFVGTF === 'auto' ? ['5m', '2m', '1m'] : [IFVGTF];
+      let choisi = null;
+      for (const tf of ordre) {
+        const serie = tf === '1m' ? m1 : tf === '2m' ? m2 : m5;
+        const idx = idxA(serie, bar.t);
+        for (const z of zIF[tf]) {
+          if (z.tCasse == null) continue;
+          if (z.tCasse < tTouche || z.tCasse > bar.t) continue;   // cassure DANS la jambe
+          // un FVG baissier cassé vers le haut donne une inversion haussière
+          const sens = z.haussier ? -1 : +1;
+          if (sens !== dir) continue;
+          choisi = { z, tf }; break;
+        }
+        if (choisi) break;                                   // plus haut TF trouvé : on s'arrête
+      }
+      if (choisi) {
+        const L = dir > 0;
+        const entree = px;
+        const buf = entree * BUF / 100;
+        const sl = L ? choisi.z.bas - buf : choisi.z.haut + buf;
+        const risq = Math.abs(entree - sl);
+        const aRef = atrC[i];
+        if (risq > 0 && aRef && risq >= aRef * ATRMIN) {
+          // OBJECTIF. [BLAKE] le draw on liquidity est la destination finale,
+          // mais viser directement le PDH depuis une entrée M1 donne des RR de
+          // 50 qui ne sont jamais atteints. La source distingue une PREMIÈRE
+          // cible interne — un plus-haut ou plus-bas récent — du draw final.
+          let tp;
+          if (CIBLE === 'draw') tp = L ? v.h : v.l;
+          else {
+            const liste = L ? piv15.hauts : piv15.bas;
+            tp = null;
+            for (let k = liste.length - 1; k >= 0 && liste.length - k <= 8; k--) {
+              if (liste[k].vu > bar.t) continue;               // pivot pas encore confirmé
+              const q = liste[k].prix;
+              if (L ? q <= entree : q >= entree) continue;
+              if (tp == null || (L ? q < tp : q > tp)) tp = q;
+            }
+            if (tp == null) tp = L ? v.h : v.l;                // repli sur le draw
+          }
+          const rr = Math.abs(tp - entree) / risq;
+          if (rr >= RRMIN) {
+            pos = { sens: L ? 'LONG' : 'SHORT', i, t: bar.t, entree, sl, sl0: sl, tp, rr,
+                    be: L ? entree + risq : entree - risq, beFait: false,
+                    tfIFVG: choisi.tf, niveau: key.tf, jour: e.jour, minET: e.min,
+                    zone: [+choisi.z.bas.toFixed(2), +choisi.z.haut.toFixed(2)] };
+            parJour[e.jour]++;
+            etat = 'WAIT_KEY'; key = null;
+          }
+        }
+      }
+    }
+  }
+  return trades;
+}
+
+// ═══════════════════════════════════════════════════════════════ rapport ══
+function stats(t) {
+  const n = t.length; if (!n) return null;
+  const R = t.reduce((a, x) => a + x.r, 0), moy = R / n;
+  const sd = n > 1 ? Math.sqrt(t.reduce((a, x) => a + Math.pow(x.r - moy, 2), 0) / (n - 1)) : 0;
+  const se = sd / Math.sqrt(n);
+  return { n, R, moy, sd, se, ic: [moy - 1.96 * se, moy + 1.96 * se], t: se ? moy / se : 0,
+    g: t.filter(x => x.r > 0).length };
+}
+
+(async () => {
+  if (!QUIET && !DUMP) console.log(`Récupération ${SYM} en M1, M2, M5, M15 et D1…`);
+  const [m1, m2, m5, m15, d1] = await Promise.all([
+    fetchCandles(SYM, '1m', '8d'),
+    fetchCandles(SYM, '2m', RANGE),
+    fetchCandles(SYM, '5m', RANGE),
+    fetchCandles(SYM, '15m', RANGE),
+    fetchCandles(SYM, '1d', '3mo')
+  ]);
+  if (!QUIET && !DUMP)
+    console.log(`  M1 ${m1.length} · M2 ${m2.length} · M5 ${m5.length} · M15 ${m15.length} · D1 ${d1.length}`);
+
+  // La série M1 ne couvre que 8 jours : c'est elle qui borne le backtest.
+  const trades = backtest(m1, m2, m5, m15, d1);
+  const s = stats(trades);
+
+  if (DUMP) { console.log(JSON.stringify(trades.map(x => +x.r.toFixed(4)))); return; }
+  if (QUIET) {
+    console.log(JSON.stringify(s ? { sym: SYM, n: s.n, wr: +(s.g / s.n * 100).toFixed(1),
+      esperance: +s.moy.toFixed(3), ic95: [+s.ic[0].toFixed(3), +s.ic[1].toFixed(3)],
+      t: +s.t.toFixed(2), cumulR: +s.R.toFixed(1) } : { sym: SYM, n: 0 }));
+    return;
+  }
+
+  console.log('\n' + '='.repeat(72));
+  console.log(`  PB BLAKE — MODÈLE COMPLET · ${SYM}`);
+  console.log('  WAIT BIAS → WAIT KEY → WAIT TOUCH → WAIT IFVG CLOSE → ENTRÉE');
+  console.log('='.repeat(72));
+  if (!s) { console.log('\n  Aucun signal sur la période.\n'); return; }
+
+  console.log(`\n  Signaux ................ ${s.n}`);
+  console.log(`  Gagnants ............... ${s.g}  (${(s.g / s.n * 100).toFixed(1)} %)`);
+  console.log(`  Espérance .............. ${s.moy >= 0 ? '+' : ''}${s.moy.toFixed(3)} R`);
+  console.log(`  Écart-type ............. ${s.sd.toFixed(2)} R`);
+  console.log(`  IC 95 % ................ [${s.ic[0].toFixed(3)} , ${s.ic[1].toFixed(3)}]`);
+  console.log(`  t ...................... ${s.t.toFixed(2)}   ${s.ic[0] > 0 ? '✅ significatif' : '(zéro dans l\'intervalle)'}`);
+  console.log(`  Cumulé ................. ${s.R >= 0 ? '+' : ''}${s.R.toFixed(1)} R`);
+  console.log(`  Net après frais ........ ${(s.moy - COUT) >= 0 ? '+' : ''}${(s.moy - COUT).toFixed(3)} R / trade`);
+
+  const parTF = {}, parKey = {};
+  trades.forEach(x => { (parTF[x.tfIFVG] = parTF[x.tfIFVG] || []).push(x.r);
+                        (parKey[x.niveau] = parKey[x.niveau] || []).push(x.r); });
+  console.log('\n  UNITÉ DE L\'IFVG RETENU   (le script prend le plus haut disponible)');
+  Object.keys(parTF).forEach(k => { const a = parTF[k], m = a.reduce((x, y) => x + y, 0) / a.length;
+    console.log(`    ${k.padEnd(5)} ${String(a.length).padStart(3)} signaux · espérance ${m >= 0 ? '+' : ''}${m.toFixed(3)} R`); });
+  console.log('\n  UNITÉ DU NIVEAU CLÉ');
+  Object.keys(parKey).forEach(k => { const a = parKey[k], m = a.reduce((x, y) => x + y, 0) / a.length;
+    console.log(`    ${k.padEnd(5)} ${String(a.length).padStart(3)} signaux · espérance ${m >= 0 ? '+' : ''}${m.toFixed(3)} R`); });
+
+  if (JOURS) {
+    console.log('\n  DERNIERS SIGNAUX');
+    trades.slice(-JOURS).forEach(x => {
+      const h = String(Math.floor(x.minET / 60)).padStart(2, '0') + 'h' + String(x.minET % 60).padStart(2, '0');
+      const ico = x.r > 0 ? '✅' : x.r < 0 ? '❌' : '➖';
+      console.log(`    ${x.jour} ${h} ET  ${ico} ${x.sens.padEnd(5)} IFVG ${x.tfIFVG.padEnd(3)} sur niveau ${x.niveau.padEnd(4)} ` +
+        `· entrée ${x.entree.toFixed(2)} stop ${x.sl0.toFixed(2)} cible ${x.tp.toFixed(2)} RR ${x.rr.toFixed(2)} → ${x.r >= 0 ? '+' : ''}${x.r.toFixed(2)} R`);
+    });
+  }
+  console.log('');
+})().catch(e => { console.error('ERREUR :', e.message); process.exit(1); });
