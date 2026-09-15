@@ -43,7 +43,11 @@ const DUMP    = args.dump === '1';
 const JOURS   = +(args.jours || 0);
 const HORLOGE = args.horloge || '2m';         // série qui cadence le backtest
 const CIBLE   = args.cible || 'interne';      // interne (swing récent) | draw (PDH/PDL)
-const BIAIS   = args.biais || 'bos';          // bos (cassure de structure HTF) | proche (ancien, faux)
+const BIAIS   = args.biais || 'bos';          // amd | seq | bos | proche
+const HRL     = args.hrl === '1';             // filtre HRL/LRL sur le stop et l'objectif
+const CONTGAP = args.contgap === '1';         // exiger un gap de continuation
+const LRLMAX  = +(args.lrlmax || 0);          // obstacles tolérés pour rester « LRL »
+const HRLMIN  = +(args.hrlmin || 1);          // obstacles exigés derrière le stop
 const COUT    = +(args.cout || 0.06);
 
 // ───────────────────────────────────────────────────────────── données ─────
@@ -116,6 +120,82 @@ function pivots(cs, L) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// PROFIL AMD PAR SESSION                                    [kintt.fx / ICT]
+// ---------------------------------------------------------------------------
+//   ASIE    → accumulation : un range étroit
+//   LONDRES → manipulation : balaye UN côté du range asiatique
+//   NY AM   → distribution : le vrai mouvement, dans le sens OPPOSÉ au balayage
+//
+// Le biais est donc connu AVANT l'ouverture de New York, ce qui vaut mieux
+// qu'un biais relu en continu pendant la séance.
+//
+// Réserve de la source : une planche montre un NY AM qui RANGE au lieu de
+// partir. La distribution dirigée n'est pas systématique.
+// ═══════════════════════════════════════════════════════════════════════════
+function profilAMD(cs) {
+  const asie = {}, londres = {};
+  cs.forEach(c => {
+    const e = heure(c.t);
+    if (e.min >= 20 * 60) {                       // 20 h → minuit = Asie du LENDEMAIN
+      const o = {}; fmtET.formatToParts(new Date(c.t + 24 * 3600 * 1000)).forEach(p => o[p.type] = p.value);
+      const j = `${o.year}-${o.month}-${o.day}`;
+      (asie[j] || (asie[j] = { h: -Infinity, l: Infinity, fin: 0 }));
+      asie[j].h = Math.max(asie[j].h, c.h); asie[j].l = Math.min(asie[j].l, c.l);
+      asie[j].fin = Math.max(asie[j].fin, c.t);
+    } else if (e.min < 3 * 60) {                  // minuit → 03 h : fin de l'Asie
+      (asie[e.jour] || (asie[e.jour] = { h: -Infinity, l: Infinity, fin: 0 }));
+      asie[e.jour].h = Math.max(asie[e.jour].h, c.h); asie[e.jour].l = Math.min(asie[e.jour].l, c.l);
+      asie[e.jour].fin = Math.max(asie[e.jour].fin, c.t);
+    }
+    if (e.min >= 3 * 60 && e.min < 6 * 60) {      // 03 h → 06 h = Londres
+      (londres[e.jour] || (londres[e.jour] = { h: -Infinity, l: Infinity, fin: 0 }));
+      londres[e.jour].h = Math.max(londres[e.jour].h, c.h); londres[e.jour].l = Math.min(londres[e.jour].l, c.l);
+      londres[e.jour].fin = Math.max(londres[e.jour].fin, c.t);
+    }
+  });
+
+  const biais = {};
+  Object.keys(londres).forEach(j => {
+    const a = asie[j], l = londres[j];
+    if (!a || a.l === Infinity || !l) return;
+    const basPris  = l.l < a.l;                   // Londres a balayé le BAS du range
+    const hautPris = l.h > a.h;                   // ou le HAUT
+    // Un seul côté pris : le biais est net. Les deux, ou aucun : indécidable.
+    if (basPris && !hautPris)      biais[j] = { dir: +1, note: 'Londres a balayé le bas de l\'Asie', asie: a, londres: l };
+    else if (hautPris && !basPris) biais[j] = { dir: -1, note: 'Londres a balayé le haut de l\'Asie', asie: a, londres: l };
+    else                           biais[j] = { dir: 0,  note: basPris ? 'les deux côtés pris' : 'aucun côté pris', asie: a, londres: l };
+  });
+  return biais;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// HRL vs LRL                                                [kintt.fx / ICT]
+// ---------------------------------------------------------------------------
+//   « You never want to target HRL and you always want to target LRL »
+//   « You always want HRL at your stop and LRL at your TP »
+//
+// LRL — chemin DÉGAGÉ vers la liquidité : rien ne la défend.
+// HRL — liquidité ADOSSÉE à des zones non mitigées : chère à atteindre.
+//
+// Lecture mécanique retenue : compter les zones non mitigées entre le prix et
+// le niveau visé. Zéro obstacle = LRL. Un ou plus = HRL.
+// ═══════════════════════════════════════════════════════════════════════════
+function obstacles(zones, idx, de, vers) {
+  const bas = Math.min(de, vers), haut = Math.max(de, vers);
+  let n = 0;
+  for (const z of zones) {
+    if (z.ne > idx) continue;                        // pas encore née
+    if (z.casse != null && z.casse <= idx) continue; // déjà invalidée
+    if (z.haut < bas || z.bas > haut) continue;      // hors du chemin
+    n++;
+  }
+  return n;
+}
+function estLRL(zones, idx, de, vers, seuil) {
+  return obstacles(zones, idx, de, vers) <= (seuil || 0);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // LE MODÈLE
 // ═══════════════════════════════════════════════════════════════════════════
 function backtest(m1, m2, m5, m15, d1) {
@@ -128,6 +208,7 @@ function backtest(m1, m2, m5, m15, d1) {
   const zIF = { '1m': fvgs(m1), '2m': fvgs(m2), '5m': z5 };   // pour l'IFVG d'exécution
   const atrC = atrSerie(HORLOGE === '1m' ? m1 : HORLOGE === '5m' ? m5 : m2, 14);
   const piv15 = pivots(m15, 5);
+  const amd = profilAMD(m5);        // profil de session, calculé une fois
 
   // PDH / PDL par jour ET — le « draw on liquidity » de base           [BLAKE]
   const jourEx = {};
@@ -190,7 +271,25 @@ function backtest(m1, m2, m5, m15, d1) {
     const v = veille[e.jour];
     if (!v) continue;
 
-    if (BIAIS === 'bos') {
+    if (BIAIS === 'amd') {
+      // [kintt.fx] Le biais du jour vient du balayage de Londres. Il est connu
+      // avant l'ouverture de New York et ne change plus de la séance.
+      const b = amd[e.jour];
+      if (!b || b.dir === 0) continue;             // journée indécidable
+      if (bar.t < (b.londres.fin || 0)) continue;  // Londres pas encore terminée
+      dir = b.dir;
+    } else if (BIAIS === 'seq') {
+      // [kintt.fx] La tendance est une SÉQUENCE : Higher High ET Higher Low
+      // enchaînés, pas une cassure isolée qui peut être un faux signal.
+      const hs = piv15.hauts.filter(x => x.vu <= bar.t).slice(-2);
+      const bs = piv15.bas.filter(x => x.vu <= bar.t).slice(-2);
+      if (hs.length < 2 || bs.length < 2) continue;
+      const hh = hs[1].prix > hs[0].prix, hl = bs[1].prix > bs[0].prix;
+      const lh = hs[1].prix < hs[0].prix, ll = bs[1].prix < bs[0].prix;
+      if (hh && hl)      dir = +1;
+      else if (lh && ll) dir = -1;
+      else continue;                                // séquence brouillée
+    } else if (BIAIS === 'bos') {
       const i15b = idxA(m15, bar.t);
       if (i15b < 20) continue;
       let dernierHaut = null, dernierBas = null;
@@ -291,11 +390,35 @@ function backtest(m1, m2, m5, m15, d1) {
             }
             if (tp == null) tp = dol;                          // repli sur le draw
           }
+          // ── FILTRE HRL / LRL ───────────────────────────────────────
+          // L'objectif doit être une LRL (chemin dégagé), et le stop doit être
+          // adossé à une HRL (protégé). Si les deux côtés sont dégagés, on est
+          // en « LRL vs LRL » : la source montre cette configuration résolue
+          // une fois à la hausse et une fois à la baisse — elle ne se tranche
+          // pas, donc on ne la trade pas.
+          let okHRL = true, etiq = '';
+          if (HRL) {
+            const zs = z5.concat(z15);
+            const obsCible = obstacles(zs, i5, entree, tp);
+            const obsStop  = obstacles(zs, i5, entree, sl);
+            if (obsCible > LRLMAX)      { okHRL = false; etiq = 'objectif en HRL (' + obsCible + ' obstacles)'; }
+            else if (obsStop < HRLMIN)  { okHRL = false; etiq = 'LRL vs LRL — indécidable'; }
+            else                        { etiq = 'HRL au stop (' + obsStop + '), LRL à l\'objectif (' + obsCible + ')'; }
+          }
+          // [kintt.fx] gap de continuation : une inefficience laissée sur le
+          // mouvement de départ, après la prise de liquidité au niveau clé.
+          let okCont = true;
+          if (CONTGAP) {
+            // On le cherche sur l'unité de l'horloge : chercher en M1 quand le
+            // backtest tourne en M5 ne marche pas, Yahoo ne donne que 8 jours de M1.
+            const zc = HORLOGE === '1m' ? zIF['1m'] : HORLOGE === '2m' ? zIF['2m'] : zIF['5m'];
+            okCont = zc.some(z => z.t >= tTouche && z.t <= bar.t && z.haussier === (dir > 0));
+          }
           const rr = Math.abs(tp - entree) / risq;
-          if (rr >= RRMIN) {
+          if (rr >= RRMIN && okHRL && okCont) {
             pos = { sens: L ? 'LONG' : 'SHORT', i, t: bar.t, entree, sl, sl0: sl, tp, rr,
                     be: L ? entree + risq : entree - risq, beFait: false,
-                    tfIFVG: choisi.tf, niveau: key.tf, jour: e.jour, minET: e.min,
+                    tfIFVG: choisi.tf, niveau: key.tf, jour: e.jour, minET: e.min, hrl: etiq,
                     zone: [+choisi.z.bas.toFixed(2), +choisi.z.haut.toFixed(2)] };
             parJour[e.jour]++;
             etat = 'WAIT_KEY'; key = null;
