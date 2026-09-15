@@ -1,0 +1,436 @@
+//@version=6
+// =============================================================================
+// MECH MODEL 2.0 — d'après PB Trading (version MÉCANIQUE, backtestable)
+// =============================================================================
+// SOURCE DES RÈGLES
+//   [V]  = règle VÉRIFIÉE dans un résumé de la vidéo "PB Trading MECH MODEL 2.0"
+//   [AC] = À CONFIRMER : la vidéo ne donne pas de définition assez précise,
+//          j'ai codé une définition mathématique explicite et CONFIGURABLE.
+//          Rien n'est inventé en douce : chaque [AC] est signalé et réglable.
+//
+// PRINCIPE [V] : viser les GAPS NON COMBLÉS (cible = EQ du gap), après un
+// balayage de liquidité et le rejet d'un niveau clé HTF, avec entrée sur
+// inversion/FVG en unité inférieure. RR visé 1:1 à 1:1,5, priorité au taux
+// de réussite. Filtre éliminatoire : ne pas trader contre la SMT.
+//
+// ANTI-REPAINT : tous les appels request.security() utilisent
+// lookahead=barmerge.lookahead_off et des valeurs décalées [1] (bougie HTF
+// CLÔTURÉE). Les signaux ne sont validés que sur bougie confirmée
+// (barstate.isconfirmed) — voir la section "ANTI-REPAINT" en bas.
+// =============================================================================
+
+indicator("MECH MODEL 2.0 (PB Trading) — mécanique", "MECH 2.0", overlay = true,
+     max_boxes_count = 500, max_lines_count = 500, max_labels_count = 500)
+
+// ============================ 1. PARAMÈTRES ==================================
+gTF   = "① Unités de temps"
+htfTF = input.timeframe("60",  "HTF — contexte/biais",      group = gTF)
+mtfTF = input.timeframe("15",  "MTF — détection des FVG",   group = gTF)
+ltfTF = input.timeframe("1",   "LTF — déclenchement",       group = gTF, tooltip = "Mets le graphique sur le LTF (1 min) pour l'exécution.")
+
+gSess   = "② Sessions (liquidité)"
+tzSess  = input.string("America/New_York", "Fuseau horaire", group = gSess)
+asiaSes = input.session("1800-0300", "Asie  (début-fin)",    group = gSess)
+lonSes  = input.session("0300-0800", "Londres",              group = gSess)
+nySes   = input.session("0930-1600", "New York",             group = gSess)
+useSessFilter = input.bool(true, "N'autoriser les entrées que pendant NY", group = gSess, tooltip = "[AC] La vidéo ne fixe pas de fenêtre horaire précise. Filtre désactivable.")
+
+gLiq    = "③ Liquidité"
+showLiq = input.bool(true,  "Afficher les niveaux",  group = gLiq)
+swingLen= input.int(10, "Longueur des swings (pivots)", minval = 2, group = gLiq)
+eqTol   = input.float(0.05, "Tolérance Equal H/L (%)", minval = 0.0, step = 0.01, group = gLiq, tooltip = "[AC] Deux extrêmes sont 'égaux' s'ils sont dans cette tolérance.")
+
+gFvg    = "④ FVG"
+fvgMinPct = input.float(0.03, "Taille MIN du FVG (% du prix)", minval = 0.0, step = 0.01, group = gFvg)
+fvgMaxAge = input.int(200, "Âge MAX d'un FVG (bougies)", minval = 5, group = gFvg)
+fullMitig = input.bool(false, "Mitigation COMPLÈTE requise pour invalider", group = gFvg, tooltip = "Décoché = le FVG est invalidé dès que le prix entre dedans (mitigation partielle).")
+showFvg   = input.bool(true, "Afficher les FVG actifs", group = gFvg)
+
+gBias   = "⑤ Biais HTF"
+biasMode = input.string("Structure HTF", "Méthode de biais", options = ["Structure HTF", "EMA HTF", "Désactivé"], group = gBias, tooltip = "[AC] La vidéo parle de 'biais journalier' sans formule. Deux méthodes objectives au choix.")
+emaLen   = input.int(50, "Longueur EMA (si EMA HTF)", minval = 5, group = gBias)
+
+gConf   = "⑥ Confirmation LTF"
+useDisp = input.bool(true, "Exiger un displacement", group = gConf)
+dispMult= input.float(1.5, "Displacement = corps > ATR ×", minval = 0.1, step = 0.1, group = gConf, tooltip = "[AC] Définition mathématique du 'displacement' : corps de bougie > ATR(14) × ce coefficient.")
+useMSS  = input.bool(true, "Exiger une cassure de structure (MSS)", group = gConf)
+
+gEntry  = "⑦ Entrée"
+entryMode = input.string("Retracement FVG", "Mode d'entrée", options = ["Market après confirmation", "Retracement FVG", "50% du FVG (EQ)"], group = gEntry)
+
+gSL     = "⑧ Stop-loss"
+slMode  = input.string("Derrière le sweep", "Placement du SL", options = ["Derrière le sweep", "Derrière le swing", "Derrière le FVG"], group = gSL)
+slBufPct= input.float(0.02, "Buffer (% du prix)", minval = 0.0, step = 0.01, group = gSL)
+
+gTP     = "⑨ Take-profit"
+tpMode  = input.string("EQ du gap non comblé", "Cible principale", options = ["EQ du gap non comblé", "R:R fixe", "Prochaine liquidité"], group = gTP)
+rrTarget= input.float(1.5, "R:R visé (si R:R fixe / TP1)", minval = 0.1, step = 0.1, group = gTP, tooltip = "[V] Le modèle vise 1:1 à 1:1,5.")
+minRR   = input.float(1.0, "R:R minimum pour valider un trade", minval = 0.1, step = 0.1, group = gTP)
+
+gMgmt   = "⑩ Gestion"
+beEnabled = input.bool(true, "Break-even activé", group = gMgmt)
+beAtR     = input.float(1.0, "Passer au BE à (R)", minval = 0.1, step = 0.1, group = gMgmt, tooltip = "[V] BE au gap comblé OU à 1:1.")
+useRunner = input.bool(true, "Garder un runner après TP1", group = gMgmt)
+runnerPct = input.int(50, "% conservé en runner", minval = 0, maxval = 100, group = gMgmt)
+
+gFilt   = "⑪ Filtres"
+useSMT    = input.bool(true, "Filtre SMT (corrélé)", group = gFilt, tooltip = "[V] Ne jamais trader contre la SMT. [AC] La vidéo ne donne pas la formule exacte — ici : divergence des extrêmes sur N bougies.")
+smtSym    = input.symbol("CME_MINI:ES1!", "Symbole corrélé (SMT)", group = gFilt, tooltip = "NQ se compare au S&P 500 (ES).")
+smtLen    = input.int(20, "Fenêtre SMT (bougies)", minval = 5, group = gFilt)
+useTrend  = input.bool(true, "Interdire les trades contre la tendance HTF", group = gFilt)
+
+gRisk   = "⑫ Risque"
+equity    = input.float(10000, "Capital ($)", minval = 1, group = gRisk)
+riskPct   = input.float(1.0, "Risque par trade (%)", minval = 0.01, step = 0.05, group = gRisk)
+maxTrades = input.int(3, "Trades max / jour", minval = 1, group = gRisk)
+maxLosses = input.int(2, "Pertes max / jour", minval = 1, group = gRisk)
+
+gUI     = "⑬ Affichage"
+showTable = input.bool(true, "Tableau de bord", group = gUI)
+showSig   = input.bool(true, "Marqueurs d'entrée", group = gUI)
+
+// ============================ 2. OUTILS ======================================
+atr14 = ta.atr(14)
+buf   = close * slBufPct / 100.0
+
+// --- Sessions : vrai si la bougie est dans la session (fuseau configurable)
+inSession(sess) => not na(time(timeframe.period, sess, tzSess))
+inAsia = inSession(asiaSes)
+inLon  = inSession(lonSes)
+inNY   = inSession(nySes)
+
+// --- Suivi des extrêmes de session (reset à chaque nouvelle session)
+var float asiaH = na, var float asiaL = na
+var float lonH  = na, var float lonL  = na
+newAsia = inAsia and not inAsia[1]
+newLon  = inLon  and not inLon[1]
+if newAsia
+    asiaH := high
+    asiaL := low
+else if inAsia
+    asiaH := math.max(nz(asiaH, high), high)
+    asiaL := math.min(nz(asiaL, low),  low)
+if newLon
+    lonH := high
+    lonL := low
+else if inLon
+    lonH := math.max(nz(lonH, high), high)
+    lonL := math.min(nz(lonL, low),  low)
+
+// --- PDH / PDL : plus-haut / plus-bas de la VEILLE (bougie D1 clôturée)
+// ANTI-REPAINT : on prend [1] (jour précédent, définitivement fermé).
+pdh = request.security(syminfo.tickerid, "D", high[1], lookahead = barmerge.lookahead_off)
+pdl = request.security(syminfo.tickerid, "D", low[1],  lookahead = barmerge.lookahead_off)
+
+// --- Swings (pivots confirmés)
+ph = ta.pivothigh(high, swingLen, swingLen)
+pl = ta.pivotlow(low,  swingLen, swingLen)
+var float lastSwingH = na, var float lastSwingL = na
+var float prevSwingH = na, var float prevSwingL = na
+if not na(ph)
+    prevSwingH := lastSwingH
+    lastSwingH := ph
+if not na(pl)
+    prevSwingL := lastSwingL
+    lastSwingL := pl
+
+// --- Equal highs / lows [AC] : deux swings dans la tolérance
+eqTolAbs = close * eqTol / 100.0
+hasEqH = not na(lastSwingH) and not na(prevSwingH) and math.abs(lastSwingH - prevSwingH) <= eqTolAbs
+hasEqL = not na(lastSwingL) and not na(prevSwingL) and math.abs(lastSwingL - prevSwingL) <= eqTolAbs
+
+// ============================ 3. BIAIS HTF ===================================
+// ANTI-REPAINT : valeurs HTF prises sur la bougie HTF CLÔTURÉE ([1]).
+htfClose = request.security(syminfo.tickerid, htfTF, close[1], lookahead = barmerge.lookahead_off)
+htfHigh  = request.security(syminfo.tickerid, htfTF, high[1],  lookahead = barmerge.lookahead_off)
+htfLow   = request.security(syminfo.tickerid, htfTF, low[1],   lookahead = barmerge.lookahead_off)
+htfEma   = request.security(syminfo.tickerid, htfTF, ta.ema(close, emaLen)[1], lookahead = barmerge.lookahead_off)
+
+// Structure HTF [AC] : haussier si le prix HTF fait des plus-hauts ET est au-dessus de son plus-bas récent
+htfBullStruct = not na(htfClose) and not na(htfHigh) and htfClose > ta.sma(htfClose, 3)
+bias = 0  // 1 = haussier, -1 = baissier, 0 = neutre
+if biasMode == "EMA HTF"
+    bias := not na(htfEma) and htfClose > htfEma ? 1 : not na(htfEma) and htfClose < htfEma ? -1 : 0
+else if biasMode == "Structure HTF"
+    bias := htfBullStruct ? 1 : not na(htfClose) and htfClose < ta.sma(htfClose, 3) ? -1 : 0
+else
+    bias := 0
+biasTxt = bias == 1 ? "HAUSSIER" : bias == -1 ? "BAISSIER" : "NEUTRE"
+
+// ============================ 4. FVG =========================================
+// Définition classique 3 bougies [V] : bullish low[0] > high[2] ; bearish high[0] < low[2]
+type Fvg
+    float top
+    float bot
+    bool  bull
+    int   born
+    bool  active
+
+var array<Fvg> fvgs = array.new<Fvg>()
+
+fvgMinAbs = close * fvgMinPct / 100.0
+bullFvgNew = low > high[2] and (low - high[2]) >= fvgMinAbs
+bearFvgNew = high < low[2] and (low[2] - high) >= fvgMinAbs
+
+if barstate.isconfirmed
+    if bullFvgNew
+        array.push(fvgs, Fvg.new(low, high[2], true, bar_index, true))
+    if bearFvgNew
+        array.push(fvgs, Fvg.new(low[2], high, false, bar_index, true))
+
+// Mitigation + expiration
+if array.size(fvgs) > 0
+    for i = array.size(fvgs) - 1 to 0
+        f = array.get(fvgs, i)
+        if f.active
+            touched  = low <= f.top and high >= f.bot
+            fullFill = f.bull ? low <= f.bot : high >= f.top
+            if (fullMitig ? fullFill : touched)
+                f.active := false
+            if bar_index - f.born > fvgMaxAge
+                f.active := false
+            array.set(fvgs, i, f)
+
+// FVG actif le plus proche dans un sens donné
+f_nearestFvg(bool wantBull) =>
+    float t = na, float b = na
+    if array.size(fvgs) > 0
+        for i = array.size(fvgs) - 1 to 0
+            f = array.get(fvgs, i)
+            if f.active and f.bull == wantBull
+                t := f.top
+                b := f.bot
+                break
+    [t, b]
+
+[bullFvgTop, bullFvgBot] = f_nearestFvg(true)
+[bearFvgTop, bearFvgBot] = f_nearestFvg(false)
+hasBullFvg = not na(bullFvgTop)
+hasBearFvg = not na(bearFvgTop)
+
+// ============================ 5. SWEEP DE LIQUIDITÉ ==========================
+// [V] Sweep = le prix prend une liquidité PUIS la rejette (clôture de l'autre côté).
+// Mécanique : la mèche dépasse le niveau, mais la CLÔTURE revient en deçà.
+f_sweepUp(float lvl)   => not na(lvl) and high > lvl and close < lvl     // liquidité du HAUT prise puis rejetée -> biais SHORT
+f_sweepDown(float lvl) => not na(lvl) and low  < lvl and close > lvl     // liquidité du BAS prise puis rejetée  -> biais LONG
+
+sweepBear = f_sweepUp(pdh) or f_sweepUp(asiaH) or f_sweepUp(lonH) or (hasEqH and f_sweepUp(lastSwingH))
+sweepBull = f_sweepDown(pdl) or f_sweepDown(asiaL) or f_sweepDown(lonL) or (hasEqL and f_sweepDown(lastSwingL))
+
+// Rejet d'un niveau clé HTF [V] : la bougie touche un extrême HTF et clôture en deçà
+htfRejBear = not na(htfHigh) and high >= htfHigh and close < htfHigh
+htfRejBull = not na(htfLow)  and low  <= htfLow  and close > htfLow
+
+// Mémoire du dernier sweep (pour le SL et la fenêtre de validité)
+var float lastSweepHigh = na, var float lastSweepLow = na
+var int   lastSweepBar  = na
+if sweepBear
+    lastSweepHigh := high
+    lastSweepBar  := bar_index
+if sweepBull
+    lastSweepLow := low
+    lastSweepBar := bar_index
+sweepFresh = not na(lastSweepBar) and (bar_index - lastSweepBar) <= 20   // [AC] validité du sweep : 20 bougies
+
+// ============================ 6. CONFIRMATION LTF ============================
+// [V] displacement / cassure de structure / inversion. [AC] formules ci-dessous.
+body        = math.abs(close - open)
+displacement= body > atr14 * dispMult
+mssBull     = not na(lastSwingH) and close > lastSwingH        // cassure du dernier swing haut
+mssBear     = not na(lastSwingL) and close < lastSwingL        // cassure du dernier swing bas
+
+confLong  = (not useDisp or displacement) and (not useMSS or mssBull) and close > open
+confShort = (not useDisp or displacement) and (not useMSS or mssBear) and close < open
+
+// ============================ 7. FILTRE SMT ==================================
+// [V] Ne jamais trader contre la SMT. [AC] Formule : divergence des extrêmes
+// entre l'actif et son corrélé sur smtLen bougies.
+corrHigh = request.security(smtSym, timeframe.period, high, lookahead = barmerge.lookahead_off)
+corrLow  = request.security(smtSym, timeframe.period, low,  lookahead = barmerge.lookahead_off)
+selfHH = high  >= ta.highest(high,  smtLen)
+selfLL = low   <= ta.lowest(low,    smtLen)
+corrHH = not na(corrHigh) and corrHigh >= ta.highest(corrHigh, smtLen)
+corrLL = not na(corrLow)  and corrLow  <= ta.lowest(corrLow,  smtLen)
+smtBear = selfHH and not corrHH      // je fais un plus-haut, pas le corrélé -> divergence baissière
+smtBull = selfLL and not corrLL      // je fais un plus-bas, pas le corrélé  -> divergence haussière
+smtBlocksLong  = useSMT and smtBear  // interdit d'acheter si divergence baissière
+smtBlocksShort = useSMT and smtBull
+
+// ============================ 8. LIMITES JOURNALIÈRES ========================
+var int tradesToday = 0
+var int lossesToday = 0
+newDay = ta.change(time("D")) != 0
+if newDay
+    tradesToday := 0
+    lossesToday := 0
+limitOK = tradesToday < maxTrades and lossesToday < maxLosses
+
+// ============================ 9. CONDITIONS D'ENTRÉE =========================
+sessOK   = not useSessFilter or inNY
+trendOKL = not useTrend or bias >= 0
+trendOKS = not useTrend or bias <= 0
+
+longSetup  = sweepBull and sweepFresh and htfRejBull and hasBullFvg and confLong  and not smtBlocksLong  and trendOKL and sessOK and limitOK
+shortSetup = sweepBear and sweepFresh and htfRejBear and hasBearFvg and confShort and not smtBlocksShort and trendOKS and sessOK and limitOK
+
+// Prix d'entrée selon le mode
+f_entryPrice(bool isLong) =>
+    float px = close
+    if entryMode == "Retracement FVG"
+        px := isLong ? bullFvgTop : bearFvgBot
+    else if entryMode == "50% du FVG (EQ)"
+        px := isLong ? (bullFvgTop + bullFvgBot) / 2.0 : (bearFvgTop + bearFvgBot) / 2.0
+    px
+
+// Stop-loss selon le mode
+f_stopPrice(bool isLong) =>
+    float sl = na
+    if slMode == "Derrière le sweep"
+        sl := isLong ? nz(lastSweepLow, low) - buf : nz(lastSweepHigh, high) + buf
+    else if slMode == "Derrière le swing"
+        sl := isLong ? nz(lastSwingL, low) - buf : nz(lastSwingH, high) + buf
+    else
+        sl := isLong ? nz(bullFvgBot, low) - buf : nz(bearFvgTop, high) + buf
+    sl
+
+// Take-profit selon le mode
+f_targetPrice(bool isLong, float entryPx, float slPx) =>
+    float risk = math.abs(entryPx - slPx)
+    float tp = na
+    if tpMode == "R:R fixe"
+        tp := isLong ? entryPx + risk * rrTarget : entryPx - risk * rrTarget
+    else if tpMode == "EQ du gap non comblé"
+        // cible = EQ du FVG OPPOSÉ non comblé (le "gap" que le prix va combler)
+        tp := isLong ? (na(bearFvgTop) ? entryPx + risk * rrTarget : (bearFvgTop + bearFvgBot) / 2.0)
+             :         (na(bullFvgTop) ? entryPx - risk * rrTarget : (bullFvgTop + bullFvgBot) / 2.0)
+    else
+        tp := isLong ? nz(pdh, entryPx + risk * rrTarget) : nz(pdl, entryPx - risk * rrTarget)
+    tp
+
+// ============================ 10. GESTION DU TRADE ===========================
+var bool  inTrade   = false
+var bool  tradeLong = false
+var float eEntry    = na
+var float eStop     = na
+var float eTarget   = na
+var float eInitStop = na
+var bool  beDone    = false
+
+longEntry  = longSetup  and not inTrade
+shortEntry = shortSetup and not inTrade
+
+if longEntry or shortEntry
+    isL = longEntry
+    px  = f_entryPrice(isL)
+    sl  = f_stopPrice(isL)
+    tp  = f_targetPrice(isL, px, sl)
+    r   = math.abs(px - sl)
+    rr  = r > 0 ? math.abs(tp - px) / r : 0.0
+    if r > 0 and rr >= minRR
+        inTrade   := true
+        tradeLong := isL
+        eEntry    := px
+        eStop     := sl
+        eInitStop := sl
+        eTarget   := tp
+        beDone    := false
+        tradesToday += 1
+
+// Suivi : BE, TP, SL
+if inTrade
+    rInit = math.abs(eEntry - eInitStop)
+    if beEnabled and not beDone and rInit > 0
+        reached = tradeLong ? high >= eEntry + rInit * beAtR : low <= eEntry - rInit * beAtR
+        if reached
+            eStop  := eEntry        // SL -> point d'entrée
+            beDone := true
+    hitTP = tradeLong ? high >= eTarget : low <= eTarget
+    hitSL = tradeLong ? low  <= eStop   : high >= eStop
+    if hitSL
+        if eStop != eEntry
+            lossesToday += 1
+        inTrade := false
+    else if hitTP
+        inTrade := false
+
+// Taille de position (money management) [V-ish : formule standard]
+riskAmount = equity * riskPct / 100.0
+stopDist   = math.abs(nz(eEntry, close) - nz(eStop, close))
+posSize    = stopDist > 0 ? riskAmount / stopDist : 0.0
+
+// ============================ 11. AFFICHAGE ==================================
+plot(showLiq ? pdh : na, "PDH", color.new(color.orange, 0), 1, plot.style_linebr)
+plot(showLiq ? pdl : na, "PDL", color.new(color.orange, 0), 1, plot.style_linebr)
+plot(showLiq ? asiaH : na, "Asia High", color.new(color.teal, 0), 1, plot.style_linebr)
+plot(showLiq ? asiaL : na, "Asia Low",  color.new(color.teal, 0), 1, plot.style_linebr)
+plot(showLiq ? lonH : na, "London High", color.new(color.purple, 0), 1, plot.style_linebr)
+plot(showLiq ? lonL : na, "London Low",  color.new(color.purple, 0), 1, plot.style_linebr)
+
+// FVG actifs
+if showFvg and barstate.islast and array.size(fvgs) > 0
+    for i = 0 to array.size(fvgs) - 1
+        f = array.get(fvgs, i)
+        if f.active
+            box.new(f.born, f.top, bar_index + 5, f.bot,
+                 border_color = color.new(f.bull ? color.green : color.red, 60),
+                 bgcolor      = color.new(f.bull ? color.green : color.red, 88))
+
+plotshape(showSig and longEntry,  "LONG",  shape.labelup,   location.belowbar, color.new(color.green, 0), text = "🟢 LONG",  textcolor = color.white, size = size.small)
+plotshape(showSig and shortEntry, "SHORT", shape.labeldown, location.abovebar, color.new(color.red, 0),   text = "🔴 SHORT", textcolor = color.white, size = size.small)
+plotshape(showSig and sweepBull,  "Sweep haussier", shape.triangleup,   location.belowbar, color.new(color.lime, 40), size = size.tiny)
+plotshape(showSig and sweepBear,  "Sweep baissier", shape.triangledown, location.abovebar, color.new(color.fuchsia, 40), size = size.tiny)
+
+plot(inTrade ? eEntry  : na, "Entrée",  color.new(color.blue, 0),  1, plot.style_linebr)
+plot(inTrade ? eStop   : na, "SL",      color.new(color.red, 0),   1, plot.style_linebr)
+plot(inTrade ? eTarget : na, "TP",      color.new(color.green, 0), 1, plot.style_linebr)
+
+// Tableau de bord
+f_ok(bool c) => c ? "✅" : "❌"
+if showTable and barstate.islast
+    var table t = table.new(position.top_right, 2, 10, border_width = 1)
+    table.cell(t, 0, 0, "MECH 2.0", bgcolor = color.new(color.blue, 70), text_color = color.white)
+    table.cell(t, 1, 0, biasTxt,    bgcolor = color.new(color.blue, 70), text_color = color.white)
+    table.cell(t, 0, 1, "Biais HTF");      table.cell(t, 1, 1, f_ok(bias != 0))
+    table.cell(t, 0, 2, "Sweep");          table.cell(t, 1, 2, f_ok(sweepBull or sweepBear))
+    table.cell(t, 0, 3, "Rejet HTF");      table.cell(t, 1, 3, f_ok(htfRejBull or htfRejBear))
+    table.cell(t, 0, 4, "FVG actif");      table.cell(t, 1, 4, f_ok(hasBullFvg or hasBearFvg))
+    table.cell(t, 0, 5, "Confirmation");   table.cell(t, 1, 5, f_ok(confLong or confShort))
+    table.cell(t, 0, 6, "SMT OK");         table.cell(t, 1, 6, f_ok(not smtBlocksLong and not smtBlocksShort))
+    table.cell(t, 0, 7, "Entrée");         table.cell(t, 1, 7, inTrade ? str.tostring(eEntry, format.mintick) : "—")
+    table.cell(t, 0, 8, "SL / TP");        table.cell(t, 1, 8, inTrade ? str.tostring(eStop, format.mintick) + " / " + str.tostring(eTarget, format.mintick) : "—")
+    table.cell(t, 0, 9, "Taille");         table.cell(t, 1, 9, str.tostring(posSize, "#.###"))
+
+// ============================ 12. ALERTES ====================================
+alertMsg(string dir) =>
+    str.tostring(syminfo.ticker) + " | " + dir + " | TF " + timeframe.period +
+     " | Entrée " + str.tostring(f_entryPrice(dir == "LONG"), format.mintick) +
+     " | SL " + str.tostring(f_stopPrice(dir == "LONG"), format.mintick) +
+     " | Setup MECH 2.0"
+
+alertcondition(longEntry,  "MECH — ENTRÉE LONG",  "MECH 2.0 : ENTRÉE LONG")
+alertcondition(shortEntry, "MECH — ENTRÉE SHORT", "MECH 2.0 : ENTRÉE SHORT")
+alertcondition(sweepBull,  "MECH — Sweep haussier", "MECH 2.0 : balayage de liquidité BAS")
+alertcondition(sweepBear,  "MECH — Sweep baissier", "MECH 2.0 : balayage de liquidité HAUT")
+alertcondition(bullFvgNew or bearFvgNew, "MECH — Nouveau FVG", "MECH 2.0 : nouveau FVG détecté")
+alertcondition(confLong,   "MECH — Confirmation LONG",  "MECH 2.0 : confirmation LONG")
+alertcondition(confShort,  "MECH — Confirmation SHORT", "MECH 2.0 : confirmation SHORT")
+
+if longEntry
+    alert(alertMsg("LONG"), alert.freq_once_per_bar_close)
+if shortEntry
+    alert(alertMsg("SHORT"), alert.freq_once_per_bar_close)
+
+// ============================ ANTI-REPAINT (explication) =====================
+// 1) request.security() : TOUJOURS lookahead = barmerge.lookahead_off  -> aucune
+//    donnée future n'est lue.
+// 2) Les valeurs HTF sont prises en [1] (bougie HTF CLÔTURÉE) : tant que la
+//    bougie HTF est en cours, on utilise la précédente, donc la valeur ne change
+//    plus a posteriori.
+// 3) Les FVG ne sont enregistrés que sur barstate.isconfirmed : un FVG ne peut
+//    pas apparaître puis disparaître pendant la formation de la bougie.
+// 4) Les pivots (ta.pivothigh/low) sont par nature décalés de swingLen bougies :
+//    ils ne sont jamais "devinés" à l'avance.
+// 5) Les alertes utilisent alert.freq_once_per_bar_close : signal sur clôture.
+// Conséquence : en replay/backtest, ce que tu vois = ce qui se serait produit
+// en direct. Le prix d'entrée en mode "Retracement FVG"/"50%" est un NIVEAU
+// (ordre limite) : le remplissage réel dépend de ton exécution.

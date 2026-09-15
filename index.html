@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>MECH · NQ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* Langage visuel repris de weevolveit.com : fond presque noir semé d'une
+     grille de points, barre flottante en pastille, libellés en monospace
+     majuscules largement espacées, un accent magenta, et de très grands
+     chiffres. La typographie des titres vient de subscrr.app — Inter Tight. */
+  :root{
+    --bg:#0a0a0b; --panel:#121214; --panel-2:#17171a;
+    --line:rgba(255,255,255,.10); --line-2:rgba(255,255,255,.20);
+    --ink:#f4f4f6; --muted:#8b8b93; --faint:#5c5c64;
+    --accent:#E4007C;
+    --long:#2fd4a0; --short:#ff5c5c; --wait:#ffb020;
+    --mono:'JetBrains Mono','IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+    --display:'Inter Tight','Inter',-apple-system,sans-serif;
+    --r:14px;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{margin:0;color:var(--ink);font:15.5px/1.6 var(--sans);letter-spacing:-.01em;
+    -webkit-font-smoothing:antialiased;background:var(--bg);
+    /* la grille de points : discrète, elle donne la profondeur sans image */
+    background-image:radial-gradient(rgba(255,255,255,.055) 1px,transparent 1px);
+    background-size:22px 22px;background-attachment:fixed;
+    padding-bottom:env(safe-area-inset-bottom,0px)}
+  .wrap{max-width:840px;margin:0 auto;padding:0 20px}
+
+  /* libellés techniques : monospace, majuscules, très espacées */
+  .lab{font-family:var(--mono);font-size:.66rem;font-weight:500;text-transform:uppercase;
+    letter-spacing:.16em;color:var(--faint)}
+  .mono{font-family:var(--display);font-variant-numeric:tabular-nums;font-feature-settings:'tnum' 1}
+
+  /* ── barre flottante ───────────────────────────────────────────────── */
+  header{position:sticky;top:0;z-index:10;padding:16px 0 4px;
+    padding-top:calc(16px + env(safe-area-inset-top,0px))}
+  .bar{display:flex;align-items:center;gap:14px;height:62px;padding:0 22px;
+    background:rgba(18,18,20,.82);backdrop-filter:blur(14px) saturate(1.4);
+    border:1px solid var(--line);border-radius:999px}
+  .sym{font-family:var(--mono);font-size:.78rem;font-weight:700;letter-spacing:.14em;color:var(--muted)}
+  .px{font-family:var(--display);font-size:1.55rem;font-weight:700;letter-spacing:-.035em;
+    font-variant-numeric:tabular-nums}
+  .chg{font-family:var(--mono);font-size:.74rem;font-weight:500;letter-spacing:.04em;
+    padding:3px 10px;border-radius:999px;border:1px solid var(--line)}
+  .chg.up{color:var(--long)} .chg.dn{color:var(--short)}
+  .bar-r{margin-left:auto;display:flex;align-items:center;gap:9px}
+  .age{font-family:var(--mono);font-size:.64rem;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--faint);white-space:nowrap}
+  .age b{color:var(--muted);font-weight:500}
+  .ico{width:36px;height:36px;display:grid;place-items:center;border:1px solid var(--line);
+    border-radius:999px;background:transparent;color:var(--muted);cursor:pointer;font-size:14px;
+    transition:border-color .15s,color .15s,background .15s}
+  .ico:hover{border-color:var(--line-2);color:var(--ink)}
+  .ico.on{border-color:var(--accent);color:var(--accent);background:rgba(228,0,124,.12)}
+
+  /* ── état de séance ────────────────────────────────────────────────── */
+  .sess{display:flex;align-items:center;gap:10px;padding:26px 0 0;
+    font-family:var(--mono);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--faint);flex:none}
+  .dot.on{background:var(--accent);box-shadow:0 0 0 4px rgba(228,0,124,.18)}
+
+  /* ── sections ──────────────────────────────────────────────────────── */
+  section{padding:34px 0 0}
+  h2{margin:0 0 14px;font-family:var(--mono);font-size:.66rem;font-weight:500;
+    letter-spacing:.18em;text-transform:uppercase;color:var(--faint)}
+
+  /* ── chaîne du modèle ──────────────────────────────────────────────── */
+  .step{display:flex;gap:18px;align-items:flex-start;padding:18px 22px;background:var(--panel);
+    border:1px solid var(--line)}
+  .step+.step{border-top:0}
+  .step:first-child{border-radius:var(--r) var(--r) 0 0}
+  .step:last-child{border-radius:0 0 var(--r) var(--r)}
+  .step-n{font-family:var(--mono);font-size:.7rem;color:var(--faint);width:18px;flex:none;padding-top:5px;
+    letter-spacing:.06em}
+  .step-b{flex:1;min-width:0}
+  .step-t{display:block;font-family:var(--display);font-size:1.08rem;font-weight:700;
+    letter-spacing:-.025em;margin-bottom:3px}
+  .step-d{display:block;font-size:.88rem;color:var(--muted);line-height:1.5}
+  .step-s{flex:none;font-family:var(--mono);font-size:.6rem;font-weight:500;letter-spacing:.14em;
+    text-transform:uppercase;padding:5px 11px;border-radius:999px;
+    border:1px solid var(--line);color:var(--faint)}
+  .step.ok .step-s{border-color:rgba(47,212,160,.4);color:var(--long)}
+  .step.no .step-s{border-color:rgba(255,92,92,.4);color:var(--short)}
+  .step.wait .step-s{border-color:rgba(255,176,32,.4);color:var(--wait)}
+
+  /* ── la position : le bloc qui se détache, bordé de magenta ────────── */
+  .trade{background:var(--panel);border:1px solid var(--accent);border-radius:var(--r);overflow:hidden;
+    box-shadow:0 0 0 4px rgba(228,0,124,.10)}
+  .t-head{display:flex;align-items:baseline;gap:14px;padding:22px 24px 18px}
+  .t-dir{font-family:var(--display);font-size:1.75rem;font-weight:800;letter-spacing:-.04em}
+  .t-dir.long{color:var(--long)} .t-dir.short{color:var(--short)}
+  .t-tf{font-family:var(--mono);font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;color:var(--faint)}
+  .t-rr{margin-left:auto;font-family:var(--mono);font-size:.76rem;font-weight:500;letter-spacing:.1em;
+    padding:5px 13px;border-radius:999px;border:1px solid var(--line);color:var(--ink)}
+  .t-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);
+    border-top:1px solid var(--line)}
+  .t-cell{background:var(--panel-2);padding:16px 18px}
+  .t-k{font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.16em;
+    color:var(--faint);margin-bottom:7px}
+  .t-v{font-family:var(--display);font-size:1.34rem;font-weight:700;letter-spacing:-.035em;
+    font-variant-numeric:tabular-nums}
+  .t-v.sl{color:var(--short)} .t-v.tp{color:var(--long)}
+  .t-sub{font-family:var(--mono);font-size:.64rem;letter-spacing:.06em;color:var(--faint);margin-top:4px}
+  .t-why{padding:16px 24px 22px;font-size:.87rem;color:var(--muted);line-height:1.55}
+  @media(max-width:560px){.t-grid{grid-template-columns:repeat(2,1fr)}}
+
+  .empty{padding:32px 22px;border:1px dashed var(--line);border-radius:var(--r);
+    font-size:.88rem;color:var(--muted);text-align:center;line-height:1.6;background:var(--panel)}
+
+  /* ── unités ────────────────────────────────────────────────────────── */
+  .tfs{border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+  .tf{display:flex;align-items:baseline;gap:16px;padding:14px 22px;background:var(--panel);font-size:.87rem}
+  .tf+.tf{border-top:1px solid var(--line)}
+  .tf.ok{background:var(--panel-2)}
+  .tf.ret{background:rgba(228,0,124,.09);box-shadow:inset 2px 0 0 var(--accent)}
+  .tf.off{color:var(--faint)}
+  .tf-id{font-family:var(--mono);font-size:.74rem;font-weight:600;letter-spacing:.1em;width:48px;flex:none}
+  .tf-st{color:var(--muted);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .tf-rr{font-family:var(--mono);font-size:.74rem;letter-spacing:.06em;flex:none;color:var(--faint)}
+  .tf.ok .tf-rr{color:var(--long)}
+
+  /* ── réglages ──────────────────────────────────────────────────────── */
+  .panelbox{display:none;border:1px solid var(--line);border-radius:var(--r);
+    background:var(--panel);padding:22px;margin-top:20px}
+  .panelbox.open{display:block}
+  .panelbox p{margin:0 0 16px;font-size:.87rem;color:var(--muted);line-height:1.6}
+  .panelbox label{display:block;font-family:var(--mono);font-size:.62rem;text-transform:uppercase;
+    letter-spacing:.16em;color:var(--faint);margin-bottom:8px}
+  .panelbox input{width:100%;padding:12px 14px;background:var(--bg);border:1px solid var(--line);
+    border-radius:10px;color:var(--ink);font:13px var(--mono)}
+  .panelbox input:focus{outline:0;border-color:var(--accent)}
+  .row{display:flex;gap:9px;margin-top:14px;flex-wrap:wrap}
+  .btn{font-family:var(--mono);font-size:.7rem;font-weight:500;letter-spacing:.12em;text-transform:uppercase;
+    padding:11px 18px;border-radius:999px;border:1px solid var(--line);
+    background:transparent;color:var(--ink);cursor:pointer;transition:border-color .15s,background .15s}
+  .btn:hover{border-color:var(--line-2)}
+  .btn.p{background:var(--accent);border-color:var(--accent);color:#fff}
+  .btn.p:hover{filter:brightness(1.1)}
+  .msg{margin-top:14px;font-size:.85rem;color:var(--muted);line-height:1.6}
+
+  footer{margin-top:44px;padding:24px 0 40px;border-top:1px solid var(--line);
+    font-family:var(--mono);font-size:.66rem;letter-spacing:.07em;color:var(--faint);line-height:1.9}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap bar">
+    <span class="sym">NQ</span>
+    <span class="px mono" id="px">—</span>
+    <span class="chg mono" id="chg"></span>
+    <span class="bar-r">
+      <span class="age" id="age"></span>
+      <button class="ico" id="b-alert" title="Alertes">🔔</button>
+      <button class="ico" id="b-set" title="Réglages">⚙</button>
+    </span>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="sess"><span class="dot" id="sdot"></span><span id="stxt">Chargement…</span></div>
+
+  <div class="panelbox" id="settings">
+    <p><b>Flux temps réel.</b> Par défaut le site lit Yahoo, qui a environ
+       <b>10 minutes de retard</b> sur le NQ. Un compte démo OANDA donne le NAS100 sans retard.
+       Le jeton part directement chez OANDA et reste dans ce navigateur.</p>
+    <label>Jeton OANDA — compte pratique</label>
+    <input type="password" id="tok" placeholder="xxxxxxxx-xxxxxxxxxxxxxxxx" autocomplete="off">
+    <div class="row">
+      <button class="btn p" id="b-save">Enregistrer</button>
+      <button class="btn" id="b-corr">Corrélation avec le NQ</button>
+      <button class="btn" id="b-clear">Retirer</button>
+    </div>
+    <div class="msg" id="setmsg"></div>
+  </div>
+
+  <section>
+    <h2>Chaîne du modèle</h2>
+    <div id="chain"></div>
+  </section>
+
+  <section>
+    <h2>Position</h2>
+    <div id="trade"></div>
+  </section>
+
+  <section>
+    <h2>Unités de temps</h2>
+    <div id="tfs"></div>
+  </section>
+
+  <footer>
+    MECH Model de PB Blake, sur le NQ uniquement. Si une étape manque, il n'y a pas de position.<br>
+    Données Yahoo Finance ou OANDA. Pédagogique — pas un conseil financier.
+  </footer>
+</div>
+
+<script src="js/session.js"></script>
+<script src="js/cfd.js"></script>
+<script src="js/nq.js"></script>
+<script src="js/notif.js"></script>
+<script>
+'use strict';
+const $ = s => document.querySelector(s);
+const fmt = n => n == null ? '—' : Number(n).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2});
+let D = null;
+
+/* ── barre + séance ─────────────────────────────────────────────────── */
+function paintTop(){
+  $('#px').textContent = D ? fmt(D.nq.prix) : '—';
+  const c = D && D.nq.variation_pct != null ? D.nq.variation_pct : null;
+  const e = $('#chg');
+  e.textContent = c == null ? '' : (c >= 0 ? '+' : '') + c.toFixed(2) + ' %';
+  e.className = 'chg mono ' + (c == null ? '' : c >= 0 ? 'up' : 'dn');
+
+  // L'âge de la donnée est affiché en clair : à 10 minutes de retard, un signal
+  // n'est pas un signal d'entrée. Mieux vaut le savoir que le croire.
+  const age = D && window.Notif ? Notif.ageMin(D) : null;
+  const src = D && D.source === 'cfd' ? 'OANDA' : 'Yahoo';
+  $('#age').innerHTML = age == null ? '' : '<b>' + src + '</b> · −' + age + ' min';
+
+  const w = window.WINDOW ? WINDOW.state() : null;
+  if(w){
+    $('#sdot').className = 'dot' + (w.ouverte ? ' on' : '');
+    $('#stxt').textContent = w.texte;
+  }
+}
+
+/* ── la chaîne : où en est le modèle, étape par étape ───────────────── */
+function paintChain(){
+  const box = $('#chain');
+  if(!D){ box.innerHTML = '<div class="empty">Récupération des données NQ…</div>'; return; }
+  const st = D.structure || {};
+  const gaps = D.gaps_non_comblés || [];
+  const smt = D.smt;
+
+  const etapes = [
+    { t:'Balayage de liquidité',
+      ok: !!st.sweep,
+      d: st.sweep ? ('Le prix a pris le ' + (st.sweep.pool ? st.sweep.pool.quoi : 'niveau') + ' puis est revenu.')
+                  : 'Aucun balayage récent suivi d’une réaction.' },
+    { t:'Structure',
+      ok: !!st.valide,
+      d: st.valide ? ('Séquence ' + st.sens + ' complète.')
+                   : (st.detail || 'Séquence incomplète.') },
+    { t:'Inversion',
+      ok: !!st.inversion,
+      attente: !!st.valide && !st.inversion,
+      d: st.inversion ? ('Confirmée — ' + (st.inversion.definition || 'clôture au travers du gap') + '.')
+                      : 'On n’entre jamais sur le balayage : il faut l’inversion.' },
+    { t:'Cible — gap non comblé',
+      ok: gaps.length > 0,
+      d: gaps.length ? (gaps.length + ' gap(s) non comblé(s), le plus proche à ' + fmt(gaps[0].eq_cible) + '.')
+                     : 'Aucune cible interne disponible.' },
+    { t:'SMT contre le S&P 500',
+      ok: !smt || smt.type === 'aucune',
+      no: smt && smt.type !== 'aucune',
+      d: !smt ? 'Non calculée.' : smt.type === 'aucune'
+            ? 'Pas de divergence — rien ne s’oppose au trade.'
+            : ('Divergence ' + smt.type + '. ' + (smt.consigne || '')) }
+  ];
+
+  box.innerHTML = etapes.map((e,i) => {
+    const cls = e.no ? 'no' : e.ok ? 'ok' : e.attente ? 'wait' : '';
+    const lbl = e.no ? 'bloqué' : e.ok ? 'validé' : e.attente ? 'en attente' : 'manquant';
+    return '<div class="step ' + cls + '"><span class="step-n mono">' + (i+1) + '</span>' +
+           '<span class="step-b"><span class="step-t">' + e.t + '</span>' +
+           '<span class="step-d">' + e.d + '</span></span>' +
+           '<span class="step-s">' + lbl + '</span></div>';
+  }).join('');
+}
+
+/* ── la position ────────────────────────────────────────────────────── */
+function paintTrade(){
+  const box = $('#trade');
+  const t = D && D.trade;
+  if(!t){ box.innerHTML = '<div class="empty">En attente des données.</div>'; return; }
+  if(!t.possible){
+    box.innerHTML = '<div class="empty">Pas de position.<br>' + (t.raison || 'Une étape du modèle manque.') + '</div>';
+    return;
+  }
+  const L = t.sens === 'LONG', dp = Math.abs(t.entree - t.sl), dt = Math.abs(t.tp - t.entree);
+  box.innerHTML =
+    '<div class="trade ' + (L ? 'long' : 'short') + '">' +
+      '<div class="t-head"><span class="t-dir ' + (L ? 'long' : 'short') + '">' + t.sens + '</span>' +
+        '<span class="t-tf">' + (D.tf_retenue || '') + '</span>' +
+        '<span class="t-rr">RR ' + Number(t.rr).toFixed(2) + '</span></div>' +
+      '<div class="t-grid">' +
+        '<div class="t-cell"><div class="t-k">Entrée</div><div class="t-v">' + fmt(t.entree) + '</div></div>' +
+        '<div class="t-cell"><div class="t-k">Stop</div><div class="t-v sl">' + fmt(t.sl) + '</div><div class="t-sub">−' + dp.toFixed(1) + ' pts</div></div>' +
+        '<div class="t-cell"><div class="t-k">Objectif</div><div class="t-v tp">' + fmt(t.tp) + '</div><div class="t-sub">+' + dt.toFixed(1) + ' pts</div></div>' +
+        '<div class="t-cell"><div class="t-k">Unité</div><div class="t-v">' + (D.tf_retenue || '—') + '</div></div>' +
+      '</div>' +
+      (t.motif ? '<div class="t-why">' + t.motif + '</div>' : '') +
+    '</div>';
+}
+
+/* ── le balayage des unités ─────────────────────────────────────────── */
+function paintTFs(){
+  const box = $('#tfs');
+  const vs = D && D.timeframes;
+  if(!vs){ box.innerHTML = '<div class="empty">—</div>'; return; }
+  box.innerHTML = '<div class="tfs">' + vs.map(v => {
+    if(!v.dispo) return '<div class="tf off"><span class="tf-id">' + v.tf + '</span><span class="tf-st">indisponible</span></div>';
+    const t = v.trade, ok = t && t.possible, ret = v.tf === D.tf_retenue;
+    const st = ok ? ('structure ' + t.sens) : ((v.structure && v.structure.valide) ? 'structure valide, pas d’entrée' : 'pas de setup');
+    return '<div class="tf ' + (ret ? 'ret' : ok ? 'ok' : '') + '">' +
+      '<span class="tf-id">' + v.tf + '</span>' +
+      '<span class="tf-st">' + st + '</span>' +
+      '<span class="tf-rr">' + (ok ? 'RR ' + Number(t.rr).toFixed(2) : '—') + '</span></div>';
+  }).join('') + '</div>';
+}
+
+function paintAll(){ paintTop(); paintChain(); paintTrade(); paintTFs(); }
+
+/* ── cycle de rafraîchissement ──────────────────────────────────────── */
+async function refresh(){
+  try{ D = await NQ.load(true); }catch(e){ D = null; }
+  paintAll();
+  if(D && window.Notif) Notif.verifier(D);
+}
+
+/* ── réglages ───────────────────────────────────────────────────────── */
+function setMsg(t){ $('#setmsg').innerHTML = t; }
+$('#b-set').addEventListener('click', () => $('#settings').classList.toggle('open'));
+$('#b-save').addEventListener('click', () => {
+  const v = $('#tok').value.trim();
+  if(v) CFD.setToken(v);
+  if(!CFD.actif()){ setMsg('Colle d’abord un jeton.'); return; }
+  setMsg('Test en cours…');
+  CFD.tester().then(r => {
+    if(!r.ok){ setMsg('Refusé : ' + r.msg); return; }
+    $('#tok').value = ''; $('#tok').placeholder = 'jeton enregistré';
+    setMsg('Connecté — ' + r.msg);
+    refresh();
+  });
+});
+$('#b-clear').addEventListener('click', () => {
+  CFD.setToken(''); $('#tok').value = ''; $('#tok').placeholder = 'xxxxxxxx-xxxxxxxxxxxxxxxx';
+  setMsg('Jeton retiré — retour aux données Yahoo différées.'); refresh();
+});
+$('#b-corr').addEventListener('click', () => {
+  if(!CFD.actif()){ setMsg('Enregistre un jeton d’abord.'); return; }
+  setMsg('Comparaison en cours…');
+  // On compare les VARIATIONS, pas les niveaux. C'est ce qui décide si le CFD
+  // est un substitut acceptable : QQQ donnait 0,924 et ce n'était pas assez.
+  Promise.all([CFD.candles('5m', 500), NQ.brut('NQ=F', '5m', '5d')]).then(([a, b]) => {
+    const r = CFD.correlation(a, b && b.candles ? b.candles : b);
+    if(!r || r.r == null){ setMsg('Pas assez de bougies communes.'); return; }
+    const v = r.r;
+    setMsg('Corrélation sur ' + r.n + ' bougies 5 min : <b>' + v.toFixed(4) + '</b><br>' +
+      (v >= 0.985 ? 'Excellent — utilisable tel quel.'
+       : v >= 0.96 ? 'Correct, mais surveille les écarts.'
+       : 'Insuffisant : QQQ faisait 0,924 et l’avantage y disparaissait.'));
+  }).catch(() => setMsg('Comparaison impossible.'));
+});
+
+/* ── alertes ────────────────────────────────────────────────────────── */
+function paintAlert(){
+  const b = $('#b-alert');
+  if(!window.Notif || !Notif.supporte()){ b.disabled = true; b.title = 'Non supporté'; return; }
+  const on = Notif.actif() && Notif.permis();
+  b.className = 'ico' + (on ? ' on' : '');
+  b.title = on ? 'Alertes activées' : 'Activer les alertes';
+}
+$('#b-alert').addEventListener('click', () => {
+  if(Notif.actif()) { Notif.desactiver(); paintAlert(); }
+  else Notif.activer().then(paintAlert);
+});
+
+/* ── démarrage ──────────────────────────────────────────────────────── */
+paintAll(); paintAlert();
+if(CFD.actif()) $('#tok').placeholder = 'jeton enregistré';
+setInterval(() => { paintTop(); }, 1000);
+refresh();
+setInterval(refresh, 300000);   // le modèle travaille en M5/M15 : 5 minutes suffisent
+</script>
+</body>
+</html>

@@ -1,0 +1,1566 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>MECH · NQ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* Langage visuel repris de weevolveit.com : fond presque noir semé d'une
+     grille de points, barre flottante en pastille, libellés en monospace
+     majuscules largement espacées, un accent magenta, et de très grands
+     chiffres. La typographie des titres vient de subscrr.app — Inter Tight. */
+  :root{
+    --bg:#0a0a0b; --panel:#121214; --panel-2:#17171a;
+    --line:rgba(255,255,255,.10); --line-2:rgba(255,255,255,.20);
+    --ink:#f4f4f6; --muted:#8b8b93; --faint:#5c5c64;
+    --accent:#E4007C;
+    --long:#2fd4a0; --short:#ff5c5c; --wait:#ffb020;
+    --mono:'JetBrains Mono','IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+    --display:'Inter Tight','Inter',-apple-system,sans-serif;
+    --r:14px;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{margin:0;color:var(--ink);font:15.5px/1.6 var(--sans);letter-spacing:-.01em;
+    -webkit-font-smoothing:antialiased;background:var(--bg);
+    /* la grille de points : discrète, elle donne la profondeur sans image */
+    background-image:radial-gradient(rgba(255,255,255,.055) 1px,transparent 1px);
+    background-size:22px 22px;background-attachment:fixed;
+    padding-bottom:env(safe-area-inset-bottom,0px)}
+  .wrap{max-width:840px;margin:0 auto;padding:0 20px}
+
+  /* libellés techniques : monospace, majuscules, très espacées */
+  .lab{font-family:var(--mono);font-size:.66rem;font-weight:500;text-transform:uppercase;
+    letter-spacing:.16em;color:var(--faint)}
+  .mono{font-family:var(--display);font-variant-numeric:tabular-nums;font-feature-settings:'tnum' 1}
+
+  /* ── barre flottante ───────────────────────────────────────────────── */
+  header{position:sticky;top:0;z-index:10;padding:16px 0 4px;
+    padding-top:calc(16px + env(safe-area-inset-top,0px))}
+  .bar{display:flex;align-items:center;gap:14px;height:62px;padding:0 22px;
+    background:rgba(18,18,20,.82);backdrop-filter:blur(14px) saturate(1.4);
+    border:1px solid var(--line);border-radius:999px}
+  .sym{font-family:var(--mono);font-size:.78rem;font-weight:700;letter-spacing:.14em;color:var(--muted)}
+  .px{font-family:var(--display);font-size:1.55rem;font-weight:700;letter-spacing:-.035em;
+    font-variant-numeric:tabular-nums}
+  .chg{font-family:var(--mono);font-size:.74rem;font-weight:500;letter-spacing:.04em;
+    padding:3px 10px;border-radius:999px;border:1px solid var(--line)}
+  .chg.up{color:var(--long)} .chg.dn{color:var(--short)}
+  .bar-r{margin-left:auto;display:flex;align-items:center;gap:9px}
+  .age{font-family:var(--mono);font-size:.64rem;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--faint);white-space:nowrap}
+  .age b{color:var(--muted);font-weight:500}
+  .ico{width:36px;height:36px;display:grid;place-items:center;border:1px solid var(--line);
+    border-radius:999px;background:transparent;color:var(--muted);cursor:pointer;font-size:14px;
+    transition:border-color .15s,color .15s,background .15s}
+  .ico:hover{border-color:var(--line-2);color:var(--ink)}
+  .ico.on{border-color:var(--accent);color:var(--accent);background:rgba(228,0,124,.12)}
+
+  /* ── état de séance ────────────────────────────────────────────────── */
+  .sess{display:flex;align-items:center;gap:10px;padding:26px 0 0;
+    font-family:var(--mono);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--faint);flex:none}
+  .dot.on{background:var(--accent);box-shadow:0 0 0 4px rgba(228,0,124,.18)}
+
+  /* ── sections ──────────────────────────────────────────────────────── */
+  section{padding:34px 0 0}
+  h2{margin:0 0 14px;font-family:var(--mono);font-size:.66rem;font-weight:500;
+    letter-spacing:.18em;text-transform:uppercase;color:var(--faint)}
+
+  /* ── chaîne du modèle ──────────────────────────────────────────────── */
+  .step{display:flex;gap:18px;align-items:flex-start;padding:18px 22px;background:var(--panel);
+    border:1px solid var(--line)}
+  .step+.step{border-top:0}
+  .step:first-child{border-radius:var(--r) var(--r) 0 0}
+  .step:last-child{border-radius:0 0 var(--r) var(--r)}
+  .step-n{font-family:var(--mono);font-size:.7rem;color:var(--faint);width:18px;flex:none;padding-top:5px;
+    letter-spacing:.06em}
+  .step-b{flex:1;min-width:0}
+  .step-t{display:block;font-family:var(--display);font-size:1.08rem;font-weight:700;
+    letter-spacing:-.025em;margin-bottom:3px}
+  .step-d{display:block;font-size:.88rem;color:var(--muted);line-height:1.5}
+  .step-s{flex:none;font-family:var(--mono);font-size:.6rem;font-weight:500;letter-spacing:.14em;
+    text-transform:uppercase;padding:5px 11px;border-radius:999px;
+    border:1px solid var(--line);color:var(--faint)}
+  .step.ok .step-s{border-color:rgba(47,212,160,.4);color:var(--long)}
+  .step.no .step-s{border-color:rgba(255,92,92,.4);color:var(--short)}
+  .step.wait .step-s{border-color:rgba(255,176,32,.4);color:var(--wait)}
+
+  /* ── la position : le bloc qui se détache, bordé de magenta ────────── */
+  .trade{background:var(--panel);border:1px solid var(--accent);border-radius:var(--r);overflow:hidden;
+    box-shadow:0 0 0 4px rgba(228,0,124,.10)}
+  .t-head{display:flex;align-items:baseline;gap:14px;padding:22px 24px 18px}
+  .t-dir{font-family:var(--display);font-size:1.75rem;font-weight:800;letter-spacing:-.04em}
+  .t-dir.long{color:var(--long)} .t-dir.short{color:var(--short)}
+  .t-tf{font-family:var(--mono);font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;color:var(--faint)}
+  .t-rr{margin-left:auto;font-family:var(--mono);font-size:.76rem;font-weight:500;letter-spacing:.1em;
+    padding:5px 13px;border-radius:999px;border:1px solid var(--line);color:var(--ink)}
+  .t-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);
+    border-top:1px solid var(--line)}
+  .t-cell{background:var(--panel-2);padding:16px 18px}
+  .t-k{font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.16em;
+    color:var(--faint);margin-bottom:7px}
+  .t-v{font-family:var(--display);font-size:1.34rem;font-weight:700;letter-spacing:-.035em;
+    font-variant-numeric:tabular-nums}
+  .t-v.sl{color:var(--short)} .t-v.tp{color:var(--long)}
+  .t-sub{font-family:var(--mono);font-size:.64rem;letter-spacing:.06em;color:var(--faint);margin-top:4px}
+  .t-why{padding:16px 24px 22px;font-size:.87rem;color:var(--muted);line-height:1.55}
+  @media(max-width:560px){.t-grid{grid-template-columns:repeat(2,1fr)}}
+
+  .empty{padding:32px 22px;border:1px dashed var(--line);border-radius:var(--r);
+    font-size:.88rem;color:var(--muted);text-align:center;line-height:1.6;background:var(--panel)}
+
+  /* ── unités ────────────────────────────────────────────────────────── */
+  .tfs{border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+  .tf{display:flex;align-items:baseline;gap:16px;padding:14px 22px;background:var(--panel);font-size:.87rem}
+  .tf+.tf{border-top:1px solid var(--line)}
+  .tf.ok{background:var(--panel-2)}
+  .tf.ret{background:rgba(228,0,124,.09);box-shadow:inset 2px 0 0 var(--accent)}
+  .tf.off{color:var(--faint)}
+  .tf-id{font-family:var(--mono);font-size:.74rem;font-weight:600;letter-spacing:.1em;width:48px;flex:none}
+  .tf-st{color:var(--muted);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .tf-rr{font-family:var(--mono);font-size:.74rem;letter-spacing:.06em;flex:none;color:var(--faint)}
+  .tf.ok .tf-rr{color:var(--long)}
+
+  /* ── réglages ──────────────────────────────────────────────────────── */
+  .panelbox{display:none;border:1px solid var(--line);border-radius:var(--r);
+    background:var(--panel);padding:22px;margin-top:20px}
+  .panelbox.open{display:block}
+  .panelbox p{margin:0 0 16px;font-size:.87rem;color:var(--muted);line-height:1.6}
+  .panelbox label{display:block;font-family:var(--mono);font-size:.62rem;text-transform:uppercase;
+    letter-spacing:.16em;color:var(--faint);margin-bottom:8px}
+  .panelbox input{width:100%;padding:12px 14px;background:var(--bg);border:1px solid var(--line);
+    border-radius:10px;color:var(--ink);font:13px var(--mono)}
+  .panelbox input:focus{outline:0;border-color:var(--accent)}
+  .row{display:flex;gap:9px;margin-top:14px;flex-wrap:wrap}
+  .btn{font-family:var(--mono);font-size:.7rem;font-weight:500;letter-spacing:.12em;text-transform:uppercase;
+    padding:11px 18px;border-radius:999px;border:1px solid var(--line);
+    background:transparent;color:var(--ink);cursor:pointer;transition:border-color .15s,background .15s}
+  .btn:hover{border-color:var(--line-2)}
+  .btn.p{background:var(--accent);border-color:var(--accent);color:#fff}
+  .btn.p:hover{filter:brightness(1.1)}
+  .msg{margin-top:14px;font-size:.85rem;color:var(--muted);line-height:1.6}
+
+  footer{margin-top:44px;padding:24px 0 40px;border-top:1px solid var(--line);
+    font-family:var(--mono);font-size:.66rem;letter-spacing:.07em;color:var(--faint);line-height:1.9}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap bar">
+    <span class="sym">NQ</span>
+    <span class="px mono" id="px">—</span>
+    <span class="chg mono" id="chg"></span>
+    <span class="bar-r">
+      <span class="age" id="age"></span>
+      <button class="ico" id="b-alert" title="Alertes">🔔</button>
+      <button class="ico" id="b-set" title="Réglages">⚙</button>
+    </span>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="sess"><span class="dot" id="sdot"></span><span id="stxt">Chargement…</span></div>
+
+  <div class="panelbox" id="settings">
+    <p><b>Flux temps réel.</b> Par défaut le site lit Yahoo, qui a environ
+       <b>10 minutes de retard</b> sur le NQ. Un compte démo OANDA donne le NAS100 sans retard.
+       Le jeton part directement chez OANDA et reste dans ce navigateur.</p>
+    <label>Jeton OANDA — compte pratique</label>
+    <input type="password" id="tok" placeholder="xxxxxxxx-xxxxxxxxxxxxxxxx" autocomplete="off">
+    <div class="row">
+      <button class="btn p" id="b-save">Enregistrer</button>
+      <button class="btn" id="b-corr">Corrélation avec le NQ</button>
+      <button class="btn" id="b-clear">Retirer</button>
+    </div>
+    <div class="msg" id="setmsg"></div>
+  </div>
+
+  <section>
+    <h2>Chaîne du modèle</h2>
+    <div id="chain"></div>
+  </section>
+
+  <section>
+    <h2>Position</h2>
+    <div id="trade"></div>
+  </section>
+
+  <section>
+    <h2>Unités de temps</h2>
+    <div id="tfs"></div>
+  </section>
+
+  <footer>
+    MECH Model de PB Blake, sur le NQ uniquement. Si une étape manque, il n'y a pas de position.<br>
+    Données Yahoo Finance ou OANDA. Pédagogique — pas un conseil financier.
+  </footer>
+</div>
+
+<script>
+/*
+ * session.js — FENÊTRES DE TRADING DU BOT
+ * -----------------------------------------------------------------------------
+ * Le bot ne prend de position que pendant DEUX créneaux :
+ *
+ *   1. De l'ouverture de Wall Street (09 h 30 à New York) à 17 h 00 à Paris.
+ *   2. De 19 h 00 à 21 h 00, heure française.
+ *
+ * Le second créneau correspond à 13 h 00 – 15 h 00 à New York : c'est la
+ * deuxième macro de la séance américaine, celle d'après le déjeuner.
+ *
+ * Pourquoi lire les DEUX fuseaux au lieu de coder « 15 h 30 – 17 h 00 » :
+ * la France et les États-Unis ne changent PAS d'heure les mêmes semaines
+ * (mi-mars et fin octobre). Pendant ces quelques semaines l'écart passe de
+ * 6 h à 5 h : l'ouverture de Wall Street tombe alors à 14 h 30 à Paris. On lit
+ * donc l'heure réelle dans chaque fuseau, et les créneaux restent justes toute
+ * l'année, sans rien toucher.
+ *
+ * Hors fenêtre : AUCUNE nouvelle position. Les positions déjà ouvertes
+ * continuent d'être suivies (on ne coupe rien de force ici).
+ */
+(function (root) {
+  'use strict';
+
+  var NY = 'America/New_York';
+  var PARIS = 'Europe/Paris';
+
+  // Chaque borne dit dans QUEL fuseau elle se lit. C'est tout l'intérêt :
+  // l'ouverture suit New York, la fermeture suit Paris.
+  var FENETRES = [
+    { id: 'wallstreet',
+      nom: 'Ouverture de Wall Street → 17 h 00 (heure française)',
+      court: 'Wall Street → 17 h',
+      debut: { tz: NY,    min: 9 * 60 + 30 },
+      fin:   { tz: PARIS, min: 17 * 60 } },
+    { id: 'soiree',
+      nom: '19 h 00 → 21 h 00 (heure française) — la macro de l’après-midi à New York',
+      court: '19 h → 21 h',
+      debut: { tz: PARIS, min: 19 * 60 },
+      fin:   { tz: PARIS, min: 21 * 60 } }
+  ];
+
+  var _fmt = {};
+  function fmtFor(tz) {
+    if (!_fmt[tz]) _fmt[tz] = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz, hour12: false, weekday: 'short',
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit'
+    });
+    return _fmt[tz];
+  }
+
+  // Lit l'heure d'une date dans un fuseau donné (sans dépendre du fuseau du PC).
+  function parts(date, tz) {
+    var o = {};
+    fmtFor(tz).formatToParts(date).forEach(function (p) { o[p.type] = p.value; });
+    var dows = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+    var h = parseInt(o.hour, 10); if (h === 24) h = 0;   // minuit s'écrit "24" chez certains moteurs
+    return {
+      y: +o.year, m: +o.month, d: +o.day,
+      h: h, mi: parseInt(o.minute, 10),
+      dow: dows[o.weekday],
+      min: h * 60 + parseInt(o.minute, 10)
+    };
+  }
+
+  function fmtDuree(mins) {
+    if (mins <= 0) return '0 min';
+    var h = Math.floor(mins / 60), m = mins % 60;
+    return h ? (h + ' h' + (m ? ' ' + m + ' min' : '')) : (m + ' min');
+  }
+  function hhmm(min) {
+    var h = Math.floor(min / 60), m = min % 60;
+    return h + ' h' + (m ? ' ' + (m < 10 ? '0' : '') + m : '');
+  }
+
+  // État complet des fenêtres à un instant donné.
+  function state(date) {
+    var now = date || new Date();
+    var ny = parts(now, NY), pa = parts(now, PARIS);
+    var horloge = {}; horloge[NY] = ny; horloge[PARIS] = pa;
+    var ouvrable = ny.dow >= 1 && ny.dow <= 5;   // Wall Street : lundi → vendredi
+
+    // Chaque borne ramenée à l'heure de PARIS, pour pouvoir tout comparer.
+    // L'écart doit être ramené dans [-12 h, +12 h] : à 20 h à New York il est
+    // 02 h à Paris, et une soustraction brute donne -18 h au lieu de +6 h — ce
+    // qui ouvrait la fenêtre en pleine nuit.
+    var ecart = pa.min - ny.min;
+    if (ecart < -720) ecart += 1440;
+    if (ecart > 720) ecart -= 1440;
+    function enParis(borne) {
+      return borne.tz === PARIS ? borne.min : borne.min + ecart;
+    }
+
+    var actives = [], prochaine = null, resteMin = null, dansMin = null;
+    FENETRES.forEach(function (f) {
+      var d = enParis(f.debut), fin = enParis(f.fin);
+      var dedans = ouvrable && pa.min >= d && pa.min < fin;
+      if (dedans) {
+        actives.push(f);
+        var r = fin - pa.min;
+        if (resteMin == null || r < resteMin) resteMin = r;
+      } else if (ouvrable && pa.min < d) {
+        var att = d - pa.min;
+        if (dansMin == null || att < dansMin) { dansMin = att; prochaine = f; }
+      }
+      f._parisDebut = d; f._parisFin = fin;
+    });
+
+    var open = actives.length > 0;
+    var raison = open ? ('Fenêtre « ' + actives[0].court +' » ouverte')
+      : !ouvrable ? 'Week-end — Wall Street est fermé'
+      : prochaine ? ('Avant la fenêtre « ' + prochaine.court + ' »')
+      : 'Toutes les fenêtres du jour sont passées';
+
+    return {
+      ouverte: open,
+      fenetre: open ? actives[0].id : null,
+      fenetre_nom: open ? actives[0].nom : null,
+      raison: raison,
+      heure_ny: (ny.h < 10 ? '0' : '') + ny.h + ':' + (ny.mi < 10 ? '0' : '') + ny.mi,
+      heure_paris: (pa.h < 10 ? '0' : '') + pa.h + ':' + (pa.mi < 10 ? '0' : '') + pa.mi,
+      reste_min: resteMin,
+      dans_min: dansMin,
+      prochaine: prochaine ? prochaine.court : null,
+      // Les créneaux du jour, en heure de Paris (14 h 30 ou 15 h 30 selon la semaine).
+      creneaux: FENETRES.map(function (f) {
+        return { id: f.id, nom: f.nom, court: f.court,
+          debut: hhmm(f._parisDebut), fin: hhmm(f._parisFin),
+          active: open && actives.indexOf(f) >= 0 };
+      }),
+      texte: open ? ('Ouverte (' + actives[0].court + ') — fermeture dans ' + fmtDuree(resteMin))
+        : (dansMin != null ? ('Fermée — ' + prochaine.court + ' dans ' + fmtDuree(dansMin))
+                           : 'Fermée — ' + raison)
+    };
+  }
+
+  function isOpen(date) { return state(date).ouverte; }
+
+  // Bloc injecté dans le prompt du Bot IA.
+  function promptBlock(date) {
+    var s = state(date);
+    var t = '=== FENÊTRES DE TRADING (RÈGLE ÉLIMINATOIRE) ===\n';
+    t += 'Le bot ne prend de position que pendant ces créneaux, heure de Paris :\n';
+    s.creneaux.forEach(function (c) {
+      t += '  • ' + c.debut + ' → ' + c.fin + '  (' + c.nom + ')' + (c.active ? '  ← EN COURS' : '') + '\n';
+    });
+    t += 'Il est actuellement ' + s.heure_paris + ' à Paris (' + s.heure_ny + ' à New York).\n';
+    t += 'ÉTAT : ' + (s.ouverte ? 'FENÊTRE OUVERTE' : 'FENÊTRE FERMÉE') + ' — ' + s.raison + '.\n';
+    if (s.ouverte) {
+      t += 'Il reste ' + fmtDuree(s.reste_min) + ' avant la fermeture de ce créneau. ';
+      t += 'N\'ouvre AUCUNE position dont l\'objectif ne peut raisonnablement pas être atteint dans ce délai : ';
+      t += 'à moins de 30 minutes de la fermeture, ne propose plus de nouvelle entrée.\n';
+    } else {
+      t += '⛔ INTERDICTION ABSOLUE : renvoie "idees": [] — AUCUNE nouvelle position hors de ces créneaux. ';
+      t += 'Tu peux en revanche remplir "amd" et "preshot" pour préparer la prochaine ouverture.\n';
+    }
+    return t;
+  }
+
+  root.WINDOW = { state: state, isOpen: isOpen, promptBlock: promptBlock, parts: parts, FENETRES: FENETRES };
+})(typeof window !== 'undefined' ? window : this);
+
+</script>
+<script>
+'use strict';
+/**
+ * FLUX TEMPS RÉEL PAR CFD — OANDA (compte démo gratuit)
+ *
+ * POURQUOI. Yahoo sert le NQ avec environ 10 minutes de retard : mesuré, pas
+ * supposé. Les indices QQQ et ^NDX sont bien en temps réel mais ne le
+ * remplacent pas — corrélation des variations en 5 min de 0,92 et 0,91, et
+ * l'avantage de la stratégie tombe de +0,262 R à +0,013 R puis −0,075 R.
+ *
+ * Un CFD « NAS100 » est différent : il n'est pas calculé sur l'indice cash, il
+ * est dérivé du FUTURE lui-même et coté 23 h sur 24. Il devrait donc suivre le
+ * NQ de bien plus près. « Devrait » : le module fournit `correlation()` pour le
+ * VÉRIFIER au lieu de le croire, en comparant au NQ de Yahoo.
+ *
+ * SÉCURITÉ. L'API d'OANDA autorise l'appel direct depuis le navigateur — elle
+ * renvoie `access-control-allow-origin` et accepte l'en-tête `Authorization`.
+ * Aucun relais tiers n'est utilisé : le jeton ne transite par personne d'autre
+ * qu'OANDA. Il reste dans le localStorage du navigateur et n'est jamais écrit
+ * dans le dépôt.
+ *
+ * Utiliser un compte PRATIQUE (démo). Le jeton d'un compte réel n'a rien à
+ * faire dans un navigateur.
+ */
+var CFD = (function () {
+
+  var API = 'https://api-fxpractice.oanda.com/v3';
+  var CLE = 'cfd.oanda.token';
+  var INSTR = 'NAS100_USD';
+  // Correspondance avec les symboles Yahoo utilisés par le reste du site.
+  // Le S&P est gardé : c'est lui qui sert à la divergence SMT.
+  var MAP = { 'NQ=F': 'NAS100_USD', 'ES=F': 'SPX500_USD' };
+
+  function token()      { try { return localStorage.getItem(CLE) || ''; } catch (e) { return ''; } }
+  function setToken(t)  { try { localStorage.setItem(CLE, (t || '').trim()); } catch (e) {} }
+  function actif()      { return !!token(); }
+
+  // OANDA : M1, M2, M5, M15, M30, H1, H4, D
+  var GRAN = { '1m': 'M1', '2m': 'M2', '5m': 'M5', '15m': 'M15', '30m': 'M30',
+               '60m': 'H1', '1h': 'H1', '4h': 'H4', '1d': 'D' };
+
+  /**
+   * Bougies OHLC, au même format que le reste du site : { t, o, h, l, c }.
+   * @param interval clé de GRAN
+   * @param count    nombre de bougies (max 5000 chez OANDA)
+   */
+  function candles(interval, count, sym) {
+    var tk = token();
+    if (!tk || typeof fetch === 'undefined') return Promise.resolve(null);
+    var inst = sym ? MAP[sym] : INSTR;
+    if (!inst) return Promise.resolve(null);          // symbole sans équivalent CFD
+    var g = GRAN[interval] || 'M5';
+    var u = API + '/instruments/' + inst + '/candles?granularity=' + g +
+            '&count=' + (count || 500) + '&price=M';
+    return fetch(u, { headers: { 'Authorization': 'Bearer ' + tk,
+                                 'Accept-Datetime-Format': 'UNIX' } })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (j) {
+        if (!j || !j.candles) return null;
+        var out = [];
+        j.candles.forEach(function (c) {
+          // `complete: false` = bougie en cours. On l'écarte : toutes les
+          // décisions du modèle se prennent sur clôture.
+          if (!c.complete || !c.mid) return;
+          out.push({ t: Math.round(parseFloat(c.time) * 1000),
+                     o: +c.mid.o, h: +c.mid.h, l: +c.mid.l, c: +c.mid.c });
+        });
+        return out.length ? out : null;
+      })
+      .catch(function () { return null; });
+  }
+
+  /** Âge de la dernière bougie close, en minutes. */
+  function fraicheur(cs) {
+    if (!cs || !cs.length) return null;
+    return Math.round((Date.now() - cs[cs.length - 1].t) / 60000);
+  }
+
+  /**
+   * Corrélation des VARIATIONS entre le CFD et le NQ de Yahoo, sur les bougies
+   * de même horodatage. C'est la mesure qui décide si ce flux est utilisable :
+   * QQQ donnait 0,924 et ce n'était pas assez.
+   * @return { n, r, ratio } ou null
+   */
+  function correlation(cfdCs, nqCs) {
+    if (!cfdCs || !nqCs) return null;
+    var m = {}; nqCs.forEach(function (x) { m[x.t] = x.c; });
+    var pa = [], pb = [];
+    cfdCs.forEach(function (x) { if (m[x.t] != null) { pa.push(x.c); pb.push(m[x.t]); } });
+    if (pa.length < 30) return null;
+    var ra = [], rb = [];
+    for (var i = 1; i < pa.length; i++) { ra.push(pa[i] / pa[i - 1] - 1); rb.push(pb[i] / pb[i - 1] - 1); }
+    var moy = function (v) { return v.reduce(function (a, b) { return a + b; }, 0) / v.length; };
+    var ma = moy(ra), mb = moy(rb), cov = 0, sa = 0, sb = 0;
+    for (var k = 0; k < ra.length; k++) {
+      cov += (ra[k] - ma) * (rb[k] - mb); sa += Math.pow(ra[k] - ma, 2); sb += Math.pow(rb[k] - mb, 2);
+    }
+    var r = (sa > 0 && sb > 0) ? cov / Math.sqrt(sa * sb) : null;
+    return { n: pa.length, r: r,
+             ratio: pb[pb.length - 1] / pa[pa.length - 1] };   // NQ / CFD : la base
+  }
+
+  /** Vérifie que le jeton fonctionne et renvoie un diagnostic lisible. */
+  function tester() {
+    if (!actif()) return Promise.resolve({ ok: false, msg: 'Aucun jeton enregistré.' });
+    return candles('5m', 60).then(function (cs) {
+      if (!cs) return { ok: false, msg: 'Jeton refusé ou instrument indisponible.' };
+      var age = fraicheur(cs);
+      return { ok: true, n: cs.length, age: age, prix: cs[cs.length - 1].c,
+               msg: cs.length + ' bougies · dernière close il y a ' + age + ' min · ' + cs[cs.length - 1].c };
+    });
+  }
+
+  return { actif: actif, token: token, setToken: setToken, candles: candles,
+           fraicheur: fraicheur, correlation: correlation, tester: tester,
+           INSTR: INSTR, MAP: MAP };
+})();
+if (typeof window !== 'undefined') window.CFD = CFD;
+
+</script>
+<script>
+/*
+ * nq.js — MECH MODEL sur le NASDAQ (NQ) avec SMT contre le S&P 500 (ES)
+ * -----------------------------------------------------------------------------
+ * Le MECH Model de PB Blake se trade sur le Nasdaq futures (NQ/MNQ). Ce module
+ * fournit au site TOUT ce que le modèle exige :
+ *   - les bougies NQ (contexte D1 + exécution M15/M5)
+ *   - les bougies ES (S&P 500) UNIQUEMENT pour la divergence SMT
+ *   - le PDH/PDL (plus-haut / plus-bas de la veille)
+ *   - les GAPS NON COMBLÉS (le cœur du modèle) avec leur EQ (équilibre = cible)
+ *   - la divergence SMT NQ vs ES (filtre éliminatoire du MECH)
+ *
+ * Données : Yahoo Finance, via un proxy CORS (même technique que le calendrier
+ * éco) pour que ça marche depuis un fichier local dans le navigateur.
+ * Pédagogique — pas un conseil financier.
+ */
+(function (root) {
+  'use strict';
+
+  // Plusieurs relais : un proxy public gratuit tombe régulièrement (j'ai eu des
+  // erreurs 520/522 en le testant). On essaie les suivants avant d'abandonner.
+  var PROXIES = [
+    'https://api.allorigins.win/raw?url=',
+    'https://corsproxy.io/?url=',
+    'https://api.codetabs.com/v1/proxy/?quest='
+  ];
+  var YF = 'https://query1.finance.yahoo.com/v8/finance/chart/';
+  var SYM = { nq: 'NQ=F', es: 'ES=F' };   // Nasdaq 100 futures / S&P 500 futures
+
+  function url(proxy, sym, interval, range) {
+    return proxy + encodeURIComponent(YF + encodeURIComponent(sym) + '?interval=' + interval + '&range=' + range);
+  }
+
+  // Combien de bougies demander au CFD pour couvrir la même profondeur que
+  // la plage Yahoo correspondante.
+  var PROFONDEUR = { '1m': 2000, '2m': 2000, '5m': 2500, '15m': 2000,
+                     '30m': 1500, '60m': 1500, '1h': 1500, '1d': 400 };
+
+  // Récupère les bougies OHLC d'un symbole.
+  //
+  // Quand un jeton CFD est enregistré, ce flux PRIME sur Yahoo : il est en
+  // temps réel là où Yahoo accuse une dizaine de minutes de retard sur le NQ.
+  // Si le CFD échoue — jeton expiré, réseau, instrument sans équivalent — on
+  // retombe silencieusement sur Yahoo plutôt que de ne rien afficher.
+  function candles(sym, interval, range) {
+    if (typeof fetch === 'undefined') return Promise.resolve(null);
+
+    if (typeof CFD !== 'undefined' && CFD.actif() && CFD.MAP[sym]) {
+      return CFD.candles(interval, PROFONDEUR[interval] || 1000, sym)
+        .then(function (cs) {
+          if (!cs || cs.length < 60) return yahoo(sym, interval, range);
+          // On rend EXACTEMENT la forme attendue par le reste du module :
+          // { sym, price, chg, candles }. Le prix est la dernière clôture —
+          // le CFD ne fournit pas de « regularMarketPrice » séparé.
+          var d = cs[cs.length - 1], v = cs.length > 1 ? cs[0] : null;
+          return { sym: CFD.MAP[sym], source: 'cfd',
+                   price: d.c, chg: v ? (d.c / v.c - 1) * 100 : null,
+                   tz: 'UTC', candles: cs };
+        })
+        .catch(function () { return yahoo(sym, interval, range); });
+    }
+    return yahoo(sym, interval, range);
+  }
+
+  function yahoo(sym, interval, range) {
+
+    function tryProxy(i) {
+      if (i >= PROXIES.length) return Promise.resolve(null);
+      return fetchOne(url(PROXIES[i], sym, interval, range))
+        .then(function (r) { return r || tryProxy(i + 1); })
+        .catch(function () { return tryProxy(i + 1); });
+    }
+    return tryProxy(0);
+  }
+
+  // Cache par requête : une bougie H1 ne bouge pas toutes les 5 minutes, et un
+  // relais public gratuit finit par limiter si on le bombarde. Chaque unité a
+  // donc sa propre durée de fraîcheur.
+  var RAW = {};
+  function candlesCached(sym, interval, range, ttl) {
+    var k = sym + '|' + interval + '|' + range;
+    var e = RAW[k];
+    if (e && (Date.now() - e.t) < ttl) return Promise.resolve(e.v);
+    return candles(sym, interval, range).then(function (v) {
+      if (v) RAW[k] = { t: Date.now(), v: v };
+      return v || (e ? e.v : null);      // en cas d'échec, on garde la dernière bonne réponse
+    });
+  }
+
+  function fetchOne(u) {
+    return fetch(u)
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (j) {
+        var res = j && j.chart && j.chart.result && j.chart.result[0];
+        if (!res || !res.timestamp) return null;
+        var q = res.indicators.quote[0], out = [];
+        for (var i = 0; i < res.timestamp.length; i++) {
+          if (q.open[i] == null || q.close[i] == null) continue;
+          out.push({ t: res.timestamp[i] * 1000, o: q.open[i], h: q.high[i], l: q.low[i], c: q.close[i] });
+        }
+        return { sym: res.meta.symbol, price: res.meta.regularMarketPrice,
+          chg: res.meta.regularMarketChangePercent, tz: res.meta.exchangeTimezoneName, candles: out };
+      })
+      .catch(function () { return null; });
+  }
+
+  // --- GAPS NON COMBLÉS (le cœur du MECH Model) -------------------------------
+  // Deux familles :
+  //  1) gap "vrai" de session : le bas d'une bougie est au-dessus du haut de la
+  //     précédente (ou l'inverse) — typique des futures qui ferment la nuit.
+  //  2) FVG (imbalance 3 bougies) : trou laissé par un mouvement rapide.
+  // Un gap est NON COMBLÉ tant que le prix n'est pas revenu dedans après coup.
+  function findGaps(cs, fenetre) {
+    // On ne remonte que les `fenetre` dernières bougies : au-delà, un gap
+    // n'est plus une cible réaliste, et la recherche coûte cher (O(n²)).
+    if (fenetre && cs.length > fenetre) cs = cs.slice(cs.length - fenetre);
+    var gaps = [], i;
+    function unfilled(lo, hi, from) {        // le prix est-il revenu dans la zone ?
+      for (var k = from; k < cs.length; k++) { if (cs[k].l <= hi && cs[k].h >= lo) return false; }
+      return true;
+    }
+    for (i = 1; i < cs.length; i++) {
+      if (cs[i].l > cs[i - 1].h) {           // gap haussier
+        var lo1 = cs[i - 1].h, hi1 = cs[i].l;
+        if (unfilled(lo1, hi1, i + 1)) gaps.push({ type: 'gap', dir: 'haussier', lo: lo1, hi: hi1, eq: (lo1 + hi1) / 2, t: cs[i].t });
+      } else if (cs[i].h < cs[i - 1].l) {    // gap baissier
+        var lo2 = cs[i].h, hi2 = cs[i - 1].l;
+        if (unfilled(lo2, hi2, i + 1)) gaps.push({ type: 'gap', dir: 'baissier', lo: lo2, hi: hi2, eq: (lo2 + hi2) / 2, t: cs[i].t });
+      }
+    }
+    for (i = 2; i < cs.length; i++) {        // FVG (3 bougies)
+      if (cs[i].l > cs[i - 2].h) {
+        var a = cs[i - 2].h, b = cs[i].l;
+        if (unfilled(a, b, i + 1)) gaps.push({ type: 'fvg', dir: 'haussier', lo: a, hi: b, eq: (a + b) / 2, t: cs[i].t });
+      } else if (cs[i].h < cs[i - 2].l) {
+        var c = cs[i].h, d = cs[i - 2].l;
+        if (unfilled(c, d, i + 1)) gaps.push({ type: 'fvg', dir: 'baissier', lo: c, hi: d, eq: (c + d) / 2, t: cs[i].t });
+      }
+    }
+    return gaps.sort(function (x, y) { return y.t - x.t; }).slice(0, 8); // les plus récents
+  }
+
+  // --- DIVERGENCE SMT : NQ vs ES (filtre éliminatoire du MECH) ---------------
+  // Principe : deux actifs corrélés doivent faire le même extrême. Si l'un fait
+  // un nouveau plus-haut et PAS l'autre, le mouvement manque de conviction.
+  function smt(nq, es, n) {
+    n = n || 20;
+    if (!nq || !es || nq.length < 2 * n || es.length < 2 * n) return null;
+    function mx(a, s, e) { return Math.max.apply(null, a.slice(s, e).map(function (x) { return x.h; })); }
+    function mn(a, s, e) { return Math.min.apply(null, a.slice(s, e).map(function (x) { return x.l; })); }
+    var nHiR = mx(nq, nq.length - n), nHiP = mx(nq, nq.length - 2 * n, nq.length - n);
+    var eHiR = mx(es, es.length - n), eHiP = mx(es, es.length - 2 * n, es.length - n);
+    var nLoR = mn(nq, nq.length - n), nLoP = mn(nq, nq.length - 2 * n, nq.length - n);
+    var eLoR = mn(es, es.length - n), eLoP = mn(es, es.length - 2 * n, es.length - n);
+    var nqHH = nHiR > nHiP, esHH = eHiR > eHiP;
+    var nqLL = nLoR < nLoP, esLL = eLoR < eLoP;
+    if (nqHH !== esHH) {
+      return { type: 'baissière', detail: nqHH ? 'NQ fait un nouveau plus-haut mais le S&P (ES) NON'
+        : 'ES fait un nouveau plus-haut mais le NQ NON',
+        consigne: 'Divergence SMT BAISSIÈRE — n’achète PAS (le MECH interdit de trader contre la SMT).' };
+    }
+    if (nqLL !== esLL) {
+      return { type: 'haussière', detail: nqLL ? 'NQ fait un nouveau plus-bas mais le S&P (ES) NON'
+        : 'ES fait un nouveau plus-bas mais le NQ NON',
+        consigne: 'Divergence SMT HAUSSIÈRE — ne vends PAS (le MECH interdit de trader contre la SMT).' };
+    }
+    return { type: 'aucune', detail: 'NQ et ES font les mêmes extrêmes (pas de divergence).',
+      consigne: 'Pas de divergence SMT — ce filtre ne bloque aucun sens.' };
+  }
+
+  // ===========================================================================
+  // STRUCTURE DU MECH : SWEEP → SÉQUENCE → INVERSION
+  // ---------------------------------------------------------------------------
+  // C'est le DÉCLENCHEUR du modèle. Avant, le site ne le calculait pas : il
+  // donnait les cibles (gaps) et les filtres (SMT) mais laissait le bot DEVINER
+  // la structure. Maintenant elle est calculée sur les vraies bougies, comme
+  // dans le script Pine — donc vérifiable, et non-repeinte.
+  //
+  // ⚠️ HONNÊTETÉ : « inversion » n'a pas de définition universelle. Celle codée
+  // ici est le CISD (clôture au-delà des opens opposés) + displacement. C'est UN
+  // choix, indiqué tel quel dans les sorties — pas « la » définition officielle.
+  // ===========================================================================
+
+  // Heure de New York d'un timestamp (les sessions du MECH sont définies en ET).
+  var _etFmt = null;
+  function etParts(ts) {
+    if (!_etFmt) _etFmt = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/New_York', hour12: false,
+      year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'
+    });
+    var o = {};
+    _etFmt.formatToParts(new Date(ts)).forEach(function (p) { o[p.type] = p.value; });
+    var h = parseInt(o.hour, 10); if (h === 24) h = 0;
+    return { jour: o.year + '-' + o.month + '-' + o.day, min: h * 60 + parseInt(o.minute, 10) };
+  }
+
+  // Extrêmes des sessions ASIE et LONDRES sur les dernières 48 h : ce sont des
+  // POOLS DE LIQUIDITÉ, donc des niveaux susceptibles d'être balayés.
+  function sessionPools(cs) {
+    var cut = cs.length ? cs[cs.length - 1].t - 48 * 3600 * 1000 : 0;
+    var asia = { h: null, l: null }, lon = { h: null, l: null };
+    cs.forEach(function (c) {
+      if (c.t < cut) return;
+      var e = etParts(c.t);
+      // Asie : 20 h 00 → minuit (ET). Londres : 03 h 00 → 06 h 00 (ET).
+      var inAsia = e.min >= 20 * 60;
+      var inLon = e.min >= 3 * 60 && e.min < 6 * 60;
+      if (inAsia) {
+        asia.h = asia.h == null ? c.h : Math.max(asia.h, c.h);
+        asia.l = asia.l == null ? c.l : Math.min(asia.l, c.l);
+      }
+      if (inLon) {
+        lon.h = lon.h == null ? c.h : Math.max(lon.h, c.h);
+        lon.l = lon.l == null ? c.l : Math.min(lon.l, c.l);
+      }
+    });
+    return { asia: asia, londres: lon };
+  }
+
+  // Swings CONFIRMÉS : un pivot n'existe qu'après `len` bougies de chaque côté.
+  // Il ne peut donc jamais apparaître puis disparaître (anti-repeint).
+  function swings(cs, len) {
+    len = len || 5;
+    var hi = [], lo = [], i, k, ok;
+    for (i = len; i < cs.length - len; i++) {
+      ok = true;
+      for (k = i - len; k <= i + len; k++) { if (k !== i && cs[k].h >= cs[i].h) { ok = false; break; } }
+      if (ok) hi.push({ prix: cs[i].h, i: i, t: cs[i].t });
+      ok = true;
+      for (k = i - len; k <= i + len; k++) { if (k !== i && cs[k].l <= cs[i].l) { ok = false; break; } }
+      if (ok) lo.push({ prix: cs[i].l, i: i, t: cs[i].t });
+    }
+    return { hauts: hi, bas: lo };
+  }
+
+  function atr(cs, n) {
+    n = n || 14;
+    if (cs.length < n + 1) return null;
+    var sum = 0;
+    for (var i = cs.length - n; i < cs.length; i++) {
+      var pc = cs[i - 1].c;
+      sum += Math.max(cs[i].h - cs[i].l, Math.abs(cs[i].h - pc), Math.abs(cs[i].l - pc));
+    }
+    return sum / n;
+  }
+
+  // --- INVERSION, version IFVG (la plus mécanique) ---------------------------
+  // Un FVG qui se fait TRAVERSER change de camp : le prix clôture au-delà, et
+  // la zone devient support (ou résistance) dans l'autre sens.
+  //   FVG baissier dont le prix CLÔTURE au-dessus  -> inversion HAUSSIÈRE
+  //   FVG haussier dont le prix CLÔTURE en dessous -> inversion BAISSIÈRE
+  // Aucun seuil arbitraire, aucune appréciation : c'est la seule définition
+  // d'« inversion » entièrement mécanique. Le backtest 60 jours la place devant
+  // le CISD, le MSS et l'engulfing — c'est pour ça qu'elle est utilisée par défaut.
+  var IFVG_AGE = 120;
+
+  function zonesFVG(cs) {
+    var z = [], i, k;
+    for (i = 2; i < cs.length; i++) {
+      if (cs[i].l > cs[i - 2].h) z.push({ bas: cs[i - 2].h, haut: cs[i].l, haussier: true, ne: i, casse: null });
+      else if (cs[i].h < cs[i - 2].l) z.push({ bas: cs[i].h, haut: cs[i - 2].l, haussier: false, ne: i, casse: null });
+    }
+    z.forEach(function (x) {
+      for (k = x.ne + 1; k < cs.length; k++) {
+        if (k - x.ne > IFVG_AGE) break;
+        if (x.haussier ? cs[k].c < x.bas : cs[k].c > x.haut) { x.casse = k; break; }
+      }
+    });
+    return z;
+  }
+
+  // Première inversion IFVG dans le bon sens, après la bougie `from`.
+  function inversionIFVG(cs, from, haussiere) {
+    var z = zonesFVG(cs), best = null;
+    z.forEach(function (x) {
+      if (x.casse == null || x.casse <= from) return;
+      if (haussiere !== !x.haussier) return;      // FVG baissier cassé au-dessus = inversion haussière
+      if (best == null || x.casse < best.casse) best = x;
+    });
+    if (!best) return null;
+    var i = best.casse;
+    return { i: i, t: cs[i].t, prix: cs[i].c,
+      bas: Math.min(cs[i].l, best.bas), haut: Math.max(cs[i].h, best.haut),
+      zone: [+best.bas.toFixed(2), +best.haut.toFixed(2)],
+      definition: 'IFVG (FVG traversé, la zone change de camp)' };
+  }
+
+  // INVERSION (définition CISD + displacement) cherchée APRÈS la bougie du sweep.
+  function inversion(cs, from, haussiere, look, a) {
+    look = look || 5;
+    for (var i = Math.max(from + 1, look); i < cs.length; i++) {
+      var corps = Math.abs(cs[i].c - cs[i].o);
+      var disp = a ? corps > a : true;          // mouvement franc, pas une bougie molle
+      var ext = cs[i - 1].o;
+      for (var k = i - look; k < i; k++) {
+        if (k < 0) continue;
+        ext = haussiere ? Math.max(ext, cs[k].o) : Math.min(ext, cs[k].o);
+      }
+      var ok = haussiere ? (cs[i].c > ext && cs[i].c > cs[i].o)
+                         : (cs[i].c < ext && cs[i].c < cs[i].o);
+      if (ok && disp) {
+        // La bougie d'inversion et les deux qui la précèdent = « la structure de
+        // l'inversion ». C'est LÀ que se place le stop (voir trade()).
+        var lo = cs[i].l, hi = cs[i].h;
+        for (var j = Math.max(0, i - 2); j <= i; j++) { lo = Math.min(lo, cs[j].l); hi = Math.max(hi, cs[j].h); }
+        return { i: i, t: cs[i].t, prix: cs[i].c, bas: lo, haut: hi, definition: 'CISD + displacement' };
+      }
+    }
+    return null;
+  }
+
+  // La séquence complète du MECH.
+  //   LONG  : swing low → swing high → LOWER LOW qui balaye une liquidité → inversion haussière
+  //   SHORT : swing high → swing low → HIGHER HIGH qui balaye une liquidité → inversion baissière
+  function structure(cs, niveaux, opts) {
+    opts = opts || {};
+    var len = opts.pivots || 5;
+    var expire = opts.expire || 30;      // le setup meurt s'il n'y a pas d'inversion
+    var sw = swings(cs, len);
+    var a = atr(cs, 14);
+    var mode = opts.inversion || 'ifvg';
+    var out = {
+      sens: null, valide: false, sweep: null, inversion: null,
+      mode_inversion: mode,
+      definition_inversion: mode === 'ifvg'
+        ? 'IFVG : un FVG traversé change de camp et devient support/résistance'
+        : 'CISD (clôture au-delà des opens opposés) + corps > ATR(14)',
+      detail: ''
+    };
+    if (sw.bas.length < 2 || sw.hauts.length < 2) {
+      out.detail = 'Pas assez de swings confirmés sur les bougies disponibles.';
+      return out;
+    }
+
+    // Quels niveaux comptent comme liquidité ?
+    function pools(bas) {
+      var p = [];
+      function add(v, nom) { if (v != null) p.push({ prix: v, quoi: nom }); }
+      if (bas) {
+        add(niveaux.pdl, 'PDL (plus-bas de la veille)');
+        add(niveaux.asiaL, "plus-bas de la session ASIE");
+        add(niveaux.lonL, 'plus-bas de la session LONDRES');
+        add(sw.bas.length >= 2 ? sw.bas[sw.bas.length - 2].prix : null, 'swing low précédent');
+      } else {
+        add(niveaux.pdh, 'PDH (plus-haut de la veille)');
+        add(niveaux.asiaH, "plus-haut de la session ASIE");
+        add(niveaux.lonH, 'plus-haut de la session LONDRES');
+        add(sw.hauts.length >= 2 ? sw.hauts[sw.hauts.length - 2].prix : null, 'swing high précédent');
+      }
+      return p;
+    }
+
+    var fin = cs.length - 1;
+
+    // On ne regarde pas QUE le dernier swing : un setup armé il y a 20 bougies
+    // est encore vivant tant qu'il n'a pas expiré. On remonte donc les swings
+    // récents et on garde le plus récent qui coche la séquence complète.
+    function chercher(bas) {
+      var liste = bas ? sw.bas : sw.hauts;
+      var autre = bas ? sw.hauts : sw.bas;
+      var p = pools(bas);
+      for (var n = liste.length - 1; n >= 1; n--) {
+        var cur = liste[n], prec = liste[n - 1];
+        if (fin - cur.i > expire) break;                       // trop vieux : setup mort
+        var casse = bas ? (cur.prix < prec.prix) : (cur.prix > prec.prix);
+        if (!casse) continue;                                   // pas un lower low / higher high
+        var entre = autre.filter(function (x) { return x.i > prec.i && x.i < cur.i; }).length > 0;
+        if (!entre) continue;                                   // séquence incomplète
+        var pris = null;
+        p.forEach(function (x) {
+          var touche = bas ? (cur.prix <= x.prix) : (cur.prix >= x.prix);
+          if (!touche) return;
+          if (!pris) { pris = x; return; }
+          // le pool le plus "proche" du prix balayé est le plus significatif
+          if (bas ? x.prix > pris.prix : x.prix < pris.prix) pris = x;
+        });
+        if (pris) return { swing: cur, pool: pris };
+      }
+      return null;
+    }
+
+    var L = chercher(true), S = chercher(false);
+    var choix = null, sens = null;
+    if (L && S) { choix = L.swing.i >= S.swing.i ? L : S; sens = (choix === L) ? 'LONG' : 'SHORT'; }
+    else if (L) { choix = L; sens = 'LONG'; }
+    else if (S) { choix = S; sens = 'SHORT'; }
+
+    if (choix) {
+      var haussier = sens === 'LONG';
+      out.sens = sens;
+      out.sweep = { niveau: +choix.pool.prix.toFixed(2), quoi: choix.pool.quoi,
+                    prix_atteint: +choix.swing.prix.toFixed(2), t: choix.swing.t,
+                    bougies_depuis: fin - choix.swing.i };
+      var inv = mode === 'ifvg' ? inversionIFVG(cs, choix.swing.i, haussier)
+                                : inversion(cs, choix.swing.i, haussier, 5, a);
+      if (inv && inv.i - choix.swing.i <= expire) {
+        out.inversion = inv;
+        out.valide = true;
+        out.detail = 'Séquence ' + sens + ' complète : balayage du ' + choix.pool.quoi + ' à ' +
+          choix.pool.prix.toFixed(2) + ' (prix descendu/monté à ' + choix.swing.prix.toFixed(2) +
+          '), puis inversion ' + (haussier ? 'haussière' : 'baissière') + ' confirmée à ' + inv.prix.toFixed(2) + '.';
+      } else {
+        out.detail = 'Balayage du ' + choix.pool.quoi + ' à ' + choix.pool.prix.toFixed(2) +
+          ' constaté il y a ' + (fin - choix.swing.i) + ' bougies, mais AUCUNE inversion ' +
+          (haussier ? 'haussière' : 'baissière') + ' confirmée depuis. On attend — on n\'entre jamais sur le balayage lui-même.';
+      }
+      return out;
+    }
+
+    out.detail = 'Aucun balayage de liquidité suivi d\'une structure valide sur les bougies récentes.';
+    return out;
+  }
+
+  // PDH / PDL : plus-haut et plus-bas de la veille (bougie D1 précédente).
+  function pdhl(daily) {
+    if (!daily || daily.length < 2) return null;
+    var y = daily[daily.length - 2];
+    return { pdh: y.h, pdl: y.l, date: y.t };
+  }
+
+  // ===========================================================================
+  // LE TRADE : entrée, stop, objectif, RR — déduits des règles du MECH.
+  // ---------------------------------------------------------------------------
+  //   ENTRÉE   : le prix de l'inversion (le modèle n'entre PAS sur le balayage).
+  //   STOP     : au-delà de l'extrême balayé, plus un petit tampon.
+  //   OBJECTIF : l'EQ du gap non comblé le plus proche dans le sens du trade.
+  //   RR       : rapport des deux. Sous 1, on ne prend pas.
+  // ===========================================================================
+  var BUFFER_PCT = 0.02;      // tampon du stop, en % du prix
+  var RR_MIN = 1.0;
+
+  function trade(d, opts) {
+    opts = opts || {};
+    if (!d || !d.structure || !d.structure.valide) return null;
+    var st = d.structure;
+    var long = st.sens === 'LONG';
+    var entree = st.inversion ? st.inversion.prix : d.nq.prix;
+    if (entree == null) return null;
+
+    var buf = entree * BUFFER_PCT / 100;
+
+    // --- STOP : sous/au-dessus de la STRUCTURE DE L'INVERSION (règle de Blake),
+    // et non au balayage. C'est la différence qui change tout : un stop au
+    // balayage est souvent 5 à 10 fois plus loin, ce qui écrase le RR et fait
+    // refuser des setups parfaitement valides.
+    var slInv = null;
+    if (st.inversion && st.inversion.bas != null) {
+      slInv = long ? st.inversion.bas - buf : st.inversion.haut + buf;
+    }
+    var slBal = long ? st.sweep.prix_atteint - buf : st.sweep.prix_atteint + buf;
+    var sl = slInv != null ? slInv : slBal;
+    var slSource = slInv != null ? "structure de l'inversion" : 'balayage';
+
+    // Un stop plus serré que la moitié de l'ATR serait balayé par le bruit :
+    // dans ce cas on recule jusqu'au balayage, comme le permet la règle
+    // (« sous le bas de l'inversion, ou sous l'order block/la structure »).
+    if (d.atr && Math.abs(entree - sl) < d.atr * 0.5) {
+      sl = slBal;
+      slSource = 'balayage (l’inversion était trop serrée pour l’ATR)';
+    }
+
+    // --- OBJECTIF : un gap NON COMBLÉ, en privilégiant l'unité la PLUS HAUTE
+    // disponible (règle de Blake : « preference for higher timeframe gaps »).
+    var candidats = opts.gaps || (d.gaps_non_comblés || []).map(function (g) {
+      return { tf: d.tf || '?', rang: 0, eq: g.eq_cible, sens: g.sens, zone: g.zone, type: g.type };
+    });
+    var tp = null, cible = null;
+    candidats.forEach(function (g) {
+      if (long ? g.eq <= entree : g.eq >= entree) return;
+      if (!cible) { cible = g; tp = g.eq; return; }
+      // unité plus haute d'abord ; à unité égale, le gap le plus proche
+      if (g.rang > cible.rang || (g.rang === cible.rang && (long ? g.eq < cible.eq : g.eq > cible.eq))) {
+        cible = g; tp = g.eq;
+      }
+    });
+    if (tp == null) {
+      return { possible: false, sens: st.sens, entree: +entree.toFixed(2), sl: +sl.toFixed(2),
+        sl_source: slSource,
+        raison: "Aucun gap non comblé au-delà de l'entrée, sur aucune unité : le modèle n'a pas d'objectif, donc pas de trade." };
+    }
+
+    var risque = Math.abs(entree - sl);
+    if (!(risque > 0)) return { possible: false, sens: st.sens, raison: 'Stop confondu avec l\'entrée.' };
+    var rr = Math.abs(tp - entree) / risque;
+
+    if (d.atr && risque < d.atr * 0.5) {
+      return { possible: false, sens: st.sens, entree: +entree.toFixed(2), sl: +sl.toFixed(2),
+        tp: +tp.toFixed(2), rr: +rr.toFixed(2), sl_source: slSource,
+        raison: 'Stop trop serré (' + risque.toFixed(2) + ' pts pour un ATR de ' + d.atr.toFixed(2) +
+          ') : il serait balayé par le bruit, et le RR de ' + rr.toFixed(2) + ' est un mirage.' };
+    }
+
+    // --- BREAK-EVEN au 1:1 (règle de Blake : stop à l'entrée une fois le 1:1
+    // atteint, ou dès que le gap interne est touché). C'est le mécanisme qui
+    // fait le taux de réussite : au pire on sort à zéro.
+    var be = long ? entree + risque : entree - risque;
+
+    // --- RUNNER : après le break-even, la liquidité EXTERNE.
+    var runner = null;
+    if (opts.liquidite) {
+      opts.liquidite.forEach(function (n) {
+        if (n == null) return;
+        if (long ? n <= tp : n >= tp) return;
+        if (runner == null || (long ? n < runner : n > runner)) runner = n;
+      });
+    }
+
+    return {
+      possible: rr >= RR_MIN,
+      sens: st.sens,
+      entree: +entree.toFixed(2),
+      sl: +sl.toFixed(2),
+      sl_source: slSource,
+      tp: +tp.toFixed(2),
+      be: +be.toFixed(2),
+      runner: runner != null ? +runner.toFixed(2) : null,
+      rr: +rr.toFixed(2),
+      risque_points: +risque.toFixed(2),
+      gain_points: +Math.abs(tp - entree).toFixed(2),
+      cible: cible ? ((cible.type || 'gap') + ' ' + cible.sens + ' en ' + cible.tf +
+                      ' — zone ' + cible.zone[0] + '–' + cible.zone[1]) : null,
+      cible_tf: cible ? cible.tf : null,
+      htf_aligne: opts.htf == null ? null : (opts.htf === st.sens),
+      raison: rr >= RR_MIN
+        ? ('Entrée sur l\'inversion à ' + entree.toFixed(2) + ', stop sous la ' + slSource +
+           ' (' + sl.toFixed(2) + '), objectif le gap non comblé de plus haute unité (' +
+           (cible ? cible.tf : '?') + ') à ' + tp.toFixed(2) + '. Break-even au 1:1 = ' + be.toFixed(2) + '.')
+        : ('RR de ' + rr.toFixed(2) + ' : sous le minimum de ' + RR_MIN + ', le modèle passe son tour.'),
+      motif: 'MECH — balayage ' + st.sweep.quoi + ' à ' + st.sweep.niveau +
+             ', inversion ' + (st.inversion ? st.inversion.definition : '—') +
+             ' à ' + (st.inversion ? st.inversion.prix : '—') +
+             ', stop sur ' + slSource + ', cible EQ ' + tp.toFixed(2) +
+             (cible ? ' (' + cible.tf + ')' : '') + ', BE au 1:1 à ' + be.toFixed(2) + '.'
+    };
+  }
+
+  // ===========================================================================
+  // BALAYAGE DE TOUTES LES TIMEFRAMES
+  // ---------------------------------------------------------------------------
+  // Le MECH ne vit pas sur une seule unité : la cible se lit en M5/M15, mais
+  // l'inversion peut se confirmer en M1. On analyse donc CHAQUE unité de la
+  // même façon, et on remonte celle qui donne le meilleur trade.
+  //
+  // M1 est plafonné à 2 jours : Yahoo n'autorise que 8 jours de M1 par requête,
+  // et au-delà de quelques centaines de bougies un gap n'est plus une cible.
+  // ===========================================================================
+  var TFS = [
+    { id: 'M1',  iv: '1m',  range: '2d',  fenetre: 400, pivots: 5, expire: 60, ttl: 4 },
+    { id: 'M5',  iv: '5m',  range: '5d',  fenetre: 400, pivots: 5, expire: 40, ttl: 4 },
+    { id: 'M15', iv: '15m', range: '5d',  fenetre: 400, pivots: 5, expire: 30, ttl: 9 },
+    { id: 'M30', iv: '30m', range: '1mo', fenetre: 300, pivots: 5, expire: 24, ttl: 19 },
+    { id: 'H1',  iv: '60m', range: '3mo', fenetre: 300, pivots: 5, expire: 20, ttl: 39 }
+  ];
+
+  function analyseTF(tf, nqC, esC, niveaux, prix) {
+    if (!nqC || nqC.length < 60) return { tf: tf.id, dispo: false, detail: 'Pas assez de bougies.' };
+    var gaps = findGaps(nqC, tf.fenetre);
+    var pools = sessionPools(nqC);
+    var lv = {
+      pdh: niveaux.pdh, pdl: niveaux.pdl,
+      asiaH: pools.asia.h, asiaL: pools.asia.l,
+      lonH: pools.londres.h, lonL: pools.londres.l
+    };
+    var struct = structure(nqC, lv, { pivots: tf.pivots, expire: tf.expire });
+    var div = esC ? smt(nqC, esC, 20) : null;
+    var vue = {
+      tf: tf.id, dispo: true, bougies: nqC.length,
+      // horodatage de la dernière bougie : sert à afficher l'âge réel de la donnée
+      derniere_bougie: nqC[nqC.length - 1] ? nqC[nqC.length - 1].t : null,
+      sessions: pools,
+      gaps_non_comblés: gaps.map(function (g) {
+        return { type: g.type === 'fvg' ? 'FVG' : 'gap de session', sens: g.dir,
+          zone: [+g.lo.toFixed(2), +g.hi.toFixed(2)], eq_cible: +g.eq.toFixed(2) };
+      }),
+      smt: div, structure: struct, nq: { prix: prix }, atr: atr(nqC, 14)
+    };
+    vue.tf = tf.id;
+    vue.trade = trade(vue);
+    // La SMT est un filtre ÉLIMINATOIRE : un trade contre elle n'existe pas.
+    if (vue.trade && vue.trade.possible && div && div.type !== 'aucune') {
+      var contre = (div.type === 'baissière' && vue.trade.sens === 'LONG') ||
+                   (div.type === 'haussière' && vue.trade.sens === 'SHORT');
+      if (contre) {
+        vue.trade.possible = false;
+        vue.trade.raison = 'Refusé par la SMT ' + div.type + ' : ' + div.consigne;
+      }
+    }
+    return vue;
+  }
+
+  // Parmi toutes les unités, laquelle retenir ?
+  // PAS celle qui affiche le plus gros RR : un RR énorme vient presque toujours
+  // d'un stop trop serré, donc d'un trade qui saute. Le MECH vise 1:1 à 1:1,5
+  // avec un TAUX DE RÉUSSITE élevé. On prend donc l'unité la PLUS BASSE qui
+  // valide — c'est là que l'entrée est la plus précise, et la spec dit que
+  // l'inversion M1 suffit.
+  function meilleur(vues) {
+    var ordre = TFS.map(function (t) { return t.id; });
+    var ok = vues.filter(function (v) { return v.dispo && v.trade && v.trade.possible; });
+    if (!ok.length) return null;
+    ok.sort(function (a, b) { return ordre.indexOf(a.tf) - ordre.indexOf(b.tf); });
+    return ok[0];
+  }
+
+  // Dernier instantané chargé : le prompt du Bot IA peut le relire sans
+  // refaire d'appel réseau (même principe que le calendrier économique).
+  var CACHE = null, CACHE_T = 0;
+  var TTL = 5 * 60 * 1000;   // 5 minutes : le MECH travaille en M5/M15
+
+  function data() { return CACHE; }
+
+  // Charge tout ce dont le MECH a besoin.
+  function load(force) {
+    if (!force && CACHE && (Date.now() - CACHE_T) < TTL) return Promise.resolve(CACHE);
+    return loadFresh();
+  }
+
+  function loadFresh() {
+    var MIN = 60 * 1000;
+    // Le PDH/PDL de la veille est figé : inutile de le redemander toutes les 5 min.
+    var req = [candlesCached(SYM.nq, '1d', '3mo', 60 * MIN)];
+    TFS.forEach(function (tf) { req.push(candlesCached(SYM.nq, tf.iv, tf.range, tf.ttl * MIN)); });
+    TFS.forEach(function (tf) { req.push(candlesCached(SYM.es, tf.iv, tf.range, tf.ttl * MIN)); });
+
+    return Promise.all(req).then(function (r) {
+      var nqD = r[0];
+      if (!nqD) return null;
+      var lv = pdhl(nqD.candles);
+      var niveaux = { pdh: lv ? lv.pdh : null, pdl: lv ? lv.pdl : null };
+      var prix = nqD.price;
+
+      var vues = TFS.map(function (tf, i) {
+        var nqC = r[1 + i], esC = r[1 + TFS.length + i];
+        return analyseTF(tf, nqC && nqC.candles, esC && esC.candles, niveaux, prix);
+      });
+      if (!vues.some(function (v) { return v.dispo; })) return null;
+
+      // ---- DEUXIÈME PASSAGE ----
+      // Blake privilégie le gap non comblé de la PLUS HAUTE unité disponible.
+      // On rassemble donc les cibles de toutes les unités, puis on recalcule
+      // chaque trade avec ce vivier commun (et pas seulement ses propres gaps).
+      // La source distingue deux niveaux de cible :
+      //   INTERNE — un gap non comblé d'unité BASSE (M1 à M15). C'est l'objectif
+      //             réel, celui qui est atteint souvent : c'est lui qui fait le
+      //             taux de réussite.
+      //   EXTERNE — la liquidité et les gaps d'unité haute, visés seulement par
+      //             le runner, APRÈS le passage au break-even.
+      // Viser directement un gap H1 depuis une entrée M1 gonfle le RR affiché
+      // et écroule le taux de réussite : exactement l'inverse du but.
+      var INTERNES = ['M1', 'M5', 'M15'];
+      var gapsGlobaux = [], gapsExternes = [];
+      vues.forEach(function (v, i) {
+        if (!v.dispo) return;
+        var interne = INTERNES.indexOf(v.tf) >= 0;
+        v.gaps_non_comblés.forEach(function (g) {
+          var o = { tf: v.tf, rang: i, eq: g.eq_cible, sens: g.sens, zone: g.zone, type: g.type };
+          if (interne) gapsGlobaux.push(o); else gapsExternes.push(g.eq_cible);
+        });
+      });
+
+      // Biais de l'unité haute : le modèle n'en exige pas, mais sa probabilité
+      // monte nettement quand le trade va dans le même sens.
+      var vueH1 = vues.filter(function (v) { return v.dispo && v.tf === 'H1'; })[0];
+      var htf = vueH1 && vueH1.structure && vueH1.structure.valide ? vueH1.structure.sens : null;
+
+      // Liquidité externe = destination du runner après le break-even.
+      var liq = [niveaux.pdh, niveaux.pdl].concat(gapsExternes);
+      vues.forEach(function (v) {
+        if (!v.dispo || !v.sessions) return;
+        liq.push(v.sessions.asia.h, v.sessions.asia.l, v.sessions.londres.h, v.sessions.londres.l);
+      });
+
+      vues.forEach(function (v) {
+        if (!v.dispo) return;
+        v.trade = trade(v, { gaps: gapsGlobaux, htf: htf, liquidite: liq });
+        if (v.trade && v.trade.possible && v.smt && v.smt.type !== 'aucune') {
+          var contre = (v.smt.type === 'baissière' && v.trade.sens === 'LONG') ||
+                       (v.smt.type === 'haussière' && v.trade.sens === 'SHORT');
+          if (contre) {
+            v.trade.possible = false;
+            v.trade.raison = 'Refusé par la SMT ' + v.smt.type + ' : ' + v.smt.consigne;
+          }
+        }
+      });
+
+      var best = meilleur(vues);
+      // La vue par défaut (affichage principal) : celle qui donne un trade, sinon M15.
+      var base = best || vues.filter(function (v) { return v.dispo && v.tf === 'M15'; })[0]
+                      || vues.filter(function (v) { return v.dispo; })[0];
+      var esPrix = null;
+      for (var k = 0; k < TFS.length; k++) { if (r[1 + TFS.length + k]) { esPrix = r[1 + TFS.length + k].price; break; } }
+
+      var out = {
+        nq: { prix: prix, variation_pct: nqD.chg != null ? +nqD.chg.toFixed(2) : null },
+        es: esPrix != null ? { prix: esPrix } : null,
+        pdh: lv ? +lv.pdh.toFixed(2) : null,
+        pdl: lv ? +lv.pdl.toFixed(2) : null,
+        timeframes: vues,
+        tf_retenue: base ? base.tf : null,
+        biais_htf: htf,
+        // Raccourcis vers la vue retenue, pour tout le code existant.
+        gaps_non_comblés: base ? base.gaps_non_comblés : [],
+        smt: base ? base.smt : null,
+        sessions: base ? base.sessions : null,
+        structure: base ? base.structure : null,
+        trade: base ? base.trade : null,
+        // Date de la DERNIÈRE bougie reçue, pas de l'appel réseau : c'est elle
+        // qui dit à quel point la donnée est fraîche. Yahoo sert le NQ avec
+        // environ 10 minutes de retard.
+        // Fraîcheur : on prend la bougie la PLUS RÉCENTE de toutes les unités,
+        // pas celle de l'unité retenue — une M15 a naturellement jusqu'à quinze
+        // minutes de retard, ce qui n'a rien à voir avec le retard du flux.
+        derniere_bougie: vues.reduce(function (m, v) {
+          return v.derniere_bougie && v.derniere_bougie > m ? v.derniere_bougie : m; }, 0) || null,
+        // D'où viennent les prix : 'cfd' en temps réel, sinon Yahoo différé.
+        source: nqD.source === 'cfd' ? 'cfd' : 'yahoo',
+        maj: Date.now()
+      };
+      CACHE = out;
+      CACHE_T = Date.now();
+      return out;
+    }).catch(function () { return null; });
+  }
+
+  // Bloc texte injecté dans le prompt du Bot IA.
+  function promptBlock(d) {
+    if (d === undefined) d = CACHE;
+    if (!d) return "=== DONNÉES NASDAQ (NQ) ===\nFlux NQ/ES injoignable pour le moment : tu n'as NI les gaps non comblés, NI le PDH/PDL, NI la SMT. "
+      + "Sans ces données le MECH Model ne peut PAS être validé — renvoie \"idees\": [] et explique-le dans \"marche\".";
+    var t = "=== DONNÉES NASDAQ (NQ) POUR LE MECH MODEL ===\n";
+    t += "NQ : " + d.nq.prix + (d.nq.variation_pct != null ? ' (' + (d.nq.variation_pct >= 0 ? '+' : '') + d.nq.variation_pct + '%)' : '') + "\n";
+    t += "PDH (plus-haut veille) : " + d.pdh + " · PDL (plus-bas veille) : " + d.pdl + "\n";
+    if (d.timeframes && d.timeframes.length) {
+      t += "BALAYAGE DE TOUTES LES UNITÉS DE TEMPS (chaque ligne est calculée, pas estimée) :\n";
+      d.timeframes.forEach(function (v) {
+        if (!v.dispo) { t += "  " + v.tf + " : indisponible\n"; return; }
+        var st = v.structure.valide ? ('structure VALIDE ' + v.structure.sens) : 'structure non valide';
+        var tr = v.trade ? (v.trade.possible
+              ? ('TRADE ' + v.trade.sens + ' · entrée ' + v.trade.entree + ' · stop ' + v.trade.sl +
+                 ' · objectif ' + v.trade.tp + ' · RR ' + v.trade.rr)
+              : ('pas de trade — ' + v.trade.raison)) : 'pas de trade';
+        t += "  " + v.tf + " : " + st + " · " + v.gaps_non_comblés.length + " gap(s) non comblé(s) · SMT " +
+             (v.smt ? v.smt.type : '—') + " · " + tr + "\n";
+      });
+      t += "UNITÉ RETENUE : " + (d.tf_retenue || '—') +
+           " — on garde la plus BASSE qui valide (entrée la plus précise), pas celle qui affiche le plus gros RR : " +
+           "un RR énorme vient presque toujours d'un stop trop serré.\n";
+    }
+    if (d.sessions) {
+      var p = d.sessions;
+      t += "Pools de liquidité récents — ASIE : haut " + (p.asia.h != null ? p.asia.h.toFixed(2) : '—') +
+        " / bas " + (p.asia.l != null ? p.asia.l.toFixed(2) : '—') +
+        " · LONDRES : haut " + (p.londres.h != null ? p.londres.h.toFixed(2) : '—') +
+        " / bas " + (p.londres.l != null ? p.londres.l.toFixed(2) : '—') + "\n";
+    }
+    if (d.structure) {
+      var st = d.structure;
+      t += "STRUCTURE (calculée sur les bougies M15, pas estimée) :\n";
+      t += "  Séquence : " + (st.valide ? "✅ VALIDE — sens " + st.sens : "❌ NON valide") + "\n";
+      if (st.sweep) {
+        t += "  Balayage : " + st.sweep.quoi + " à " + st.sweep.niveau +
+          " (le prix est allé jusqu'à " + st.sweep.prix_atteint + ")\n";
+      } else { t += "  Balayage : aucun balayage de liquidité identifié.\n"; }
+      t += "  Inversion : " + (st.inversion ? "confirmée à " + st.inversion.prix + " (" + st.inversion.definition + ")"
+                                            : "PAS encore confirmée") + "\n";
+      t += "  Lecture : " + st.detail + "\n";
+      t += "  ⚠️ La définition d'inversion utilisée ici est : " + st.definition_inversion +
+        ". Il n'existe pas de définition universelle — ne présente pas celle-ci comme officielle.\n";
+      if (!st.valide) {
+        t += "  ⛔ Sans séquence valide (balayage + structure + inversion), le MECH INTERDIT le trade : renvoie \"idees\": [].\n";
+      }
+    }
+    if (d.gaps_non_comblés.length) {
+      t += "GAPS NON COMBLÉS sur NQ (M15) — ce sont TES CIBLES (vise l'EQ) :\n";
+      d.gaps_non_comblés.forEach(function (g) {
+        t += "  • " + g.type + " " + g.sens + " : zone " + g.zone[0] + "–" + g.zone[1] + " · EQ (cible) = " + g.eq_cible + "\n";
+      });
+    } else { t += "Aucun gap non comblé détecté en M15 — sans cible de gap, le MECH ne donne pas de trade.\n"; }
+    if (d.trade) {
+      var tr = d.trade;
+      if (tr.possible) {
+        t += "TRADE CALCULÉ PAR LES RÈGLES (entrée/stop/objectif déjà déduits — reprends CES chiffres) :\n";
+        t += "  " + tr.sens + " · entrée " + tr.entree + " · stop " + tr.sl + " (" + tr.sl_source + ")" +
+             " · objectif " + tr.tp + " (" + tr.cible_tf + ") · RR " + tr.rr + "\n";
+        t += "  Break-even au 1:1 = " + tr.be + (tr.runner != null ? " · runner (liquidité externe) = " + tr.runner : "") + "\n";
+        if (tr.htf_aligne != null) {
+          t += "  Biais H1 : " + (tr.htf_aligne ? "ALIGNÉ avec le trade (la probabilité monte nettement)"
+                                                : "OPPOSÉ au trade (le modèle reste valable mais la probabilité baisse)") + "\n";
+        }
+        t += "  " + tr.raison + "\n";
+      } else {
+        t += "TRADE : impossible — " + tr.raison + "\n";
+      }
+    }
+    if (d.smt) {
+      t += "SMT (NQ vs S&P 500 / ES) : " + d.smt.type + " — " + d.smt.detail + "\n";
+      t += "  ⚠️ " + d.smt.consigne + "\n";
+    }
+    t += "RAPPEL : tu ne trades QUE le NQ avec le MECH Model, et la SMT se lit contre le S&P 500 (ES).\n";
+    return t;
+  }
+
+  root.NQ = { load: load, data: data, promptBlock: promptBlock, candles: candles,
+    // accès direct à Yahoo, sans passer par le CFD : sert à comparer les deux
+    brut: yahoo,
+    findGaps: findGaps, smt: smt, swings: swings, structure: structure,
+    sessionPools: sessionPools, trade: trade, TFS: TFS, analyseTF: analyseTF,
+    zonesFVG: zonesFVG, inversionIFVG: inversionIFVG };
+})(typeof window !== 'undefined' ? window : this);
+
+</script>
+<script>
+'use strict';
+/**
+ * NOTIFICATIONS — le site prévient au lieu d'attendre qu'on le regarde.
+ *
+ * ⚠️ HONNÊTETÉ SUR LE DÉLAI. Yahoo Finance sert le NQ avec environ 10 minutes
+ * de retard : c'est mesuré, pas supposé. Une notification d'ici n'est donc PAS
+ * un signal d'entrée en temps réel — c'est une alerte de surveillance. Le
+ * temps réel demande TradingView (pine/MECH_LIVE.pine) ou le flux Rithmic /
+ * Tradovate d'un compte prop firm.
+ *
+ * Le module affiche systématiquement l'âge de la donnée dans la notification,
+ * pour qu'on ne puisse pas se tromper là-dessus.
+ */
+var Notif = (function () {
+
+  var CLE_ETAT = 'notif.actif';
+  var CLE_VUS  = 'notif.vus';
+
+  function supporte() { return typeof Notification !== 'undefined'; }
+  function actif()    { try { return localStorage.getItem(CLE_ETAT) === '1'; } catch (e) { return false; } }
+  function permis()   { return supporte() && Notification.permission === 'granted'; }
+
+  function activer() {
+    if (!supporte()) return Promise.resolve(false);
+    return Notification.requestPermission().then(function (p) {
+      var ok = p === 'granted';
+      try { localStorage.setItem(CLE_ETAT, ok ? '1' : '0'); } catch (e) {}
+      return ok;
+    });
+  }
+  function desactiver() { try { localStorage.setItem(CLE_ETAT, '0'); } catch (e) {} }
+
+  // Mémoire des signaux déjà notifiés, pour ne pas sonner à chaque rafraîchissement.
+  function dejaVu(id) {
+    try {
+      var v = JSON.parse(localStorage.getItem(CLE_VUS) || '[]');
+      if (v.indexOf(id) >= 0) return true;
+      v.push(id);
+      if (v.length > 60) v = v.slice(-60);
+      localStorage.setItem(CLE_VUS, JSON.stringify(v));
+      return false;
+    } catch (e) { return false; }
+  }
+
+  /** Âge de la dernière bougie reçue, en minutes. */
+  function ageMin(d) {
+    if (!d || !d.derniere_bougie) return null;
+    return Math.round((Date.now() - d.derniere_bougie) / 60000);
+  }
+
+  /**
+   * Notifie s'il y a un trade possible non encore signalé.
+   * @param d instantané renvoyé par NQ.load()
+   */
+  function verifier(d) {
+    if (!d || !d.trade || !d.trade.possible) return null;
+    if (window.WINDOW && !WINDOW.isOpen()) return null;     // hors fenêtre de trading
+
+    var t = d.trade;
+    // identité d'un signal : sens + entrée + unité + jour. Deux rafraîchissements
+    // du même setup donnent le même identifiant.
+    var id = [new Date().toISOString().slice(0, 10), t.sens, t.entree, d.tf_retenue].join('|');
+    if (dejaVu(id)) return null;
+
+    var age = ageMin(d);
+    var retard = age == null ? 'retard inconnu' : 'donnée vieille de ' + age + ' min';
+    var corps = t.sens + ' NQ · entrée ' + t.entree + ' · stop ' + t.sl +
+                ' · objectif ' + t.tp + ' (RR ' + t.rr + ')\n' +
+                d.tf_retenue + ' — ' + retard + ', vérifie le graphique avant d\'agir.';
+
+    if (permis() && actif()) {
+      try {
+        new Notification('Signal MECH — ' + t.sens + ' NQ', {
+          body: corps, tag: id, requireInteraction: false
+        });
+      } catch (e) {}
+    }
+    return { id: id, sens: t.sens, corps: corps, age: age };
+  }
+
+  return { supporte: supporte, actif: actif, permis: permis,
+           activer: activer, desactiver: desactiver,
+           verifier: verifier, ageMin: ageMin };
+})();
+if (typeof window !== 'undefined') window.Notif = Notif;
+
+</script>
+<script>
+'use strict';
+const $ = s => document.querySelector(s);
+const fmt = n => n == null ? '—' : Number(n).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2});
+let D = null;
+
+/* ── barre + séance ─────────────────────────────────────────────────── */
+function paintTop(){
+  $('#px').textContent = D ? fmt(D.nq.prix) : '—';
+  const c = D && D.nq.variation_pct != null ? D.nq.variation_pct : null;
+  const e = $('#chg');
+  e.textContent = c == null ? '' : (c >= 0 ? '+' : '') + c.toFixed(2) + ' %';
+  e.className = 'chg mono ' + (c == null ? '' : c >= 0 ? 'up' : 'dn');
+
+  // L'âge de la donnée est affiché en clair : à 10 minutes de retard, un signal
+  // n'est pas un signal d'entrée. Mieux vaut le savoir que le croire.
+  const age = D && window.Notif ? Notif.ageMin(D) : null;
+  const src = D && D.source === 'cfd' ? 'OANDA' : 'Yahoo';
+  $('#age').innerHTML = age == null ? '' : '<b>' + src + '</b> · −' + age + ' min';
+
+  const w = window.WINDOW ? WINDOW.state() : null;
+  if(w){
+    $('#sdot').className = 'dot' + (w.ouverte ? ' on' : '');
+    $('#stxt').textContent = w.texte;
+  }
+}
+
+/* ── la chaîne : où en est le modèle, étape par étape ───────────────── */
+function paintChain(){
+  const box = $('#chain');
+  if(!D){ box.innerHTML = '<div class="empty">Récupération des données NQ…</div>'; return; }
+  const st = D.structure || {};
+  const gaps = D.gaps_non_comblés || [];
+  const smt = D.smt;
+
+  const etapes = [
+    { t:'Balayage de liquidité',
+      ok: !!st.sweep,
+      d: st.sweep ? ('Le prix a pris le ' + (st.sweep.pool ? st.sweep.pool.quoi : 'niveau') + ' puis est revenu.')
+                  : 'Aucun balayage récent suivi d’une réaction.' },
+    { t:'Structure',
+      ok: !!st.valide,
+      d: st.valide ? ('Séquence ' + st.sens + ' complète.')
+                   : (st.detail || 'Séquence incomplète.') },
+    { t:'Inversion',
+      ok: !!st.inversion,
+      attente: !!st.valide && !st.inversion,
+      d: st.inversion ? ('Confirmée — ' + (st.inversion.definition || 'clôture au travers du gap') + '.')
+                      : 'On n’entre jamais sur le balayage : il faut l’inversion.' },
+    { t:'Cible — gap non comblé',
+      ok: gaps.length > 0,
+      d: gaps.length ? (gaps.length + ' gap(s) non comblé(s), le plus proche à ' + fmt(gaps[0].eq_cible) + '.')
+                     : 'Aucune cible interne disponible.' },
+    { t:'SMT contre le S&P 500',
+      ok: !smt || smt.type === 'aucune',
+      no: smt && smt.type !== 'aucune',
+      d: !smt ? 'Non calculée.' : smt.type === 'aucune'
+            ? 'Pas de divergence — rien ne s’oppose au trade.'
+            : ('Divergence ' + smt.type + '. ' + (smt.consigne || '')) }
+  ];
+
+  box.innerHTML = etapes.map((e,i) => {
+    const cls = e.no ? 'no' : e.ok ? 'ok' : e.attente ? 'wait' : '';
+    const lbl = e.no ? 'bloqué' : e.ok ? 'validé' : e.attente ? 'en attente' : 'manquant';
+    return '<div class="step ' + cls + '"><span class="step-n mono">' + (i+1) + '</span>' +
+           '<span class="step-b"><span class="step-t">' + e.t + '</span>' +
+           '<span class="step-d">' + e.d + '</span></span>' +
+           '<span class="step-s">' + lbl + '</span></div>';
+  }).join('');
+}
+
+/* ── la position ────────────────────────────────────────────────────── */
+function paintTrade(){
+  const box = $('#trade');
+  const t = D && D.trade;
+  if(!t){ box.innerHTML = '<div class="empty">En attente des données.</div>'; return; }
+  if(!t.possible){
+    box.innerHTML = '<div class="empty">Pas de position.<br>' + (t.raison || 'Une étape du modèle manque.') + '</div>';
+    return;
+  }
+  const L = t.sens === 'LONG', dp = Math.abs(t.entree - t.sl), dt = Math.abs(t.tp - t.entree);
+  box.innerHTML =
+    '<div class="trade ' + (L ? 'long' : 'short') + '">' +
+      '<div class="t-head"><span class="t-dir ' + (L ? 'long' : 'short') + '">' + t.sens + '</span>' +
+        '<span class="t-tf">' + (D.tf_retenue || '') + '</span>' +
+        '<span class="t-rr">RR ' + Number(t.rr).toFixed(2) + '</span></div>' +
+      '<div class="t-grid">' +
+        '<div class="t-cell"><div class="t-k">Entrée</div><div class="t-v">' + fmt(t.entree) + '</div></div>' +
+        '<div class="t-cell"><div class="t-k">Stop</div><div class="t-v sl">' + fmt(t.sl) + '</div><div class="t-sub">−' + dp.toFixed(1) + ' pts</div></div>' +
+        '<div class="t-cell"><div class="t-k">Objectif</div><div class="t-v tp">' + fmt(t.tp) + '</div><div class="t-sub">+' + dt.toFixed(1) + ' pts</div></div>' +
+        '<div class="t-cell"><div class="t-k">Unité</div><div class="t-v">' + (D.tf_retenue || '—') + '</div></div>' +
+      '</div>' +
+      (t.motif ? '<div class="t-why">' + t.motif + '</div>' : '') +
+    '</div>';
+}
+
+/* ── le balayage des unités ─────────────────────────────────────────── */
+function paintTFs(){
+  const box = $('#tfs');
+  const vs = D && D.timeframes;
+  if(!vs){ box.innerHTML = '<div class="empty">—</div>'; return; }
+  box.innerHTML = '<div class="tfs">' + vs.map(v => {
+    if(!v.dispo) return '<div class="tf off"><span class="tf-id">' + v.tf + '</span><span class="tf-st">indisponible</span></div>';
+    const t = v.trade, ok = t && t.possible, ret = v.tf === D.tf_retenue;
+    const st = ok ? ('structure ' + t.sens) : ((v.structure && v.structure.valide) ? 'structure valide, pas d’entrée' : 'pas de setup');
+    return '<div class="tf ' + (ret ? 'ret' : ok ? 'ok' : '') + '">' +
+      '<span class="tf-id">' + v.tf + '</span>' +
+      '<span class="tf-st">' + st + '</span>' +
+      '<span class="tf-rr">' + (ok ? 'RR ' + Number(t.rr).toFixed(2) : '—') + '</span></div>';
+  }).join('') + '</div>';
+}
+
+function paintAll(){ paintTop(); paintChain(); paintTrade(); paintTFs(); }
+
+/* ── cycle de rafraîchissement ──────────────────────────────────────── */
+async function refresh(){
+  try{ D = await NQ.load(true); }catch(e){ D = null; }
+  paintAll();
+  if(D && window.Notif) Notif.verifier(D);
+}
+
+/* ── réglages ───────────────────────────────────────────────────────── */
+function setMsg(t){ $('#setmsg').innerHTML = t; }
+$('#b-set').addEventListener('click', () => $('#settings').classList.toggle('open'));
+$('#b-save').addEventListener('click', () => {
+  const v = $('#tok').value.trim();
+  if(v) CFD.setToken(v);
+  if(!CFD.actif()){ setMsg('Colle d’abord un jeton.'); return; }
+  setMsg('Test en cours…');
+  CFD.tester().then(r => {
+    if(!r.ok){ setMsg('Refusé : ' + r.msg); return; }
+    $('#tok').value = ''; $('#tok').placeholder = 'jeton enregistré';
+    setMsg('Connecté — ' + r.msg);
+    refresh();
+  });
+});
+$('#b-clear').addEventListener('click', () => {
+  CFD.setToken(''); $('#tok').value = ''; $('#tok').placeholder = 'xxxxxxxx-xxxxxxxxxxxxxxxx';
+  setMsg('Jeton retiré — retour aux données Yahoo différées.'); refresh();
+});
+$('#b-corr').addEventListener('click', () => {
+  if(!CFD.actif()){ setMsg('Enregistre un jeton d’abord.'); return; }
+  setMsg('Comparaison en cours…');
+  // On compare les VARIATIONS, pas les niveaux. C'est ce qui décide si le CFD
+  // est un substitut acceptable : QQQ donnait 0,924 et ce n'était pas assez.
+  Promise.all([CFD.candles('5m', 500), NQ.brut('NQ=F', '5m', '5d')]).then(([a, b]) => {
+    const r = CFD.correlation(a, b && b.candles ? b.candles : b);
+    if(!r || r.r == null){ setMsg('Pas assez de bougies communes.'); return; }
+    const v = r.r;
+    setMsg('Corrélation sur ' + r.n + ' bougies 5 min : <b>' + v.toFixed(4) + '</b><br>' +
+      (v >= 0.985 ? 'Excellent — utilisable tel quel.'
+       : v >= 0.96 ? 'Correct, mais surveille les écarts.'
+       : 'Insuffisant : QQQ faisait 0,924 et l’avantage y disparaissait.'));
+  }).catch(() => setMsg('Comparaison impossible.'));
+});
+
+/* ── alertes ────────────────────────────────────────────────────────── */
+function paintAlert(){
+  const b = $('#b-alert');
+  if(!window.Notif || !Notif.supporte()){ b.disabled = true; b.title = 'Non supporté'; return; }
+  const on = Notif.actif() && Notif.permis();
+  b.className = 'ico' + (on ? ' on' : '');
+  b.title = on ? 'Alertes activées' : 'Activer les alertes';
+}
+$('#b-alert').addEventListener('click', () => {
+  if(Notif.actif()) { Notif.desactiver(); paintAlert(); }
+  else Notif.activer().then(paintAlert);
+});
+
+/* ── démarrage ──────────────────────────────────────────────────────── */
+paintAll(); paintAlert();
+if(CFD.actif()) $('#tok').placeholder = 'jeton enregistré';
+setInterval(() => { paintTop(); }, 1000);
+refresh();
+setInterval(refresh, 300000);   // le modèle travaille en M5/M15 : 5 minutes suffisent
+</script>
+</body>
+</html>
