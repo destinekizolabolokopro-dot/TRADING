@@ -102,6 +102,11 @@ const DOLSEL  = args.dolsel || 'ancien';         // [HYP] proche | loin | ancien
 const DOLAGE  = +(args.dolage || 0);             // [HYP] âge max en bougies H1, 0 = illimité
 const DOLTOL  = +(args.doltol || 0.05);          // [HYP] % pour regrouper des niveaux « égaux »
 const LOGDOL  = args.logdol === '1';
+
+// Fenêtre de dates explicite, au format AAAA-MM-JJ, heure de New York.
+// Sert à séparer période de développement et période de validation.
+const DU      = args.du || '';
+const AU      = args.au || '';
 // ── STACKED POWER OF THREE ────────────────────────────────────────[BLAKE]
 // Les derniers schémas montrent DEUX PD Arrays empilés : le prix entre dans le
 // premier, repart (expansion), puis vient chercher un SECOND PD Array plus haut
@@ -487,6 +492,8 @@ function backtest(m1, m2, m5, m15, d1, h1) {
     // pour qu'un trade parte : ce n'était plus la séquence de Blake, c'était
     // un motif d'une bougie. --react et --keyage ne servaient à rien.
     if (parJour[e.jour] === undefined) { parJour[e.jour] = 0; etat = 'WAIT_BIAS'; dir = 0; key = null; }
+    if (DU && e.jour < DU) continue;
+    if (AU && e.jour > AU) continue;
     if (MOITIE === 1 && i > clock.length / 2) continue;
     if (MOITIE === 2 && i <= clock.length / 2) continue;
     if (GOLDEN && !dansGolden(e)) continue;                         // [SCRIPT]

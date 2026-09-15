@@ -97,6 +97,38 @@ et les quatre limites d'âge testées donnent toutes le même résultat à 0,07 
 près. Le choix de la règle est donc, à ce stade, sans effet mesurable — ce qui
 confirme que le problème n'est pas là.
 
+### Test hors période — deux blocs de 30 jours
+
+Yahoo plafonne l'intraday à 60 jours, période explicite ou non : il n'existe
+aucune « autre date » accessible sans fichier local. Le 2 minutes ne remonte
+qu'au 7 août — donc **toutes les mesures précédentes partent de là**. Le 5
+minutes remonte au 7 juillet, ce qui libère un bloc de 30 jours jamais
+examiné.
+
+Horloge 5 min, NQ seul, nets de frais :
+
+| | période | Trades | WR | WR hors BE | Espérance | PF | Max DD |
+|---|---|---|---|---|---|---|---|
+| **V0** | 07/07 → 06/08 · *jamais vu* | 12 | **33,3 %** | 20,0 % | **+0,780 R** | 2,16 | 4,05 R |
+| **V0** | 16/08 → 15/09 | 18 | **44,4 %** | 9,1 % | **−0,257 R** | 0,55 | 5,29 R |
+| **V1** | 07/07 → 06/08 · *jamais vu* | 12 | **41,7 %** | 22,2 % | **+0,720 R** | 2,22 | 3,59 R |
+| **V1** | 16/08 → 15/09 | 17 | **29,4 %** | 7,7 % | **−0,441 R** | 0,39 | 7,63 R |
+| V1 | tout le 5 min disponible | 34 | 35,3 % | 15,4 % | −0,030 R | 0,95 | 13,38 R |
+
+**Le signe s'inverse entre deux mois qui se suivent.** Gagnant sur juillet,
+perdant sur septembre, pour les deux versions. Rien n'est établi.
+
+Et la ligne la plus instructive du tableau : sur V0, la période au **plus fort
+taux de réussite** (44,4 %) est celle qui **perd de l'argent**, tandis que la
+période à 33,3 % gagne +0,78 R par trade. La démonstration est faite une
+deuxième fois, sur données indépendantes : **le taux de réussite ne dit rien de
+la rentabilité.**
+
+Note d'instabilité supplémentaire : passer l'horloge de 2 à 5 minutes fait
+chuter le taux de réussite de ~54 % à ~35 % sur des périodes qui se recouvrent.
+Le modèle est très sensible à l'unité d'exécution, ce qui est un signe de
+fragilité de plus.
+
 ### Réserve permanente sur la taille d'échantillon
 
 Aucun seuil de trades n'est posé comme vérité. Ce qui est reporté à chaque
