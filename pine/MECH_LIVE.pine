@@ -77,9 +77,13 @@ voteTF() =>
     var int   v     = 0
     // dernier FVG formé
     if low > high[2]
-        zBas := high[2], zHaut := low, zUp := true
+        zBas  := high[2]
+        zHaut := low
+        zUp   := true
     else if high < low[2]
-        zBas := high, zHaut := low[2], zUp := false
+        zBas  := high
+        zHaut := low[2]
+        zUp   := false
     if not na(zHaut)
         if zUp and close < zBas
             v := -1
