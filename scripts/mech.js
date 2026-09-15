@@ -96,7 +96,13 @@ const ATRMIN = +(args.atrmin || 0.5);          // stop minimum, en fraction d'AT
 const REACT  = +(args.react || 12);            // bougies max entre touche et IFVG
 
 // ═══════════════════════════════════════════════════════════════ données ══
+const fs = require('fs'), path = require('path');
+const CACHE = process.env.MECH_CACHE || '';
 async function fetchCandles(sym, interval, range) {
+  // Cache disque : une recherche de paramètres lance des centaines de
+  // backtests, il est hors de question de retélécharger à chaque fois.
+  const f = CACHE ? path.join(CACHE, `${sym.replace(/\W/g, '')}_${interval}_${range}.json`) : '';
+  if (f && fs.existsSync(f)) return JSON.parse(fs.readFileSync(f, 'utf-8'));
   const r = await fetch(`${YF}${encodeURIComponent(sym)}?interval=${interval}&range=${range}`,
     { headers: { 'User-Agent': 'Mozilla/5.0' } });
   if (!r.ok) throw new Error(`${sym} ${interval} : HTTP ${r.status}`);
@@ -108,6 +114,7 @@ async function fetchCandles(sym, interval, range) {
     if (q.open[i] == null || q.close[i] == null) continue;
     out.push({ t: res.timestamp[i] * 1000, o: q.open[i], h: q.high[i], l: q.low[i], c: q.close[i] });
   }
+  if (f) { fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, JSON.stringify(out)); }
   return out;
 }
 
