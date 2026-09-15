@@ -804,6 +804,8 @@ function journal(trades, cs, hs, nJours) {
     const requis = moy !== 0 ? Math.ceil(Math.pow(1.96 * sd / Math.abs(moy), 2)) : null;
     console.log(JSON.stringify({ tf: CSV ? "csv" : TF, moitie: MOITIE, sl: SLMODE, zentree: ZENTREE, disp: DISP, partiel: PART, smt: SMTMOD, n: trades.length, gains: g, pertes: p, be: b,
       wr: trades.length ? +(g / trades.length * 100).toFixed(1) : 0,
+      risquePts: trades.length ? +(trades.reduce((a,t)=>a+Math.abs(t.entree-t.slInit),0)/trades.length).toFixed(2) : 0,
+      prixMoyen: trades.length ? +(trades.reduce((a,t)=>a+t.entree,0)/trades.length).toFixed(0) : 0,
       esperance: +moy.toFixed(3), ecartType: +sd.toFixed(2),
       ic95: [+ic[0].toFixed(3), +ic[1].toFixed(3)],
       tradesRequis: requis, cumulR: +R.toFixed(1) }));
