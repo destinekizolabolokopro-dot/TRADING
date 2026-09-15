@@ -706,7 +706,13 @@
         // Date de la DERNIÈRE bougie reçue, pas de l'appel réseau : c'est elle
         // qui dit à quel point la donnée est fraîche. Yahoo sert le NQ avec
         // environ 10 minutes de retard.
-        derniere_bougie: base && base.derniere_bougie ? base.derniere_bougie : null,
+        // Fraîcheur : on prend la bougie la PLUS RÉCENTE de toutes les unités,
+        // pas celle de l'unité retenue — une M15 a naturellement jusqu'à quinze
+        // minutes de retard, ce qui n'a rien à voir avec le retard du flux.
+        derniere_bougie: vues.reduce(function (m, v) {
+          return v.derniere_bougie && v.derniere_bougie > m ? v.derniere_bougie : m; }, 0) || null,
+        // D'où viennent les prix : 'cfd' en temps réel, sinon Yahoo différé.
+        source: nqD.source === 'cfd' ? 'cfd' : 'yahoo',
         maj: Date.now()
       };
       CACHE = out;
