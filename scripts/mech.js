@@ -242,7 +242,7 @@ function mech(D) {
         p.r = p.part1 ? PART * TP1 + (1 - PART) * Math.max(0, Math.min(p.rr2, rBrut))
                       : Math.max(-1, Math.min(p.rr2, rBrut));
       }
-      if (p.sortie) { trades.push(p); ouverte = null; } else continue;
+      if (p.sortie) { p.tSortie = bar.t; p.barres = i - p.i; trades.push(p); ouverte = null; } else continue;
     }
 
     if (parJour[e.jour] === undefined) { parJour[e.jour] = 0; etat = 'CHERCHE'; key = null; swept = null; }
@@ -398,7 +398,7 @@ function mech(D) {
     console.log(JSON.stringify({ entonnoir: trades.entonnoir, trades: trades.map(x => ({
       r: +x.r.toFixed(4), o: x.sortie, sens: x.sens, d: x.jour, h: x.minET, tf: x.tf,
       niveau: x.niveau, sweep: x.sweep, e: +x.entree.toFixed(2), sl: +x.sl0.toFixed(2),
-      risq: +x.risq.toFixed(2), rr: +x.rr.toFixed(3) })) }));
+      risq: +x.risq.toFixed(2), rr: +x.rr.toFixed(3), min: x.barres * (HORLOGE==='1m'?1:HORLOGE==='2m'?2:5), finET: x.tSortie })) }));
     return;
   }
   console.log(`${trades.length} trades`);
