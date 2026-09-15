@@ -61,6 +61,83 @@ l'avais présenté de façon trop tranchée. Chercher le taux de réussite n'est
 absurde en soi ; ce qui est absurde, c'est de le chercher **en rapprochant la
 cible**, mécanisme qui dégrade toujours la rentabilité.
 
+## Vérifications de solidité
+
+Aucune autre période NQ n'est accessible : Yahoo plafonne l'intraday à 60
+jours, Dukascopy est bloqué depuis cet environnement, Polygon et EODHD
+demandent une clé. Trois vérifications de substitution ont donc été faites.
+
+### Test 1 · le même réglage, sans rien toucher, sur d'autres contrats
+
+Valeur du point et slippage propres à chaque contrat.
+
+| | Trades | WR | Espérance | PF | Max DD |
+|---|---|---|---|---|---|
+| **NQ** Nasdaq | 64 | 84,4 % | **+0,237 R** | 2,49 | 2,25 R |
+| YM Dow | 46 | 78,3 % | +0,102 R | 1,44 | 5,39 R |
+| GC Or | 46 | 76,1 % | +0,086 R | 1,35 | 3,28 R |
+| RTY Russell | 54 | 77,8 % | +0,069 R | 1,28 | 3,16 R |
+| ES S&P 500 | 45 | 71,1 % | −0,079 R | 0,75 | 5,06 R |
+| CL Pétrole | 32 | 65,6 % | −0,170 R | 0,55 | 6,53 R |
+
+Quatre contrats sur six sont positifs, et le taux de réussite reste haut
+partout — entre 65 et 84 %. Mais **aucun n'approche le NQ**, et le S&P, qui
+est le contrat le plus proche du Nasdaq, est négatif.
+
+La moyenne des trois autres indices est de **+0,031 R**, celle des quatre
+positifs hors NQ de **+0,086 R**. C'est une estimation indépendante de ce que
+vaut le jeu de règles une fois retiré le gain d'optimisation : autour de
+**+0,10 R**, pas +0,237 R.
+
+### Test 2 · la même stratégie sur une autre horloge d'exécution — ÉCHEC
+
+| horloge | Trades | WR | Espérance | PF |
+|---|---|---|---|---|
+| 5 min | 64 | 84,4 % | +0,237 R | 2,49 |
+| 2 min | 42 | 71,4 % | +0,038 R | 1,13 |
+| 1 min | 12 | 58,3 % | −0,140 R | 0,67 |
+
+L'avantage ne vit que sur le 5 minutes. C'est le résultat le plus inquiétant
+des trois : un comportement de marché réel ne devrait pas disparaître parce
+qu'on regarde les mêmes prix découpés autrement.
+
+### Test 3 · sensibilité aux paramètres — RÉUSSI
+
+C'est le test le plus parlant contre le sur-ajustement : un réglage ajusté au
+bruit s'effondre dès qu'on le bouge d'un cran, un effet réel se dégrade
+doucement.
+
+| fenêtre horaire | Espérance | | prise partielle | Espérance |
+|---|---|---|---|---|
+| 09:30 → 10:00 | +0,237 R | | tp1 = 0,4 | +0,225 R |
+| 09:35 → 10:05 | +0,189 R | | tp1 = 0,5 | +0,237 R |
+| 09:30 → 10:15 | +0,204 R | | tp1 = 0,6 | +0,237 R |
+| 09:30 → 09:45 | +0,220 R | | tp1 = 0,75 | +0,258 R |
+
+La fraction encaissée de 0,7 à 1,0 donne +0,231 à +0,240 R : aucune
+sensibilité. **C'est un plateau, pas un pic.** Le réglage n'est donc pas un
+accident numérique de l'optimiseur.
+
+À noter : `tp1 = 0,4` donne **89,1 % de réussite** avec un profit factor de
+**3,02** et une espérance quasi identique. Sur le même plateau, c'est un
+meilleur point si le taux de réussite est ce qui compte.
+
+### Verdict
+
+| test | résultat |
+|---|---|
+| sensibilité aux paramètres | ✅ réussi, franchement |
+| transfert vers d'autres contrats | ⚠️ partiel — 4 sur 6 positifs, le NQ très au-dessus |
+| transfert vers une autre horloge | ❌ échec |
+
+Un sur trois franchement réussi, un partiel, un échec. **Le jeu de règles a
+probablement un avantage réel mais faible, de l'ordre de +0,10 R**, et le
++0,237 R du NQ en 5 minutes contient une part de gain d'optimisation qu'on ne
+peut pas chiffrer sans vraies données hors période.
+
+À +0,10 R, le rendement tombe à **1,4 % par mois** à 0,5 % de risque — le bas
+de la fourchette annoncée, et non son haut.
+
 ## Ce qu'il faut savoir avant de s'en servir
 
 **1. Sélection sur les mêmes données.** Ce réglage est le meilleur de 263
