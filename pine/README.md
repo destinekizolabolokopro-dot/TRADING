@@ -197,3 +197,65 @@ message exact (ligne + texte) et je corrige.
 
 Et si tu récupères les **transcripts** ou des **captures** des deux vidéos, je
 compare règle par règle avec ce qui est codé, et j'ajuste ce qui diffère.
+
+---
+
+## MECH_LIVE.pine — alertes temps réel
+
+C'est **le seul fichier Pine à jour**. Les autres (`BLAKE_MECH_*`,
+`IFVG_MODEL_*`, `MECH_MODEL_2_*`) encodent une compréhension antérieure du
+modèle, avant le biais par respect des FVG, avant les quatre familles de
+niveaux clés, avant la cible courte à 1 R plus runner, et avant la fenêtre
+09 h 30 – 10 h 00. Ils sont conservés pour mémoire, pas pour être utilisés.
+
+`MECH_LIVE.pine` porte `scripts/mech.js` avec la configuration mesurée dans
+`scripts/REGLAGES.md`.
+
+### Pourquoi TradingView plutôt que le site
+
+Mesuré, pas supposé : **Yahoo Finance est différé de 10 minutes sur le NQ**.
+La détention médiane de la stratégie est de 5 minutes — le signal arriverait
+après la fin du trade.
+
+QQQ, lui, est en temps réel sur Yahoo, mais ne sert pas de substitut : la
+corrélation des variations en 5 minutes n'est que de 0,92, et l'avantage
+tombe de +0,262 R à +0,013 R. Les FVG et les balayages vivent exactement dans
+les 8 % qui diffèrent.
+
+TradingView donne le NQ en temps réel (abonnement CME Level 1) et envoie les
+alertes en notification sur le téléphone. C'est la seule voie gratuite en
+dehors du flux Rithmic ou Tradovate fourni avec un compte prop firm.
+
+### Mise en place
+
+1. Graphique **NQ1!** en **5 minutes**, fuseau **New York**.
+2. Coller le fichier dans l'éditeur Pine, enregistrer, ajouter au graphique.
+3. Alertes → Créer une alerte → Condition : *MECH Live* → **Signal MECH** →
+   cocher *Notifier sur l'application mobile*.
+
+Le tableau en haut à droite affiche en continu le biais et son score, l'étape
+en cours, le niveau clé retenu, le DOL et le nombre de signaux du jour.
+
+### Ce qui diffère du moteur de backtest
+
+Pine n'a pas les mêmes moyens que Node, deux approximations sont assumées :
+
+- **ITL / ITH** sont approchés par un pivot de rang 2. La hiérarchie fractale
+  complète d'ICT — un STL encadré de STL plus hauts — demanderait de
+  reconstruire trois étages ; le pivot en est l'équivalent le plus proche
+  directement disponible.
+- **L'IFVG** est cherché sur l'unité du graphique seulement. Le moteur balaie
+  1, 2 et 5 minutes et retient la plus haute valide ; dans la configuration
+  retenue, 47 signaux sur 64 venaient déjà du 5 minutes.
+
+### Avant de s'en servir
+
+Le réglage est le meilleur de 263 essais menés sur la même période de 60
+jours. Il tient sur deux blocs de 30 jours (83,3 % puis 85,0 %) et résiste au
+déplacement de ses paramètres, mais il ne transfère ni à l'ES ni à une autre
+unité d'exécution. L'avantage réel est probablement plus proche de +0,10 R
+que de +0,237 R. Voir `scripts/REGLAGES.md`.
+
+**Ce fichier n'a pas pu être compilé ici** — Pine ne s'exécute que sur
+TradingView. La syntaxe a été relue, mais la première compilation peut
+signaler des erreurs à corriger.
