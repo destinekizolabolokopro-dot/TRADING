@@ -42,11 +42,12 @@ const QUIET   = args.quiet === '1';
 const DUMP    = args.dump === '1';
 const JOURS   = +(args.jours || 0);
 const HORLOGE = args.horloge || '2m';         // série qui cadence le backtest
-const CIBLE   = args.cible || 'interne';      // interne (swing récent) | draw (PDH/PDL)
+const CIBLE   = args.cible || 'interne';      // interne | draw | fvgopp (schéma de Blake)
 const BIAIS   = args.biais || 'bos';          // amd | seq | bos | proche
 const HRL     = args.hrl === '1';             // filtre HRL/LRL sur le stop et l'objectif
 const CONTGAP = args.contgap === '1';         // exiger un gap de continuation
 const LRLMAX  = +(args.lrlmax || 0);          // obstacles tolérés pour rester « LRL »
+const BORDC   = args.bordc || 'proche';       // proche | milieu | loin : où viser DANS le FVG cible
 const HRLMIN  = +(args.hrlmin || 1);          // obstacles exigés derrière le stop
 const SCOREMIN= +(args.score || 0);           // confluence minimale exigée
 const CONF    = args.conf || '';              // liste de critères exigés, ex. amd,ifvgHaut
@@ -383,7 +384,29 @@ function backtest(m1, m2, m5, m15, d1) {
           // 50 qui ne sont jamais atteints. La source distingue une PREMIÈRE
           // cible interne — un plus-haut ou plus-bas récent — du draw final.
           let tp;
-          if (CIBLE === 'draw') tp = dol;
+          if (CIBLE === 'fvgopp') {
+            // ══ CIBLE DU SCHÉMA DE BLAKE ══════════════════════════════════
+            // Le schéma est explicite : pour un LONG, la cible est un
+            // « 5/15Min Unfilled BEARISH FVG » situé au-dessus. Donc un FVG
+            // NON COMBLÉ, de polarité OPPOSÉE au trade, sur M5 ou M15.
+            // Ce n'est ni un swing récent ni le plus-haut de la veille.
+            tp = null;
+            const scanC = (zs, idx) => zs.forEach(z => {
+              if (z.ne > idx) return;
+              if (z.casse != null && z.casse <= idx) return;   // déjà invalidé
+              if (z.haussier === (dir > 0)) return;            // polarité OPPOSÉE exigée
+              // Le schéma ne dit pas OÙ dans le FVG cible on sort : au premier
+              // contact, à l'équilibre, ou au bout. Les trois sont testés.
+              const niv = BORDC === 'milieu' ? (z.bas + z.haut) / 2
+                        : BORDC === 'loin'   ? (dir > 0 ? z.haut : z.bas)
+                        :                      (dir > 0 ? z.bas : z.haut);
+              if (dir > 0 ? niv <= entree : niv >= entree) return;
+              if (tp == null || (dir > 0 ? niv < tp : niv > tp)) tp = niv;
+            });
+            scanC(z5, i5); scanC(z15, i15);
+            if (tp == null) { etat = 'WAIT_KEY'; key = null; continue; }  // pas de cible = pas de trade
+          }
+          else if (CIBLE === 'draw') tp = dol;
           else {
             const liste = L ? piv15.hauts : piv15.bas;
             tp = null;
