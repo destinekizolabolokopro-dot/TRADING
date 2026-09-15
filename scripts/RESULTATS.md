@@ -14,6 +14,7 @@ node scripts/rapport.js --moteur <moteur> --sym NQ=F --range 60d [--v N]
 |---|---|---|---|---|---|---|---|---|
 | **V0** | BASELINE — gelée | 21 | 52,4 % | 28,6 % | 7,32 | −0,164 R | 0,66 | 5,85 R |
 | **V1** | vrai biais HTF par respect des FVG 1D/4H/1H/15M | 22 | 54,5 % | 33,3 % | 8,66 | +0,009 R | 1,02 | 4,41 R |
+| **V2** | DOL par swing 1H — ❌ **rejetée** | 32 | 37,5 % | **0,0 %** | 207,55 | **−0,444 R** | 0,31 | 14,95 R |
 
 ### Lecture
 
@@ -48,6 +49,54 @@ quatre familles (FVG, ITL/ITH, CISD, Rejection Block) sur six unités de 3M à
 suivantes des **événements**. Elles ne s'enchaînent donc pas arithmétiquement.
 L'entonnoir sera repris en comptage d'événements homogène en phase 3.
 
+### V2 — rejetée, et ce qu'elle apprend
+
+V2 remplace le haut/bas de la veille par un swing 1H, comme le dit la source.
+Le résultat est mauvais **et significatif** : IC 95 % = [−0,765 ; −0,124],
+t = −2,72. Le zéro est exclu du mauvais côté. Ce n'est pas du bruit.
+
+Le journal des décisions (`--logdol 1`) donne le mécanisme immédiatement :
+
+```
+prix 29 677 · BSL · DOL retenu 30 975  (swing 1H du 16 juin)
+prix 29 807 · SSL · DOL retenu 22 961  (swing 1H du 31 mars)
+```
+
+Des niveaux à 1 300 et 6 800 points. Et la conséquence se lit dans une seule
+ligne du rapport :
+
+```
+Win rate hors BE .... 0,0 %   (0 gain / 20 pertes / 11 seuils)
+RR moyen visé ....... 207,55
+```
+
+**Zéro trade n'atteint jamais son objectif**, sur 32. Aucun. Parce que
+l'objectif est à 207 fois le risque.
+
+### La vraie leçon : le DOL n'est pas un objectif
+
+Mon code confondait deux choses que les sources séparent :
+
+- le **draw on liquidity** dit *dans quel sens* le marché veut aller — c'est un
+  contexte directionnel ;
+- l'**objectif** est court : 1 R partiel puis runner.
+
+Tant que le DOL sert de cible de repli, plus il est « correct » au sens de la
+source, plus il est loin, et plus le modèle casse. V2 n'a pas échoué parce que
+le swing 1H serait un mauvais DOL — elle a échoué parce que mon moteur s'en
+sert comme cible.
+
+**Décision, conforme au protocole :** je ne corrige pas l'objectif maintenant,
+ce serait changer deux variables à la fois. V2 est marquée rejetée, **V1 reste
+la référence pour V3**, et la règle d'objectif devient une phase à part entière
+à traiter après les niveaux clés. Le sélecteur de DOL reste dans le code,
+inactif, prêt à être réévalué une fois l'objectif corrigé.
+
+*Note :* les quatre règles de sélection (`proche`, `loin`, `ancien`, `cluster`)
+et les quatre limites d'âge testées donnent toutes le même résultat à 0,07 R
+près. Le choix de la règle est donc, à ce stade, sans effet mesurable — ce qui
+confirme que le problème n'est pas là.
+
 ### Réserve permanente sur la taille d'échantillon
 
 Aucun seuil de trades n'est posé comme vérité. Ce qui est reporté à chaque
@@ -58,6 +107,7 @@ que l'échantillon autorise à affirmer :
 |---|---|---|
 | V0 | [−0,572 ; +0,244] | 0,82 R |
 | V1 | [−0,504 ; +0,522] | 1,03 R |
+| V2 | [−0,765 ; −0,124] | 0,64 R |
 
 Tant que cette largeur dépasse l'écart entre deux versions, aucune comparaison
 n'est concluante. Un fichier NQ 1 minute déposé dans le dépôt est lu

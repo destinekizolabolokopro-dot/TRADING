@@ -89,6 +89,19 @@ const VERSION = +(args.v == null ? 0 : args.v);
 const SEUIL   = +(args.seuil || 2);              // [COMM] défaut 2
 const POIDS   = (args.poids || '1,1,1,1').split(',').map(Number);   // 1D,4H,1H,15M
 const FVGN    = +(args.fvgn || 1);               // [HYP] FVG résolus pris en compte par unité
+
+// ── V2 · DOL par swing 1H ─────────────────────────────────────────── [COMM]
+// La source dit : « identifie le draw on liquidity probable en utilisant une
+// unité de swing, 1H par défaut », marqué BSL ou SSL.
+// Ce qu'elle ne dit pas, et qui est donc de nous — UNCONFIRMED ASSUMPTION :
+//   · quel NIVEAU de swing (short / intermediate / long terme) ;
+//   · lequel choisir quand plusieurs conviennent ;
+//   · quand un DOL cesse d'être valide.
+const DOLNIV  = args.dolniv || 'it';             // [HYP] st | it | lt
+const DOLSEL  = args.dolsel || 'ancien';         // [HYP] proche | loin | ancien | cluster
+const DOLAGE  = +(args.dolage || 0);             // [HYP] âge max en bougies H1, 0 = illimité
+const DOLTOL  = +(args.doltol || 0.05);          // [HYP] % pour regrouper des niveaux « égaux »
+const LOGDOL  = args.logdol === '1';
 // ── STACKED POWER OF THREE ────────────────────────────────────────[BLAKE]
 // Les derniers schémas montrent DEUX PD Arrays empilés : le prix entre dans le
 // premier, repart (expansion), puis vient chercher un SECOND PD Array plus haut
@@ -318,6 +331,76 @@ function biaisHTF(prep, t) {
   return { score, votes, dir: score >= SEUIL ? 1 : score <= -SEUIL ? -1 : 0 };
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// V2 · DRAW ON LIQUIDITY PAR SWING 1H                                 [COMM]
+// ---------------------------------------------------------------------------
+// Identification du swing — [ICT] : la hiérarchie fractale STH/ITH/LTH, appliquée
+// aux bougies 1H. Aucun paramètre de longueur : la structure se définit seule.
+// --dolniv choisit l'étage, pas une longueur de lookback.
+//
+// Choix BSL / SSL — découle du biais, pas du prix :
+//     biais haussier → BSL, un swing HIGH 1H situé AU-DESSUS du prix
+//     biais baissier → SSL, un swing LOW  1H situé EN DESSOUS
+//
+// Quand plusieurs conviennent — [HYP], quatre règles comparées :
+//     proche   le plus proche du prix          (ce que faisait la baseline)
+//     loin     le plus éloigné encore intact
+//     ancien   le plus ANCIEN non balayé  ← défaut : la liquidité qui dort
+//              depuis longtemps est la plus grosse réserve d'ordres
+//     cluster  celui où plusieurs swings se superposent à DOLTOL près
+//              (des « equal highs » concentrent la liquidité)
+//
+// Invalidation d'un DOL :
+//     · le prix le traverse   → atteint, il ne tire plus
+//     · le biais change de sens
+//     · DOLAGE dépassé, si fixé
+// ═══════════════════════════════════════════════════════════════════════════
+function choisirDOL(h1, hier, t, dir, journal) {
+  const idx = ST.idxA(h1, t);
+  if (idx < 0) return null;
+  const px = h1[idx].c;
+  const liste = dir > 0
+    ? (DOLNIV === 'st' ? hier.sth : DOLNIV === 'lt' ? hier.lth : hier.ith)
+    : (DOLNIV === 'st' ? hier.stl : DOLNIV === 'lt' ? hier.ltl : hier.itl);
+
+  // candidats : confirmés, du bon côté, non encore balayés
+  const cand = [];
+  for (const sw of liste) {
+    if (sw.vu > t) continue;                               // pas encore connaissable
+    if (DOLAGE && idx - sw.i > DOLAGE) continue;
+    if (dir > 0 ? sw.prix <= px : sw.prix >= px) continue; // déjà dépassé
+    // balayé depuis ? on regarde les bougies H1 entre le swing et maintenant
+    let pris = false;
+    for (let k = sw.i + 1; k <= idx; k++)
+      if (dir > 0 ? h1[k].h > sw.prix : h1[k].l < sw.prix) { pris = true; break; }
+    if (pris) continue;
+    cand.push(sw);
+  }
+  if (!cand.length) return null;
+
+  let choisi;
+  if (DOLSEL === 'proche')      choisi = cand.reduce((a, b) => Math.abs(b.prix - px) < Math.abs(a.prix - px) ? b : a);
+  else if (DOLSEL === 'loin')   choisi = cand.reduce((a, b) => Math.abs(b.prix - px) > Math.abs(a.prix - px) ? b : a);
+  else if (DOLSEL === 'cluster') {
+    // celui qui a le plus de voisins à DOLTOL % près
+    let best = null, bestN = -1;
+    for (const c of cand) {
+      const n = cand.filter(o => Math.abs(o.prix - c.prix) / c.prix * 100 <= DOLTOL).length;
+      if (n > bestN || (n === bestN && best && c.t < best.t)) { best = c; bestN = n; }
+    }
+    choisi = best;
+  }
+  else choisi = cand.reduce((a, b) => b.t < a.t ? b : a);   // 'ancien'
+
+  if (LOGDOL && journal) journal.push({
+    t: new Date(t).toISOString().slice(0, 16), prix: +px.toFixed(2),
+    sens: dir > 0 ? 'BSL' : 'SSL', niveau: DOLNIV, regle: DOLSEL,
+    dol: +choisi.prix.toFixed(2), ne: new Date(choisi.t).toISOString().slice(0, 16),
+    connu: new Date(choisi.vu).toISOString().slice(0, 16), candidats: cand.length
+  });
+  return choisi.prix;
+}
+
 function backtest(m1, m2, m5, m15, d1, h1) {
   // L'horloge décide de la longueur du backtest. M1 ne couvre que 8 jours chez
   // Yahoo : cadencer dessus réduit l'échantillon à presque rien. M2 couvre 39
@@ -352,6 +435,10 @@ function backtest(m1, m2, m5, m15, d1, h1) {
     { cs: h1,  zs: ST.fvgs(h1)  },
     { cs: m15, zs: ST.fvgs(m15) }
   ]) : null;
+
+  // V2 : hiérarchie de swings sur 1H, pour le DOL.
+  const hierH1 = VERSION >= 2 && h1 ? ST.hierarchie(h1) : null;
+  const logDOL = [];
 
   // ENTONNOIR — combien de setups meurent à chaque étape.
   const E = { barres: 0, biais: 0, neutre: 0, dolAtteint: 0, niveauTrouve: 0,
@@ -471,7 +558,13 @@ function backtest(m1, m2, m5, m15, d1, h1) {
     if (VERSION < 1) E.biais++;
 
     // DOL : la liquidité DANS LE SENS DU BIAIS, pas la plus proche des deux.
-    const dol = dir > 0 ? v.h : v.l;
+    let dol;
+    if (VERSION >= 2) {
+      dol = choisirDOL(h1, hierH1, bar.t, dir, logDOL);
+      if (dol == null) { E.dolAtteint++; continue; }      // aucune liquidité qui tire
+    } else {
+      dol = dir > 0 ? v.h : v.l;
+    }
     if (dir > 0 ? px >= dol : px <= dol) { E.dolAtteint++; continue; }   // draw déjà atteint
     if (etat === 'WAIT_BIAS') etat = 'WAIT_KEY';
 
@@ -676,6 +769,7 @@ function backtest(m1, m2, m5, m15, d1, h1) {
     }
   }
   trades.entonnoir = E;
+  trades.logDOL = logDOL;
   return trades;
 }
 
@@ -707,7 +801,7 @@ function stats(t) {
   const s = stats(trades);
 
   if (DUMP) {
-    console.log(JSON.stringify({ entonnoir: trades.entonnoir, trades: trades.map(x => ({ r: +x.r.toFixed(4), s: x.score, c: x.crit, j: x.jambe, h: x.minET, d: x.jour, o: x.sortie,
+    console.log(JSON.stringify({ entonnoir: trades.entonnoir, logDOL: trades.logDOL, trades: trades.map(x => ({ r: +x.r.toFixed(4), s: x.score, c: x.crit, j: x.jambe, h: x.minET, d: x.jour, o: x.sortie,
       sens: x.sens, e: +x.entree.toFixed(2), sl: +x.sl0.toFixed(2), tp: +x.tp.toFixed(2),
       risq: +Math.abs(x.entree - x.sl0).toFixed(2), rr: +x.rr.toFixed(3), t: x.t, tf: x.tfIFVG })) }));
     return;
