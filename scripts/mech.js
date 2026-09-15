@@ -49,16 +49,45 @@ const KEYAGE   = +(args.keyage || 400);        // [HYP] âge max, en bougies de 
 // ─── balayage ITL / ITH ──────────────────────────────────── [SCHÉMA + ICT]
 const SWEEP    = args.sweep !== '0';
 const SWEEPAGE = +(args.sweepage || 30);       // [HYP] bougies max entre balayage et entrée
+// Sur quelle unité chercher l'ITL/ITH à balayer. Les planches ne le disent pas.
+// Sur l'unité d'exécution, les ITL sont si fréquents que la condition est
+// presque toujours vraie et ne filtre rien : c'est mesuré plus bas.
+const SWEEPTF  = args.sweeptf || 'clock';      // clock | 15m | 30m | 1h
 
 // ─── le « x » : second passage dans la zone ─────────────────────── [SCHÉMA]
 const TOUCHE2 = args.touche2 === '1';          // [HYP] le schéma le montre, sans dire s'il est requis
 const SORTIEZ = +(args.sortiez || 0.25);
 
-// ─── sortie ──────────────────────────────────────────────────────── [COMM]
-// Deux sources concordent : objectif court, 1 R partiel puis runner. Le RR
-// moyen annoncé est de 1,19 et le maximum de 2,44.
+// ─── 6. DÉPLACEMENT ───────────────────────────────────────────────── [ICT]
+// « Il doit y avoir une vraie réaction du prix depuis la zone. Une petite
+//   bougie sans déplacement significatif ne doit pas être considérée comme
+//   valide. »
+//   fvg    le départ laisse un FVG dans le sens du trade — définition
+//          canonique d'ICT, SANS PARAMÈTRE, donc impossible à sur-ajuster
+//   atr    amplitude du départ ≥ DISPX × ATR                        [HYP]
+//   taille bougie de départ ≥ DISPX × la moyenne des 5 précédentes  [HYP]
+//   off    aucun filtre (l'ancien comportement)
+const DISP  = args.disp || 'fvg';
+const DISPX = +(args.dispx || 1.0);
+
+// ─── 10. STOP ─────────────────────────────────────────── NON TRANCHÉ [HYP]
+// Aucune source ne donne l'emplacement exact. Les trois candidats sont
+// implémentés et mesurés côte à côte ; aucun n'est présenté comme la règle.
+//   ifvg   bord de l'IFVG de confirmation
+//   jambe  extrémité de la jambe de manipulation (depuis la touche)
+//   sweep  extrémité du balayage
+const SL = args.sl || 'jambe';
+
+// ─── 11. OBJECTIF ────────────────────────────────── SOURCES EN DÉSACCORD
+// La séquence dit : « TP vers le DOL / la liquidité ciblée ».
+// Le résumé vidéo et la capture de résultats disent : 1 R puis runner, RR
+// moyen 1,19 et maximum 2,44 — incompatible avec un objectif au DOL, qui
+// donnerait des RR bien plus grands.
+// Synthèse retenue, qui satisfait les deux : PARTIEL À 1 R, puis le RESTE
+// court jusqu'au DOL. C'est littéralement « prendre à 1 R et laisser un
+// runner » ET « viser le DOL ».
 const TP1  = +(args.tp1 || 1.0);
-const TP2  = +(args.tp2 || 2.5);
+const TP2  = args.tp2 || 'dol';                // 'dol' ou un multiple de R
 const PART = +(args.part || 0.5);              // [HYP] fraction encaissée à TP1
 
 // ─── garde-fous ────────────────────────────────────────────────────── [HYP]
@@ -132,18 +161,23 @@ function mech(D) {
   // Il n'est JAMAIS un objectif : c'est l'erreur qui cassait le modèle, un
   // swing 1H se trouvant couramment à plus de mille points.
   const hierH1 = ST.hierarchie(h1);
-  function dolLibre(t, dir, px) {
-    const idx = ST.idxA(h1, t); if (idx < 0) return false;
+  // Renvoie le niveau de liquidité intacte LE PLUS PROCHE dans le sens du
+  // biais, ou null s'il n'y en a plus. Le plus proche, et non le plus ancien :
+  // c'est celui que le prix peut réellement aller chercher dans la séance.
+  function dolNiveau(t, dir, px) {
+    const idx = ST.idxA(h1, t); if (idx < 0) return null;
     const liste = dir > 0 ? hierH1.ith : hierH1.itl;
+    let best = null;
     for (const sw of liste) {
       if (sw.vu > t) continue;
       if (dir > 0 ? sw.prix <= px : sw.prix >= px) continue;
       let pris = false;
       for (let k = sw.i + 1; k <= idx; k++)
         if (dir > 0 ? h1[k].h > sw.prix : h1[k].l < sw.prix) { pris = true; break; }
-      if (!pris) return true;                       // au moins une poche de liquidité intacte
+      if (pris) continue;
+      if (best == null || Math.abs(sw.prix - px) < Math.abs(best - px)) best = sw.prix;
     }
-    return false;
+    return best;
   }
 
   // ── NIVEAUX CLÉS : 4 familles × 5 unités ────────────────────────── [COMM]
@@ -169,14 +203,15 @@ function mech(D) {
   });
 
   // ── hiérarchie de l'unité d'exécution, pour le balayage ITL/ITH ──── [ICT]
-  const hierClock = ST.hierarchie(clock);
+  const serieSweep = SWEEPTF === '15m' ? m15 : SWEEPTF === '30m' ? m30 : SWEEPTF === '1h' ? h1 : clock;
+  const hierSweep = ST.hierarchie(serieSweep);
 
   // ── IFVG : zones par unité fine, on retiendra la plus haute valide ─ [COMM]
   const zIF = { '5m': ST.fvgs(m5), '2m': ST.fvgs(m2), '1m': ST.fvgs(m1) };
   const atrC = ST.atr(clock);
 
-  const E = { barres: 0, biaisNeutre: 0, dolPris: 0, niveau: 0, sweepManquant: 0,
-              touche: 0, ifvg: 0, stopTropSerre: 0, entrees: 0 };
+  const E = { barres: 0, biaisNeutre: 0, dolPris: 0, niveau: 0, touche: 0,
+              sweepManquant: 0, dispManquant: 0, ifvg: 0, stopTropSerre: 0, entrees: 0 };
   const trades = [];
   let ouverte = null, parJour = {};
   let etat = 'CHERCHE', dir = 0, key = null, tTouche = 0, legDeb = 0, swept = null;
@@ -190,15 +225,15 @@ function mech(D) {
       const touche = (niv) => L ? bar.h >= niv : bar.l <= niv;
       const stoppe = () => L ? bar.l <= p.sl : bar.h >= p.sl;
       if (!p.part1 && touche(p.tp1)) { p.part1 = true; p.sl = p.entree; }   // partiel + seuil
-      if (p.part1 && touche(p.tp2)) { p.sortie = 'gain'; p.r = PART * TP1 + (1 - PART) * TP2; }
+      if (p.part1 && touche(p.tp2)) { p.sortie = 'gain'; p.r = PART * TP1 + (1 - PART) * p.rr2; }
       else if (stoppe()) {
         if (p.part1) { p.sortie = 'gain partiel'; p.r = PART * TP1; }
         else { p.sortie = 'perte'; p.r = -1; }
       } else if (i - p.i > 200) {
         const rBrut = (L ? bar.c - p.entree : p.entree - bar.c) / p.risq;
         p.sortie = 'expiré';
-        p.r = p.part1 ? PART * TP1 + (1 - PART) * Math.max(0, Math.min(TP2, rBrut))
-                      : Math.max(-1, Math.min(TP2, rBrut));
+        p.r = p.part1 ? PART * TP1 + (1 - PART) * Math.max(0, Math.min(p.rr2, rBrut))
+                      : Math.max(-1, Math.min(p.rr2, rBrut));
       }
       if (p.sortie) { trades.push(p); ouverte = null; } else continue;
     }
@@ -216,7 +251,8 @@ function mech(D) {
     if (b !== dir) { dir = b; etat = 'CHERCHE'; key = null; swept = null; }   // le contexte a tourné
 
     // ── 2. DOL : reste-t-il du chemin ? ─────────────────────────────────
-    if (!dolLibre(bar.t, dir, px)) { E.dolPris++; continue; }
+    const dol = dolNiveau(bar.t, dir, px);
+    if (dol == null) { E.dolPris++; continue; }
 
     // ── 3. NIVEAU CLÉ ───────────────────────────────────────────────────
     if (etat === 'CHERCHE') {
@@ -234,27 +270,8 @@ function mech(D) {
       if (best) { key = best.z; etat = 'ATTEND_TOUCHE'; E.niveau++; key.t1 = false; key.sorti = false; }
     }
 
-    // ── 4. BALAYAGE ITL / ITH ───────────────────────────────── [SCHÉMA+ICT]
-    // Pour un long : un ITL doit avoir été pris — mèche EN DESSOUS, clôture
-    // qui REVIENT au-dessus. Une clôture sous le niveau n'est pas un balayage
-    // mais une cassure de structure, et elle annule le contexte.
-    if (SWEEP && etat !== 'CHERCHE') {
-      const liste = dir > 0 ? hierClock.itl : hierClock.ith;
-      swept = null;
-      for (let k = liste.length - 1; k >= 0; k--) {
-        const sw = liste[k];
-        if (sw.vu > bar.t) continue;
-        for (let j = Math.max(sw.i + 1, i - SWEEPAGE); j <= i; j++) {
-          const mecheDehors = dir > 0 ? clock[j].l < sw.prix : clock[j].h > sw.prix;
-          const clotureDedans = dir > 0 ? clock[j].c > sw.prix : clock[j].c < sw.prix;
-          if (mecheDehors && clotureDedans) { swept = { niveau: sw.prix, j, ext: dir > 0 ? clock[j].l : clock[j].h }; break; }
-        }
-        if (swept) break;
-      }
-      if (!swept) { E.sweepManquant++; continue; }
-    }
-
-    // ── 5. TOUCHE, puis RETOUR ──────────────────────────────────────────
+    // ── 4. ATTENDS LE TOUCH ─────────────────────────────────────────────
+    // On n'entre pas parce que le niveau existe : il faut que le prix y vienne.
     if (etat === 'ATTEND_TOUCHE' && key) {
       const dedans = bar.l <= key.haut && bar.h >= key.bas;
       if (dedans) {
@@ -269,9 +286,53 @@ function mech(D) {
       }
     }
 
-    // ── 6. IFVG, plus haute unité valide dans la jambe ──────────── [COMM]
+    // ── 5. LE BALAYAGE ──────────────────────────────────────── [SCHÉMA+ICT]
+    // Il vient APRÈS la touche, pas avant : la manipulation est la réaction au
+    // niveau, pas ce qui y conduit. (Je l'avais placé avant, c'était faux.)
+    // Mèche au-delà du niveau puis clôture qui revient = balayage.
+    // Clôture au-delà = cassure de structure, et le contexte tombe.
+    if (etat === 'ATTEND_IFVG' && key && SWEEP && !swept) {
+      // Le niveau vient de SWEEPTF ; le balayage se constate sur l'horloge.
+      const liste = dir > 0 ? hierSweep.itl : hierSweep.ith;
+      for (let k = liste.length - 1; k >= 0 && !swept; k--) {
+        const sw = liste[k]; if (sw.vu > bar.t) continue;
+        for (let j = Math.max(legDeb, i - SWEEPAGE); j <= i; j++) {
+          if (clock[j].t < sw.vu) continue;              // pas encore connaissable
+          const dehors = dir > 0 ? clock[j].l < sw.prix : clock[j].h > sw.prix;
+          const revient = dir > 0 ? clock[j].c > sw.prix : clock[j].c < sw.prix;
+          if (dehors && revient) { swept = { niveau: sw.prix, j, ext: dir > 0 ? clock[j].l : clock[j].h }; break; }
+        }
+      }
+      if (!swept) { E.sweepManquant++; if (i - legDeb > REACT) { etat = 'CHERCHE'; key = null; } continue; }
+    }
+
+    // ── 6. LE DÉPLACEMENT ───────────────────────────────────────────── [ICT]
+    // Une vraie réaction depuis la zone. Une petite bougie ne suffit pas.
+    if (etat === 'ATTEND_IFVG' && key && DISP !== 'off') {
+      let ok = false;
+      if (DISP === 'fvg') {
+        // définition canonique, sans paramètre : le départ laisse un FVG
+        for (let j = legDeb + 2; j <= i; j++)
+          if (dir > 0 ? clock[j].l > clock[j - 2].h : clock[j].h < clock[j - 2].l) { ok = true; break; }
+      } else if (DISP === 'atr') {
+        const a = atrC[i];
+        const ext = dir > 0 ? Math.max(...clock.slice(legDeb, i + 1).map(c => c.h))
+                            : Math.min(...clock.slice(legDeb, i + 1).map(c => c.l));
+        ok = !!a && Math.abs(ext - (dir > 0 ? key.haut : key.bas)) >= a * DISPX;
+      } else {                                   // 'taille'
+        for (let j = legDeb + 1; j <= i; j++) {
+          const moy = clock.slice(Math.max(0, j - 5), j).reduce((x, c) => x + (c.h - c.l), 0) / 5;
+          const corps = Math.abs(clock[j].c - clock[j].o);
+          if (moy > 0 && corps >= moy * DISPX &&
+              (dir > 0 ? clock[j].c > clock[j].o : clock[j].c < clock[j].o)) { ok = true; break; }
+        }
+      }
+      if (!ok) { E.dispManquant++; if (i - legDeb > REACT) { etat = 'CHERCHE'; key = null; swept = null; } continue; }
+    }
+
+    // ── 7. IFVG, plus haute unité valide dans la jambe ──────────── [COMM]
     if (etat === 'ATTEND_IFVG' && key) {
-      if (i - legDeb > REACT) { etat = 'CHERCHE'; key = null; continue; }
+      if (i - legDeb > REACT) { etat = 'CHERCHE'; key = null; swept = null; continue; }
       let choisi = null;
       for (const tf of ['5m', '2m', '1m']) {
         for (const z of zIF[tf]) {
@@ -286,21 +347,30 @@ function mech(D) {
 
       // ── 7. ENTRÉE ─────────────────────────────────────────────────────
       const L = dir > 0, entree = px, buf = entree * BUF / 100;
-      // ── 8. STOP : l'extrémité de la jambe de manipulation ────── [COMM]
-      //    « the manipulation swing as a visual stop reference ». Quand un
-      //    balayage a eu lieu, son extrémité EST cette extrémité.
-      const base = swept ? swept.ext : (L ? choisi.z.bas : choisi.z.haut);
-      const sl = L ? Math.min(base, choisi.z.bas) - buf : Math.max(base, choisi.z.haut) + buf;
+      // ── 10. STOP — NON TRANCHÉ ─────────────────────────────────────────
+      // Trois emplacements possibles, aucune source ne dit lequel. Le
+      // balayage n'est PAS supposé être le bon : c'est un des trois candidats.
+      let base;
+      if (SL === 'ifvg') base = L ? choisi.z.bas : choisi.z.haut;
+      else if (SL === 'sweep') base = swept ? swept.ext : (L ? choisi.z.bas : choisi.z.haut);
+      else {                                        // 'jambe' : extrémité depuis la touche
+        const seg = clock.slice(legDeb, i + 1);
+        base = L ? Math.min(...seg.map(c => c.l)) : Math.max(...seg.map(c => c.h));
+      }
+      const sl = L ? base - buf : base + buf;
       const risq = Math.abs(entree - sl);
       if (!(risq > 0) || !atrC[i] || risq < atrC[i] * ATRMIN) { E.stopTropSerre++; continue; }
 
       // ── 9. SORTIE : 1 R partiel puis runner ──────────────────── [COMM]
       ouverte = { sens: L ? 'LONG' : 'SHORT', i, t: bar.t, entree, sl, sl0: sl, risq,
         tp1: L ? entree + risq * TP1 : entree - risq * TP1,
-        tp2: L ? entree + risq * TP2 : entree - risq * TP2,
-        rr: PART * TP1 + (1 - PART) * TP2, part1: false,
+        // Le runner court vers le DOL — la liquidité intacte la plus proche.
+        tp2: TP2 === 'dol' ? dol : (L ? entree + risq * (+TP2) : entree - risq * (+TP2)),
+        part1: false,
         jour: e.jour, minET: e.min, tf: choisi.tf, niveau: key.type + ' ' + key.tf,
         sweep: swept ? +swept.niveau.toFixed(2) : null };
+      ouverte.rr2 = Math.abs(ouverte.tp2 - entree) / risq;
+      ouverte.rr = PART * TP1 + (1 - PART) * ouverte.rr2;
       parJour[e.jour]++; E.entrees++;
       etat = 'CHERCHE'; key = null;
     }
