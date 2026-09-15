@@ -54,6 +54,7 @@ const MOITIE = +(args.moitie || 0);      // 0 = tout · 1 = 1re moitié · 2 = 2
 const SMTMOD = args.smt || 'elim';       // off | elim (éliminatoire) | conflu (bonus seulement)
 const CSV    = args.csv || null;         // fichier OHLC local, à la place de Yahoo
 const CSVC   = args.csvcorr || null;     // même chose pour l'actif corrélé (SMT)
+const DUMP   = args.dump === '1';        // sortir les R bruts, pour regrouper plusieurs marchés
 
 // ------------------------------------------------------------- lecture CSV --
 // Yahoo plafonne à 60 jours en M5 et 8 jours en M1 : bien trop court pour
@@ -768,7 +769,7 @@ function journal(trades, cs, hs, nJours) {
 }
 
 (async () => {
-  if (!QUIET) console.log(CSV ? `Lecture de ${CSV}` + (CSVC ? ` et ${CSVC}` : ' (pas de SMT)') + '…'
+  if (!QUIET && !DUMP) console.log(CSV ? `Lecture de ${CSV}` + (CSVC ? ` et ${CSVC}` : ' (pas de SMT)') + '…'
                                 : `Récupération ${SYM} et ${CORR} en ${TF} sur ${RANGE}…`);
   const [nq, es] = CSV
     ? [lireCSV(CSV), CSVC ? lireCSV(CSVC) : null]
@@ -777,13 +778,15 @@ function journal(trades, cs, hs, nJours) {
         fetchCandles(CORR, TF, RANGE).catch(() => null)
       ]);
   if (!nq || nq.length < 100) throw new Error('pas assez de bougies');
-  if (!QUIET) console.log(`  ${nq.length} bougies ${SYM}` + (es ? `, ${es.length} bougies ${CORR} (SMT active)` : ', pas de SMT'));
+  if (!QUIET && !DUMP) console.log(`  ${nq.length} bougies ${SYM}` + (es ? `, ${es.length} bougies ${CORR} (SMT active)` : ', pas de SMT'));
   const hs = horaires(nq);
   const al = aligner(nq, es);
   if (al && al.manquants && !QUIET) console.log(`  ⚠️ ${al.manquants} bougies ${CORR} manquantes, comblées par la précédente`);
   const trades = STRAT === 'ifvg' ? backtestIFVG(nq, al ? al.serie : null, hs)
                                   : backtest(nq, al ? al.serie : null, hs);
-  if (QUIET) {
+  if (DUMP) {
+    console.log(JSON.stringify(trades.map(t => +t.r.toFixed(4))));
+  } else if (QUIET) {
     const g = trades.filter(t => t.sortie === 'gain' || t.sortie === 'gain partiel').length;
     const p = trades.filter(t => t.sortie === 'perte' || t.sortie === 'ambigu').length;
     const b = trades.filter(t => t.sortie === 'break-even').length;
