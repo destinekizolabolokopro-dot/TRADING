@@ -26,7 +26,7 @@
 // =============================================================================
 
 indicator("MECH Live — alertes NQ", "MECH", overlay = true,
-     max_boxes_count = 200, max_lines_count = 200, max_labels_count = 100)
+     max_lines_count = 200, max_labels_count = 100)
 
 // ============================ PARAMÈTRES =====================================
 g1 = "Séance"
@@ -49,14 +49,12 @@ keyAge  = input.int(400, "Âge maximum (bougies)", group = g3)
 
 g4 = "Entrée et sortie"
 tp1R   = input.float(0.5, "Partiel à (R)",        step = 0.1, group = g4)
-partP  = input.float(90,  "Fraction encaissée %", step = 5,   group = g4)
 tp2R   = input.float(2.5, "Runner jusqu'à (R)",   step = 0.1, group = g4)
 bufPc  = input.float(0.02,"Tampon du stop (% du prix)", step = 0.01, group = g4)
 atrMin = input.float(0.3, "Stop minimum (× ATR)", step = 0.1, group = g4)
 reactN = input.int(12, "Bougies max entre touche et IFVG", group = g4)
 
 g5 = "Affichage"
-showZones = input.bool(true, "Dessiner les zones", group = g5)
 showDOL   = input.bool(true, "Tracer le DOL",      group = g5)
 
 // ============================ HORAIRES =======================================
@@ -196,7 +194,6 @@ var float  stop    = na
 var float  cible1  = na
 var float  cible2  = na
 var bool   part1   = false
-var float  risque  = na
 
 nouveauJour = ta.change(time("D")) != 0
 if nouveauJour
@@ -277,7 +274,6 @@ if (sigLong or sigShort) and not pos
     if rq > 0 and rq >= atrV * atrMin
         entree := close
         stop   := st
-        risque := rq
         cible1 := L ? close + rq * tp1R : close - rq * tp1R
         cible2 := L ? close + rq * tp2R : close - rq * tp2R
         part1  := false
