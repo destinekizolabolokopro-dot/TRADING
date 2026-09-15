@@ -9,20 +9,21 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root{
-    /* Fond neutre (sombre), aucun bleu ni accent de marque */
-    --bg:#0b0b0c; --surface:#141416; --surface-2:#1b1b1e; --surface-3:#232327;
-    --border:#2a2a2e; --border-strong:#3a3a40;
-    --ink:#f5f5f6; --muted:#a2a2a8; --faint:#6d6d74;
-    /* Couleurs sémantiques uniquement */
-    --long:#37c46b; --long-dim:#16351f;
-    --short:#f0555b; --short-dim:#38171a;
+    /* Palette de terminal : des gris denses, aucun dégradé de marque. Seules
+       les couleurs sémantiques — hausse, baisse, attente — ont le droit d'exister. */
+    --bg:#0e0f11; --surface:#16171a; --surface-2:#1c1e22; --surface-3:#24262b;
+    --border:#26282d; --border-strong:#34373d;
+    --ink:#e8e9ec; --muted:#9298a3; --faint:#5f646e;
+    --accent:#2962ff;                 /* un seul accent, sobre, jamais décoratif */
+    --long:#26a69a; --long-dim:#12302e;
+    --short:#ef5350; --short-dim:#3a1c1c;
     --wait:#e0a63f; --wait-dim:#332711;
-    /* Dégradé premium réservé au HERO (sphère + CTA), pas au dashboard */
-    --grad:linear-gradient(135deg,#9a7bff 0%,#6d5aed 45%,#22c9e0 100%);
-    --sans:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
-    --display:'Space Grotesk',var(--sans);
-    --mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
-    --r:16px;
+    --grad:var(--accent);             /* le dégradé disparaît : il ne reste que l'accent */
+    --line:var(--border);
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    --display:var(--sans);            /* plus de police d'affichage : une seule voix */
+    --mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+    --r:6px;                          /* angles francs, pas de pastille */
   }
   *{box-sizing:border-box}
   html{-webkit-text-size-adjust:100%}
@@ -78,66 +79,75 @@
   a{color:inherit}
 
   /* ---------- Header ---------- */
-  header{position:sticky;top:0;z-index:20;background:rgba(11,11,12,.78);
-    backdrop-filter:blur(14px);border-bottom:1px solid var(--border)}
-  .bar{display:flex;align-items:center;justify-content:space-between;gap:16px;height:62px}
-  /* Tablette / téléphone : la barre du haut passe sur deux lignes au lieu de
-     déborder sur le côté (le site se scrollait horizontalement sur iPad). */
-  @media(max-width:1100px){
-    .bar{flex-wrap:wrap;height:auto;padding-block:10px;gap:8px 12px}
-    .status{flex-wrap:wrap;gap:8px 12px;width:100%;justify-content:flex-start}
-  }
-  .brand{display:flex;align-items:center;gap:11px;font-family:var(--display);font-weight:700;font-size:1.12rem;letter-spacing:-.02em}
+  header{position:sticky;top:0;z-index:20;background:var(--bg);
+    border-bottom:1px solid var(--border);backdrop-filter:none}
+  .bar{display:flex;align-items:center;justify-content:space-between;gap:12px;height:48px}
+  .brand{display:flex;align-items:center;gap:9px;font-weight:600;font-size:.94rem;letter-spacing:-.01em;color:var(--muted)}
   .mark{width:26px;height:26px;border-radius:7px;border:1px solid var(--border-strong);
     display:grid;place-items:center;background:var(--surface-2)}
   .mark i{width:9px;height:9px;border-radius:2px;background:var(--long);display:block;transform:rotate(45deg)}
-  .status{display:flex;align-items:center;flex-wrap:wrap;gap:16px;font-size:.82rem;color:var(--muted)}
+  .status{display:flex;align-items:center;flex-wrap:nowrap;gap:9px;font-size:.78rem;color:var(--muted);
+    min-width:0;overflow-x:auto;scrollbar-width:none}
+  .status::-webkit-scrollbar{display:none}
+  .status>*{flex:0 0 auto}
   .live{display:inline-flex;align-items:center;gap:7px;color:var(--muted)}
   .dot{width:7px;height:7px;border-radius:50%;background:var(--faint);display:inline-block}
   .dot.on{background:var(--long)}
-.tfscan{display:flex;flex-direction:column;gap:5px}
-.tfrow{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline;padding:8px 11px;border-radius:9px;
-  border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.03);font-size:12.5px}
-.tfrow.ok{border-color:rgba(34,197,94,.32);background:rgba(34,197,94,.06)}
-.tfrow.no{opacity:.72}
-.tfrow.ret{box-shadow:inset 0 0 0 1px rgba(124,108,255,.5)}
-.tfrow b{min-width:44px;font-size:13px}
-.tfrow b i{font-style:normal;font-size:10px;font-weight:700;color:#a99cff;letter-spacing:.03em}
+/* ---------- Panneau MECH ---------- */
+/* Des lignes de tableau, pas des cartes flottantes. Les couleurs sémantiques
+   ne peignent plus le fond : elles marquent un filet à gauche, comme dans un
+   terminal, et le texte reste lisible. */
+.tfscan{display:flex;flex-direction:column;gap:0;border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+.tfrow{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:baseline;padding:9px 12px;
+  border-left:2px solid transparent;background:var(--surface);font-size:12.5px}
+.tfrow+.tfrow{border-top:1px solid var(--border)}
+.tfrow.ok{border-left-color:var(--long);background:var(--surface-2)}
+.tfrow.no{color:var(--faint)}
+.tfrow.ret{border-left-color:var(--accent)}
+.tfrow b{min-width:44px;font-size:12.5px;font-family:var(--mono);font-weight:600}
+.tfrow b i{font-style:normal;font-size:10px;font-weight:600;color:var(--accent);letter-spacing:.03em}
 .tfst{color:var(--muted);min-width:130px}
 .tfgap{color:var(--muted);min-width:58px}
-.tfres{margin-left:auto;font-variant-numeric:tabular-nums;text-align:right}
-.tfrow.ok .tfres{color:#4ade80;font-weight:600}
+.tfres{margin-left:auto;font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right}
+.tfrow.ok .tfres{color:var(--long);font-weight:600}
 @media(max-width:700px){.tfres{margin-left:0;text-align:left;width:100%}}
 
-.mtrade{border:1px solid rgba(255,255,255,.1);border-radius:13px;padding:14px 15px;background:rgba(255,255,255,.03)}
-.mtrade.long{border-color:rgba(34,197,94,.4);background:rgba(34,197,94,.06)}
-.mtrade.short{border-color:rgba(248,113,113,.4);background:rgba(248,113,113,.06)}
-.mtrade.off{opacity:.8}
-.mt-head{display:flex;align-items:baseline;gap:12px;margin-bottom:11px}
-.mt-head b{font-size:15px}
-.mt-rr{margin-left:auto;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums}
-.mt-lvls{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:9px;margin-bottom:10px}
-.mt-lvls>div{background:rgba(0,0,0,.25);border-radius:9px;padding:8px 10px}
-.mt-lvls span{display:block;font-size:11px;color:var(--muted);margin-bottom:2px}
-.mt-lvls b{font-size:15px;font-variant-numeric:tabular-nums}
-.mt-lvls i{display:block;font-style:normal;font-size:11px;color:var(--muted);margin-top:2px}
-.mt-sl{color:#f87171}.mt-tp{color:#4ade80}
-.mt-htf{font-size:12.5px;padding:7px 10px;border-radius:8px;margin-bottom:8px;line-height:1.45}
-.mt-htf.ok{background:rgba(34,197,94,.1);color:#86efac}
-.mt-htf.no{background:rgba(251,191,36,.1);color:#fcd34d}
+/* Le trade : un bloc de valeurs, lisible d'un coup d'œil, sans fond teinté. */
+.mtrade{border:1px solid var(--border);border-left:3px solid var(--border-strong);
+  border-radius:var(--r);padding:14px 16px;background:var(--surface)}
+.mtrade.long{border-left-color:var(--long)}
+.mtrade.short{border-left-color:var(--short)}
+.mtrade.off{opacity:.7}
+.mt-head{display:flex;align-items:baseline;gap:12px;margin-bottom:12px}
+.mt-head b{font-size:14px;letter-spacing:.01em}
+.mt-rr{margin-left:auto;font-family:var(--mono);font-size:13px;font-weight:600;font-variant-numeric:tabular-nums}
+.mt-lvls{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:1px;
+  background:var(--border);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:12px}
+.mt-lvls>div{background:var(--surface-2);padding:9px 11px}
+.mt-lvls span{display:block;font-size:.66rem;text-transform:uppercase;letter-spacing:.07em;color:var(--faint);margin-bottom:3px}
+.mt-lvls b{font-family:var(--mono);font-size:14.5px;font-weight:600;font-variant-numeric:tabular-nums}
+.mt-lvls i{display:block;font-style:normal;font-size:11px;color:var(--faint);margin-top:2px}
+.mt-sl b{color:var(--short)} .mt-tp b{color:var(--long)}
+.mt-htf{font-size:12.5px;padding:7px 11px;border-radius:var(--r);margin-bottom:9px;line-height:1.45;
+  border:1px solid var(--border);background:var(--surface-2);color:var(--muted)}
+.mt-htf.ok{border-left:2px solid var(--long)}
+.mt-htf.no{border-left:2px solid var(--wait)}
+.mt-why{font-size:12.5px;color:var(--muted);line-height:1.5;margin-top:6px}
+.mt-eur{margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:12.5px;font-weight:600}
 
-.mt-why{font-size:12.5px;color:var(--muted);line-height:1.5;margin-top:5px}
-.mt-eur{margin-top:9px;padding-top:9px;border-top:1px solid rgba(255,255,255,.08);font-size:12.5px;font-weight:600}
-
-.mrow{display:flex;gap:11px;align-items:flex-start;padding:11px 13px;border-radius:11px;margin-bottom:7px;
-  border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.03)}
-.mrow.ok{border-color:rgba(34,197,94,.35);background:rgba(34,197,94,.07)}
-.mrow.no{border-color:rgba(248,113,113,.35);background:rgba(248,113,113,.07)}
-.mrow.wait{opacity:.85}
-.mico{font-size:15px;line-height:1.3;flex:none}
-.mrow b{display:block;font-size:13.5px;margin-bottom:2px}
+/* Les étapes du modèle : une liste, un filet de couleur par état. */
+.mrow{display:flex;gap:11px;align-items:flex-start;padding:10px 13px;margin:0;
+  border:1px solid var(--border);border-left:2px solid var(--border-strong);background:var(--surface)}
+.mrow+.mrow{border-top:0}
+.mrow:first-of-type{border-radius:var(--r) var(--r) 0 0}
+.mrow:last-of-type{border-radius:0 0 var(--r) var(--r)}
+.mrow.ok{border-left-color:var(--long)}
+.mrow.no{border-left-color:var(--short)}
+.mrow.wait{border-left-color:var(--wait);color:var(--muted)}
+.mico{font-size:14px;line-height:1.35;flex:none;opacity:.85}
+.mrow b{display:block;font-size:13px;margin-bottom:2px;font-weight:600}
 .mrow span{font-size:12.5px;color:var(--muted);line-height:1.45}
-.mech-cta{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}
+.mech-cta{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
 
 .nq-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin:0 0 10px}
 .nq-cell{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:8px 10px}
@@ -157,56 +167,57 @@
 .nq-smt.ok{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08)}
 .nq-smt.warn{background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.35)}
 
-.winbadge{font-size:11px;font-weight:700;letter-spacing:.02em;padding:4px 9px;border-radius:999px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);color:#9aa4b2;white-space:nowrap}
+.winbadge{font-size:.74rem;font-weight:500;padding:3px 9px;border-radius:var(--r);
+  border:1px solid var(--border);background:var(--surface-2);color:var(--muted);white-space:nowrap}
 .winbadge.on{border-color:rgba(34,197,94,.45);background:rgba(34,197,94,.12);color:#4ade80}
 @media(max-width:460px){.winbadge{font-size:10px;padding:3px 7px}}
 
   .clock{font-family:var(--mono);font-size:.8rem}
   @media (max-width:600px){.clock{display:none}}
 
-  /* ---------- Hero ---------- */
-  .hero{position:relative;padding:48px 0 34px;overflow:hidden}
-  .hero::before{content:'';position:absolute;top:-60px;right:-40px;width:560px;height:560px;
-    background:radial-gradient(circle,rgba(109,90,237,.20),rgba(34,201,224,.06) 45%,transparent 68%);
-    pointer-events:none;z-index:0}
-  .hero-grid{position:relative;z-index:1;display:grid;grid-template-columns:1.05fr .95fr;gap:28px;align-items:center}
-  .hero-eyebrow{font-size:.74rem;letter-spacing:.18em;text-transform:uppercase;color:var(--faint);margin-bottom:14px}
-  .hero h1{font-family:var(--display);font-weight:600;font-size:clamp(1.9rem,5vw,3rem);
-    line-height:1.06;letter-spacing:-.03em;margin:0 0 14px;max-width:16ch;text-wrap:balance}
-  .hero h1 em{font-style:normal;color:var(--muted)}
-  .hero-sub{color:var(--muted);max-width:48ch;margin:0 0 22px;font-size:1.02rem}
-  .cta-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:28px}
-  .btn{font:inherit;font-weight:600;font-size:.9rem;padding:12px 20px;border-radius:11px;
-    border:1px solid var(--border);cursor:pointer;background:var(--surface-2);color:var(--ink);transition:.18s}
-  .btn:hover{border-color:var(--border-strong);transform:translateY(-2px)}
-  .btn-primary{background:var(--grad);border:0;color:#0a0a12;font-weight:700}
-  .btn-primary:hover{filter:brightness(1.08)}
-  .hero-stats{display:flex;flex-wrap:wrap;gap:12px}
-  .stat{background:var(--surface);border:1px solid var(--border);border-radius:13px;padding:13px 16px;min-width:126px}
-  .stat .k{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--faint);margin-bottom:5px}
-  .stat .v{font-family:var(--display);font-weight:600;font-size:1.32rem;display:flex;align-items:center;gap:8px}
+  /* ---------- Bandeau d'instrument ---------- */
+  /* Remplace l'ancien hero. Un outil de trading ouvre sur le marché, pas sur un
+     slogan : symbole, prix, contexte, actions. Rien de décoratif. */
+  .instr{display:flex;align-items:center;gap:26px;flex-wrap:wrap;
+    padding:14px 0 16px;border-bottom:1px solid var(--border);margin-bottom:0}
+  .instr-id{display:flex;align-items:baseline;gap:10px;min-width:0}
+  .instr-sym{font-weight:700;font-size:1.34rem;letter-spacing:-.02em}
+  .instr-name{color:var(--faint);font-size:.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .instr-px{display:flex;align-items:baseline;gap:10px}
+  .px{font-family:var(--mono);font-size:1.5rem;font-weight:600;font-variant-numeric:tabular-nums}
+  .px-chg{font-family:var(--mono);font-size:.88rem;font-variant-numeric:tabular-nums}
+  .px-chg.up{color:var(--long)} .px-chg.dn{color:var(--short)}
+  .instr-fields{display:flex;gap:24px;flex-wrap:wrap;margin-left:auto}
+  .instr-fields .f{display:flex;flex-direction:column;gap:2px;min-width:74px}
+  .fk{font-size:.66rem;text-transform:uppercase;letter-spacing:.07em;color:var(--faint)}
+  .fv{font-size:.92rem;font-weight:600;font-variant-numeric:tabular-nums}
+  .fv.up{color:var(--long)} .fv.dn{color:var(--short)} .fv.wait{color:var(--wait)}
+  .instr-act{display:flex;gap:8px}
+  @media (max-width:900px){
+    .instr{gap:14px;padding:12px 0}
+    .instr-fields{margin-left:0;gap:16px;width:100%;order:3}
+    .instr-act{order:4;width:100%}
+    .instr-act .btn{flex:1}
+  }
 
-  /* Sphère « marché » + anneaux + chips flottants */
-  .hero-visual{position:relative;height:400px;display:grid;place-items:center}
-  .ring{position:absolute;border:1px solid var(--border);border-radius:50%;opacity:.6}
-  .ring.r1{width:180px;height:180px}
-  .ring.r2{width:290px;height:290px;opacity:.4}
-  .ring.r3{width:400px;height:400px;opacity:.22}
-  .orb{width:148px;height:148px;border-radius:50%;
-    background:radial-gradient(circle at 34% 28%,#b9a3ff,#6d5aed 46%,#22c9e0 100%);
-    box-shadow:0 0 90px 12px rgba(124,92,255,.30),inset 0 0 46px rgba(255,255,255,.18);
-    animation:breathe 5.5s ease-in-out infinite}
-  @keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.055)}}
-  .chip-f{position:absolute;display:inline-flex;align-items:center;gap:8px;
-    background:rgba(20,20,23,.88);border:1px solid var(--border);border-radius:99px;
-    padding:8px 13px;font-size:.82rem;white-space:nowrap;backdrop-filter:blur(6px)}
-  .chip-f .d{width:8px;height:8px;border-radius:50%}
-  .chip-f.c1{top:20%;left:-2%;animation:floaty 8s ease-in-out infinite}
-  .chip-f.c2{top:48%;left:6%;animation:floaty 10s ease-in-out infinite reverse}
-  .chip-f.c3{top:72%;left:34%;animation:floaty 9s ease-in-out infinite}
-  .chip-f.c4{top:30%;right:2%;animation:floaty 11s ease-in-out infinite reverse}
-  @keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-15px)}}
-  @media (max-width:860px){.hero-grid{grid-template-columns:1fr}.hero-visual{display:none}}
+  /* ---------- Boutons ---------- */
+  /* Rectangulaires, discrets, sans mouvement au survol : dans un terminal on
+     clique, on n'admire pas. */
+  .btn{font:inherit;font-weight:500;font-size:.85rem;padding:8px 14px;border-radius:var(--r);
+    border:1px solid var(--border);cursor:pointer;background:var(--surface-2);color:var(--ink);
+    transition:background .12s ease,border-color .12s ease}
+  .btn:hover{background:var(--surface-3);border-color:var(--border-strong)}
+  .btn-primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+  .btn-primary:hover{filter:brightness(1.12);background:var(--accent)}
+  .cta-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+
+  /* La carte de statistique n'est plus une boîte arrondie mais une colonne de
+     tableau : c'est ainsi que se lisent des chiffres. */
+  .hero-stats{display:flex;flex-wrap:wrap;gap:0}
+  .stat{background:transparent;border:0;border-left:1px solid var(--border);padding:4px 18px;min-width:120px}
+  .stat:first-child{border-left:0;padding-left:0}
+  .stat .k{font-size:.66rem;text-transform:uppercase;letter-spacing:.07em;color:var(--faint);margin-bottom:3px}
+  .stat .v{font-weight:600;font-size:1.02rem;font-variant-numeric:tabular-nums;display:flex;align-items:center;gap:8px}
 
   /* ---------- Filtres ---------- */
   .toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;
@@ -225,7 +236,7 @@
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;padding-bottom:40px}
   .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);
     padding:20px;cursor:pointer;transition:transform .18s ease,border-color .18s ease,background .18s ease}
-  .card:hover{transform:translateY(-3px);border-color:var(--border-strong);background:var(--surface-2)}
+  .card:hover{border-color:var(--border-strong);background:var(--surface-2)}
   .card:focus-visible{outline:2px solid var(--muted);outline-offset:2px}
   .c-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:20px}
   .pair-id{display:flex;flex-direction:column;gap:3px}
@@ -291,11 +302,13 @@
   .ctag.down{color:var(--short);border-color:color-mix(in srgb,var(--short) 40%,transparent)}
 
   /* Bascule de vue ICT / Pro */
-  .viewswitch{display:inline-flex;gap:4px;padding:4px;background:var(--surface-2);border:1px solid var(--border);
-    border-radius:12px;margin:4px 0 22px}
-  .viewswitch .vs{font:inherit;font-weight:600;font-size:.86rem;padding:8px 16px;border-radius:9px;border:0;
-    background:transparent;color:var(--muted);cursor:pointer;transition:.15s}
-  .viewswitch .vs.on{background:var(--grad);color:#0a0a12}
+  .viewswitch{display:flex;gap:0;padding:0;background:transparent;border:0;
+    border-bottom:1px solid var(--border);margin:0 0 20px}
+  .viewswitch .vs{font:inherit;font-weight:500;font-size:.85rem;padding:11px 16px;border-radius:0;border:0;
+    background:transparent;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;
+    margin-bottom:-1px;transition:color .12s ease}
+  .viewswitch .vs:hover{color:var(--ink)}
+  .viewswitch .vs.on{background:transparent;color:var(--ink);border-bottom-color:var(--accent);font-weight:600}
   .viewswitch{flex-wrap:wrap}
   .pro-intro{color:var(--muted);font-size:.9rem;max-width:70ch;margin:0 0 20px;line-height:1.55}
   .pro-warn{color:var(--faint)}
@@ -525,7 +538,7 @@
   footer{border-top:1px solid var(--border);padding:26px 0 40px;color:var(--faint);font-size:.8rem;text-align:center}
 
   /* Bouton IA + modale */
-  .ai-btn{font:inherit;font-weight:600;font-size:.82rem;padding:7px 14px;border-radius:10px;
+  .ai-btn{font:inherit;font-weight:500;font-size:.79rem;padding:6px 11px;border-radius:var(--r);
     border:0;cursor:pointer;background:var(--grad);color:#0a0a12;display:inline-flex;align-items:center;gap:6px}
   .ai-btn:hover{filter:brightness(1.08)}
   .overlay{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);
@@ -647,47 +660,42 @@
       <span class="live"><span class="dot" id="live-dot"></span><span id="live-txt">Connexion…</span></span>
       <span class="clock" id="clock">--:--:--</span>
       <span class="winbadge" id="winbadge" title="Le bot ne prend de position que pendant ses créneaux : ouverture de Wall Street → 17 h, et 19 h → 21 h (heure française)">—</span>
-      <button class="ai-btn ghost" id="mech-notif" title="Recevoir une notification quand un setup MECH est armé. Attention : les données Yahoo ont environ 10 minutes de retard sur le NQ.">🔕&nbsp;Alertes</button>
-      <button class="ai-btn ghost" id="calc-open">🧮&nbsp;Calc</button>
-      <button class="ai-btn ghost" id="tools-open">⚙️&nbsp;Mes&nbsp;outils</button>
+      <button class="ai-btn ghost" id="mech-notif" title="Recevoir une notification quand un setup MECH est armé. Attention : les données Yahoo ont environ 10 minutes de retard sur le NQ.">Alertes</button>
+      <button class="ai-btn ghost" id="calc-open">Calculateur</button>
+      <button class="ai-btn ghost" id="tools-open">Réglages</button>
       <button class="ai-btn ghost" id="hist-open">Historique</button>
-      <button class="ai-btn" id="ai-open">🤖&nbsp;Bot&nbsp;IA <span class="vs-tag ext">Claude</span></button>
+      <button class="ai-btn" id="ai-open">Bot IA <span class="vs-tag ext">Claude</span></button>
     </div>
   </div>
 </header>
 
 <div class="wrap">
-  <section class="hero">
-    <div class="hero-grid">
-      <div class="hero-left">
-        <div class="hero-eyebrow">MECH Model · Nasdaq (NQ) · SMT contre le S&amp;P 500</div>
-        <h1>Un seul modèle. <em>Appliqué à la lettre.</em></h1>
-        <p class="hero-sub">Le MECH Model de PB Blake, sur le NQ uniquement : balayage de liquidité, structure, inversion, puis un gap non comblé comme cible. Si une règle manque, il n'y a pas de trade.</p>
-        <div class="cta-row">
-          <button class="btn btn-primary" id="cta-signals">Voir les données</button>
-          <button class="btn" id="cta-how">Comment ça marche</button>
-        </div>
-        <div class="hero-stats">
-          <div class="stat"><div class="k">Fenêtre de trading</div><div class="v" id="s-win">—</div></div>
-          <div class="stat"><div class="k">NQ (Nasdaq)</div><div class="v mono" id="s-nq">—</div></div>
-          <div class="stat"><div class="k">Gaps non comblés</div><div class="v mono" id="s-gaps">—</div></div>
-        </div>
-      </div>
-      <div class="hero-visual" aria-hidden="true">
-        <span class="ring r1"></span><span class="ring r2"></span><span class="ring r3"></span>
-        <div class="orb"></div>
-        <span class="chip-f c1"><span class="d" style="background:var(--long)"></span>Sweep de liquidité</span>
-        <span class="chip-f c2"><span class="d" style="background:var(--wait)"></span>Inversion confirmée</span>
-        <span class="chip-f c3"><span class="d" style="background:var(--short)"></span>SMT NQ vs ES</span>
-        <span class="chip-f c4"><span class="d" style="background:var(--long)"></span>Gap non comblé</span>
-      </div>
+  <!-- Bandeau d'instrument : la première chose lue doit être le marché, pas un slogan. -->
+  <section class="instr">
+    <div class="instr-id">
+      <span class="instr-sym">NQ</span>
+      <span class="instr-name">E-mini Nasdaq 100 · MECH Model</span>
+    </div>
+    <div class="instr-px">
+      <span class="px mono" id="s-nq">—</span>
+      <span class="px-chg mono" id="s-chg"></span>
+    </div>
+    <div class="instr-fields">
+      <div class="f"><span class="fk">Fenêtre</span><span class="fv" id="s-win">—</span></div>
+      <div class="f"><span class="fk">Biais HTF</span><span class="fv" id="s-bias">—</span></div>
+      <div class="f"><span class="fk">Unité retenue</span><span class="fv mono" id="s-tf">—</span></div>
+      <div class="f"><span class="fk">Gaps non comblés</span><span class="fv mono" id="s-gaps">—</span></div>
+    </div>
+    <div class="instr-act">
+      <button class="btn btn-primary" id="cta-signals">Analyse IA</button>
+      <button class="btn" id="cta-how">Aide</button>
     </div>
   </section>
 
   <div class="viewswitch">
-    <button class="vs on" data-v="mech">🎯 MECH Model · NQ</button>
-    <button class="vs" data-v="eco">📅 Économie</button>
-    <button class="vs" data-v="kb">📚 Bibliothèque</button>
+    <button class="vs on" data-v="mech">MECH Model</button>
+    <button class="vs" data-v="eco">Calendrier</button>
+    <button class="vs" data-v="kb">Bibliothèque</button>
   </div>
 
   <div id="view-mech">
@@ -797,44 +805,42 @@
 </div>
 
 <div class="overlay" id="how-overlay">
-  <div class="modal" style="max-width:720px">
+  <div class="modal" style="max-width:660px">
     <button class="modal-close" id="how-close" aria-label="Fermer">×</button>
-    <h2>👋 Bienvenue — comment ça marche</h2>
-    <p class="sub">Ce site lit le marché en temps réel (crypto, or, forex) et t'aide à décider. Voici les 4 réflexes, du plus simple au plus poussé.</p>
+    <h2>Comment ça marche</h2>
+    <p class="sub">Un seul modèle, un seul marché : le MECH Model de PB&nbsp;Blake sur le Nasdaq (NQ). Rien d'autre n'est suivi.</p>
     <div class="how-steps">
-      <div class="how-step"><span class="how-n">1</span><div><b>Regarde les signaux</b> — l'onglet <b>Signaux ICT/SMC</b> te montre, pour chaque actif, le sens (long/short), la confluence et un trade prêt (entrée, stop, objectif). Rien à installer.</div></div>
-      <div class="how-step"><span class="how-n">2</span><div><b>Explore les autres angles</b> — <b>Stratégies Pro</b>, <b>IA maison</b> (un modèle entraîné dans ton navigateur) et <b>Quant</b> (panier market-neutral) donnent chacun un avis indépendant.</div></div>
-      <div class="how-step"><span class="how-n">3</span><div><b>Apprends dans la 📚 Bibliothèque</b> — 248 concepts de trading (ICT, SMC, chandeliers, risque, psycho…) expliqués simplement. Cherche n'importe quel terme.</div></div>
-      <div class="how-step"><span class="how-n">4</span><div><b>Active le Bot IA (Claude)</b> — le plus puissant : il analyse les vraies bougies <b>avec toute la bibliothèque</b> et propose ses meilleurs trades. Il te faut une clé API (2 min à créer).</div></div>
+      <div class="how-step"><span class="how-n">1</span><div><b>Le bandeau du haut</b> donne l'état du marché : prix du NQ, variation, fenêtre de trading ouverte ou non, biais haute unité, unité de temps retenue, gaps non comblés.</div></div>
+      <div class="how-step"><span class="how-n">2</span><div><b>Le tableau MECH</b> déroule la chaîne du modèle, unité par unité : biais, niveau clé, balayage, inversion, puis entrée, stop et objectif quand tout est réuni. <b>Si une étape manque, il n'y a pas de trade</b> — et la raison est écrite.</div></div>
+      <div class="how-step"><span class="how-n">3</span><div><b>Les alertes</b> (bouton 🔕 en haut) préviennent dès qu'un setup s'arme, même si le site est en arrière-plan.</div></div>
+      <div class="how-step"><span class="how-n">4</span><div><b>Le Bot IA</b> relit la situation avec la bibliothèque du modèle et donne un avis argumenté. Il demande une clé API Anthropic.</div></div>
     </div>
     <div class="duo">
-      <div class="duo-head">🤝 Deux IA différentes — ne les confonds pas</div>
+      <div class="duo-head">À savoir sur les données</div>
       <div class="duo-grid">
         <div class="duo-card ext">
-          <div class="duo-title">🤖 Bot IA <span class="vs-tag ext">Claude</span></div>
+          <div class="duo-title">Par défaut · Yahoo</div>
           <ul>
-            <li>Cerveau <b>expert externe</b> (cloud Anthropic)</li>
-            <li>Raisonne avec <b>toute la bibliothèque (303 concepts)</b></li>
-            <li>Rédige de <b>vraies idées de trade</b> (entrée/stop/objectif)</li>
-            <li>Besoin d'une <b>clé API</b> · payant à l'usage</li>
+            <li><b>Environ 10 minutes de retard</b> sur le NQ — mesuré</li>
+            <li>Gratuit, rien à configurer</li>
+            <li>Bon pour <b>surveiller</b>, pas pour entrer en position</li>
           </ul>
         </div>
         <div class="duo-card local">
-          <div class="duo-title">🧠 IA maison <span class="vs-tag local">locale</span></div>
+          <div class="duo-title">Au choix · CFD temps réel</div>
           <ul>
-            <li>Vrai modèle <b>qui tourne dans ton navigateur</b></li>
-            <li><b>100 % gratuit</b>, aucune clé, rien n'est envoyé</li>
-            <li><b>S'entraîne seul</b> &amp; apprend de ses erreurs (momentum relatif)</li>
-            <li>Propose ses <b>positions</b> (LONG/SHORT) déduites de son classement</li>
+            <li>Flux <b>sans retard</b> via un compte démo OANDA</li>
+            <li>Le jeton part directement chez OANDA, sans relais</li>
+            <li>Un bouton <b>mesure la corrélation avec le NQ</b> avant que tu t'y fies</li>
           </ul>
         </div>
       </div>
     </div>
     <div class="modal-actions" style="margin-top:4px">
-      <button class="btn btn-primary" id="how-signals">Voir les signaux</button>
+      <button class="btn btn-primary" id="how-signals">Voir le modèle</button>
       <button class="btn ai-run" id="how-ia">Activer le Bot IA</button>
     </div>
-    <p class="ai-note">🔒 Tout reste sur ton appareil (clé, réglages, historique). 📊 Données réelles · <b>pédagogique, pas un conseil financier</b> · risque max 1 % par trade.</p>
+    <p class="ai-note">Tout reste sur ton appareil : clé, réglages, historique. <b>Pédagogique, pas un conseil financier.</b></p>
   </div>
 </div>
 
@@ -4237,13 +4243,23 @@ function renderMech(){
   el.innerHTML = h;
 }
 
+// Alimente le bandeau d'instrument. Chaque champ est une donnée du modèle :
+// prix, variation, fenêtre, biais haute unité, unité retenue, gaps restants.
 function hero(){
+  const set = (id, txt, cls) => { const e=$(id); if(!e) return;
+    e.textContent = txt; e.className = (e.className.replace(/\b(up|dn|wait)\b/g,'').trim()+' '+(cls||'')).trim(); };
   const w = window.WINDOW ? WINDOW.state() : null;
-  if(w) $('#s-win').innerHTML = '<span class="dot" style="background:'+(w.ouverte?'var(--long)':'var(--faint)')+'"></span>'+
-    (w.ouverte ? 'Ouverte' : 'Fermée');
+  if(w) set('#s-win', w.ouverte ? 'Ouverte' : 'Fermée', w.ouverte ? 'fv up' : 'fv');
   const d = MECH;
-  $('#s-nq').textContent = d ? fmtN(d.nq.prix) : '—';
-  $('#s-gaps').textContent = d ? String((d.gaps_non_comblés||[]).length) : '—';
+  set('#s-nq', d ? fmtN(d.nq.prix) : '—', 'px mono');
+  const chg = d && d.nq.variation_pct != null ? d.nq.variation_pct : null;
+  set('#s-chg', chg == null ? '' : (chg >= 0 ? '+' : '') + chg.toFixed(2) + ' %',
+      'px-chg mono ' + (chg == null ? '' : chg >= 0 ? 'up' : 'dn'));
+  const b = d ? d.biais_htf : null;
+  set('#s-bias', !d ? '—' : b === 'haussier' ? 'Haussier' : b === 'baissier' ? 'Baissier' : 'Neutre',
+      'fv ' + (b === 'haussier' ? 'up' : b === 'baissier' ? 'dn' : ''));
+  set('#s-tf', d && d.tf_retenue ? d.tf_retenue : '—', 'fv mono');
+  set('#s-gaps', d ? String((d.gaps_non_comblés||[]).length) : '—', 'fv mono');
 }
 
 function clock(){
@@ -4255,7 +4271,11 @@ function clock(){
   const b = $('#winbadge');
   if(b && window.WINDOW){
     const w = WINDOW.state();
-    b.textContent = (w.ouverte ? '🟢 ' : '⛔ ') + w.texte;
+    // Texte court dans la barre, détail complet en infobulle : une barre
+    // d'outils ne doit jamais passer à la ligne.
+    b.textContent = w.ouverte ? 'Séance ouverte' : 'Hors séance';
+    b.title = w.texte + ' — créneaux : ' +
+      (w.creneaux||[]).map(function(c){return c.debut+' → '+c.fin;}).join('  ·  ') + ' (heure de Paris)';
     b.className = 'winbadge' + (w.ouverte ? ' on' : '');
     b.title = w.raison + ' · ' + w.heure_paris + ' Paris / ' + w.heure_ny + ' New York';
   }
@@ -4365,7 +4385,7 @@ function majBoutonNotif(){
   const b=$('#mech-notif'); if(!b) return;
   if(!window.Notif || !Notif.supporte()){ b.textContent='🔔 Indisponible'; b.disabled=true; return; }
   const on = Notif.actif() && Notif.permis();
-  b.innerHTML = on ? '🔔&nbsp;Alertes' : '🔕&nbsp;Alertes';
+  b.textContent = on ? 'Alertes activées' : 'Alertes';
   b.className = 'ai-btn ghost' + (on ? ' btn-on' : '');
 }
 
