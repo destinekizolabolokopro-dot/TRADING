@@ -55,6 +55,29 @@ const SCOREMIN= +(args.score || 0);           // confluence minimale exigée
 const CONF    = args.conf || '';              // liste de critères exigés, ex. amd,ifvgHaut
 const MOITIE  = +(args.moitie || 0);          // 0 = tout · 1 = 1re moitié · 2 = 2e
 const COUT    = +(args.cout || 0.06);
+// ── STACKED POWER OF THREE ────────────────────────────────────────[BLAKE]
+// Les derniers schémas montrent DEUX PD Arrays empilés : le prix entre dans le
+// premier, repart (expansion), puis vient chercher un SECOND PD Array plus haut
+// — créé par cette première expansion — et repart de nouveau vers le DOL.
+// Ce n'est pas « deux signaux dans la journée » : la deuxième jambe a des
+// conditions propres, elle doit être EMPILÉE au-dessus (ou en dessous) de la
+// première et aller dans le même sens.
+const STACK   = args.stack === '1';           // n'autoriser la 2e jambe que si empilée
+const STACKDEB= args.stackdeb || '';          // heure ET minimale de la 2e jambe (ex. 10:15)
+// « x » : le SECOND passage dans le PD Array. Sur les schémas, le prix balaye
+// l'ITL, entre dans le PD Array, remonte, PUIS REVIENT le toucher une seconde
+// fois — c'est ce deuxième contact qui porte le repère « x ». Le départ réel
+// part de là, pas du premier contact.
+const TOUCHE2 = args.touche2 === '1';
+const SORTIEZ = +(args.sortiez || 0.25);      // le prix doit ressortir de ce % de zone
+const RRMAX   = +(args.rrmax || 0);           // plafond de l'objectif, en R (0 = aucun)
+// Seuil de passage au point mort, en R. C'est LE paramètre qui fabrique le
+// « taux de réussite » : plus il est bas, plus de trades perdants deviennent
+// des seuils, et plus le taux hors BE monte — sans que l'espérance bouge.
+const BETRIG  = +(args.betrig || 1);
+const PART    = +(args.part || 0.3);          // fraction encaissée au point mort
+const CUMUL   = args.cumul === '1';           // la 2e jambe peut s'ouvrir avant la clôture de la 1re
+const JAMBE   = +(args.jambe || 0);           // 0 = tout · 1 = 1re jambe seule · 2 = 2e seule
 
 // ───────────────────────────────────────────────────────────── données ─────
 async function fetchCandles(sym, interval, range) {
@@ -88,6 +111,7 @@ function heure(t) {
 // communautaire. La fenêtre est donc devenue un paramètre, pour les comparer.
 const hhmm = t => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
 const GH_DEB = hhmm(GHDEB), GH_FIN = hhmm(GHFIN);
+const STACK_DEB = STACKDEB ? hhmm(STACKDEB) : 0;
 function dansGolden(e) { return e.dow >= 1 && e.dow <= 5 && e.min >= GH_DEB && e.min < GH_FIN; }
 
 // ───────────────────────────────────────────────────────── outils prix ─────
@@ -234,7 +258,7 @@ function backtest(m1, m2, m5, m15, d1) {
   }
 
   const trades = [];
-  let pos = null, parJour = {};
+  let ouvertes = [], parJour = {}, premier = {};
 
   // état de la machine, réinitialisé à chaque séance
   let etat = 'WAIT_BIAS', dir = 0, key = null, tTouche = null, legDeb = null;
@@ -242,27 +266,40 @@ function backtest(m1, m2, m5, m15, d1) {
   for (let i = 30; i < clock.length; i++) {
     const bar = clock[i], e = heure(bar.t);
 
-    // ── gestion d'une position ouverte ────────────────────────────────────
-    if (pos) {
+    // ── gestion des positions ouvertes ────────────────────────────────────
+    // Le Stacked Power of Three ouvre une deuxième jambe avant que la première
+    // ait fini sa course vers le DOL : il faut donc pouvoir en suivre plusieurs.
+    for (const pos of ouvertes) {
       const L = pos.sens === 'LONG';
       const sl = L ? bar.l <= pos.sl : bar.h >= pos.sl;
       const tp = L ? bar.h >= pos.tp : bar.l <= pos.tp;
       const be = L ? bar.h >= pos.be : bar.l <= pos.be;
-      if (sl && tp)  { pos.sortie = pos.beFait ? 'gain partiel' : 'ambigu'; pos.r = pos.beFait ? 0.3 : -1; }
-      else if (sl)   { pos.sortie = pos.beFait ? 'gain partiel' : 'perte';  pos.r = pos.beFait ? 0.3 : -1; }
-      else if (tp)   { pos.sortie = 'gain'; pos.r = 0.3 + 0.7 * pos.rr; }
+      if (sl && tp)  { pos.sortie = pos.beFait ? 'gain partiel' : 'ambigu'; pos.r = pos.beFait ? PART * BETRIG : -1; }
+      else if (sl)   { pos.sortie = pos.beFait ? 'gain partiel' : 'perte';  pos.r = pos.beFait ? PART * BETRIG : -1; }
+      else if (tp)   { pos.sortie = 'gain'; pos.r = PART * BETRIG + (1 - PART) * pos.rr; }
       else {
         if (be && !pos.beFait) { pos.beFait = true; pos.sl = pos.entree; }
         if (i - pos.i > 400) { const risq = Math.abs(pos.entree - pos.sl0);
           pos.sortie = 'expiré';
           pos.r = Math.max(-1, Math.min(pos.rr, (L ? bar.c - pos.entree : pos.entree - bar.c) / risq)); }
       }
-      if (pos.sortie) { trades.push(pos); pos = null; }
-      else continue;
     }
+    if (ouvertes.some(x => x.sortie)) {
+      ouvertes.filter(x => x.sortie).forEach(x => trades.push(x));
+      ouvertes = ouvertes.filter(x => !x.sortie);
+    }
+    // Sans --cumul, on garde le comportement d'origine : une seule position
+    // à la fois, donc pas de nouveau signal tant qu'elle court.
+    if (ouvertes.length && !CUMUL) continue;
 
     // ── réinitialisation à chaque séance ──────────────────────────────────
-    if (!parJour[e.jour]) { parJour[e.jour] = 0; etat = 'WAIT_BIAS'; dir = 0; key = null; }
+    // BUG CORRIGÉ. La condition était `if (!parJour[e.jour])`, et parJour est
+    // mis à 0 — qui est faux en JavaScript. La machine à états était donc
+    // REMISE À ZÉRO À CHAQUE BOUGIE tant qu'aucun signal n'avait eu lieu dans
+    // la journée. Les quatre étapes devaient se produire sur UNE SEULE bougie
+    // pour qu'un trade parte : ce n'était plus la séquence de Blake, c'était
+    // un motif d'une bougie. --react et --keyage ne servaient à rien.
+    if (parJour[e.jour] === undefined) { parJour[e.jour] = 0; etat = 'WAIT_BIAS'; dir = 0; key = null; }
     if (MOITIE === 1 && i > clock.length / 2) continue;
     if (MOITIE === 2 && i <= clock.length / 2) continue;
     if (GOLDEN && !dansGolden(e)) continue;                         // [SCRIPT]
@@ -333,6 +370,22 @@ function backtest(m1, m2, m5, m15, d1) {
     // On prend le FVG non mitigé le plus proche, sur M5 ou M15, DANS le sens
     // opposé au draw (c'est là que le prix va chercher avant de repartir).
     const i5 = idxA(m5, bar.t), i15 = idxA(m15, bar.t);
+    // ── STACKED POWER OF THREE : conditions de la deuxième jambe ────[BLAKE]
+    // Le schéma empile un second PD Array AU-DESSUS du premier (pour un long).
+    // Il n'est pas là avant : c'est l'expansion de la première jambe qui le
+    // creuse. Trois conditions en découlent, toutes vérifiables :
+    //   · le sens ne change pas — on va toujours vers le même DOL ;
+    //   · la zone est NÉE après l'entrée de la première jambe ;
+    //   · elle est EMPILÉE, c'est-à-dire entièrement au-dessus du premier
+    //     niveau clé (au-dessous pour un short).
+    const p1 = premier[e.jour];
+    const enJambe2 = !!p1;
+    if (STACK && enJambe2) {
+      if (dir !== p1.dir) continue;                          // le contexte a tourné
+      if (STACK_DEB && e.min < STACK_DEB) continue;          // repère horaire du schéma
+    }
+    if (JAMBE === 1 && enJambe2) continue;
+    if (JAMBE === 2 && !enJambe2) continue;
     if (etat === 'WAIT_KEY') {
       let best = null;
       const scan = (zs, serie, idx, tf) => zs.forEach(z => {
@@ -342,6 +395,14 @@ function backtest(m1, m2, m5, m15, d1) {
         if (dir < 0 && z.haussier) return;
         const d = dir > 0 ? px - z.haut : z.bas - px;
         if (d < 0) return;                                   // le prix l'a déjà dépassé
+        if (STACK && enJambe2) {
+          // LECTURE CORRIGÉE. J'avais d'abord codé « empilé » comme un second
+          // PD Array situé PLUS HAUT, créé par l'expansion. Les schémas disent
+          // l'inverse : le prix RETOMBE sur la même zone et refait un cycle
+          // complet accumulation → manipulation → expansion au même endroit.
+          // L'empilement est dans le TEMPS, pas dans le prix.
+          if (dir > 0 ? z.bas > p1.keyHaut : z.haut < p1.keyBas) return;
+        }
         if (!best || d < best.d) best = { z, d, tf };
       });
       scan(z15, m15, i15, 'M15');
@@ -352,9 +413,21 @@ function backtest(m1, m2, m5, m15, d1) {
     // ── 3. WAIT TOUCH — le prix atteint le niveau, la manipulation commence ──
     if (etat === 'WAIT_TOUCH' && key) {
       const dedans = bar.l <= key.z.haut && bar.h >= key.z.bas;
-      if (dedans) { etat = 'WAIT_IFVG'; tTouche = bar.t; legDeb = i; }
+      if (dedans) {
+        // [BLAKE — le « x » des schémas] Le premier contact ne déclenche rien.
+        // Le prix touche, remonte (la fausse reprise barrée d'une croix sur le
+        // schéma « Dont Align »), puis REVIENT : c'est ce second contact qui
+        // marque le départ. Sans --touche2, on garde l'ancien comportement.
+        if (TOUCHE2 && !key.sorti) { key.touche1 = true; }
+        else { etat = 'WAIT_IFVG'; tTouche = bar.t; legDeb = i; }
+      } else if (TOUCHE2 && key.touche1) {
+        // sortie franche de la zone entre les deux contacts
+        const ep = (key.z.haut - key.z.bas) * SORTIEZ;
+        if (dir > 0 ? bar.c > key.z.haut + ep : bar.c < key.z.bas - ep) key.sorti = true;
+      }
       // le niveau est traversé sans réaction → il n'était pas valide
-      else if (dir > 0 ? bar.c < key.z.bas : bar.c > key.z.haut) { key = null; etat = 'WAIT_KEY'; }
+      if (etat === 'WAIT_TOUCH' && key && (dir > 0 ? bar.c < key.z.bas : bar.c > key.z.haut)
+          && !(TOUCHE2 && key.touche1)) { key = null; etat = 'WAIT_KEY'; }
     }
 
     // ── 4. WAIT IFVG CLOSE — dans la jambe de manipulation ──────[BLAKE+SCRIPT]
@@ -468,15 +541,23 @@ function backtest(m1, m2, m5, m15, d1) {
           if (HRL) okHRL = obsCible <= LRLMAX && obsStop >= HRLMIN;
           // [kintt.fx] gap de continuation : une inefficience laissée sur le
           // mouvement de départ, après la prise de liquidité au niveau clé.
+          // [BLAKE — capture d'écran des résultats] le RR moyen annoncé est de
+          // 1,19 et le maximum de 2,44 : les objectifs sont COURTS. Mon code
+          // visait des RR de 5 ou 6 qui ne sont presque jamais atteints.
+          if (RRMAX && Math.abs(tp - entree) / risq > RRMAX)
+            tp = L ? entree + risq * RRMAX : entree - risq * RRMAX;
           const rr = Math.abs(tp - entree) / risq;
           // Confluence exigée : liste explicite de critères qui doivent être vrais.
           const confOK = !CONF || CONF.split(',').every(k => crit[k.trim()]);
           if (rr >= RRMIN && okHRL && (!CONTGAP || crit.contgap) && score >= SCOREMIN && confOK) {
-            pos = { sens: L ? 'LONG' : 'SHORT', i, t: bar.t, entree, sl, sl0: sl, tp, rr,
-                    be: L ? entree + risq : entree - risq, beFait: false,
+            const pos = { sens: L ? 'LONG' : 'SHORT', i, t: bar.t, entree, sl, sl0: sl, tp, rr,
+                    be: L ? entree + risq * BETRIG : entree - risq * BETRIG, beFait: false,
                     tfIFVG: choisi.tf, niveau: key.tf, jour: e.jour, minET: e.min,
-                    score, crit, etiq, obsCible, obsStop,
+                    score, crit, etiq, obsCible, obsStop, jambe: enJambe2 ? 2 : 1,
                     zone: [+choisi.z.bas.toFixed(2), +choisi.z.haut.toFixed(2)] };
+            ouvertes.push(pos);
+            if (!premier[e.jour]) premier[e.jour] =
+              { t: bar.t, dir, keyBas: key.z.bas, keyHaut: key.z.haut, entree };
             parJour[e.jour]++;
             etat = 'WAIT_KEY'; key = null;
           }
@@ -514,7 +595,7 @@ function stats(t) {
   const s = stats(trades);
 
   if (DUMP) {
-    console.log(JSON.stringify(trades.map(x => ({ r: +x.r.toFixed(4), s: x.score, c: x.crit }))));
+    console.log(JSON.stringify(trades.map(x => ({ r: +x.r.toFixed(4), s: x.score, c: x.crit, j: x.jambe, h: x.minET, d: x.jour, o: x.sortie }))));
     return;
   }
   if (QUIET) {
@@ -538,6 +619,15 @@ function stats(t) {
   console.log(`  t ...................... ${s.t.toFixed(2)}   ${s.ic[0] > 0 ? '✅ significatif' : '(zéro dans l\'intervalle)'}`);
   console.log(`  Cumulé ................. ${s.R >= 0 ? '+' : ''}${s.R.toFixed(1)} R`);
   console.log(`  Net après frais ........ ${(s.moy - COUT) >= 0 ? '+' : ''}${(s.moy - COUT).toFixed(3)} R / trade`);
+
+  const parJambe = {};
+  trades.forEach(x => (parJambe[x.jambe] = parJambe[x.jambe] || []).push(x.r));
+  if (Object.keys(parJambe).length > 1 || STACK) {
+    console.log('\n  POWER OF THREE EMPILÉ   (1 = premier PD Array · 2 = celui du dessus)');
+    Object.keys(parJambe).sort().forEach(k => { const a = parJambe[k], m = a.reduce((x, y) => x + y, 0) / a.length;
+      const g = a.filter(x => x > 0).length;
+      console.log(`    jambe ${k}  ${String(a.length).padStart(3)} signaux · ${(g / a.length * 100).toFixed(1)} % · espérance ${m >= 0 ? '+' : ''}${m.toFixed(3)} R`); });
+  }
 
   const parTF = {}, parKey = {};
   trades.forEach(x => { (parTF[x.tfIFVG] = parTF[x.tfIFVG] || []).push(x.r);
