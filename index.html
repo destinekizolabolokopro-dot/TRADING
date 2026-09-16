@@ -55,11 +55,15 @@
   .ico:hover{border-color:var(--line-2);color:var(--ink);background:var(--panel-2)}
   .ico.on{border-color:var(--accent);color:var(--accent);background:var(--accent-dim)}
 
-  /* ── bandeau de séance ─────────────────────────────────────────────── */
-  .sess{display:flex;align-items:center;gap:9px;padding:14px 0;
-    font-family:var(--mono);font-size:.66rem;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
-  .dot{width:7px;height:7px;border-radius:50%;background:var(--faint);flex:none}
-  .dot.on{background:var(--long);box-shadow:0 0 0 3px rgba(61,220,151,.16)}
+  /* ── état de séance, dans la barre ─────────────────────────────────── */
+  .sessdot{display:inline-flex;align-items:center;gap:7px;padding:5px 11px;border-radius:999px;
+    background:var(--panel);border:1px solid var(--line);
+    font-family:var(--mono);font-size:.6rem;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);
+    max-width:280px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+  .dot{width:6px;height:6px;border-radius:50%;background:var(--faint);flex:none}
+  .dot.on{background:var(--long);box-shadow:0 0 0 3px rgba(61,220,151,.18)}
+  @media(max-width:760px){.sessdot{display:none}}
+  .grid{margin-top:16px}
 
   /* ── grille de tableau de bord ─────────────────────────────────────── */
   .grid{display:grid;grid-template-columns:1.35fr .95fr;gap:14px;align-items:start;padding-bottom:20px}
@@ -76,18 +80,53 @@
     text-transform:uppercase;color:var(--faint);padding:2px 8px;border-radius:5px;background:var(--raise)}
 
   /* ── chaîne du modèle ──────────────────────────────────────────────── */
-  .step{display:flex;gap:13px;align-items:flex-start;padding:13px 15px}
-  .step+.step{border-top:1px solid var(--line)}
-  .step-n{font-family:var(--mono);font-size:.64rem;color:var(--faint);width:14px;flex:none;padding-top:3px}
+  /* C'est une SÉQUENCE : elle se lit comme un fil, pas comme une liste. Un
+     trait relie les étapes, plein tant qu'elles sont franchies, pointillé
+     dès que la chaîne casse — on voit d'un coup d'œil jusqu'où le modèle
+     est allé et où il bute. */
+  .chain{padding:4px 0}
+  .step{position:relative;display:flex;gap:12px;align-items:flex-start;
+    padding:13px 16px 13px 46px;min-height:58px}
+  /* la pastille */
+  .step::before{content:'';position:absolute;left:17px;top:17px;width:13px;height:13px;
+    border-radius:50%;border:2px solid var(--line-2);background:var(--panel);z-index:1;
+    transition:border-color .25s,background .25s,box-shadow .25s}
+  /* le trait qui descend vers l'étape suivante */
+  .step::after{content:'';position:absolute;left:23px;top:30px;bottom:-13px;width:1px;
+    background:var(--line-2)}
+  .step:last-child::after{display:none}
+  .step.ok::before{border-color:var(--long);background:var(--long);
+    box-shadow:0 0 0 3px rgba(61,220,151,.15)}
+  .step.ok::after{background:var(--long);opacity:.45}
+  .step.wait::before{border-color:var(--wait);background:transparent;
+    box-shadow:0 0 0 3px rgba(255,181,71,.13)}
+  .step.wait::after{background:linear-gradient(var(--line-2) 50%,transparent 0);
+    background-size:1px 6px}
+  .step.no::before{border-color:var(--short);background:var(--short);
+    box-shadow:0 0 0 3px rgba(255,92,122,.15)}
+  .step.no::after{background:linear-gradient(var(--line-2) 50%,transparent 0);background-size:1px 6px}
+  .step.todo::after{background:linear-gradient(var(--line-2) 50%,transparent 0);background-size:1px 6px}
+
   .step-b{flex:1;min-width:0}
-  .step-t{display:block;font-family:var(--display);font-size:.94rem;font-weight:650;
-    letter-spacing:-.018em;margin-bottom:2px}
-  .step-d{display:block;font-size:.8rem;color:var(--muted);line-height:1.45}
-  .step-s{flex:none;font-family:var(--mono);font-size:.55rem;font-weight:500;letter-spacing:.12em;
-    text-transform:uppercase;padding:3px 8px;border-radius:5px;background:var(--raise);color:var(--faint)}
-  .step.ok .step-s{background:rgba(61,220,151,.14);color:var(--long)}
-  .step.no .step-s{background:rgba(255,92,122,.14);color:var(--short)}
-  .step.wait .step-s{background:rgba(255,181,71,.14);color:var(--wait)}
+  .step-t{display:block;font-family:var(--display);font-size:.95rem;font-weight:650;
+    letter-spacing:-.018em;margin-bottom:3px;color:var(--ink)}
+  .step.todo .step-t{color:var(--muted)}
+  .step-d{display:block;font-size:.815rem;color:var(--muted);line-height:1.5}
+  .step-s{flex:none;font-family:var(--mono);font-size:.55rem;font-weight:500;letter-spacing:.13em;
+    text-transform:uppercase;padding:3px 9px;border-radius:5px;background:var(--raise);
+    color:var(--faint);margin-top:1px}
+  .step.ok .step-s{background:rgba(61,220,151,.13);color:var(--long)}
+  .step.no .step-s{background:rgba(255,92,122,.13);color:var(--short)}
+  .step.wait .step-s{background:rgba(255,181,71,.13);color:var(--wait)}
+
+  /* jauge d'avancement dans l'en-tête du panneau */
+  .gauge{margin-left:auto;display:flex;align-items:center;gap:9px}
+  .gauge-bar{width:70px;height:4px;border-radius:2px;background:var(--raise);overflow:hidden;
+    box-shadow:inset 0 0 0 1px var(--line)}
+  .gauge-fill{height:100%;background:var(--accent);border-radius:2px;width:0;min-width:4px;
+    box-shadow:0 0 6px rgba(123,108,246,.6);
+    transition:width .5s cubic-bezier(.4,0,.2,1)}
+  .gauge-txt{font-family:var(--mono);font-size:.58rem;letter-spacing:.1em;color:var(--muted)}
 
   /* ── position ──────────────────────────────────────────────────────── */
   .trade{border-radius:var(--r);overflow:hidden;border:1px solid var(--accent);
@@ -108,13 +147,18 @@
   .t-sub{font-family:var(--mono);font-size:.58rem;color:var(--faint);margin-top:3px}
   .t-why{padding:12px 16px;font-size:.79rem;color:var(--muted);line-height:1.5;border-top:1px solid var(--line)}
 
-  .empty{padding:26px 16px;font-size:.82rem;color:var(--faint);text-align:center;line-height:1.55}
+  .empty{padding:30px 20px;font-size:.82rem;color:var(--faint);text-align:center;line-height:1.6}
+  .empty b{display:block;font-family:var(--display);font-size:.98rem;font-weight:650;
+    letter-spacing:-.02em;color:var(--muted);margin-bottom:6px}
+  .empty .hint{display:block;margin-top:8px;font-family:var(--mono);font-size:.58rem;
+    letter-spacing:.11em;text-transform:uppercase;color:var(--line-2)}
 
   /* ── radar de balayage ─────────────────────────────────────────────── */
   /* Repris du « balayage de volatilité » de la référence, mais il montre de
      vraies données : chaque axe est une unité de temps, et le rayon dit
      jusqu'où le modèle est allé sur cette unité. Rien n'est décoratif. */
-  .radar{padding:14px 10px 6px;display:grid;place-items:center}
+  .radar{padding:20px 10px 10px;display:grid;place-items:center;
+    border-bottom:1px solid var(--line)}
   .rd-box{position:relative;width:100%;max-width:280px}
   .radar svg{display:block;width:100%;height:auto;overflow:visible}
   .rd-ring{fill:none;stroke:var(--line);stroke-width:1}
@@ -142,7 +186,7 @@
   .tf.ret{background:var(--accent-dim);box-shadow:inset 2px 0 0 var(--accent)}
   .tf.off{color:var(--faint)}
   .tf-id{font-family:var(--mono);font-size:.68rem;font-weight:600;letter-spacing:.08em;width:40px;flex:none}
-  .tf-st{color:var(--muted);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .tf-st{color:var(--ink);opacity:.72;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .tf-rr{font-family:var(--mono);font-size:.68rem;flex:none;color:var(--faint)}
   .tf.ok .tf-rr{color:var(--long)}
 
@@ -176,6 +220,7 @@
     <span class="sym">NQ</span>
     <span class="px mono" id="px">—</span>
     <span class="chg mono" id="chg"></span>
+    <span class="sessdot" id="sesswrap" title=""><span class="dot" id="sdot"></span><span id="stxt">Chargement…</span></span>
     <span class="bar-r">
       <span class="age" id="age"></span>
       <button class="ico" id="b-alert" title="Alertes">🔔</button>
@@ -203,7 +248,7 @@
     </div>
   </noscript>
 
-  <div class="sess"><span class="dot" id="sdot"></span><span id="stxt">Chargement…</span></div>
+
 
   <div class="pan panelbox" id="settings">
     <p><b>Flux temps réel.</b> Par défaut le site lit Yahoo, qui a environ
@@ -222,8 +267,10 @@
   <div class="grid">
     <div class="col">
       <div class="pan">
-        <div class="pan-h"><h2>Chaîne du modèle</h2><span class="tag" id="chain-tag">—</span></div>
-        <div id="chain"></div>
+        <div class="pan-h"><h2>Chaîne du modèle</h2>
+          <span class="gauge"><span class="gauge-bar"><span class="gauge-fill" id="gauge"></span></span>
+          <span class="gauge-txt" id="chain-tag">—</span></span></div>
+        <div class="chain" id="chain"></div>
       </div>
     </div>
 
@@ -267,10 +314,16 @@ function paintTop(){
   const src = D && D.source === 'cfd' ? 'OANDA' : 'Yahoo';
   $('#age').innerHTML = age == null ? '' : '<b>' + src + '</b> · −' + age + ' min';
 
+  // La barre reçoit un texte COURT — « Ouverte · 1 h 12 » — et le détail
+  // complet passe en infobulle : une pastille tronquée en plein mot est pire
+  // que pas de pastille du tout.
   const w = window.WINDOW ? WINDOW.state() : null;
   if(w){
     $('#sdot').className = 'dot' + (w.ouverte ? ' on' : '');
-    $('#stxt').textContent = w.texte;
+    const m = /dans ([^—]+)$/.exec(w.texte);
+    const duree = m ? m[1].trim() : '';
+    $('#stxt').textContent = (w.ouverte ? 'Ouverte' : 'Fermée') + (duree ? ' · ' + duree : '');
+    const e = $('#sesswrap'); if(e) e.title = w.texte;
   }
 }
 
@@ -309,17 +362,18 @@ function paintChain(){
             : ('Divergence ' + smt.type + '. ' + (smt.consigne || '')) }
   ];
 
-  box.innerHTML = etapes.map((e,i) => {
-    const cls = e.no ? 'no' : e.ok ? 'ok' : e.attente ? 'wait' : '';
+  box.innerHTML = etapes.map(e => {
+    const cls = e.no ? 'no' : e.ok ? 'ok' : e.attente ? 'wait' : 'todo';
     const lbl = e.no ? 'bloqué' : e.ok ? 'validé' : e.attente ? 'en attente' : 'manquant';
-    return '<div class="step ' + cls + '"><span class="step-n mono">' + (i+1) + '</span>' +
+    return '<div class="step ' + cls + '">' +
            '<span class="step-b"><span class="step-t">' + e.t + '</span>' +
            '<span class="step-d">' + e.d + '</span></span>' +
            '<span class="step-s">' + lbl + '</span></div>';
   }).join('');
   const n = etapes.filter(e => e.ok && !e.no).length;
-  const tag = document.querySelector('#chain-tag');
+  const tag = $('#chain-tag'), g = $('#gauge');
   if(tag) tag.textContent = n + '/' + etapes.length;
+  if(g) g.style.width = Math.round(n / etapes.length * 100) + '%';
 }
 
 /* ── la position ────────────────────────────────────────────────────── */
@@ -328,9 +382,10 @@ function paintTrade(){
   const t = D && D.trade;
   const vide = h => '<div class="pan"><div class="pan-h"><h2>Position</h2></div>' +
                     '<div class="empty">' + h + '</div></div>';
-  if(!t){ box.innerHTML = vide('En attente des données.'); return; }
+  if(!t){ box.innerHTML = vide('<b>Aucune position</b>En attente des données du marché.'); return; }
   if(!t.possible){
-    box.innerHTML = vide('Pas de position.<br>' + (t.raison || 'Une étape du modèle manque.'));
+    box.innerHTML = vide('<b>Aucune position</b>' + (t.raison || 'Une étape de la chaîne n\u2019est pas franchie.') +
+      '<span class="hint">le modèle n\u2019entre que si tout est réuni</span>');
     return;
   }
   const L = t.sens === 'LONG', dp = Math.abs(t.entree - t.sl), dt = Math.abs(t.tp - t.entree);
