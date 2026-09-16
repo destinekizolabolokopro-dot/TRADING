@@ -375,6 +375,8 @@
 <script src="js/session.js"></script>
 <script src="js/cfd.js"></script>
 <script src="js/nq.js"></script>
+<script src="js/structure.js"></script>
+<script src="js/modele.js"></script>
 <script src="js/compte.js"></script>
 <script src="js/history.js"></script>
 <script src="js/notif.js"></script>
@@ -386,87 +388,78 @@ let D = null;
 
 /* ── barre + séance ─────────────────────────────────────────────────── */
 function paintTop(){
-  $('#px').textContent = D ? fmt(D.nq.prix) : '—';
-  const c = D && D.nq.variation_pct != null ? D.nq.variation_pct : null;
-  const e = $('#chg');
-  e.textContent = c == null ? '' : (c >= 0 ? '+' : '') + c.toFixed(2) + ' %';
-  e.className = 'chg mono ' + (c == null ? '' : c >= 0 ? 'up' : 'dn');
+  $('#px').textContent = D ? fmt(D.prix) : '—';
+  const e = $('#chg'); e.textContent = ''; e.className = 'chg mono';
 
-  // L'âge de la donnée est affiché en clair : à 10 minutes de retard, un signal
-  // n'est pas un signal d'entrée. Mieux vaut le savoir que le croire.
-  const age = D && window.Notif ? Notif.ageMin(D) : null;
+  const age = D && D.derniereBougie ? Math.round((Date.now() - D.derniereBougie)/60000) : null;
   const src = D && D.source === 'cfd' ? 'OANDA' : 'Yahoo';
-  $('#age').innerHTML = age == null ? '' : '<b>' + src + '</b> · −' + age + ' min';
+  $('#age').innerHTML = age == null ? '—' : '<b>' + src + '</b> · −' + age + ' min';
 
-  // La barre reçoit un texte COURT — « Ouverte · 1 h 12 » — et le détail
-  // complet passe en infobulle : une pastille tronquée en plein mot est pire
-  // que pas de pastille du tout.
   const w = window.WINDOW ? WINDOW.state() : null;
   if(w){
     $('#sdot').className = 'dot' + (w.ouverte ? ' on' : '');
     const m = /dans ([^—]+)$/.exec(w.texte);
-    const duree = m ? m[1].trim() : '';
-    $('#stxt').textContent = (w.ouverte ? 'Ouverte' : 'Fermée') + (duree ? ' · ' + duree : '');
-    const e = $('#sesswrap'); if(e) e.title = w.texte;
+    $('#stxt').textContent = (w.ouverte ? 'Ouverte' : 'Fermée') + (m ? ' · ' + m[1].trim() : '');
+    const el = $('#sesswrap'); if(el) el.title = w.texte;
   }
 }
 
-/* ── la chaîne : où en est le modèle, étape par étape ───────────────── */
+/* ── la chaîne du modèle mesuré ─────────────────────────────────────── */
 function paintChain(){
   const box = $('#chain');
-  if(!D){ box.innerHTML = '<div class="empty">Récupération des données NQ…</div>'; return; }
-  // Le compteur du panneau dit tout de suite combien d'étapes sont franchies.
-  const st = D.structure || {};
-  const gaps = D.gaps_non_comblés || [];
-  const smt = D.smt;
+  if(!D){ box.innerHTML = '<div class="empty"><b>Aucune donnée</b>Récupération des bougies NQ…</div>'; return; }
+  const c = Modele.CFG;
+  const hh = m => String(Math.floor(m/60)).padStart(2,'0') + ' h ' + String(m%60).padStart(2,'0');
 
-  // Libellés d'interface : courts, au présent, sans phrase de rapport. Le
-  // détail complet reste disponible en infobulle pour qui veut savoir
-  // exactement ce que le moteur a vu.
   const etapes = [
-    { t:'Balayage de liquidité',
-      ok: !!st.sweep,
-      d: st.sweep ? ((st.sweep.pool ? st.sweep.pool.quoi : 'Niveau') + ' pris, puis retour.')
-                  : 'Rien de pris récemment.',
-      long: st.detail || '' },
-    { t:'Structure',
-      ok: !!st.valide,
-      d: st.valide ? ('Séquence ' + st.sens + ' complète.') : 'Séquence incomplète.',
-      long: st.detail || '' },
-    { t:'Inversion',
-      ok: !!st.inversion,
-      attente: !!st.valide && !st.inversion,
-      d: st.inversion ? 'Confirmée.' : 'Attendue — on n\u2019entre jamais sur le balayage.',
-      long: st.inversion ? (st.inversion.definition || '') : (st.definition_inversion || '') },
-    { t:'Cible',
-      ok: gaps.length > 0,
-      d: gaps.length ? (gaps.length + (gaps.length > 1 ? ' gaps ouverts · ' : ' gap ouvert · ') + fmt(gaps[0].eq_cible))
-                     : 'Aucun gap ouvert.',
-      long: gaps.length ? gaps.map(g => g.type + ' ' + g.sens + ' ' + fmt(g.zone[0]) + '–' + fmt(g.zone[1])).join(' · ') : '' },
-    { t:'SMT vs S&P 500',
-      ok: !smt || smt.type === 'aucune',
-      no: smt && smt.type !== 'aucune',
-      d: !smt ? 'Non calculée.' : smt.type === 'aucune' ? 'Aucune divergence.'
-            : ('Divergence ' + smt.type + '.'),
-      long: smt ? (smt.detail || '') + ' ' + (smt.consigne || '') : '' }
+    { t:'Biais haute unité',
+      ok: D.dir !== 0,
+      d: D.dir === 0 ? 'Neutre — score ' + D.score + '/4, il en faut ' + c.seuil + '.'
+                     : (D.dir > 0 ? 'Haussier' : 'Baissier') + ' — score ' + Math.abs(D.score) + '/4.',
+      long:'Respect des FVG en 1 jour, 4 h, 1 h et 15 min. Neutre = aucune position.' },
+    { t:'Draw on liquidity',
+      ok: D.dol != null,
+      d: D.dol != null ? 'Liquidité intacte à ' + fmt(D.dol) + '.' : 'Plus de liquidité intacte dans ce sens.',
+      long:'Swing 1 h non encore balayé, le plus proche dans le sens du biais.' },
+    { t:'Niveau clé',
+      ok: !!D.key,
+      d: D.key ? D.key.type + ' ' + D.key.tf + ' · ' + fmt(D.key.bas) + ' – ' + fmt(D.key.haut)
+               : 'Aucun niveau valide du bon côté.',
+      long:'FVG, ITL/ITH, CISD ou Rejection Block, de M5 à H4.' },
+    { t:'Touche',
+      ok: D.etat === 'ATTEND_IFVG',
+      attente: D.etat === 'ATTEND_TOUCHE',
+      d: D.etat === 'ATTEND_IFVG' ? 'Le prix est entré dans la zone.'
+         : D.etat === 'ATTEND_TOUCHE' ? 'Niveau repéré, le prix n\u2019y est pas encore.'
+         : 'Pas de niveau en attente.',
+      long:'On n\u2019entre pas parce que le niveau existe : il faut que le prix y vienne.' },
+    { t:'IFVG confirmé',
+      ok: !!D.ifvg,
+      attente: D.etat === 'ATTEND_IFVG' && !D.ifvg,
+      d: D.ifvg ? 'Inversion ' + D.ifvg.tf + ' validée par clôture de corps.'
+                : 'Aucune inversion dans la jambe.',
+      long:'Plus haute unité disponible de 5 min vers 1 min. Le simple contact ne suffit pas.' }
   ];
 
   box.innerHTML = etapes.map(e => {
-    // Une étape simplement pas encore atteinte ne porte pas de badge : quatre
-    // pastilles « manquant » identiques n'apprennent rien et saturent l'œil.
-    // Seuls l'acquis, l'attente et le blocage méritent d'être signalés.
-    const cls = e.no ? 'no' : e.ok ? 'ok' : e.attente ? 'wait' : 'todo';
-    const lbl = e.no ? 'bloqué' : e.ok ? 'validé' : e.attente ? 'en attente' : '';
-    const ti = e.long ? ' title="' + String(e.long).replace(/"/g,'&quot;').trim() + '"' : '';
+    const cls = e.ok ? 'ok' : e.attente ? 'wait' : 'todo';
+    const lbl = e.ok ? 'validé' : e.attente ? 'en attente' : '';
+    const ti = e.long ? ' title="' + e.long.replace(/"/g,'&quot;') + '"' : '';
     return '<div class="step ' + cls + '"' + ti + '>' +
            '<span class="step-b"><span class="step-t">' + e.t + '</span>' +
            '<span class="step-d">' + e.d + '</span></span>' +
            (lbl ? '<span class="step-s">' + lbl + '</span>' : '') + '</div>';
   }).join('');
-  const n = etapes.filter(e => e.ok && !e.no).length;
+
+  const n = etapes.filter(e => e.ok).length;
   const tag = $('#chain-tag'), g = $('#gauge');
   if(tag) tag.textContent = n + '/' + etapes.length;
   if(g) g.style.width = Math.round(n / etapes.length * 100) + '%';
+
+  // La fenêtre du modèle n'est pas celle du site : on l'affiche pour éviter
+  // toute confusion sur l'heure à laquelle un signal peut apparaître.
+  const tf = $('#tf-tag');
+  if(tf) tf.textContent = hh(c.ghDeb) + ' – ' + hh(c.ghFin) + ' NY';
 }
 
 /* ── la position ────────────────────────────────────────────────────── */
@@ -507,74 +500,81 @@ function paintTrade(){
     '</div>';
 }
 
-/* ── radar : jusqu'où chaque unité est allée dans la chaîne ─────────── */
-// Score honnête, de 0 à 4, calculé sur ce que l'unité montre vraiment :
-// structure valide, balayage détecté, inversion confirmée, trade possible.
-function scoreTF(v){
-  if(!v || !v.dispo) return 0;
-  const st = v.structure || {};
-  return (st.valide ? 1 : 0) + (st.sweep ? 1 : 0) + (st.inversion ? 1 : 0) +
-         (v.trade && v.trade.possible ? 1 : 0);
-}
+/* ── radar : ce que chaque unité offre comme niveaux clés ───────────── */
 function paintRadar(){
   const box = $('#radar');
-  const vs = (D && D.timeframes) || [];
-  if(!vs.length){ box.innerHTML = ''; return; }
-  const R = 92, cx = 118, cy = 104, n = vs.length, MAX = 4;
-  const pt = (i, r) => {
-    const a = -Math.PI/2 + i * 2*Math.PI/n;
-    return [cx + Math.cos(a)*r, cy + Math.sin(a)*r];
-  };
+  const vs = D && D.parTF;
+  if(!vs || !vs.length){ box.innerHTML = ''; return; }
+  const R = 92, cx = 118, cy = 104, n = vs.length;
+  const maxN = Math.max(4, ...vs.map(v => v.n));
+  const pt = (i, r) => { const a = -Math.PI/2 + i*2*Math.PI/n;
+    return [cx + Math.cos(a)*r, cy + Math.sin(a)*r]; };
   let g = '';
-  // anneaux concentriques
-  for(let k = 1; k <= MAX; k++) g += '<circle class="rd-ring" cx="'+cx+'" cy="'+cy+'" r="'+(R*k/MAX).toFixed(1)+'"/>';
-  // axes et étiquettes
-  vs.forEach((v, i) => {
-    const [x, y] = pt(i, R);
+  for(let k=1;k<=4;k++) g += '<circle class="rd-ring" cx="'+cx+'" cy="'+cy+'" r="'+(R*k/4).toFixed(1)+'"/>';
+  vs.forEach((v,i) => {
+    const [x,y] = pt(i,R);
     g += '<line class="rd-axis" x1="'+cx+'" y1="'+cy+'" x2="'+x.toFixed(1)+'" y2="'+y.toFixed(1)+'"/>';
-    const [lx, ly] = pt(i, R + 15);
-    const ret = v.tf === D.tf_retenue;
-    g += '<text class="rd-lab'+(ret?' ret':'')+'" x="'+lx.toFixed(1)+'" y="'+(ly+3).toFixed(1)+
+    const [lx,ly] = pt(i,R+15);
+    const actif = D.key && D.key.tf === v.tf;
+    g += '<text class="rd-lab'+(actif?' ret':'')+'" x="'+lx.toFixed(1)+'" y="'+(ly+3).toFixed(1)+
          '" text-anchor="middle">'+v.tf+'</text>';
   });
-  // le polygone des scores
-  const pts = vs.map((v, i) => pt(i, Math.max(3, R * scoreTF(v) / MAX)));
+  const pts = vs.map((v,i) => pt(i, Math.max(3, R * v.n / maxN)));
   g += '<polygon class="rd-poly" points="'+pts.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ')+'"/>';
-  pts.forEach((p, i) => {
-    g += '<circle class="rd-pt'+(scoreTF(vs[i])>=MAX?' ok':'')+'" cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="2.6"/>';
-  });
-  box.innerHTML = '<svg viewBox="0 0 236 208" role="img" aria-label="Avancement du modèle par unité de temps">'+g+'</svg>';
+  pts.forEach((p,i) => { g += '<circle class="rd-pt'+(D.key&&D.key.tf===vs[i].tf?' ok':'')+
+    '" cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="2.6"/>'; });
+  box.innerHTML = '<svg viewBox="0 0 236 208" role="img" aria-label="Niveaux clés valides par unité de temps">'+g+'</svg>';
 }
 
-/* ── le balayage des unités ─────────────────────────────────────────── */
+/* ── liste des unités ───────────────────────────────────────────────── */
 function paintTFs(){
   const box = $('#tfs');
-  const vs = D && D.timeframes;
+  const vs = D && D.parTF;
   if(!vs){ box.innerHTML = '<div class="empty">—</div>'; return; }
   box.innerHTML = vs.map(v => {
-    if(!v.dispo) return '<div class="tf off"><span class="tf-id">' + v.tf + '</span><span class="tf-st">indisponible</span></div>';
-    const t = v.trade, ok = t && t.possible, ret = v.tf === D.tf_retenue;
-    const st = ok ? ('structure ' + t.sens) : ((v.structure && v.structure.valide) ? 'structure valide, pas d’entrée' : 'pas de setup');
-    return '<div class="tf ' + (ret ? 'ret' : ok ? 'ok' : '') + '">' +
+    const actif = D.key && D.key.tf === v.tf;
+    return '<div class="tf ' + (actif ? 'ret' : v.n ? 'ok' : 'off') + '">' +
       '<span class="tf-id">' + v.tf + '</span>' +
-      '<span class="tf-st">' + st + '</span>' +
-      '<span class="tf-rr">' + (ok ? 'RR ' + Number(t.rr).toFixed(2) : '—') + '</span></div>';
+      '<span class="tf-st">' + (v.n ? v.n + ' niveaux valides' + (v.type ? ' · plus proche ' + v.type : '')
+                                    : 'aucun niveau du bon côté') + '</span>' +
+      '<span class="tf-rr">' + (v.distance != null ? v.distance.toFixed(1) + ' pts' : '—') + '</span></div>';
   }).join('');
 }
 
 function paintAll(){ paintTop(); paintChain(); paintTrade(); paintJournal(); paintRadar(); paintTFs(); }
 
 /* ── cycle de rafraîchissement ──────────────────────────────────────── */
+// Les six séries dont le modèle a besoin. Plus d'ES : la configuration
+// mesurée n'utilise pas la divergence SMT, et six requêtes au lieu de onze
+// ménagent les relais.
+const SERIES = [['1m','8d'],['2m','60d'],['5m','60d'],['15m','60d'],['60m','3mo'],['1d','1y']];
+const CLES   = ['m1','m2','m5','m15','h1','d1'];
+
+async function charger(){
+  const out = {};
+  for(let i=0;i<SERIES.length;i++){
+    const [iv,rg] = SERIES[i];
+    const r = await NQ.candles('NQ=F', iv, rg).catch(()=>null);
+    out[CLES[i]] = r && r.candles ? r.candles : (Array.isArray(r) ? r : null);
+    if(!out[CLES[i]]) return null;
+  }
+  return out;
+}
+
 async function refresh(){
-  try{ D = await NQ.load(true); }catch(e){ D = null; }
+  try{
+    const brut = await charger();
+    D = brut ? Modele.evaluer(brut) : null;
+    if(D) D.source = (window.CFD && CFD.actif()) ? 'cfd' : 'yahoo';
+  }catch(e){ D = null; }
   if(D && window.History){
     // Un signal armé pendant un créneau de trading entre au journal ; les
     // signaux déjà ouverts sont confrontés au prix courant.
-    History.evaluate({ NQ: D.nq.prix });
+    History.evaluate({ NQ: D.prix });
     const t = D.trade;
     if(t && t.possible && (!window.WINDOW || WINDOW.isOpen()))
       History.record([{ sym:'NQ', dir:t.sens, entry:t.entree, sl:t.sl, tp:t.tp, rr:t.rr,
-        note:t.motif || '', tf:D.tf_retenue, price:D.nq.prix }], 'MECH');
+        note:'IFVG ' + t.tf + ' sur ' + t.niveau, tf:t.tf, price:D.prix }], 'MECH');
   }
   paintAll();
   if(D && window.Notif) Notif.verifier(D);

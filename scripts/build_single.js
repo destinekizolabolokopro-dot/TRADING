@@ -13,7 +13,7 @@ const ROOT = path.join(__dirname, '..');
 const out = process.argv[2] || path.join(ROOT, 'TRADEassist.html');
 let html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
 
-['js/session.js', 'js/cfd.js', 'js/nq.js', 'js/compte.js', 'js/history.js', 'js/notif.js'].forEach((rel) => {
+['js/session.js', 'js/cfd.js', 'js/nq.js', 'js/structure.js', 'js/modele.js', 'js/compte.js', 'js/history.js', 'js/notif.js'].forEach((rel) => {
   const tag = `<script src="${rel}"></script>`;
   if (html.indexOf(tag) === -1) { console.warn('⚠️ balise absente :', tag); return; }
   const code = fs.readFileSync(path.join(ROOT, rel), 'utf8');

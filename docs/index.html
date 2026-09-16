@@ -1519,6 +1519,430 @@ if (typeof window !== 'undefined') window.CFD = CFD;
 <script>
 'use strict';
 /**
+ * STRUCTURE — briques de détection, version navigateur.
+ *
+ * Portage littéral de scripts/lib/structure.js, le module utilisé par le
+ * backtest. Le site et la mesure doivent partager EXACTEMENT le même code de
+ * détection : sinon les signaux affichés ne sont pas ceux qui ont été mesurés,
+ * ce qui était précisément le décalage à corriger.
+ */
+(function (root) {
+  /**
+   * Briques de structure de marché. AUCUNE décision de trading ici — uniquement
+   * la détection, pour qu'elle soit partagée, testable et identique d'une version
+   * à l'autre du modèle.
+   *
+   * Marquage : [ICT] canonique · [COMM] implémentation communautaire ·
+   * [HYP] hypothèse non sourcée.
+   */
+
+  // ───────────────────────────────────────────────── agrégation d'unités ─────
+  /** Regroupe n bougies en une. Sert à fabriquer le 4H, absent de Yahoo. */
+  function agreger(cs, n) {
+    const out = [];
+    for (let i = 0; i + n <= cs.length; i += n) {
+      const p = cs.slice(i, i + n);
+      out.push({ t: p[0].t, o: p[0].o, c: p[n - 1].c,
+        h: Math.max(...p.map(x => x.h)), l: Math.min(...p.map(x => x.l)) });
+    }
+    return out;
+  }
+
+  // ───────────────────────────────────────────────────────────── FVG [ICT] ────
+  /**
+   * Motif à 3 bougies dont les mèches 1 et 3 ne se chevauchent pas.
+   * `casse` = index de la première bougie qui CLÔTURE au-delà de la zone, du
+   * côté opposé — c'est ce qui invalide le gap et, à l'inverse, ce qui crée
+   * l'inversion (IFVG).
+   */
+  function fvgs(cs) {
+    const z = [];
+    for (let i = 2; i < cs.length; i++) {
+      if (cs[i].l > cs[i - 2].h)
+        z.push({ bas: cs[i - 2].h, haut: cs[i].l, haussier: true, ne: i, t: cs[i].t });
+      else if (cs[i].h < cs[i - 2].l)
+        z.push({ bas: cs[i].h, haut: cs[i - 2].l, haussier: false, ne: i, t: cs[i].t });
+    }
+    z.forEach(x => {
+      x.casse = null; x.tCasse = null; x.touche = null; x.tTouche = null;
+      for (let k = x.ne + 1; k < cs.length; k++) {
+        if (x.touche == null && cs[k].l <= x.haut && cs[k].h >= x.bas) { x.touche = k; x.tTouche = cs[k].t; }
+        if (x.haussier ? cs[k].c < x.bas : cs[k].c > x.haut) { x.casse = k; x.tCasse = cs[k].t; break; }
+      }
+    });
+    return z;
+  }
+
+  /**
+   * État d'un FVG à un instant donné, pour le score de biais.  [HYP] — la source
+   * parle de FVG « respectés ou non », sans définir les deux mots.
+   *
+   *   RESPECTÉ     le prix est entré dans la zone et en est ressorti du bon côté,
+   *                sans qu'une bougie clôture au-delà
+   *   NON RESPECTÉ une bougie a clôturé au-delà de la zone, du côté opposé
+   *   EN ATTENTE   le prix n'a pas encore interagi avec la zone
+   */
+  function etatFVG(z, idx) {
+    if (z.ne > idx) return 'futur';
+    if (z.casse != null && z.casse <= idx) return 'non-respecte';
+    if (z.touche != null && z.touche <= idx) return 'respecte';
+    return 'attente';
+  }
+
+  // ──────────────────────────────── hiérarchie STL / ITL / LTL — [ICT] ────────
+  /**
+   * Définition canonique, FRACTALE et SANS PARAMÈTRE :
+   *
+   *   STL  un creux encadré d'un creux PLUS HAUT de chaque côté
+   *   ITL  un STL encadré d'un STL PLUS HAUT de chaque côté
+   *   LTL  un ITL encadré d'un ITL PLUS HAUT de chaque côté
+   *
+   * Il n'y a donc ni longueur de lookback ni distance minimale à régler : toute
+   * valeur de ce genre serait une invention.
+   *
+   * `vu` = instant où le niveau devient CONNAISSABLE, c'est-à-dire quand
+   * l'élément de droite est lui-même confirmé. C'est cet horodatage qui doit
+   * être utilisé par un backtest, jamais celui de l'extrême : sinon on lit
+   * l'avenir.
+   */
+  function niveau1(cs, bas) {                       // STL / STH
+    const out = [];
+    for (let i = 1; i < cs.length - 1; i++) {
+      const a = cs[i - 1], m = cs[i], b = cs[i + 1];
+      if (bas ? (a.l > m.l && b.l > m.l) : (a.h < m.h && b.h < m.h))
+        out.push({ prix: bas ? m.l : m.h, i, t: m.t, vu: b.t });
+    }
+    return out;
+  }
+  function niveauSup(pts, bas) {                    // ITL depuis STL, LTL depuis ITL
+    const out = [];
+    for (let i = 1; i < pts.length - 1; i++) {
+      const a = pts[i - 1], m = pts[i], b = pts[i + 1];
+      if (bas ? (a.prix > m.prix && b.prix > m.prix) : (a.prix < m.prix && b.prix < m.prix))
+        out.push({ prix: m.prix, i: m.i, t: m.t, vu: b.vu });   // connu quand celui de droite est confirmé
+    }
+    return out;
+  }
+  function hierarchie(cs) {
+    const stl = niveau1(cs, true),  sth = niveau1(cs, false);
+    const itl = niveauSup(stl, true), ith = niveauSup(sth, false);
+    return { stl, sth, itl, ith, ltl: niveauSup(itl, true), lth: niveauSup(ith, false) };
+  }
+
+  // ──────────────────────────────────────────────────────── CISD — [HYP] ─────
+  /**
+   * Change in State of Delivery. Plusieurs variantes circulent ; celle-ci est la
+   * plus répandue et la plus mécanique :
+   *
+   *   dernière série consécutive de bougies BAISSIÈRES qui produit un plus-bas,
+   *   puis une CLÔTURE au-dessus de l'OPEN de la première bougie de la série
+   *   → changement d'état haussier. Zone = [plus-bas de la série, cet open].
+   *
+   * UNCONFIRMED ASSUMPTION : la source cite « CISD » sans le définir.
+   */
+  function cisd(cs) {
+    const out = [];
+    for (let i = 2; i < cs.length; i++) {
+      for (const haussier of [true, false]) {
+        // série de bougies de sens opposé qui précède i
+        let j = i - 1, ext = haussier ? Infinity : -Infinity;
+        while (j >= 0 && (haussier ? cs[j].c < cs[j].o : cs[j].c > cs[j].o)) {
+          ext = haussier ? Math.min(ext, cs[j].l) : Math.max(ext, cs[j].h); j--;
+        }
+        const deb = j + 1;
+        if (deb > i - 1) continue;                       // pas de série
+        const ouv = cs[deb].o;
+        if (haussier ? cs[i].c > ouv : cs[i].c < ouv) {
+          out.push({ bas: haussier ? ext : ouv, haut: haussier ? ouv : ext,
+            haussier, ne: i, t: cs[i].t, type: 'CISD' });
+        }
+      }
+    }
+    return out;
+  }
+
+  // ──────────────────────────────────────────── Rejection Block — [HYP] ──────
+  /**
+   * La MÈCHE — et non le corps — de la bougie qui marque un extrême rejeté.
+   * Zone = [extrémité du corps, extrémité de la mèche].
+   *
+   * UNCONFIRMED ASSUMPTION : la source cite « Rejection Block » sans le définir.
+   * Le seuil « la mèche fait au moins la moitié du range » est de nous.
+   */
+  function rejectionBlocks(cs, ratio) {
+    const r = ratio == null ? 0.5 : ratio, out = [];
+    for (let i = 1; i < cs.length - 1; i++) {
+      const c = cs[i], rng = c.h - c.l; if (rng <= 0) continue;
+      const corpsH = Math.max(c.o, c.c), corpsB = Math.min(c.o, c.c);
+      // mèche basse longue + creux local → bloc haussier
+      if ((corpsB - c.l) / rng >= r && cs[i - 1].l > c.l && cs[i + 1].l > c.l)
+        out.push({ bas: c.l, haut: corpsB, haussier: true, ne: i, t: c.t, type: 'RB' });
+      if ((c.h - corpsH) / rng >= r && cs[i - 1].h < c.h && cs[i + 1].h < c.h)
+        out.push({ bas: corpsH, haut: c.h, haussier: false, ne: i, t: c.t, type: 'RB' });
+    }
+    return out;
+  }
+
+  // ───────────────────────────────────────────────────────────────── ATR ─────
+  function atr(cs, n) {
+    const p = n || 14, a = new Array(cs.length).fill(null);
+    const tr = new Array(cs.length).fill(0);
+    for (let i = 1; i < cs.length; i++)
+      tr[i] = Math.max(cs[i].h - cs[i].l, Math.abs(cs[i].h - cs[i - 1].c), Math.abs(cs[i].l - cs[i - 1].c));
+    let s = 0;
+    for (let i = 1; i < cs.length; i++) {
+      s += tr[i];
+      if (i > p) s -= tr[i - p];
+      if (i >= p) a[i] = s / p;
+    }
+    return a;
+  }
+
+  /** Index de la dernière bougie dont l'horodatage est ≤ t (anti-anticipation). */
+  function idxA(serie, t) {
+    let lo = 0, hi = serie.length - 1, r = -1;
+    while (lo <= hi) { const m = (lo + hi) >> 1; if (serie[m].t <= t) { r = m; lo = m + 1; } else hi = m - 1; }
+    return r;
+  }
+  root.ST = { agreger: agreger, fvgs: fvgs, etatFVG: etatFVG, hierarchie: hierarchie,
+    niveau1: niveau1, niveauSup: niveauSup, cisd: cisd, rejectionBlocks: rejectionBlocks,
+    atr: atr, idxA: idxA };
+})(typeof window !== 'undefined' ? window : this);
+
+</script>
+<script>
+'use strict';
+/**
+ * LE MODÈLE — version navigateur, calquée sur scripts/mech.js.
+ *
+ * Même chaîne, mêmes définitions, mêmes réglages que ceux qui ont été
+ * MESURÉS :
+ *
+ *   NQ seul · bougies 5 min · 09 h 30 → 10 h 00 New York
+ *   56 trades · 83,9 % de réussite · espérance +0,237 R · profit factor 2,45
+ *   drawdown maximal 2,21 R    (voir scripts/REGLAGES.md)
+ *
+ * Réserve, à garder en tête : ce réglage est le meilleur de 263 essais menés
+ * sur la même période de soixante jours. Il tient sur deux blocs de trente
+ * jours et résiste au déplacement de ses paramètres, mais il ne transfère ni
+ * à l'ES ni à une autre unité d'exécution. Le seuil d'équilibre est de 68 %
+ * de trades non perdants : la marge n'est que de quinze points.
+ *
+ *   BIAIS HTF → DOL → NIVEAU CLÉ → TOUCHE → IFVG (clôture de corps) → ENTRÉE
+ */
+(function (root) {
+
+  var CFG = {
+    ghDeb: 9 * 60 + 30, ghFin: 10 * 60,   // fenêtre mesurée, heure de New York
+    seuil: 2, fvgn: 1,                    // biais : score minimum, FVG comptés par unité
+    keyAge: 400, react: 12,               // âge d'un niveau, bougies entre touche et IFVG
+    tp1: 0.5, tp2: 2.5, part: 0.9,        // partiel à 0,5 R, runner à 2,5 R
+    buf: 0.02, atrMin: 0.3,               // tampon du stop en %, stop minimum en fraction d'ATR
+    maxJour: 2
+  };
+
+  var NY = 'America/New_York';
+  var fmtET = new Intl.DateTimeFormat('en-US', { timeZone: NY, hour12: false,
+    weekday: 'short', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+  var DOW = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+  function heure(t) {
+    var o = {}; fmtET.formatToParts(new Date(t)).forEach(function (p) { o[p.type] = p.value; });
+    var h = +o.hour; if (h === 24) h = 0;
+    return { jour: o.year + '-' + o.month + '-' + o.day, dow: DOW[o.weekday], min: h * 60 + (+o.minute) };
+  }
+
+  // ── biais : score de respect des FVG sur 1D, 4H, 1H, 15M ────────── [COMM]
+  // Respecté : le prix est entré dans la zone et en est ressorti du bon côté.
+  // Non respecté : une bougie a clôturé au-delà, du côté opposé.
+  function prepareBiais(series) {
+    return series.map(function (cs) {
+      var out = [];
+      ST.fvgs(cs).forEach(function (z) {
+        var iRes = z.casse != null ? z.casse : z.touche;
+        if (iRes == null) return;
+        var respecte = z.casse == null;
+        out.push({ t: cs[iRes].t, c: (z.haussier ? 1 : -1) * (respecte ? 1 : -1) });
+      });
+      return out.sort(function (a, b) { return a.t - b.t; });
+    });
+  }
+  function biaisA(prep, t) {
+    var score = 0;
+    prep.forEach(function (serie) {
+      var d = serie.filter(function (r) { return r.t <= t; }).slice(-CFG.fvgn);
+      var s = d.reduce(function (a, r) { return a + r.c; }, 0);
+      score += s > 0 ? 1 : s < 0 ? -1 : 0;
+    });
+    return { score: score, dir: score >= CFG.seuil ? 1 : score <= -CFG.seuil ? -1 : 0 };
+  }
+
+  /**
+   * Évalue le modèle sur les bougies fournies et rend l'état COURANT.
+   * @param D { m1, m2, m5, m15, h1, d1 }
+   */
+  function evaluer(D) {
+    if (!D || !D.m5 || D.m5.length < 80 || !D.h1 || !D.d1 || !D.m15) return null;
+    var clock = D.m5;
+    var m30 = ST.agreger(D.m15, 2), h4 = ST.agreger(D.h1, 4);
+    var prep = prepareBiais([D.d1, h4, D.h1, D.m15]);
+    var hierH1 = ST.hierarchie(D.h1);
+
+    // ── niveaux clés : quatre familles, cinq unités ────────────────── [COMM]
+    var UNITES = [{ cs: D.m5, n: 'M5' }, { cs: D.m15, n: 'M15' }, { cs: m30, n: 'M30' },
+                  { cs: D.h1, n: 'H1' }, { cs: h4, n: 'H4' }];
+    var niveaux = [];
+    UNITES.forEach(function (u) {
+      var push = function (zs, type) { zs.forEach(function (z) {
+        niveaux.push({ type: type, tf: u.n, cs: u.cs, bas: z.bas, haut: z.haut,
+          haussier: z.haussier, ne: z.ne, casse: z.casse == null ? null : z.casse }); }); };
+      push(ST.fvgs(u.cs), 'FVG');
+      push(ST.cisd(u.cs), 'CISD');
+      push(ST.rejectionBlocks(u.cs), 'RB');
+      var h = ST.hierarchie(u.cs);
+      h.itl.forEach(function (x) { niveaux.push({ type: 'ITL', tf: u.n, cs: u.cs, bas: x.prix,
+        haut: u.cs[x.i].h, haussier: true, ne: x.i, casse: null, vu: x.vu }); });
+      h.ith.forEach(function (x) { niveaux.push({ type: 'ITH', tf: u.n, cs: u.cs, bas: u.cs[x.i].l,
+        haut: x.prix, haussier: false, ne: x.i, casse: null, vu: x.vu }); });
+    });
+
+    var zIF = { '5m': ST.fvgs(D.m5), '2m': D.m2 ? ST.fvgs(D.m2) : [], '1m': D.m1 ? ST.fvgs(D.m1) : [] };
+    var atrC = ST.atr(clock);
+
+    // DOL : la liquidité intacte LA PLUS PROCHE dans le sens du biais.
+    function dolNiveau(t, dir, px) {
+      var idx = ST.idxA(D.h1, t); if (idx < 0) return null;
+      var liste = dir > 0 ? hierH1.ith : hierH1.itl, best = null;
+      for (var i = 0; i < liste.length; i++) {
+        var sw = liste[i];
+        if (sw.vu > t) continue;
+        if (dir > 0 ? sw.prix <= px : sw.prix >= px) continue;
+        var pris = false;
+        for (var k = sw.i + 1; k <= idx; k++)
+          if (dir > 0 ? D.h1[k].h > sw.prix : D.h1[k].l < sw.prix) { pris = true; break; }
+        if (pris) continue;
+        if (best == null || Math.abs(sw.prix - px) < Math.abs(best - px)) best = sw.prix;
+      }
+      return best;
+    }
+
+    // ── machine à états, identique au backtest ─────────────────────────────
+    var etat = 'CHERCHE', dir = 0, key = null, legDeb = 0, tTouche = 0;
+    var parJour = {}, dernier = null, etapes = null;
+
+    for (var i = 60; i < clock.length; i++) {
+      var bar = clock[i], e = heure(bar.t), px = bar.c;
+      if (parJour[e.jour] === undefined) { parJour[e.jour] = 0; etat = 'CHERCHE'; key = null; }
+      if (e.dow < 1 || e.dow > 5 || e.min < CFG.ghDeb || e.min >= CFG.ghFin) continue;
+      if (parJour[e.jour] >= CFG.maxJour) continue;
+
+      var b = biaisA(prep, bar.t);
+      var etapeCourante = { score: b.score, dir: b.dir, dol: null, key: null, ifvg: null, t: bar.t };
+      if (b.dir === 0) { etapes = etapeCourante; continue; }
+      if (b.dir !== dir) { dir = b.dir; etat = 'CHERCHE'; key = null; }
+
+      var dol = dolNiveau(bar.t, dir, px);
+      etapeCourante.dol = dol;
+      if (dol == null) { etapes = etapeCourante; continue; }
+
+      if (etat === 'CHERCHE') {
+        var best = null;
+        for (var n = 0; n < niveaux.length; n++) {
+          var z = niveaux[n], idx = ST.idxA(z.cs, bar.t);
+          if (z.ne == null || z.ne > idx || idx - z.ne > CFG.keyAge) continue;
+          if (z.vu && z.vu > bar.t) continue;
+          if (z.casse != null && z.casse <= idx) continue;
+          if (z.haussier !== (dir > 0)) continue;
+          var d = dir > 0 ? px - z.haut : z.bas - px;
+          if (d < 0) continue;
+          if (!best || d < best.d) best = { z: z, d: d };
+        }
+        if (best) { key = best.z; etat = 'ATTEND_TOUCHE'; }
+      }
+      etapeCourante.key = key;
+
+      if (etat === 'ATTEND_TOUCHE' && key) {
+        if (bar.l <= key.haut && bar.h >= key.bas) { etat = 'ATTEND_IFVG'; tTouche = bar.t; legDeb = i; }
+        else if (dir > 0 ? px < key.bas : px > key.haut) { key = null; etat = 'CHERCHE'; }
+      }
+
+      if (etat === 'ATTEND_IFVG' && key) {
+        if (i - legDeb > CFG.react) { etat = 'CHERCHE'; key = null; etapes = etapeCourante; continue; }
+        var choisi = null, ordre = ['5m', '2m', '1m'];
+        for (var o = 0; o < ordre.length && !choisi; o++) {
+          var zs = zIF[ordre[o]];
+          for (var q = 0; q < zs.length; q++) {
+            var zz = zs[q];
+            if (zz.tCasse == null || zz.tCasse < tTouche || zz.tCasse > bar.t) continue;
+            if ((zz.haussier ? -1 : 1) !== dir) continue;
+            choisi = { z: zz, tf: ordre[o] }; break;
+          }
+        }
+        etapeCourante.ifvg = choisi;
+        if (choisi) {
+          var L = dir > 0, entree = px, buf = entree * CFG.buf / 100;
+          var sl = L ? choisi.z.bas - buf : choisi.z.haut + buf;   // stop au bord de l'IFVG
+          var risq = Math.abs(entree - sl);
+          if (risq > 0 && atrC[i] && risq >= atrC[i] * CFG.atrMin) {
+            dernier = { sens: L ? 'LONG' : 'SHORT', t: bar.t, entree: +entree.toFixed(2),
+              sl: +sl.toFixed(2), risq: risq,
+              tp1: +(L ? entree + risq * CFG.tp1 : entree - risq * CFG.tp1).toFixed(2),
+              tp: +(L ? entree + risq * CFG.tp2 : entree - risq * CFG.tp2).toFixed(2),
+              rr: CFG.part * CFG.tp1 + (1 - CFG.part) * CFG.tp2,
+              tf: choisi.tf, niveau: key.type + ' ' + key.tf, dol: dol,
+              barre: i, derniere: i >= clock.length - 2 };
+            parJour[e.jour]++; etat = 'CHERCHE'; key = null;
+          }
+        }
+      }
+      etapes = etapeCourante;
+    }
+
+    // Pour l'affichage : ce que chaque unité offre comme niveaux clés valides
+    // dans le sens du biais. C'est la matière du radar et de la liste.
+    var fin = clock[clock.length - 1];
+    var parTF = ['M5', 'M15', 'M30', 'H1', 'H4'].map(function (nom) {
+      var n = 0, proche = null, type = null;
+      if (dir !== 0) niveaux.forEach(function (z) {
+        if (z.tf !== nom) return;
+        var idx = ST.idxA(z.cs, fin.t);
+        if (z.ne == null || z.ne > idx || idx - z.ne > CFG.keyAge) return;
+        if (z.vu && z.vu > fin.t) return;
+        if (z.casse != null && z.casse <= idx) return;
+        if (z.haussier !== (dir > 0)) return;
+        var d = dir > 0 ? fin.c - z.haut : z.bas - fin.c;
+        if (d < 0) return;
+        n++;
+        if (proche == null || d < proche) { proche = d; type = z.type; }
+      });
+      return { tf: nom, n: n, distance: proche, type: type };
+    });
+
+    return {
+      prix: fin.c, derniereBougie: fin.t,
+      etat: etat,
+      // Le sens et le score rendus sont ceux de la DERNIÈRE bougie évaluée, pas
+      // ceux que la machine à états traîne depuis une bougie antérieure :
+      // sinon on affiche « haussier » avec un score nul, ce qui se contredit.
+      dir: etapes ? etapes.dir : 0,
+      score: etapes ? etapes.score : 0,
+      dol: etapes ? etapes.dol : null,
+      key: etapes ? etapes.key : null,
+      ifvg: etapes ? etapes.ifvg : null,
+      // un signal n'est « vivant » que s'il vient d'être produit
+      parTF: parTF,
+      trade: dernier && dernier.derniere ? dernier : null,
+      dernierSignal: dernier,
+      cfg: CFG
+    };
+  }
+
+  root.Modele = { evaluer: evaluer, CFG: CFG, heure: heure };
+})(typeof window !== 'undefined' ? window : this);
+
+</script>
+<script>
+'use strict';
+/**
  * COMPTE — calibrage des positions sur un capital réel.
  *
  * Le modèle raisonne en R : une unité de risque. Ce module traduit le R en
@@ -1848,87 +2272,78 @@ let D = null;
 
 /* ── barre + séance ─────────────────────────────────────────────────── */
 function paintTop(){
-  $('#px').textContent = D ? fmt(D.nq.prix) : '—';
-  const c = D && D.nq.variation_pct != null ? D.nq.variation_pct : null;
-  const e = $('#chg');
-  e.textContent = c == null ? '' : (c >= 0 ? '+' : '') + c.toFixed(2) + ' %';
-  e.className = 'chg mono ' + (c == null ? '' : c >= 0 ? 'up' : 'dn');
+  $('#px').textContent = D ? fmt(D.prix) : '—';
+  const e = $('#chg'); e.textContent = ''; e.className = 'chg mono';
 
-  // L'âge de la donnée est affiché en clair : à 10 minutes de retard, un signal
-  // n'est pas un signal d'entrée. Mieux vaut le savoir que le croire.
-  const age = D && window.Notif ? Notif.ageMin(D) : null;
+  const age = D && D.derniereBougie ? Math.round((Date.now() - D.derniereBougie)/60000) : null;
   const src = D && D.source === 'cfd' ? 'OANDA' : 'Yahoo';
-  $('#age').innerHTML = age == null ? '' : '<b>' + src + '</b> · −' + age + ' min';
+  $('#age').innerHTML = age == null ? '—' : '<b>' + src + '</b> · −' + age + ' min';
 
-  // La barre reçoit un texte COURT — « Ouverte · 1 h 12 » — et le détail
-  // complet passe en infobulle : une pastille tronquée en plein mot est pire
-  // que pas de pastille du tout.
   const w = window.WINDOW ? WINDOW.state() : null;
   if(w){
     $('#sdot').className = 'dot' + (w.ouverte ? ' on' : '');
     const m = /dans ([^—]+)$/.exec(w.texte);
-    const duree = m ? m[1].trim() : '';
-    $('#stxt').textContent = (w.ouverte ? 'Ouverte' : 'Fermée') + (duree ? ' · ' + duree : '');
-    const e = $('#sesswrap'); if(e) e.title = w.texte;
+    $('#stxt').textContent = (w.ouverte ? 'Ouverte' : 'Fermée') + (m ? ' · ' + m[1].trim() : '');
+    const el = $('#sesswrap'); if(el) el.title = w.texte;
   }
 }
 
-/* ── la chaîne : où en est le modèle, étape par étape ───────────────── */
+/* ── la chaîne du modèle mesuré ─────────────────────────────────────── */
 function paintChain(){
   const box = $('#chain');
-  if(!D){ box.innerHTML = '<div class="empty">Récupération des données NQ…</div>'; return; }
-  // Le compteur du panneau dit tout de suite combien d'étapes sont franchies.
-  const st = D.structure || {};
-  const gaps = D.gaps_non_comblés || [];
-  const smt = D.smt;
+  if(!D){ box.innerHTML = '<div class="empty"><b>Aucune donnée</b>Récupération des bougies NQ…</div>'; return; }
+  const c = Modele.CFG;
+  const hh = m => String(Math.floor(m/60)).padStart(2,'0') + ' h ' + String(m%60).padStart(2,'0');
 
-  // Libellés d'interface : courts, au présent, sans phrase de rapport. Le
-  // détail complet reste disponible en infobulle pour qui veut savoir
-  // exactement ce que le moteur a vu.
   const etapes = [
-    { t:'Balayage de liquidité',
-      ok: !!st.sweep,
-      d: st.sweep ? ((st.sweep.pool ? st.sweep.pool.quoi : 'Niveau') + ' pris, puis retour.')
-                  : 'Rien de pris récemment.',
-      long: st.detail || '' },
-    { t:'Structure',
-      ok: !!st.valide,
-      d: st.valide ? ('Séquence ' + st.sens + ' complète.') : 'Séquence incomplète.',
-      long: st.detail || '' },
-    { t:'Inversion',
-      ok: !!st.inversion,
-      attente: !!st.valide && !st.inversion,
-      d: st.inversion ? 'Confirmée.' : 'Attendue — on n\u2019entre jamais sur le balayage.',
-      long: st.inversion ? (st.inversion.definition || '') : (st.definition_inversion || '') },
-    { t:'Cible',
-      ok: gaps.length > 0,
-      d: gaps.length ? (gaps.length + (gaps.length > 1 ? ' gaps ouverts · ' : ' gap ouvert · ') + fmt(gaps[0].eq_cible))
-                     : 'Aucun gap ouvert.',
-      long: gaps.length ? gaps.map(g => g.type + ' ' + g.sens + ' ' + fmt(g.zone[0]) + '–' + fmt(g.zone[1])).join(' · ') : '' },
-    { t:'SMT vs S&P 500',
-      ok: !smt || smt.type === 'aucune',
-      no: smt && smt.type !== 'aucune',
-      d: !smt ? 'Non calculée.' : smt.type === 'aucune' ? 'Aucune divergence.'
-            : ('Divergence ' + smt.type + '.'),
-      long: smt ? (smt.detail || '') + ' ' + (smt.consigne || '') : '' }
+    { t:'Biais haute unité',
+      ok: D.dir !== 0,
+      d: D.dir === 0 ? 'Neutre — score ' + D.score + '/4, il en faut ' + c.seuil + '.'
+                     : (D.dir > 0 ? 'Haussier' : 'Baissier') + ' — score ' + Math.abs(D.score) + '/4.',
+      long:'Respect des FVG en 1 jour, 4 h, 1 h et 15 min. Neutre = aucune position.' },
+    { t:'Draw on liquidity',
+      ok: D.dol != null,
+      d: D.dol != null ? 'Liquidité intacte à ' + fmt(D.dol) + '.' : 'Plus de liquidité intacte dans ce sens.',
+      long:'Swing 1 h non encore balayé, le plus proche dans le sens du biais.' },
+    { t:'Niveau clé',
+      ok: !!D.key,
+      d: D.key ? D.key.type + ' ' + D.key.tf + ' · ' + fmt(D.key.bas) + ' – ' + fmt(D.key.haut)
+               : 'Aucun niveau valide du bon côté.',
+      long:'FVG, ITL/ITH, CISD ou Rejection Block, de M5 à H4.' },
+    { t:'Touche',
+      ok: D.etat === 'ATTEND_IFVG',
+      attente: D.etat === 'ATTEND_TOUCHE',
+      d: D.etat === 'ATTEND_IFVG' ? 'Le prix est entré dans la zone.'
+         : D.etat === 'ATTEND_TOUCHE' ? 'Niveau repéré, le prix n\u2019y est pas encore.'
+         : 'Pas de niveau en attente.',
+      long:'On n\u2019entre pas parce que le niveau existe : il faut que le prix y vienne.' },
+    { t:'IFVG confirmé',
+      ok: !!D.ifvg,
+      attente: D.etat === 'ATTEND_IFVG' && !D.ifvg,
+      d: D.ifvg ? 'Inversion ' + D.ifvg.tf + ' validée par clôture de corps.'
+                : 'Aucune inversion dans la jambe.',
+      long:'Plus haute unité disponible de 5 min vers 1 min. Le simple contact ne suffit pas.' }
   ];
 
   box.innerHTML = etapes.map(e => {
-    // Une étape simplement pas encore atteinte ne porte pas de badge : quatre
-    // pastilles « manquant » identiques n'apprennent rien et saturent l'œil.
-    // Seuls l'acquis, l'attente et le blocage méritent d'être signalés.
-    const cls = e.no ? 'no' : e.ok ? 'ok' : e.attente ? 'wait' : 'todo';
-    const lbl = e.no ? 'bloqué' : e.ok ? 'validé' : e.attente ? 'en attente' : '';
-    const ti = e.long ? ' title="' + String(e.long).replace(/"/g,'&quot;').trim() + '"' : '';
+    const cls = e.ok ? 'ok' : e.attente ? 'wait' : 'todo';
+    const lbl = e.ok ? 'validé' : e.attente ? 'en attente' : '';
+    const ti = e.long ? ' title="' + e.long.replace(/"/g,'&quot;') + '"' : '';
     return '<div class="step ' + cls + '"' + ti + '>' +
            '<span class="step-b"><span class="step-t">' + e.t + '</span>' +
            '<span class="step-d">' + e.d + '</span></span>' +
            (lbl ? '<span class="step-s">' + lbl + '</span>' : '') + '</div>';
   }).join('');
-  const n = etapes.filter(e => e.ok && !e.no).length;
+
+  const n = etapes.filter(e => e.ok).length;
   const tag = $('#chain-tag'), g = $('#gauge');
   if(tag) tag.textContent = n + '/' + etapes.length;
   if(g) g.style.width = Math.round(n / etapes.length * 100) + '%';
+
+  // La fenêtre du modèle n'est pas celle du site : on l'affiche pour éviter
+  // toute confusion sur l'heure à laquelle un signal peut apparaître.
+  const tf = $('#tf-tag');
+  if(tf) tf.textContent = hh(c.ghDeb) + ' – ' + hh(c.ghFin) + ' NY';
 }
 
 /* ── la position ────────────────────────────────────────────────────── */
@@ -1969,74 +2384,81 @@ function paintTrade(){
     '</div>';
 }
 
-/* ── radar : jusqu'où chaque unité est allée dans la chaîne ─────────── */
-// Score honnête, de 0 à 4, calculé sur ce que l'unité montre vraiment :
-// structure valide, balayage détecté, inversion confirmée, trade possible.
-function scoreTF(v){
-  if(!v || !v.dispo) return 0;
-  const st = v.structure || {};
-  return (st.valide ? 1 : 0) + (st.sweep ? 1 : 0) + (st.inversion ? 1 : 0) +
-         (v.trade && v.trade.possible ? 1 : 0);
-}
+/* ── radar : ce que chaque unité offre comme niveaux clés ───────────── */
 function paintRadar(){
   const box = $('#radar');
-  const vs = (D && D.timeframes) || [];
-  if(!vs.length){ box.innerHTML = ''; return; }
-  const R = 92, cx = 118, cy = 104, n = vs.length, MAX = 4;
-  const pt = (i, r) => {
-    const a = -Math.PI/2 + i * 2*Math.PI/n;
-    return [cx + Math.cos(a)*r, cy + Math.sin(a)*r];
-  };
+  const vs = D && D.parTF;
+  if(!vs || !vs.length){ box.innerHTML = ''; return; }
+  const R = 92, cx = 118, cy = 104, n = vs.length;
+  const maxN = Math.max(4, ...vs.map(v => v.n));
+  const pt = (i, r) => { const a = -Math.PI/2 + i*2*Math.PI/n;
+    return [cx + Math.cos(a)*r, cy + Math.sin(a)*r]; };
   let g = '';
-  // anneaux concentriques
-  for(let k = 1; k <= MAX; k++) g += '<circle class="rd-ring" cx="'+cx+'" cy="'+cy+'" r="'+(R*k/MAX).toFixed(1)+'"/>';
-  // axes et étiquettes
-  vs.forEach((v, i) => {
-    const [x, y] = pt(i, R);
+  for(let k=1;k<=4;k++) g += '<circle class="rd-ring" cx="'+cx+'" cy="'+cy+'" r="'+(R*k/4).toFixed(1)+'"/>';
+  vs.forEach((v,i) => {
+    const [x,y] = pt(i,R);
     g += '<line class="rd-axis" x1="'+cx+'" y1="'+cy+'" x2="'+x.toFixed(1)+'" y2="'+y.toFixed(1)+'"/>';
-    const [lx, ly] = pt(i, R + 15);
-    const ret = v.tf === D.tf_retenue;
-    g += '<text class="rd-lab'+(ret?' ret':'')+'" x="'+lx.toFixed(1)+'" y="'+(ly+3).toFixed(1)+
+    const [lx,ly] = pt(i,R+15);
+    const actif = D.key && D.key.tf === v.tf;
+    g += '<text class="rd-lab'+(actif?' ret':'')+'" x="'+lx.toFixed(1)+'" y="'+(ly+3).toFixed(1)+
          '" text-anchor="middle">'+v.tf+'</text>';
   });
-  // le polygone des scores
-  const pts = vs.map((v, i) => pt(i, Math.max(3, R * scoreTF(v) / MAX)));
+  const pts = vs.map((v,i) => pt(i, Math.max(3, R * v.n / maxN)));
   g += '<polygon class="rd-poly" points="'+pts.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ')+'"/>';
-  pts.forEach((p, i) => {
-    g += '<circle class="rd-pt'+(scoreTF(vs[i])>=MAX?' ok':'')+'" cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="2.6"/>';
-  });
-  box.innerHTML = '<svg viewBox="0 0 236 208" role="img" aria-label="Avancement du modèle par unité de temps">'+g+'</svg>';
+  pts.forEach((p,i) => { g += '<circle class="rd-pt'+(D.key&&D.key.tf===vs[i].tf?' ok':'')+
+    '" cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="2.6"/>'; });
+  box.innerHTML = '<svg viewBox="0 0 236 208" role="img" aria-label="Niveaux clés valides par unité de temps">'+g+'</svg>';
 }
 
-/* ── le balayage des unités ─────────────────────────────────────────── */
+/* ── liste des unités ───────────────────────────────────────────────── */
 function paintTFs(){
   const box = $('#tfs');
-  const vs = D && D.timeframes;
+  const vs = D && D.parTF;
   if(!vs){ box.innerHTML = '<div class="empty">—</div>'; return; }
   box.innerHTML = vs.map(v => {
-    if(!v.dispo) return '<div class="tf off"><span class="tf-id">' + v.tf + '</span><span class="tf-st">indisponible</span></div>';
-    const t = v.trade, ok = t && t.possible, ret = v.tf === D.tf_retenue;
-    const st = ok ? ('structure ' + t.sens) : ((v.structure && v.structure.valide) ? 'structure valide, pas d’entrée' : 'pas de setup');
-    return '<div class="tf ' + (ret ? 'ret' : ok ? 'ok' : '') + '">' +
+    const actif = D.key && D.key.tf === v.tf;
+    return '<div class="tf ' + (actif ? 'ret' : v.n ? 'ok' : 'off') + '">' +
       '<span class="tf-id">' + v.tf + '</span>' +
-      '<span class="tf-st">' + st + '</span>' +
-      '<span class="tf-rr">' + (ok ? 'RR ' + Number(t.rr).toFixed(2) : '—') + '</span></div>';
+      '<span class="tf-st">' + (v.n ? v.n + ' niveaux valides' + (v.type ? ' · plus proche ' + v.type : '')
+                                    : 'aucun niveau du bon côté') + '</span>' +
+      '<span class="tf-rr">' + (v.distance != null ? v.distance.toFixed(1) + ' pts' : '—') + '</span></div>';
   }).join('');
 }
 
 function paintAll(){ paintTop(); paintChain(); paintTrade(); paintJournal(); paintRadar(); paintTFs(); }
 
 /* ── cycle de rafraîchissement ──────────────────────────────────────── */
+// Les six séries dont le modèle a besoin. Plus d'ES : la configuration
+// mesurée n'utilise pas la divergence SMT, et six requêtes au lieu de onze
+// ménagent les relais.
+const SERIES = [['1m','8d'],['2m','60d'],['5m','60d'],['15m','60d'],['60m','3mo'],['1d','1y']];
+const CLES   = ['m1','m2','m5','m15','h1','d1'];
+
+async function charger(){
+  const out = {};
+  for(let i=0;i<SERIES.length;i++){
+    const [iv,rg] = SERIES[i];
+    const r = await NQ.candles('NQ=F', iv, rg).catch(()=>null);
+    out[CLES[i]] = r && r.candles ? r.candles : (Array.isArray(r) ? r : null);
+    if(!out[CLES[i]]) return null;
+  }
+  return out;
+}
+
 async function refresh(){
-  try{ D = await NQ.load(true); }catch(e){ D = null; }
+  try{
+    const brut = await charger();
+    D = brut ? Modele.evaluer(brut) : null;
+    if(D) D.source = (window.CFD && CFD.actif()) ? 'cfd' : 'yahoo';
+  }catch(e){ D = null; }
   if(D && window.History){
     // Un signal armé pendant un créneau de trading entre au journal ; les
     // signaux déjà ouverts sont confrontés au prix courant.
-    History.evaluate({ NQ: D.nq.prix });
+    History.evaluate({ NQ: D.prix });
     const t = D.trade;
     if(t && t.possible && (!window.WINDOW || WINDOW.isOpen()))
       History.record([{ sym:'NQ', dir:t.sens, entry:t.entree, sl:t.sl, tp:t.tp, rr:t.rr,
-        note:t.motif || '', tf:D.tf_retenue, price:D.nq.prix }], 'MECH');
+        note:'IFVG ' + t.tf + ' sur ' + t.niveau, tf:t.tf, price:D.prix }], 'MECH');
   }
   paintAll();
   if(D && window.Notif) Notif.verifier(D);
