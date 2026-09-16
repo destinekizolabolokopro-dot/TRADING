@@ -8,151 +8,146 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  /* Langage visuel repris de weevolveit.com : fond presque noir semé d'une
-     grille de points, barre flottante en pastille, libellés en monospace
-     majuscules largement espacées, un accent magenta, et de très grands
-     chiffres. La typographie des titres vient de subscrr.app — Inter Tight. */
+  /* Langage repris du tableau de bord Méridian : bleu nuit profond, panneaux
+     légèrement plus clairs, accent violet, libellés petits en majuscules,
+     densité forte. La typographie des chiffres reste Inter Tight. */
   :root{
-    --bg:#0a0a0b; --panel:#121214; --panel-2:#17171a;
-    --line:rgba(255,255,255,.10); --line-2:rgba(255,255,255,.20);
-    --ink:#f4f4f6; --muted:#8b8b93; --faint:#5c5c64;
-    --accent:#E4007C;
-    --long:#2fd4a0; --short:#ff5c5c; --wait:#ffb020;
+    --bg:#0c0d1a; --panel:#141731; --panel-2:#1a1e3d; --raise:#20254a;
+    --line:rgba(255,255,255,.07); --line-2:rgba(255,255,255,.14);
+    --ink:#e9eaf6; --muted:#8a8dae; --faint:#5a5d80;
+    --accent:#7b6cf6; --accent-dim:rgba(123,108,246,.14);
+    --long:#3ddc97; --short:#ff5c7a; --wait:#ffb547;
     --mono:'JetBrains Mono','IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
     --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
     --display:'Inter Tight','Inter',-apple-system,sans-serif;
-    --r:14px;
+    --r:10px;
   }
   *{box-sizing:border-box}
   html{-webkit-text-size-adjust:100%}
-  body{margin:0;color:var(--ink);font:15.5px/1.6 var(--sans);letter-spacing:-.01em;
-    -webkit-font-smoothing:antialiased;background:var(--bg);
-    /* la grille de points : discrète, elle donne la profondeur sans image */
-    background-image:radial-gradient(rgba(255,255,255,.055) 1px,transparent 1px);
-    background-size:22px 22px;background-attachment:fixed;
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.55 var(--sans);
+    letter-spacing:-.005em;-webkit-font-smoothing:antialiased;
     padding-bottom:env(safe-area-inset-bottom,0px)}
-  .wrap{max-width:840px;margin:0 auto;padding:0 20px}
-
-  /* libellés techniques : monospace, majuscules, très espacées */
-  .lab{font-family:var(--mono);font-size:.66rem;font-weight:500;text-transform:uppercase;
-    letter-spacing:.16em;color:var(--faint)}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 18px}
   .mono{font-family:var(--display);font-variant-numeric:tabular-nums;font-feature-settings:'tnum' 1}
 
-  /* ── barre flottante ───────────────────────────────────────────────── */
-  header{position:sticky;top:0;z-index:10;padding:16px 0 4px;
-    padding-top:calc(16px + env(safe-area-inset-top,0px))}
-  .bar{display:flex;align-items:center;gap:14px;height:62px;padding:0 22px;
-    background:rgba(18,18,20,.82);backdrop-filter:blur(14px) saturate(1.4);
-    border:1px solid var(--line);border-radius:999px}
-  .sym{font-family:var(--mono);font-size:.78rem;font-weight:700;letter-spacing:.14em;color:var(--muted)}
-  .px{font-family:var(--display);font-size:1.55rem;font-weight:700;letter-spacing:-.035em;
+  /* ── barre ─────────────────────────────────────────────────────────── */
+  header{position:sticky;top:0;z-index:20;background:rgba(12,13,26,.88);
+    backdrop-filter:blur(14px);border-bottom:1px solid var(--line);
+    padding-top:env(safe-area-inset-top,0px)}
+  .bar{display:flex;align-items:center;gap:16px;height:54px}
+  .brandpill{display:inline-flex;align-items:center;gap:8px;padding:5px 12px;border-radius:999px;
+    background:var(--panel-2);border:1px solid var(--line)}
+  .brandpill i{width:7px;height:7px;border-radius:50%;background:var(--accent);font-style:normal}
+  .brandpill span{font-family:var(--display);font-weight:700;font-size:.82rem;letter-spacing:-.01em}
+  .sym{font-family:var(--mono);font-size:.68rem;font-weight:600;letter-spacing:.12em;color:var(--faint)}
+  .px{font-family:var(--display);font-size:1.22rem;font-weight:700;letter-spacing:-.03em;
     font-variant-numeric:tabular-nums}
-  .chg{font-family:var(--mono);font-size:.74rem;font-weight:500;letter-spacing:.04em;
-    padding:3px 10px;border-radius:999px;border:1px solid var(--line)}
-  .chg.up{color:var(--long)} .chg.dn{color:var(--short)}
-  .bar-r{margin-left:auto;display:flex;align-items:center;gap:9px}
-  .age{font-family:var(--mono);font-size:.64rem;letter-spacing:.1em;text-transform:uppercase;
+  .chg{font-family:var(--mono);font-size:.68rem;font-weight:500;padding:3px 8px;border-radius:6px}
+  .chg.up{color:var(--long);background:rgba(61,220,151,.12)}
+  .chg.dn{color:var(--short);background:rgba(255,92,122,.12)}
+  .bar-r{margin-left:auto;display:flex;align-items:center;gap:8px}
+  .age{font-family:var(--mono);font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;
     color:var(--faint);white-space:nowrap}
   .age b{color:var(--muted);font-weight:500}
-  .ico{width:36px;height:36px;display:grid;place-items:center;border:1px solid var(--line);
-    border-radius:999px;background:transparent;color:var(--muted);cursor:pointer;font-size:14px;
-    transition:border-color .15s,color .15s,background .15s}
-  .ico:hover{border-color:var(--line-2);color:var(--ink)}
-  .ico.on{border-color:var(--accent);color:var(--accent);background:rgba(228,0,124,.12)}
+  .ico{width:32px;height:32px;display:grid;place-items:center;border:1px solid var(--line);
+    border-radius:8px;background:var(--panel);color:var(--muted);cursor:pointer;font-size:13px;
+    transition:.15s}
+  .ico:hover{border-color:var(--line-2);color:var(--ink);background:var(--panel-2)}
+  .ico.on{border-color:var(--accent);color:var(--accent);background:var(--accent-dim)}
 
-  /* ── état de séance ────────────────────────────────────────────────── */
-  .sess{display:flex;align-items:center;gap:10px;padding:26px 0 0;
-    font-family:var(--mono);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+  /* ── bandeau de séance ─────────────────────────────────────────────── */
+  .sess{display:flex;align-items:center;gap:9px;padding:14px 0;
+    font-family:var(--mono);font-size:.66rem;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
   .dot{width:7px;height:7px;border-radius:50%;background:var(--faint);flex:none}
-  .dot.on{background:var(--accent);box-shadow:0 0 0 4px rgba(228,0,124,.18)}
+  .dot.on{background:var(--long);box-shadow:0 0 0 3px rgba(61,220,151,.16)}
 
-  /* ── sections ──────────────────────────────────────────────────────── */
-  section{padding:34px 0 0}
-  h2{margin:0 0 14px;font-family:var(--mono);font-size:.66rem;font-weight:500;
-    letter-spacing:.18em;text-transform:uppercase;color:var(--faint)}
+  /* ── grille de tableau de bord ─────────────────────────────────────── */
+  .grid{display:grid;grid-template-columns:1.35fr .95fr;gap:14px;align-items:start;padding-bottom:20px}
+  @media(max-width:900px){.grid{grid-template-columns:1fr}}
+  .col{display:flex;flex-direction:column;gap:14px;min-width:0}
+
+  /* ── panneau ───────────────────────────────────────────────────────── */
+  .pan{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+  .pan-h{display:flex;align-items:center;gap:8px;padding:11px 15px;border-bottom:1px solid var(--line);
+    background:var(--panel-2)}
+  .pan-h h2{margin:0;font-family:var(--mono);font-size:.62rem;font-weight:500;
+    letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+  .pan-h .tag{margin-left:auto;font-family:var(--mono);font-size:.58rem;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--faint);padding:2px 8px;border-radius:5px;background:var(--raise)}
 
   /* ── chaîne du modèle ──────────────────────────────────────────────── */
-  .step{display:flex;gap:18px;align-items:flex-start;padding:18px 22px;background:var(--panel);
-    border:1px solid var(--line)}
-  .step+.step{border-top:0}
-  .step:first-child{border-radius:var(--r) var(--r) 0 0}
-  .step:last-child{border-radius:0 0 var(--r) var(--r)}
-  .step-n{font-family:var(--mono);font-size:.7rem;color:var(--faint);width:18px;flex:none;padding-top:5px;
-    letter-spacing:.06em}
+  .step{display:flex;gap:13px;align-items:flex-start;padding:13px 15px}
+  .step+.step{border-top:1px solid var(--line)}
+  .step-n{font-family:var(--mono);font-size:.64rem;color:var(--faint);width:14px;flex:none;padding-top:3px}
   .step-b{flex:1;min-width:0}
-  .step-t{display:block;font-family:var(--display);font-size:1.08rem;font-weight:700;
-    letter-spacing:-.025em;margin-bottom:3px}
-  .step-d{display:block;font-size:.88rem;color:var(--muted);line-height:1.5}
-  .step-s{flex:none;font-family:var(--mono);font-size:.6rem;font-weight:500;letter-spacing:.14em;
-    text-transform:uppercase;padding:5px 11px;border-radius:999px;
-    border:1px solid var(--line);color:var(--faint)}
-  .step.ok .step-s{border-color:rgba(47,212,160,.4);color:var(--long)}
-  .step.no .step-s{border-color:rgba(255,92,92,.4);color:var(--short)}
-  .step.wait .step-s{border-color:rgba(255,176,32,.4);color:var(--wait)}
+  .step-t{display:block;font-family:var(--display);font-size:.94rem;font-weight:650;
+    letter-spacing:-.018em;margin-bottom:2px}
+  .step-d{display:block;font-size:.8rem;color:var(--muted);line-height:1.45}
+  .step-s{flex:none;font-family:var(--mono);font-size:.55rem;font-weight:500;letter-spacing:.12em;
+    text-transform:uppercase;padding:3px 8px;border-radius:5px;background:var(--raise);color:var(--faint)}
+  .step.ok .step-s{background:rgba(61,220,151,.14);color:var(--long)}
+  .step.no .step-s{background:rgba(255,92,122,.14);color:var(--short)}
+  .step.wait .step-s{background:rgba(255,181,71,.14);color:var(--wait)}
 
-  /* ── la position : le bloc qui se détache, bordé de magenta ────────── */
-  .trade{background:var(--panel);border:1px solid var(--accent);border-radius:var(--r);overflow:hidden;
-    box-shadow:0 0 0 4px rgba(228,0,124,.10)}
-  .t-head{display:flex;align-items:baseline;gap:14px;padding:22px 24px 18px}
-  .t-dir{font-family:var(--display);font-size:1.75rem;font-weight:800;letter-spacing:-.04em}
+  /* ── position ──────────────────────────────────────────────────────── */
+  .trade{border-radius:var(--r);overflow:hidden;border:1px solid var(--accent);
+    background:var(--panel);box-shadow:0 0 0 3px var(--accent-dim)}
+  .t-head{display:flex;align-items:center;gap:10px;padding:13px 16px;background:var(--panel-2)}
+  .t-dir{font-family:var(--display);font-size:1.2rem;font-weight:800;letter-spacing:-.035em}
   .t-dir.long{color:var(--long)} .t-dir.short{color:var(--short)}
-  .t-tf{font-family:var(--mono);font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;color:var(--faint)}
-  .t-rr{margin-left:auto;font-family:var(--mono);font-size:.76rem;font-weight:500;letter-spacing:.1em;
-    padding:5px 13px;border-radius:999px;border:1px solid var(--line);color:var(--ink)}
-  .t-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);
-    border-top:1px solid var(--line)}
-  .t-cell{background:var(--panel-2);padding:16px 18px}
-  .t-k{font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.16em;
-    color:var(--faint);margin-bottom:7px}
-  .t-v{font-family:var(--display);font-size:1.34rem;font-weight:700;letter-spacing:-.035em;
+  .t-tf{font-family:var(--mono);font-size:.6rem;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
+  .t-rr{margin-left:auto;font-family:var(--mono);font-size:.68rem;letter-spacing:.06em;
+    padding:4px 10px;border-radius:6px;background:var(--raise)}
+  .t-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--line)}
+  .t-cell{background:var(--panel);padding:13px 16px}
+  .t-k{font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.14em;
+    color:var(--faint);margin-bottom:5px}
+  .t-v{font-family:var(--display);font-size:1.1rem;font-weight:700;letter-spacing:-.03em;
     font-variant-numeric:tabular-nums}
   .t-v.sl{color:var(--short)} .t-v.tp{color:var(--long)}
-  .t-sub{font-family:var(--mono);font-size:.64rem;letter-spacing:.06em;color:var(--faint);margin-top:4px}
-  .t-why{padding:16px 24px 22px;font-size:.87rem;color:var(--muted);line-height:1.55}
-  @media(max-width:560px){.t-grid{grid-template-columns:repeat(2,1fr)}}
+  .t-sub{font-family:var(--mono);font-size:.58rem;color:var(--faint);margin-top:3px}
+  .t-why{padding:12px 16px;font-size:.79rem;color:var(--muted);line-height:1.5;border-top:1px solid var(--line)}
 
-  .empty{padding:32px 22px;border:1px dashed var(--line);border-radius:var(--r);
-    font-size:.88rem;color:var(--muted);text-align:center;line-height:1.6;background:var(--panel)}
+  .empty{padding:26px 16px;font-size:.82rem;color:var(--faint);text-align:center;line-height:1.55}
 
   /* ── unités ────────────────────────────────────────────────────────── */
-  .tfs{border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
-  .tf{display:flex;align-items:baseline;gap:16px;padding:14px 22px;background:var(--panel);font-size:.87rem}
+  .tf{display:flex;align-items:center;gap:12px;padding:10px 15px;font-size:.8rem}
   .tf+.tf{border-top:1px solid var(--line)}
-  .tf.ok{background:var(--panel-2)}
-  .tf.ret{background:rgba(228,0,124,.09);box-shadow:inset 2px 0 0 var(--accent)}
+  .tf.ok{background:rgba(61,220,151,.05)}
+  .tf.ret{background:var(--accent-dim);box-shadow:inset 2px 0 0 var(--accent)}
   .tf.off{color:var(--faint)}
-  .tf-id{font-family:var(--mono);font-size:.74rem;font-weight:600;letter-spacing:.1em;width:48px;flex:none}
+  .tf-id{font-family:var(--mono);font-size:.68rem;font-weight:600;letter-spacing:.08em;width:40px;flex:none}
   .tf-st{color:var(--muted);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .tf-rr{font-family:var(--mono);font-size:.74rem;letter-spacing:.06em;flex:none;color:var(--faint)}
+  .tf-rr{font-family:var(--mono);font-size:.68rem;flex:none;color:var(--faint)}
   .tf.ok .tf-rr{color:var(--long)}
 
   /* ── réglages ──────────────────────────────────────────────────────── */
-  .panelbox{display:none;border:1px solid var(--line);border-radius:var(--r);
-    background:var(--panel);padding:22px;margin-top:20px}
+  .panelbox{display:none;padding:15px}
   .panelbox.open{display:block}
-  .panelbox p{margin:0 0 16px;font-size:.87rem;color:var(--muted);line-height:1.6}
-  .panelbox label{display:block;font-family:var(--mono);font-size:.62rem;text-transform:uppercase;
-    letter-spacing:.16em;color:var(--faint);margin-bottom:8px}
-  .panelbox input{width:100%;padding:12px 14px;background:var(--bg);border:1px solid var(--line);
-    border-radius:10px;color:var(--ink);font:13px var(--mono)}
+  .panelbox p{margin:0 0 13px;font-size:.8rem;color:var(--muted);line-height:1.55}
+  .panelbox label{display:block;font-family:var(--mono);font-size:.56rem;text-transform:uppercase;
+    letter-spacing:.14em;color:var(--faint);margin-bottom:6px}
+  .panelbox input{width:100%;padding:10px 12px;background:var(--bg);border:1px solid var(--line);
+    border-radius:7px;color:var(--ink);font:12.5px var(--mono)}
   .panelbox input:focus{outline:0;border-color:var(--accent)}
-  .row{display:flex;gap:9px;margin-top:14px;flex-wrap:wrap}
-  .btn{font-family:var(--mono);font-size:.7rem;font-weight:500;letter-spacing:.12em;text-transform:uppercase;
-    padding:11px 18px;border-radius:999px;border:1px solid var(--line);
-    background:transparent;color:var(--ink);cursor:pointer;transition:border-color .15s,background .15s}
-  .btn:hover{border-color:var(--line-2)}
+  .row{display:flex;gap:7px;margin-top:11px;flex-wrap:wrap}
+  .btn{font-family:var(--mono);font-size:.62rem;font-weight:500;letter-spacing:.1em;text-transform:uppercase;
+    padding:9px 14px;border-radius:7px;border:1px solid var(--line);background:var(--panel-2);
+    color:var(--ink);cursor:pointer;transition:.15s}
+  .btn:hover{border-color:var(--line-2);background:var(--raise)}
   .btn.p{background:var(--accent);border-color:var(--accent);color:#fff}
   .btn.p:hover{filter:brightness(1.1)}
-  .msg{margin-top:14px;font-size:.85rem;color:var(--muted);line-height:1.6}
+  .msg{margin-top:12px;font-size:.78rem;color:var(--muted);line-height:1.55}
 
-  footer{margin-top:44px;padding:24px 0 40px;border-top:1px solid var(--line);
-    font-family:var(--mono);font-size:.66rem;letter-spacing:.07em;color:var(--faint);line-height:1.9}
+  footer{padding:18px 0 34px;border-top:1px solid var(--line);
+    font-family:var(--mono);font-size:.6rem;letter-spacing:.06em;color:var(--faint);line-height:1.9}
 </style>
 </head>
 <body>
 
 <header>
   <div class="wrap bar">
+    <span class="brandpill"><i></i><span>MECH</span></span>
     <span class="sym">NQ</span>
     <span class="px mono" id="px">—</span>
     <span class="chg mono" id="chg"></span>
@@ -167,7 +162,7 @@
 <div class="wrap">
   <div class="sess"><span class="dot" id="sdot"></span><span id="stxt">Chargement…</span></div>
 
-  <div class="panelbox" id="settings">
+  <div class="pan panelbox" id="settings">
     <p><b>Flux temps réel.</b> Par défaut le site lit Yahoo, qui a environ
        <b>10 minutes de retard</b> sur le NQ. Un compte démo OANDA donne le NAS100 sans retard.
        Le jeton part directement chez OANDA et reste dans ce navigateur.</p>
@@ -181,20 +176,22 @@
     <div class="msg" id="setmsg"></div>
   </div>
 
-  <section>
-    <h2>Chaîne du modèle</h2>
-    <div id="chain"></div>
-  </section>
+  <div class="grid">
+    <div class="col">
+      <div class="pan">
+        <div class="pan-h"><h2>Chaîne du modèle</h2><span class="tag" id="chain-tag">—</span></div>
+        <div id="chain"></div>
+      </div>
+    </div>
 
-  <section>
-    <h2>Position</h2>
-    <div id="trade"></div>
-  </section>
-
-  <section>
-    <h2>Unités de temps</h2>
-    <div id="tfs"></div>
-  </section>
+    <div class="col">
+      <div id="trade"></div>
+      <div class="pan">
+        <div class="pan-h"><h2>Unités de temps</h2><span class="tag" id="tf-tag">NQ</span></div>
+        <div id="tfs"></div>
+      </div>
+    </div>
+  </div>
 
   <footer>
     MECH Model de PB Blake, sur le NQ uniquement. Si une étape manque, il n'y a pas de position.<br>
@@ -237,6 +234,7 @@ function paintTop(){
 function paintChain(){
   const box = $('#chain');
   if(!D){ box.innerHTML = '<div class="empty">Récupération des données NQ…</div>'; return; }
+  // Le compteur du panneau dit tout de suite combien d'étapes sont franchies.
   const st = D.structure || {};
   const gaps = D.gaps_non_comblés || [];
   const smt = D.smt;
@@ -275,15 +273,20 @@ function paintChain(){
            '<span class="step-d">' + e.d + '</span></span>' +
            '<span class="step-s">' + lbl + '</span></div>';
   }).join('');
+  const n = etapes.filter(e => e.ok && !e.no).length;
+  const tag = document.querySelector('#chain-tag');
+  if(tag) tag.textContent = n + '/' + etapes.length;
 }
 
 /* ── la position ────────────────────────────────────────────────────── */
 function paintTrade(){
   const box = $('#trade');
   const t = D && D.trade;
-  if(!t){ box.innerHTML = '<div class="empty">En attente des données.</div>'; return; }
+  const vide = h => '<div class="pan"><div class="pan-h"><h2>Position</h2></div>' +
+                    '<div class="empty">' + h + '</div></div>';
+  if(!t){ box.innerHTML = vide('En attente des données.'); return; }
   if(!t.possible){
-    box.innerHTML = '<div class="empty">Pas de position.<br>' + (t.raison || 'Une étape du modèle manque.') + '</div>';
+    box.innerHTML = vide('Pas de position.<br>' + (t.raison || 'Une étape du modèle manque.'));
     return;
   }
   const L = t.sens === 'LONG', dp = Math.abs(t.entree - t.sl), dt = Math.abs(t.tp - t.entree);
@@ -307,7 +310,7 @@ function paintTFs(){
   const box = $('#tfs');
   const vs = D && D.timeframes;
   if(!vs){ box.innerHTML = '<div class="empty">—</div>'; return; }
-  box.innerHTML = '<div class="tfs">' + vs.map(v => {
+  box.innerHTML = vs.map(v => {
     if(!v.dispo) return '<div class="tf off"><span class="tf-id">' + v.tf + '</span><span class="tf-st">indisponible</span></div>';
     const t = v.trade, ok = t && t.possible, ret = v.tf === D.tf_retenue;
     const st = ok ? ('structure ' + t.sens) : ((v.structure && v.structure.valide) ? 'structure valide, pas d’entrée' : 'pas de setup');
@@ -315,7 +318,7 @@ function paintTFs(){
       '<span class="tf-id">' + v.tf + '</span>' +
       '<span class="tf-st">' + st + '</span>' +
       '<span class="tf-rr">' + (ok ? 'RR ' + Number(t.rr).toFixed(2) : '—') + '</span></div>';
-  }).join('') + '</div>';
+  }).join('');
 }
 
 function paintAll(){ paintTop(); paintChain(); paintTrade(); paintTFs(); }
