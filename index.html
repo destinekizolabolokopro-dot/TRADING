@@ -12,10 +12,12 @@
      légèrement plus clairs, accent violet, libellés petits en majuscules,
      densité forte. La typographie des chiffres reste Inter Tight. */
   :root{
-    --bg:#0c0d1a; --panel:#141731; --panel-2:#1a1e3d; --raise:#20254a;
-    --line:rgba(255,255,255,.07); --line-2:rgba(255,255,255,.14);
-    --ink:#e9eaf6; --muted:#8a8dae; --faint:#5a5d80;
-    --accent:#7b6cf6; --accent-dim:rgba(123,108,246,.14);
+    /* Noir véritable. Les panneaux ne sont pas bleutés mais neutres, à peine
+       détachés du fond ; c'est le filet qui les dessine, pas leur couleur. */
+    --bg:#000000; --panel:#0b0b0d; --panel-2:#121215; --raise:#1b1b1f;
+    --line:rgba(255,255,255,.09); --line-2:rgba(255,255,255,.18);
+    --ink:#f2f2f4; --muted:#9a9aa4; --faint:#63636d;
+    --accent:#8b7bff; --accent-dim:rgba(139,123,255,.15);
     --long:#3ddc97; --short:#ff5c7a; --wait:#ffb547;
     --mono:'JetBrains Mono','IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
     --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
@@ -26,12 +28,14 @@
   html{-webkit-text-size-adjust:100%}
   body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.55 var(--sans);
     letter-spacing:-.005em;-webkit-font-smoothing:antialiased;
+    background-image:radial-gradient(rgba(255,255,255,.045) 1px,transparent 1px);
+    background-size:24px 24px;background-attachment:fixed;
     padding-bottom:env(safe-area-inset-bottom,0px)}
   .wrap{max-width:1180px;margin:0 auto;padding:0 18px}
   .mono{font-family:var(--display);font-variant-numeric:tabular-nums;font-feature-settings:'tnum' 1}
 
   /* ── barre ─────────────────────────────────────────────────────────── */
-  header{position:sticky;top:0;z-index:20;background:rgba(12,13,26,.88);
+  header{position:sticky;top:0;z-index:20;background:rgba(0,0,0,.86);
     backdrop-filter:blur(14px);border-bottom:1px solid var(--line);
     padding-top:env(safe-area-inset-top,0px)}
   .bar{display:flex;align-items:center;gap:16px;height:54px}
@@ -124,13 +128,13 @@
   .gauge-bar{width:70px;height:4px;border-radius:2px;background:var(--raise);overflow:hidden;
     box-shadow:inset 0 0 0 1px var(--line)}
   .gauge-fill{height:100%;background:var(--accent);border-radius:2px;width:0;min-width:4px;
-    box-shadow:0 0 6px rgba(123,108,246,.6);
+    box-shadow:0 0 7px rgba(139,123,255,.65);
     transition:width .5s cubic-bezier(.4,0,.2,1)}
   .gauge-txt{font-family:var(--mono);font-size:.58rem;letter-spacing:.1em;color:var(--muted)}
 
   /* ── position ──────────────────────────────────────────────────────── */
   .trade{border-radius:var(--r);overflow:hidden;border:1px solid var(--accent);
-    background:var(--panel);box-shadow:0 0 0 3px var(--accent-dim)}
+    background:var(--panel);box-shadow:0 0 0 3px var(--accent-dim),0 0 24px rgba(139,123,255,.12)}
   .t-head{display:flex;align-items:center;gap:10px;padding:13px 16px;background:var(--panel-2)}
   .t-dir{font-family:var(--display);font-size:1.2rem;font-weight:800;letter-spacing:-.035em}
   .t-dir.long{color:var(--long)} .t-dir.short{color:var(--short)}
@@ -163,7 +167,7 @@
   .radar svg{display:block;width:100%;height:auto;overflow:visible}
   .rd-ring{fill:none;stroke:var(--line);stroke-width:1}
   .rd-axis{stroke:var(--line);stroke-width:1}
-  .rd-poly{fill:rgba(123,108,246,.18);stroke:var(--accent);stroke-width:1.5;stroke-linejoin:round}
+  .rd-poly{fill:rgba(139,123,255,.16);stroke:var(--accent);stroke-width:1.5;stroke-linejoin:round}
   .rd-pt{fill:var(--accent)}
   .rd-pt.ok{fill:var(--long)}
   .rd-lab{font-family:var(--mono);font-size:8.5px;letter-spacing:.1em;fill:var(--faint)}
@@ -173,7 +177,7 @@
      celui du viewBox : les deux se superposent au pixel près. */
   .rd-sweep{position:absolute;top:50%;left:50%;width:78%;aspect-ratio:1;
     border-radius:50%;pointer-events:none;
-    background:conic-gradient(from 0deg at 50% 50%,rgba(123,108,246,.32),rgba(123,108,246,0) 40%);
+    background:conic-gradient(from 0deg at 50% 50%,rgba(139,123,255,.30),rgba(139,123,255,0) 40%);
     animation:rdspin 4.4s linear infinite}
   @keyframes rdspin{from{transform:translate(-50%,-50%) rotate(0)}
                     to{transform:translate(-50%,-50%) rotate(360deg)}}
@@ -183,7 +187,7 @@
   .tf{display:flex;align-items:center;gap:12px;padding:10px 15px;font-size:.8rem}
   .tf+.tf{border-top:1px solid var(--line)}
   .tf.ok{background:rgba(61,220,151,.05)}
-  .tf.ret{background:var(--accent-dim);box-shadow:inset 2px 0 0 var(--accent)}
+  .tf.ret{background:rgba(139,123,255,.10);box-shadow:inset 2px 0 0 var(--accent)}
   .tf.off{color:var(--faint)}
   .tf-id{font-family:var(--mono);font-size:.68rem;font-weight:600;letter-spacing:.08em;width:40px;flex:none}
   .tf-st{color:var(--ink);opacity:.72;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
