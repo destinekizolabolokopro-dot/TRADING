@@ -225,7 +225,10 @@
   .jr-s.long{color:var(--long)} .jr-s.short{color:var(--short)}
   .jr-p{font-family:var(--display);font-variant-numeric:tabular-nums;color:var(--muted);flex:1;min-width:0;
     overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .jr-r{font-family:var(--display);font-weight:700;font-variant-numeric:tabular-nums;flex:none;font-size:.85rem}
+  .jr-r{flex:none;text-align:right;display:flex;flex-direction:column;gap:1px;min-width:104px}
+  .jr-r .jv{font-family:var(--mono);font-size:.56rem;font-weight:500;letter-spacing:.13em;
+    text-transform:uppercase}
+  .jr-r .jn{font-family:var(--display);font-weight:700;font-variant-numeric:tabular-nums;font-size:.85rem}
   .jr-r.pos{color:var(--long)} .jr-r.neg{color:var(--short)} .jr-r.open{color:var(--wait);font-weight:500}
 
   .fgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:11px}
@@ -2008,7 +2011,7 @@ function paintJournal(){
         nR(rrMoyGain) + '</div></div>' +
       '<div><div class="bk">Espérance</div><div class="bv ' + (esp > 0 ? 'pos' : esp < 0 ? 'neg' : '') + '">' +
         nR(esp) + (esp != null ? '<span class="bsub"> / trade</span>' : '') + '</div></div>' +
-      '<div><div class="bk">Cumulé</div><div class="bv ' + (b.rsum > 0 ? 'pos' : b.rsum < 0 ? 'neg' : '') + '">' +
+      '<div><div class="bk">Cumulé · 1 R = ' + uR + dev + '</div><div class="bv ' + (b.rsum > 0 ? 'pos' : b.rsum < 0 ? 'neg' : '') + '">' +
         (b.rsum > 0 ? '+' : '') + b.rsum.toFixed(1) + ' R' +
         '<span class="bsub"> ' + (eur > 0 ? '+' : '') + eur + dev + '</span></div></div>' +
     '</div>';
@@ -2024,12 +2027,18 @@ function paintJournal(){
                  ' ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
     const ouvert = x.status === 'open';
     const r = ouvert ? null : (x.r || 0);
+    // Le résultat est écrit en toutes lettres AVANT les chiffres : « perdu
+    // −1.00 R » se lit sans avoir à savoir ce qu'est un R.
+    const verdict = ouvert ? 'en cours' : r > 0 ? 'gagné' : 'perdu';
     return '<div class="jr" title="' + (x.motif || '').replace(/"/g,'&quot;') + '">' +
       '<span class="jr-d">' + jour + '</span>' +
       '<span class="jr-s ' + (x.direction === 'LONG' ? 'long' : 'short') + '">' + x.direction + '</span>' +
-      '<span class="jr-p">' + fmt(x.entry) + ' → ' + fmt(x.tp) + ' · stop ' + fmt(x.sl) + (x.tf ? ' · ' + x.tf : '') + '</span>' +
+      '<span class="jr-p">entrée ' + fmt(x.entry) + ' · cible ' + fmt(x.tp) + ' · stop ' + fmt(x.sl) +
+        (x.tf ? ' · ' + x.tf : '') + '</span>' +
       '<span class="jr-r ' + (ouvert ? 'open' : r > 0 ? 'pos' : 'neg') + '">' +
-        (ouvert ? 'en cours' : (r > 0 ? '+' : '') + r.toFixed(2) + ' R · ' + (r > 0 ? '+' : '') + Math.round(r * uR) + dev) +
+        '<span class="jv">' + verdict + '</span>' +
+        (ouvert ? '' : '<span class="jn">' + (r > 0 ? '+' : '') + r.toFixed(2) + ' R · ' +
+                        (r > 0 ? '+' : '') + Math.round(r * uR) + dev + '</span>') +
       '</span></div>';
   }).join('');
 }
