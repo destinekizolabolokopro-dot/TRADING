@@ -185,6 +185,24 @@
 </header>
 
 <div class="wrap">
+  <!-- Si le JavaScript ne tourne pas — c'est le cas de l'aperçu de fichier
+       d'iOS, qui affiche le HTML mais n'exécute rien — la page resterait
+       muette et vide. Autant expliquer pourquoi. -->
+  <noscript>
+    <div class="pan" style="margin-top:16px">
+      <div class="pan-h"><h2>JavaScript désactivé</h2></div>
+      <div class="empty" style="text-align:left;padding:16px">
+        Cette page calcule tout dans le navigateur : sans JavaScript elle reste vide.<br><br>
+        <b>Sur iPad</b>, c'est ce qui arrive quand on ouvre le fichier depuis l'aperçu de
+        l'app Fichiers ou depuis une autre application. L'aperçu affiche la mise en page
+        mais n'exécute rien.<br><br>
+        Ouvre le fichier dans un vrai navigateur — par exemple avec l'app gratuite
+        <b>Documents</b> de Readdle, qui a un navigateur intégré — ou mets le site en ligne
+        pour l'ouvrir par une adresse.
+      </div>
+    </div>
+  </noscript>
+
   <div class="sess"><span class="dot" id="sdot"></span><span id="stxt">Chargement…</span></div>
 
   <div class="pan panelbox" id="settings">
