@@ -138,6 +138,68 @@ peut pas chiffrer sans vraies données hors période.
 À +0,10 R, le rendement tombe à **1,4 % par mois** à 0,5 % de risque — le bas
 de la fourchette annoncée, et non son haut.
 
+## Relance du 16 septembre — le seuil d'équilibre
+
+Données retéléchargées, fenêtre glissée d'un jour, même réglage.
+
+| | 15 sept. | **16 sept.** |
+|---|---|---|
+| Trades | 64 | **56** |
+| Taux de réussite | 84,4 % | **83,9 %** |
+| Espérance | +0,237 R | **+0,237 R** |
+| Profit factor | 2,49 | **2,45** |
+| Max drawdown | 2,25 R | **2,21 R** |
+
+Ce n'est pas une validation : la fenêtre n'a bougé que d'un jour, c'est
+presque le même échantillon. L'intérêt est ailleurs.
+
+### Le chiffre qui manquait — le taux de réussite d'équilibre
+
+```
+gain moyen quand ça gagne   : +0,477 R   (47 trades)
+perte moyenne quand ça perd : −1,019 R   ( 9 trades)
+
+taux de réussite actuel      83,9 %
+TAUX D'ÉQUILIBRE             68,1 %   ← en dessous, on perd
+marge                        15,8 points
+```
+
+Les gains sont petits et les pertes sont pleines : il faut **68 % de trades
+non perdants rien que pour ne rien gagner**. C'est la contrepartie du profil
+de scalp, et c'est la fragilité principale du réglage. Un taux qui glisse de
+84 % à 70 % ne divise pas le gain par deux — il l'annule presque.
+
+### Courbe jour par jour
+
+35 séances avec trade, du 9 juillet au 14 septembre.
+
+```
+26 jours gagnants · 9 perdants · 0 nul
+pire journée  −1,00 R      meilleure journée  +1,40 R
+plus longue série de jours perdants : 3
+drawdown maximal recalculé jour par jour : 2,10 R
+```
+
+La courbe ne recule jamais de plus de deux unités de risque, ce qui est très
+confortable pour une évaluation prop firm. Mais cette régularité est celle
+d'un modèle à petits gains fréquents : elle tient tant que le taux tient.
+
+### Transfert, mesuré le même jour
+
+| | Trades | WR | Espérance | PF |
+|---|---|---|---|---|
+| **NQ** | 56 | 83,9 % | **+0,237 R** | 2,45 |
+| RTY Russell | 45 | 75,6 % | +0,035 R | 1,13 |
+| GC Or | 42 | 71,4 % | +0,021 R | 1,07 |
+| YM Dow | 50 | 72,0 % | −0,001 R | 1,00 |
+| ES S&P 500 | 43 | 72,1 % | −0,069 R | 0,78 |
+
+Trois contrats sur quatre sont à l'équilibre, un est négatif, et tous ont un
+taux de réussite autour de 72 à 76 % — **au-dessus du seuil d'équilibre de
+68 %, mais de peu**. Le NQ reste très au-dessus des autres. Cet écart est
+soit une vraie particularité du contrat, soit ce que l'optimisation a
+capté ; deux mois de données ne permettent pas de trancher.
+
 ## Ce qu'il faut savoir avant de s'en servir
 
 **1. Sélection sur les mêmes données.** Ce réglage est le meilleur de 263
