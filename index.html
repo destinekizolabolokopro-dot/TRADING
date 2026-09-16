@@ -110,6 +110,31 @@
 
   .empty{padding:26px 16px;font-size:.82rem;color:var(--faint);text-align:center;line-height:1.55}
 
+  /* ── radar de balayage ─────────────────────────────────────────────── */
+  /* Repris du « balayage de volatilité » de la référence, mais il montre de
+     vraies données : chaque axe est une unité de temps, et le rayon dit
+     jusqu'où le modèle est allé sur cette unité. Rien n'est décoratif. */
+  .radar{padding:14px 10px 6px;display:grid;place-items:center}
+  .rd-box{position:relative;width:100%;max-width:280px}
+  .radar svg{display:block;width:100%;height:auto;overflow:visible}
+  .rd-ring{fill:none;stroke:var(--line);stroke-width:1}
+  .rd-axis{stroke:var(--line);stroke-width:1}
+  .rd-poly{fill:rgba(123,108,246,.18);stroke:var(--accent);stroke-width:1.5;stroke-linejoin:round}
+  .rd-pt{fill:var(--accent)}
+  .rd-pt.ok{fill:var(--long)}
+  .rd-lab{font-family:var(--mono);font-size:8.5px;letter-spacing:.1em;fill:var(--faint)}
+  .rd-lab.ret{fill:var(--accent)}
+  /* Le faisceau qui tourne. Sa largeur — 78 % de la boîte — vaut exactement le
+     diamètre du cercle extérieur du SVG (2 × 92 sur 236), et son centre est
+     celui du viewBox : les deux se superposent au pixel près. */
+  .rd-sweep{position:absolute;top:50%;left:50%;width:78%;aspect-ratio:1;
+    border-radius:50%;pointer-events:none;
+    background:conic-gradient(from 0deg at 50% 50%,rgba(123,108,246,.32),rgba(123,108,246,0) 40%);
+    animation:rdspin 4.4s linear infinite}
+  @keyframes rdspin{from{transform:translate(-50%,-50%) rotate(0)}
+                    to{transform:translate(-50%,-50%) rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){.rd-sweep{animation:none;opacity:.22}}
+
   /* ── unités ────────────────────────────────────────────────────────── */
   .tf{display:flex;align-items:center;gap:12px;padding:10px 15px;font-size:.8rem}
   .tf+.tf{border-top:1px solid var(--line)}
@@ -187,7 +212,8 @@
     <div class="col">
       <div id="trade"></div>
       <div class="pan">
-        <div class="pan-h"><h2>Unités de temps</h2><span class="tag" id="tf-tag">NQ</span></div>
+        <div class="pan-h"><h2>Balayage des unités</h2><span class="tag" id="tf-tag">NQ</span></div>
+        <div class="radar"><div class="rd-box"><div class="rd-sweep"></div><div id="radar"></div></div></div>
         <div id="tfs"></div>
       </div>
     </div>
@@ -305,6 +331,45 @@ function paintTrade(){
     '</div>';
 }
 
+/* ── radar : jusqu'où chaque unité est allée dans la chaîne ─────────── */
+// Score honnête, de 0 à 4, calculé sur ce que l'unité montre vraiment :
+// structure valide, balayage détecté, inversion confirmée, trade possible.
+function scoreTF(v){
+  if(!v || !v.dispo) return 0;
+  const st = v.structure || {};
+  return (st.valide ? 1 : 0) + (st.sweep ? 1 : 0) + (st.inversion ? 1 : 0) +
+         (v.trade && v.trade.possible ? 1 : 0);
+}
+function paintRadar(){
+  const box = $('#radar');
+  const vs = (D && D.timeframes) || [];
+  if(!vs.length){ box.innerHTML = ''; return; }
+  const R = 92, cx = 118, cy = 104, n = vs.length, MAX = 4;
+  const pt = (i, r) => {
+    const a = -Math.PI/2 + i * 2*Math.PI/n;
+    return [cx + Math.cos(a)*r, cy + Math.sin(a)*r];
+  };
+  let g = '';
+  // anneaux concentriques
+  for(let k = 1; k <= MAX; k++) g += '<circle class="rd-ring" cx="'+cx+'" cy="'+cy+'" r="'+(R*k/MAX).toFixed(1)+'"/>';
+  // axes et étiquettes
+  vs.forEach((v, i) => {
+    const [x, y] = pt(i, R);
+    g += '<line class="rd-axis" x1="'+cx+'" y1="'+cy+'" x2="'+x.toFixed(1)+'" y2="'+y.toFixed(1)+'"/>';
+    const [lx, ly] = pt(i, R + 15);
+    const ret = v.tf === D.tf_retenue;
+    g += '<text class="rd-lab'+(ret?' ret':'')+'" x="'+lx.toFixed(1)+'" y="'+(ly+3).toFixed(1)+
+         '" text-anchor="middle">'+v.tf+'</text>';
+  });
+  // le polygone des scores
+  const pts = vs.map((v, i) => pt(i, Math.max(3, R * scoreTF(v) / MAX)));
+  g += '<polygon class="rd-poly" points="'+pts.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ')+'"/>';
+  pts.forEach((p, i) => {
+    g += '<circle class="rd-pt'+(scoreTF(vs[i])>=MAX?' ok':'')+'" cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="2.6"/>';
+  });
+  box.innerHTML = '<svg viewBox="0 0 236 208" role="img" aria-label="Avancement du modèle par unité de temps">'+g+'</svg>';
+}
+
 /* ── le balayage des unités ─────────────────────────────────────────── */
 function paintTFs(){
   const box = $('#tfs');
@@ -321,7 +386,7 @@ function paintTFs(){
   }).join('');
 }
 
-function paintAll(){ paintTop(); paintChain(); paintTrade(); paintTFs(); }
+function paintAll(){ paintTop(); paintChain(); paintTrade(); paintRadar(); paintTFs(); }
 
 /* ── cycle de rafraîchissement ──────────────────────────────────────── */
 async function refresh(){
