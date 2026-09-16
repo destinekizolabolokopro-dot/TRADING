@@ -73,6 +73,16 @@
   .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start;padding-bottom:20px}
   @media(max-width:900px){.grid{grid-template-columns:1fr}}
   #trade{margin-bottom:14px}
+  .pan.wide{grid-column:1/-1}
+  /* Radar et liste côte à côte : le panneau occupe toute la largeur, plus de
+     colonne vide à droite. */
+  .unites{display:grid;grid-template-columns:330px 1fr}
+  .unites .radar{border-bottom:0;border-right:1px solid var(--line)}
+  .unites #tfs{align-self:center}
+  @media(max-width:760px){
+    .unites{grid-template-columns:1fr}
+    .unites .radar{border-right:0;border-bottom:1px solid var(--line)}
+  }
 
   /* ── panneau ───────────────────────────────────────────────────────── */
   .pan{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
@@ -152,7 +162,7 @@
   .t-sub{font-family:var(--mono);font-size:.58rem;color:var(--faint);margin-top:3px}
   .t-why{padding:12px 16px;font-size:.79rem;color:var(--muted);line-height:1.5;border-top:1px solid var(--line)}
 
-  .empty{padding:30px 20px;font-size:.82rem;color:var(--faint);text-align:center;line-height:1.6}
+  .empty{padding:22px 20px;font-size:.82rem;color:var(--faint);text-align:center;line-height:1.6}
   .empty b{display:block;font-family:var(--display);font-size:.98rem;font-weight:650;
     letter-spacing:-.02em;color:var(--muted);margin-bottom:6px}
   .empty .hint{display:block;margin-top:8px;font-family:var(--mono);font-size:.58rem;
@@ -194,6 +204,32 @@
   .tf-st{color:var(--ink);opacity:.72;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .tf-rr{font-family:var(--mono);font-size:.68rem;flex:none;color:var(--faint)}
   .tf.ok .tf-rr{color:var(--long)}
+
+  /* ── journal des signaux ───────────────────────────────────────────── */
+  .bilan{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);
+    border-bottom:1px solid var(--line)}
+  .bilan div{background:var(--panel-2);padding:12px 14px}
+  .bilan .bk{font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.14em;
+    color:var(--faint);margin-bottom:5px}
+  .bilan .bv{font-family:var(--display);font-size:1.12rem;font-weight:700;letter-spacing:-.03em;
+    font-variant-numeric:tabular-nums}
+  .bilan .bv.pos{color:var(--long)} .bilan .bv.neg{color:var(--short)}
+  @media(max-width:620px){.bilan{grid-template-columns:repeat(2,1fr)}}
+
+  .jr{display:flex;align-items:center;gap:11px;padding:10px 15px;font-size:.79rem}
+  .jr+.jr{border-top:1px solid var(--line)}
+  .jr-d{font-family:var(--mono);font-size:.64rem;color:var(--faint);width:76px;flex:none}
+  .jr-s{font-family:var(--display);font-weight:700;font-size:.8rem;width:48px;flex:none}
+  .jr-s.long{color:var(--long)} .jr-s.short{color:var(--short)}
+  .jr-p{font-family:var(--display);font-variant-numeric:tabular-nums;color:var(--muted);flex:1;min-width:0;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .jr-r{font-family:var(--display);font-weight:700;font-variant-numeric:tabular-nums;flex:none;font-size:.85rem}
+  .jr-r.pos{color:var(--long)} .jr-r.neg{color:var(--short)} .jr-r.open{color:var(--wait);font-weight:500}
+
+  .fgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:11px}
+  .panelbox select{width:100%;padding:10px 12px;background:var(--bg);border:1px solid var(--line);
+    border-radius:7px;color:var(--ink);font:12.5px var(--sans)}
+  .panelbox select:focus{outline:0;border-color:var(--accent)}
 
   /* ── réglages ──────────────────────────────────────────────────────── */
   .panelbox{display:none;padding:15px}
@@ -259,12 +295,23 @@
     <p><b>Flux temps réel.</b> Par défaut le site lit Yahoo, qui a environ
        <b>10 minutes de retard</b> sur le NQ. Un compte démo OANDA donne le NAS100 sans retard.
        Le jeton part directement chez OANDA et reste dans ce navigateur.</p>
+    <div class="fgrid">
+      <div><label>Capital</label><input type="number" id="c-capital" min="100" step="100"></div>
+      <div><label>Devise</label>
+        <select id="c-devise"><option value="EUR">EUR €</option><option value="USD">USD $</option></select></div>
+      <div><label>Risque par trade %</label><input type="number" id="c-risque" min="0.05" max="5" step="0.05"></div>
+      <div><label>Contrat</label>
+        <select id="c-contrat"><option value="MNQ">MNQ — micro (2 $/pt)</option><option value="NQ">NQ — plein (20 $/pt)</option></select></div>
+    </div>
+    <div class="msg" id="c-msg"></div>
+    <hr style="border:0;border-top:1px solid var(--line);margin:18px 0">
     <label>Jeton OANDA — compte pratique</label>
     <input type="password" id="tok" placeholder="xxxxxxxx-xxxxxxxxxxxxxxxx" autocomplete="off">
     <div class="row">
       <button class="btn p" id="b-save">Enregistrer</button>
       <button class="btn" id="b-corr">Corrélation avec le NQ</button>
       <button class="btn" id="b-clear">Retirer</button>
+      <button class="btn" id="b-reset">Vider le journal</button>
     </div>
     <div class="msg" id="setmsg"></div>
   </div>
@@ -283,9 +330,18 @@
     </div>
 
     <div class="pan">
+      <div class="pan-h"><h2>Journal des signaux</h2>
+        <span class="tag" id="j-tag">—</span></div>
+      <div id="bilan"></div>
+      <div id="journal"></div>
+    </div>
+
+    <div class="pan wide">
       <div class="pan-h"><h2>Balayage des unités</h2><span class="tag" id="tf-tag">NQ</span></div>
-      <div class="radar"><div class="rd-box"><div class="rd-sweep"></div><div id="radar"></div></div></div>
-      <div id="tfs"></div>
+      <div class="unites">
+        <div class="radar"><div class="rd-box"><div class="rd-sweep"></div><div id="radar"></div></div></div>
+        <div id="tfs"></div>
+      </div>
     </div>
   </div>
 
@@ -298,6 +354,8 @@
 <script src="js/session.js"></script>
 <script src="js/cfd.js"></script>
 <script src="js/nq.js"></script>
+<script src="js/compte.js"></script>
+<script src="js/history.js"></script>
 <script src="js/notif.js"></script>
 <script>
 'use strict';
@@ -403,6 +461,10 @@ function paintTrade(){
     return;
   }
   const L = t.sens === 'LONG', dp = Math.abs(t.entree - t.sl), dt = Math.abs(t.tp - t.entree);
+  // Calibrage sur le capital réel : le modèle raisonne en R, on passe des ordres
+  // en contrats.
+  const k = window.Compte ? Compte.calibrer(t.entree, t.sl, t.tp) : null;
+  const dev = k ? Compte.sym(k.devise) : '';
   box.innerHTML =
     '<div class="trade ' + (L ? 'long' : 'short') + '">' +
       '<div class="t-head"><span class="t-dir ' + (L ? 'long' : 'short') + '">' + t.sens + '</span>' +
@@ -412,7 +474,13 @@ function paintTrade(){
         '<div class="t-cell"><div class="t-k">Entrée</div><div class="t-v">' + fmt(t.entree) + '</div></div>' +
         '<div class="t-cell"><div class="t-k">Stop</div><div class="t-v sl">' + fmt(t.sl) + '</div><div class="t-sub">−' + dp.toFixed(1) + ' pts</div></div>' +
         '<div class="t-cell"><div class="t-k">Objectif</div><div class="t-v tp">' + fmt(t.tp) + '</div><div class="t-sub">+' + dt.toFixed(1) + ' pts</div></div>' +
-        '<div class="t-cell"><div class="t-k">Unité</div><div class="t-v">' + (D.tf_retenue || '—') + '</div></div>' +
+        '<div class="t-cell"><div class="t-k">Taille</div>' +
+          (k && !k.tropPetit
+            ? '<div class="t-v">' + k.contrats + ' ' + Compte.lire().contrat + '</div>' +
+              '<div class="t-sub">risque ' + k.risqueDev + dev + ' · gain ' + k.gainDev + dev + '</div>'
+            : '<div class="t-v" style="color:var(--wait)">—</div>' +
+              '<div class="t-sub">stop trop large pour ce capital</div>') +
+        '</div>' +
       '</div>' +
       (t.motif ? '<div class="t-why">' + t.motif + '</div>' : '') +
     '</div>';
@@ -473,13 +541,65 @@ function paintTFs(){
   }).join('');
 }
 
-function paintAll(){ paintTop(); paintChain(); paintTrade(); paintRadar(); paintTFs(); }
+function paintAll(){ paintTop(); paintChain(); paintTrade(); paintJournal(); paintRadar(); paintTFs(); }
 
 /* ── cycle de rafraîchissement ──────────────────────────────────────── */
 async function refresh(){
   try{ D = await NQ.load(true); }catch(e){ D = null; }
+  if(D && window.History){
+    // Un signal armé pendant un créneau de trading entre au journal ; les
+    // signaux déjà ouverts sont confrontés au prix courant.
+    History.evaluate({ NQ: D.nq.prix });
+    const t = D.trade;
+    if(t && t.possible && (!window.WINDOW || WINDOW.isOpen()))
+      History.record([{ sym:'NQ', dir:t.sens, entry:t.entree, sl:t.sl, tp:t.tp, rr:t.rr,
+        note:t.motif || '', tf:D.tf_retenue, price:D.nq.prix }], 'MECH');
+  }
   paintAll();
   if(D && window.Notif) Notif.verifier(D);
+}
+
+/* ── journal : ce que les signaux passés ont donné ──────────────────── */
+function paintJournal(){
+  const bx = $('#bilan'), jx = $('#journal'), tag = $('#j-tag');
+  if(!window.History){ return; }
+  const h = History.load().filter(x => x.source === 'MECH');
+  const b = History.bilan('MECH');
+  const uR = window.Compte ? Compte.uniteR() : 0;
+  const dev = window.Compte ? Compte.sym(Compte.lire().devise) : '';
+  const eur = Math.round(b.rsum * uR);
+
+  if(tag) tag.textContent = b.total + (b.open ? ' + ' + b.open + ' en cours' : '');
+
+  bx.innerHTML =
+    '<div class="bilan">' +
+      '<div><div class="bk">Signaux clos</div><div class="bv">' + b.total + '</div></div>' +
+      '<div><div class="bk">Réussite</div><div class="bv">' + (b.rate == null ? '—' : b.rate + ' %') + '</div></div>' +
+      '<div><div class="bk">Cumulé</div><div class="bv ' + (b.rsum > 0 ? 'pos' : b.rsum < 0 ? 'neg' : '') + '">' +
+        (b.rsum > 0 ? '+' : '') + b.rsum.toFixed(1) + ' R</div></div>' +
+      '<div><div class="bk">Sur ce compte</div><div class="bv ' + (eur > 0 ? 'pos' : eur < 0 ? 'neg' : '') + '">' +
+        (eur > 0 ? '+' : '') + eur + dev + '</div></div>' +
+    '</div>';
+
+  if(!h.length){
+    jx.innerHTML = '<div class="empty"><b>Journal vide</b>Chaque signal armé pendant un créneau ' +
+                   'sera enregistré ici, puis suivi jusqu\u2019à son stop ou son objectif.</div>';
+    return;
+  }
+  jx.innerHTML = h.slice().reverse().slice(0, 12).map(x => {
+    const d = new Date(x.ts);
+    const jour = String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') +
+                 ' ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+    const ouvert = x.status === 'open';
+    const r = ouvert ? null : (x.r || 0);
+    return '<div class="jr" title="' + (x.motif || '').replace(/"/g,'&quot;') + '">' +
+      '<span class="jr-d">' + jour + '</span>' +
+      '<span class="jr-s ' + (x.direction === 'LONG' ? 'long' : 'short') + '">' + x.direction + '</span>' +
+      '<span class="jr-p">' + fmt(x.entry) + ' → ' + fmt(x.tp) + ' · stop ' + fmt(x.sl) + (x.tf ? ' · ' + x.tf : '') + '</span>' +
+      '<span class="jr-r ' + (ouvert ? 'open' : r > 0 ? 'pos' : 'neg') + '">' +
+        (ouvert ? 'en cours' : (r > 0 ? '+' : '') + r.toFixed(2) + ' R · ' + (r > 0 ? '+' : '') + Math.round(r * uR) + dev) +
+      '</span></div>';
+  }).join('');
 }
 
 /* ── réglages ───────────────────────────────────────────────────────── */
@@ -517,6 +637,39 @@ $('#b-corr').addEventListener('click', () => {
   }).catch(() => setMsg('Comparaison impossible.'));
 });
 
+/* ── réglages du compte ─────────────────────────────────────────────── */
+function compteInit(){
+  if(!window.Compte) return;
+  const r = Compte.lire();
+  $('#c-capital').value = r.capital;
+  $('#c-devise').value  = r.devise;
+  $('#c-risque').value  = r.risque;
+  $('#c-contrat').value = r.contrat;
+  const maj = () => {
+    const o = Compte.ecrire({
+      capital: Math.max(100, +$('#c-capital').value || Compte.DEF.capital),
+      devise:  $('#c-devise').value,
+      risque:  Math.min(5, Math.max(0.05, +$('#c-risque').value || Compte.DEF.risque)),
+      contrat: $('#c-contrat').value
+    });
+    const c = Compte.CONTRATS[o.contrat];
+    $('#c-msg').innerHTML = '1 R = <b>' + Compte.uniteR() + Compte.sym(o.devise) + '</b> · ' +
+      c.nom + ', ' + c.point + ' $ le point' +
+      (o.devise === 'EUR' ? ' · EUR/USD ' + o.taux : '');
+    paintAll();
+  };
+  ['#c-capital','#c-devise','#c-risque','#c-contrat'].forEach(id =>
+    $(id).addEventListener('change', maj));
+  Compte.majTaux().then(maj);
+  maj();
+}
+$('#b-reset').addEventListener('click', () => {
+  if(!window.History) return;
+  History.reset();
+  setMsg('Journal vidé.');
+  paintAll();
+});
+
 /* ── alertes ────────────────────────────────────────────────────────── */
 function paintAlert(){
   const b = $('#b-alert');
@@ -531,7 +684,7 @@ $('#b-alert').addEventListener('click', () => {
 });
 
 /* ── démarrage ──────────────────────────────────────────────────────── */
-paintAll(); paintAlert();
+paintAll(); paintAlert(); compteInit();
 if(CFD.actif()) $('#tok').placeholder = 'jeton enregistré';
 setInterval(() => { paintTop(); }, 1000);
 refresh();
