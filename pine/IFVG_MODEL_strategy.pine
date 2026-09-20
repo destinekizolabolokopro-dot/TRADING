@@ -1,0 +1,390 @@
+//@version=6
+// =============================================================================
+// IFVG MODEL — STRATEGY (backtest)  |  Pine Script v6
+// =============================================================================
+// MODÈLE :  FVG → INVALIDATION → IFVG → RETEST → CONFIRMATION → ENTRÉE
+//           → SL → TP → 1R/BE → RUNNER
+//
+// SOURCE DES RÈGLES : la spécification fournie par l'utilisateur (formules FVG
+// et IFVG exactes). Je n'ai PAS eu accès à la vidéo d'origine : aucune règle
+// n'est présentée comme "vérifiée dans la vidéo".
+//
+// TOUTE RÈGLE AMBIGUË EST UN PARAMÈTRE (aucune valeur "optimale" imposée) :
+//   • définition de la cassure (wick / close / displacement)
+//   • mode de retest (touche / 50% / extrémité)
+//   • seuil de displacement
+//   • durée de vie de l'IFVG
+//
+// ⚠️ On ne cherche PAS à forcer 80 % de réussite. La table affiche l'EXPECTANCY,
+//    car un win rate élevé avec un mauvais RR peut être PERDANT.
+// =============================================================================
+
+strategy("IFVG Model — Strategy", "IFVG-S", overlay = true,
+     initial_capital        = 10000,
+     default_qty_type       = strategy.percent_of_equity,
+     default_qty_value      = 100,
+     commission_type        = strategy.commission.percent,
+     commission_value       = 0.02,
+     slippage               = 1,
+     calc_on_every_tick     = false,
+     process_orders_on_close= true,
+     max_boxes_count = 500, max_labels_count = 500, max_lines_count = 500)
+
+// ============================ 1. PARAMÈTRES ==================================
+gF = "① FVG / IFVG"
+fvgMinPct   = input.float(0.02, "Taille min du FVG (% du prix)", minval = 0.0, step = 0.01, group = gF)
+fvgMaxAge   = input.int(500, "Âge max d'un FVG (bougies)", minval = 10, group = gF)
+ifvgMaxAge  = input.int(200, "Âge max d'un IFVG après inversion", minval = 5, group = gF,
+     tooltip = "[AMBIGU] La durée de validité d'un IFVG n'est pas définie : paramètre.")
+breakMode   = input.string("Close", "Confirmation de la cassure (FVG -> IFVG)",
+     options = ["Wick", "Close", "Full displacement"], group = gF,
+     tooltip = "[AMBIGU] Wick = la mèche traverse. Close = clôture de l'autre côté. Full displacement = cassure + bougie impulsive.")
+
+gR = "② Retest"
+needRetest  = input.bool(true, "Exiger un retest de l'IFVG", group = gR)
+retestMode  = input.string("Touche la zone", "Mode de retest",
+     options = ["Touche la zone", "50% de la zone", "Extrémité opposée"], group = gR)
+retestMaxBars = input.int(50, "Fenêtre max pour le retest (bougies)", minval = 1, group = gR)
+
+gC = "③ Filtres de confirmation (tous OPTIONNELS)"
+useStruct   = input.bool(false, "Filtre STRUCTURE (MSS)", group = gC,
+     tooltip = "MSS = clôture au-delà du dernier swing opposé confirmé (pivot).")
+pivLen      = input.int(5, "Longueur des pivots (swings)", minval = 2, group = gC)
+useLiq      = input.bool(false, "Filtre LIQUIDITÉ (sweep avant l'IFVG)", group = gC)
+liqLookback = input.int(30, "Fenêtre de recherche du sweep (bougies)", minval = 3, group = gC)
+useDisp     = input.bool(false, "Filtre DISPLACEMENT", group = gC)
+dispMode    = input.string("ATR", "Mesure du displacement", options = ["ATR", "% de la range", "Clôture près de l'extrémité"], group = gC)
+dispAtrMult = input.float(1.0, "Displacement : corps > ATR(14) ×", minval = 0.1, step = 0.1, group = gC)
+dispBodyPct = input.float(60.0, "Displacement : corps >= % de la range", minval = 1.0, maxval = 100.0, step = 1.0, group = gC)
+
+gE = "④ Entrée"
+entryMode = input.string("Market", "Mode d'entrée",
+     options = ["Market", "IFVG midpoint (50%)", "IFVG boundary", "Confirmation + retracement"], group = gE)
+
+gS = "⑤ Stop-loss"
+slMode    = input.string("Derrière l'IFVG", "Mode de SL",
+     options = ["Derrière l'IFVG", "Derrière le swing", "Derrière le sweep", "ATR"], group = gS)
+slAtrMult = input.float(1.5, "SL ATR ×", minval = 0.1, step = 0.1, group = gS)
+slBufTicks= input.int(2, "Buffer SL (ticks)", minval = 0, group = gS)
+
+gT = "⑥ Take-profit"
+tpMode  = input.string("R:R fixe", "Mode de TP",
+     options = ["R:R fixe", "Prochaine liquidité", "Prochain FVG", "Prochain swing"], group = gT)
+rrFixed = input.float(2.0, "R:R fixe", minval = 0.1, step = 0.1, group = gT)
+minRR   = input.float(1.0, "RR minimum pour valider un trade", minval = 0.1, step = 0.1, group = gT)
+
+gM = "⑦ Gestion"
+beEnabled  = input.bool(true, "Break-even activé", group = gM)
+beAtR      = input.float(1.0, "BE à (R)", minval = 0.1, step = 0.1, group = gM)
+partialOn  = input.bool(true, "Prise partielle", group = gM)
+partialPct = input.int(50, "% pris à TP1", minval = 1, maxval = 99, group = gM)
+partialAtR = input.float(1.0, "TP1 à (R)", minval = 0.1, step = 0.1, group = gM)
+
+gSes = "⑧ Sessions"
+useSession = input.bool(false, "Filtre de session", group = gSes)
+tz         = input.string("America/New_York", "Fuseau horaire", group = gSes)
+sessWin    = input.session("0930-1600", "Fenêtre autorisée", group = gSes)
+
+gL = "⑨ Limites & risque"
+riskPct    = input.float(1.0, "Risque par trade (%)", minval = 0.01, step = 0.05, group = gL)
+maxTrades  = input.int(5, "Trades max / jour", minval = 1, group = gL)
+maxLosses  = input.int(3, "Pertes max / jour", minval = 1, group = gL)
+maxDDpct   = input.float(5.0, "Drawdown max / jour (%)", minval = 0.1, step = 0.1, group = gL)
+
+gW = "⑩ Walk-forward (validation honnête)"
+useWF   = input.bool(false, "Limiter le backtest à une période", group = gW)
+wfStart = input.time(timestamp("01 Jan 2025 00:00"), "Début", group = gW)
+wfEnd   = input.time(timestamp("01 Jan 2026 00:00"), "Fin",   group = gW)
+
+gV = "⑪ Affichage"
+showZones = input.bool(true, "Afficher FVG / IFVG", group = gV)
+showTable = input.bool(true, "Tableau de bord + stats", group = gV)
+
+// ============================ 2. OUTILS ======================================
+atr14  = ta.atr(14)
+tickBuf = slBufTicks * syminfo.mintick
+inWindow = not useWF or (time >= wfStart and time <= wfEnd)
+inSess   = not useSession or not na(time(timeframe.period, sessWin, tz))
+
+// Swings confirmés (non-repaint : décalés de pivLen)
+phv = ta.pivothigh(high, pivLen, pivLen)
+plv = ta.pivotlow(low,  pivLen, pivLen)
+var float lastSwH = na, lastSwL = na
+if not na(phv)
+    lastSwH := phv
+if not na(plv)
+    lastSwL := plv
+
+// Displacement (défini mathématiquement, mode au choix)
+rng  = high - low
+body = math.abs(close - open)
+dispOK = switch dispMode
+    "ATR"                        => body > atr14 * dispAtrMult
+    "% de la range"              => rng > 0 and (body / rng) * 100.0 >= dispBodyPct
+    => (close > open ? (high - close) : (close - low)) <= rng * 0.25   // clôture près de l'extrémité
+
+// ============================ 3. FVG / IFVG ==================================
+// state : 0 = FVG actif (non cassé) | 1 = IFVG (inversé) | 2 = mort
+type Zone
+    float top
+    float bot
+    bool  origBull      // direction du FVG D'ORIGINE
+    int   born
+    int   invBar        // bougie de l'inversion
+    int   state
+    bool  retested
+
+var array<Zone> zones = array.new<Zone>()
+minAbs = close * fvgMinPct / 100.0
+
+// Détection FVG (3 bougies) — enregistrée seulement sur bougie CONFIRMÉE
+newBull = low > high[2] and (low - high[2]) >= minAbs
+newBear = high < low[2] and (low[2] - high) >= minAbs
+if barstate.isconfirmed
+    if newBull
+        array.push(zones, Zone.new(low, high[2], true, bar_index, na, 0, false))
+    if newBear
+        array.push(zones, Zone.new(low[2], high, false, bar_index, na, 0, false))
+
+// Transitions : FVG -> IFVG, puis retest, puis expiration
+var bool freshBullIfvg = false, freshBearIfvg = false
+var float sigTop = na, sigBot = na
+freshBullIfvg := false
+freshBearIfvg := false
+
+if array.size(zones) > 0
+    for i = array.size(zones) - 1 to 0
+        z = array.get(zones, i)
+        if z.state == 0
+            // Un FVG haussier est cassé VERS LE BAS -> devient IFVG baissier
+            brokeDown = switch breakMode
+                "Wick"  => low < z.bot
+                "Close" => close < z.bot
+                => close < z.bot and dispOK
+            brokeUp = switch breakMode
+                "Wick"  => high > z.top
+                "Close" => close > z.top
+                => close > z.top and dispOK
+            if z.origBull and brokeDown
+                z.state  := 1
+                z.invBar := bar_index
+                freshBearIfvg := true
+            else if not z.origBull and brokeUp
+                z.state  := 1
+                z.invBar := bar_index
+                freshBullIfvg := true
+            if bar_index - z.born > fvgMaxAge
+                z.state := 2
+        else if z.state == 1
+            // IFVG : on surveille le RETEST puis l'expiration
+            touched = low <= z.top and high >= z.bot
+            mid     = (z.top + z.bot) / 2.0
+            hit = switch retestMode
+                "Touche la zone"   => touched
+                "50% de la zone"   => low <= mid and high >= mid
+                => (z.origBull ? low <= z.bot : high >= z.top)   // extrémité opposée
+            if hit
+                z.retested := true
+            if bar_index - z.invBar > ifvgMaxAge
+                z.state := 2
+        array.set(zones, i, z)
+
+// IFVG exploitable le plus proche (retesté si exigé)
+f_pickIfvg(bool wantBull) =>
+    float t = na, b = na
+    if array.size(zones) > 0
+        for i = array.size(zones) - 1 to 0
+            z = array.get(zones, i)
+            // IFVG haussier = FVG baissier d'origine cassé vers le haut
+            isBullIfvg = z.state == 1 and not z.origBull
+            isBearIfvg = z.state == 1 and z.origBull
+            if (wantBull ? isBullIfvg : isBearIfvg) and (not needRetest or z.retested)
+                t := z.top
+                b := z.bot
+                break
+    [t, b]
+
+[bullT, bullB] = f_pickIfvg(true)
+[bearT, bearB] = f_pickIfvg(false)
+hasBullIfvg = not na(bullT)
+hasBearIfvg = not na(bearT)
+
+// ============================ 4. FILTRES OPTIONNELS ==========================
+// Structure : MSS = clôture au-delà du dernier swing opposé
+mssBull = not na(lastSwH) and close > lastSwH
+mssBear = not na(lastSwL) and close < lastSwL
+structOKL = not useStruct or mssBull
+structOKS = not useStruct or mssBear
+
+// Liquidité : un sweep a-t-il eu lieu récemment ?
+sweptLow  = ta.lowest(low,  liqLookback) == ta.lowest(low,  liqLookback)[0] and low  <= ta.lowest(low[1],  liqLookback)
+sweptHigh = ta.highest(high, liqLookback) == ta.highest(high, liqLookback)[0] and high >= ta.highest(high[1], liqLookback)
+var int lastSweepLowBar = na, lastSweepHighBar = na
+if sweptLow
+    lastSweepLowBar := bar_index
+if sweptHigh
+    lastSweepHighBar := bar_index
+liqOKL = not useLiq or (not na(lastSweepLowBar)  and bar_index - lastSweepLowBar  <= liqLookback)
+liqOKS = not useLiq or (not na(lastSweepHighBar) and bar_index - lastSweepHighBar <= liqLookback)
+
+dispOKL = not useDisp or (dispOK and close > open)
+dispOKS = not useDisp or (dispOK and close < open)
+
+// ============================ 5. LIMITES JOURNALIÈRES ========================
+var int tradesToday = 0, lossesToday = 0
+var float eqDayStart = na
+newDay = ta.change(time("D")) != 0
+if newDay
+    tradesToday := 0
+    lossesToday := 0
+    eqDayStart  := strategy.equity
+ddToday = na(eqDayStart) ? 0.0 : (eqDayStart - strategy.equity) / eqDayStart * 100.0
+limitsOK = tradesToday < maxTrades and lossesToday < maxLosses and ddToday < maxDDpct
+
+// ============================ 6. ENTRÉE / SL / TP ============================
+f_entry(bool isLong, float t, float b) =>
+    switch entryMode
+        "Market"                    => close
+        "IFVG midpoint (50%)"       => (t + b) / 2.0
+        "IFVG boundary"             => isLong ? b : t
+        => isLong ? (t + b) / 2.0 : (t + b) / 2.0      // confirmation + retracement
+
+f_sl(bool isLong, float t, float b) =>
+    float s = switch slMode
+        "Derrière l'IFVG"   => isLong ? b : t
+        "Derrière le swing" => isLong ? nz(lastSwL, low) : nz(lastSwH, high)
+        "Derrière le sweep" => isLong ? ta.lowest(low, liqLookback) : ta.highest(high, liqLookback)
+        => isLong ? close - atr14 * slAtrMult : close + atr14 * slAtrMult
+    isLong ? s - tickBuf : s + tickBuf
+
+f_tp(bool isLong, float e, float s) =>
+    float risk = math.abs(e - s)
+    switch tpMode
+        "R:R fixe"            => isLong ? e + risk * rrFixed : e - risk * rrFixed
+        "Prochaine liquidité" => isLong ? ta.highest(high, 50) : ta.lowest(low, 50)
+        "Prochain swing"      => isLong ? nz(lastSwH, e + risk * rrFixed) : nz(lastSwL, e - risk * rrFixed)
+        => isLong ? e + risk * rrFixed : e - risk * rrFixed     // "Prochain FVG" -> repli R:R
+
+longSignal  = hasBullIfvg and structOKL and liqOKL and dispOKL and inSess and inWindow and limitsOK and strategy.position_size == 0
+shortSignal = hasBearIfvg and structOKS and liqOKS and dispOKS and inSess and inWindow and limitsOK and strategy.position_size == 0
+
+var float ePx = na, eSL = na, eTP = na, eSL0 = na
+var bool  beDone = false, partDone = false
+
+if longSignal or shortSignal
+    isL = longSignal
+    t   = isL ? bullT : bearT
+    b   = isL ? bullB : bearB
+    px  = f_entry(isL, t, b)
+    sl  = f_sl(isL, t, b)
+    tp  = f_tp(isL, px, sl)
+    risk= math.abs(px - sl)
+    rr  = risk > 0 ? math.abs(tp - px) / risk : 0.0
+    if risk > 0 and rr >= minRR
+        // Taille selon le risque (% du capital / distance au stop)
+        qty = (strategy.equity * riskPct / 100.0) / risk
+        if isL
+            strategy.entry("LONG", strategy.long, qty = qty)
+        else
+            strategy.entry("SHORT", strategy.short, qty = qty)
+        ePx := px
+        eSL := sl
+        eSL0:= sl
+        eTP := tp
+        beDone   := false
+        partDone := false
+        tradesToday += 1
+
+// Gestion en position : partiel, BE, sorties
+if strategy.position_size != 0 and not na(ePx)
+    isL  = strategy.position_size > 0
+    r0   = math.abs(ePx - eSL0)
+    if r0 > 0
+        // Prise partielle à partialAtR
+        if partialOn and not partDone
+            lvl = isL ? ePx + r0 * partialAtR : ePx - r0 * partialAtR
+            if (isL and high >= lvl) or (not isL and low <= lvl)
+                strategy.close(isL ? "LONG" : "SHORT", qty_percent = partialPct, comment = "TP1")
+                partDone := true
+        // Break-even
+        if beEnabled and not beDone
+            lvl = isL ? ePx + r0 * beAtR : ePx - r0 * beAtR
+            if (isL and high >= lvl) or (not isL and low <= lvl)
+                eSL := ePx
+                beDone := true
+    strategy.exit(isL ? "X-LONG" : "X-SHORT", from_entry = isL ? "LONG" : "SHORT", stop = eSL, limit = eTP)
+
+// Comptage des pertes du jour
+if strategy.closedtrades > 0 and ta.change(strategy.closedtrades) > 0
+    if strategy.closedtrades.profit(strategy.closedtrades - 1) < 0
+        lossesToday += 1
+
+// ============================ 7. AFFICHAGE ===================================
+if showZones and barstate.islast and array.size(zones) > 0
+    for i = 0 to array.size(zones) - 1
+        z = array.get(zones, i)
+        if z.state == 0
+            box.new(z.born, z.top, bar_index + 2, z.bot,
+                 border_color = color.new(z.origBull ? color.green : color.red, 70),
+                 bgcolor      = color.new(z.origBull ? color.green : color.red, 92))
+        else if z.state == 1
+            box.new(z.invBar, z.top, bar_index + 2, z.bot,
+                 border_color = color.new(z.origBull ? color.red : color.green, 20),
+                 bgcolor      = color.new(z.origBull ? color.red : color.green, 80))
+
+plotshape(longSignal,  "LONG",  shape.labelup,   location.belowbar, color.new(color.green, 0), text = "🟢", size = size.tiny)
+plotshape(shortSignal, "SHORT", shape.labeldown, location.abovebar, color.new(color.red, 0),   text = "🔴", size = size.tiny)
+
+ok(bool c) => c ? "✅" : "❌"
+if showTable and barstate.islast
+    // --- Statistiques honnêtes, y compris l'EXPECTANCY ---
+    wins    = strategy.wintrades
+    losses  = strategy.losstrades
+    total   = strategy.closedtrades
+    wr      = total > 0 ? wins / total * 100.0 : 0.0
+    avgW    = wins   > 0 ? strategy.grossprofit / wins  : 0.0
+    avgL    = losses > 0 ? strategy.grossloss  / losses : 0.0
+    expect  = total > 0 ? (wr / 100.0) * avgW - (1.0 - wr / 100.0) * avgL : 0.0
+    pf      = strategy.grossloss > 0 ? strategy.grossprofit / strategy.grossloss : na
+    avgR    = (avgL > 0 and total > 0) ? ((wr / 100.0) * (avgW / avgL) - (1.0 - wr / 100.0)) : na
+
+    var table t = table.new(position.top_right, 2, 14, border_width = 1)
+    table.cell(t, 0, 0,  "IFVG MODEL", bgcolor = color.new(color.blue, 70), text_color = color.white)
+    table.cell(t, 1, 0,  strategy.position_size > 0 ? "LONG" : strategy.position_size < 0 ? "SHORT" : "—",
+         bgcolor = color.new(color.blue, 70), text_color = color.white)
+    table.cell(t, 0, 1,  "IFVG dispo");   table.cell(t, 1, 1, ok(hasBullIfvg or hasBearIfvg))
+    table.cell(t, 0, 2,  "Retest");       table.cell(t, 1, 2, ok(not needRetest or hasBullIfvg or hasBearIfvg))
+    table.cell(t, 0, 3,  "Structure");    table.cell(t, 1, 3, ok(structOKL or structOKS))
+    table.cell(t, 0, 4,  "Liquidité");    table.cell(t, 1, 4, ok(liqOKL or liqOKS))
+    table.cell(t, 0, 5,  "Displacement"); table.cell(t, 1, 5, ok(dispOKL or dispOKS))
+    table.cell(t, 0, 6,  "Trades");       table.cell(t, 1, 6, str.tostring(total))
+    table.cell(t, 0, 7,  "Win rate");     table.cell(t, 1, 7, str.tostring(wr, "#.#") + " %")
+    table.cell(t, 0, 8,  "Profit factor");table.cell(t, 1, 8, na(pf) ? "—" : str.tostring(pf, "#.##"))
+    table.cell(t, 0, 9,  "Net profit");   table.cell(t, 1, 9, str.tostring(strategy.netprofit, "#.##"))
+    table.cell(t, 0, 10, "Max DD");       table.cell(t, 1, 10, str.tostring(strategy.max_drawdown, "#.##"))
+    table.cell(t, 0, 11, "Avg R");        table.cell(t, 1, 11, na(avgR) ? "—" : str.tostring(avgR, "#.##"))
+    table.cell(t, 0, 12, "EXPECTANCY",    bgcolor = color.new(color.gray, 80))
+    table.cell(t, 1, 12, str.tostring(expect, "#.##"),
+         bgcolor = color.new(expect > 0 ? color.green : color.red, 60), text_color = color.white)
+    table.cell(t, 0, 13, "Trades/jour");  table.cell(t, 1, 13, str.tostring(tradesToday) + "/" + str.tostring(maxTrades))
+
+// ============================ 8. ALERTES =====================================
+alertcondition(freshBullIfvg, "IFVG haussier créé", "IFVG : un FVG baissier a été cassé vers le haut")
+alertcondition(freshBearIfvg, "IFVG baissier créé", "IFVG : un FVG haussier a été cassé vers le bas")
+alertcondition(longSignal,    "IFVG — ENTRÉE LONG",  "IFVG : ENTRÉE LONG")
+alertcondition(shortSignal,   "IFVG — ENTRÉE SHORT", "IFVG : ENTRÉE SHORT")
+if longSignal or shortSignal
+    alert(syminfo.ticker + " | " + (longSignal ? "LONG" : "SHORT") + " | TF " + timeframe.period +
+         " | Entrée " + str.tostring(ePx, format.mintick) + " | SL " + str.tostring(eSL, format.mintick) +
+         " | TP " + str.tostring(eTP, format.mintick), alert.freq_once_per_bar_close)
+
+// ============================ 9. ANTI-REPAINT ================================
+// • Aucun request.security() n'est utilisé ici -> aucun risque de fuite MTF.
+// • Les FVG ne sont enregistrés que sur barstate.isconfirmed : une zone ne peut
+//   pas apparaître puis disparaître pendant la formation de la bougie.
+// • Les swings viennent de ta.pivothigh/ta.pivotlow : confirmés seulement après
+//   pivLen bougies, donc jamais "devinés" à l'avance.
+// • process_orders_on_close = true et calc_on_every_tick = false : les ordres
+//   sont évalués sur bougie CLÔTURÉE (pas d'exécution intra-bougie optimiste).
+// • Les alertes utilisent alert.freq_once_per_bar_close.
+// => Le backtest reflète ce qui aurait été exécutable en direct.

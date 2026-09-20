@@ -1,0 +1,270 @@
+'use strict';
+/**
+ * JOURNAL EN DIRECT — enregistre ce que le modèle fait sur le marché réel,
+ * que quelqu'un regarde ou non.
+ *
+ * Le site est une page statique : il ne calcule que pendant qu'un onglet est
+ * ouvert. Personne ne garde un onglet ouvert tous les jours de 15 h 30 à
+ * 16 h 00. Ce script fait le travail à sa place, depuis une GitHub Action,
+ * et écrit le résultat dans data/signaux.json — qui est versionné, donc
+ * conservé pour toujours.
+ *
+ * Il consigne DEUX choses :
+ *   · chaque signal émis, avec son raisonnement complet ;
+ *   · chaque passage sans signal, avec l'étape qui a bloqué.
+ * La deuxième est aussi instructive que la première : elle montre pourquoi
+ * le modèle s'est tu.
+ *
+ * ⚠️ Ce n'est PAS du trading. Aucun ordre n'est passé nulle part. Les prix
+ * viennent de Yahoo, avec une dizaine de minutes de retard : les entrées
+ * consignées ici ne sont pas des prix qu'on aurait obtenus, ce sont les prix
+ * de clôture des bougies. C'est un test à blanc, pas un relevé de compte.
+ *
+ *   node scripts/live_log.js            enregistre le passage courant
+ *   node scripts/live_log.js --force    ignore la fenêtre (pour tester)
+ */
+const fs = require('fs');
+const path = require('path');
+
+global.window = global;
+require(path.join(__dirname, '..', 'js', 'structure.js'));
+require(path.join(__dirname, '..', 'js', 'modele.js'));
+
+const FICHIER = path.join(__dirname, '..', 'data', 'signaux.json');
+const ETAT    = path.join(__dirname, '..', 'data', 'etat.json');
+const YF = 'https://query1.finance.yahoo.com/v8/finance/chart/';
+const SERIES = [['1m','8d','m1'],['2m','60d','m2'],['5m','60d','m5'],
+                ['15m','60d','m15'],['60m','3mo','h1'],['1d','1y','d1']];
+const FORCE = process.argv.includes('--force');
+
+async function serie(sym, interval, range) {
+  const url = `${YF}${sym}?interval=${interval}&range=${range}`;
+  for (let essai = 0; essai < 4; essai++) {
+    try {
+      const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const j = await r.json();
+      const res = j.chart && j.chart.result && j.chart.result[0];
+      if (!res) throw new Error('réponse vide');
+      const t = res.timestamp || [], q = res.indicators.quote[0];
+      const out = [];
+      for (let i = 0; i < t.length; i++) {
+        if (q.open[i] == null || q.close[i] == null) continue;
+        out.push({ t: t[i] * 1000, o: q.open[i], h: q.high[i], l: q.low[i], c: q.close[i] });
+      }
+      if (!out.length) throw new Error('aucune bougie');
+      return out;
+    } catch (e) {
+      if (essai === 3) throw e;
+      await new Promise(r => setTimeout(r, 1000 * Math.pow(2, essai)));
+    }
+  }
+}
+
+function charger() {
+  try { return JSON.parse(fs.readFileSync(FICHIER, 'utf8')); }
+  catch (e) { return { version: 1, signaux: [], passages: [] }; }
+}
+function ecrire(db) {
+  // On borne les passages : un an de séances à six passages par jour tient
+  // largement, mais le fichier ne doit pas gonfler indéfiniment.
+  db.passages = db.passages.slice(-3000);
+  fs.mkdirSync(path.dirname(FICHIER), { recursive: true });
+  // Même précaution que pour l'instantané : `bilan.maj` avance à chaque
+  // passage, y compris quand rien n'a changé. Réécrire pour ça seul
+  // produirait un commit toutes les cinq minutes.
+  const utile = o => JSON.stringify({ signaux: o.signaux, passages: o.passages });
+  let ancien = null;
+  try { ancien = JSON.parse(fs.readFileSync(FICHIER, 'utf8')); } catch (e) {}
+  if (ancien && utile(ancien) === utile(db)) return false;
+  fs.writeFileSync(FICHIER, JSON.stringify(db, null, 1) + '\n');
+  return true;
+}
+
+// Quelle étape de la chaîne a bloqué ? C'est le « raisonnement » que
+// l'utilisateur veut lire en rentrant.
+function blocage(d) {
+  if (d.dir === 0)  return { etape: 'biais', dit: `Biais neutre (score ${d.score}/4, il en faut ${d.cfg.seuil}) — aucune position possible.` };
+  const sens = d.dir > 0 ? 'haussier' : 'baissier';
+  if (d.dol == null) return { etape: 'dol', dit: `Biais ${sens}, mais plus aucune liquidité intacte dans ce sens.` };
+  if (!d.key)        return { etape: 'niveau', dit: `Biais ${sens}, DOL à ${d.dol} — mais aucun niveau clé valide du bon côté.` };
+  const k = `${d.key.type} ${d.key.tf} (${d.key.bas} – ${d.key.haut})`;
+  // Hors fenêtre, la machine à états ne tourne pas : on ne SAIT pas si le
+  // prix a touché le niveau. On ne l'affirme donc pas.
+  if (d.hors) return { etape: 'fenetre', dit: `Hors fenêtre. Biais ${sens}, DOL à ${d.dol}, niveau le plus proche ${k}.` };
+  if (d.etat === 'ATTEND_TOUCHE') return { etape: 'touche', dit: `Biais ${sens}, niveau ${k} repéré — le prix n'y est pas encore venu.` };
+  if (!d.ifvg)       return { etape: 'ifvg', dit: `Le prix a touché ${k}, mais aucune inversion confirmée par clôture de corps.` };
+  return { etape: 'stop', dit: `Inversion ${d.ifvg.tf} confirmée sur ${k}, mais le stop était trop serré face à l'ATR.` };
+}
+
+(async () => {
+  const f = Modele.fenetre();
+  const maintenant = new Date().toISOString();
+
+  let brut;
+  try {
+    brut = {};
+    for (const [iv, rg, cle] of SERIES) brut[cle] = await serie('NQ=F', iv, rg);
+  } catch (e) {
+    console.error('Récupération impossible : ' + e.message);
+    process.exit(1);
+  }
+
+  // Le site affiche des euros : il lui faut EUR/USD. Il allait le chercher
+  // lui-même via les relais CORS, qui sont morts. On le relève ici.
+  let eurusd = null;
+  try {
+    const cs = await serie('EURUSD=X', '1d', '5d');
+    const v = cs[cs.length - 1].c;
+    if (v > 0.5 && v < 2) eurusd = +v.toFixed(4);
+  } catch (e) { console.error('EUR/USD indisponible : ' + e.message); }
+
+  const d = Modele.evaluer(brut);
+  const e = Modele.heure(d.derniereBougie);
+  const hNY = String(Math.floor(e.min / 60)).padStart(2, '0') + ':' + String(e.min % 60).padStart(2, '0');
+  const db = charger();
+
+  const commun = {
+    ts: maintenant, bougie: new Date(d.derniereBougie).toISOString(),
+    jour: e.jour, heureNY: hNY, prix: d.prix,
+    retardMin: Math.round((Date.now() - d.derniereBougie) / 60000),
+    biais: d.dir === 0 ? 'neutre' : d.dir > 0 ? 'haussier' : 'baissier',
+    score: d.score, dol: d.dol,
+    niveau: d.key ? `${d.key.type} ${d.key.tf}` : null,
+    etat: d.etat,
+    niveauxParUnite: d.parTF.map(v => `${v.tf}:${v.n}`).join(' ')
+  };
+
+  // ── INSTANTANÉ DE MARCHÉ ────────────────────────────────────────────
+  // Yahoo ne sert pas d'en-tête CORS : un navigateur ne peut pas l'appeler
+  // directement, et les quatre relais publics que le site utilisait sont
+  // tous morts (500, 429, 429, 522 au dernier test). Node, lui, n'a pas
+  // cette contrainte. C'est donc ici qu'on récupère le marché, une fois,
+  // et le site se contente de lire ce fichier — servi par GitHub avec
+  // `access-control-allow-origin: *`.
+  const instantane = {
+    maj: maintenant, source: 'yahoo', eurusd: eurusd,
+    prix: d.prix, derniereBougie: d.derniereBougie,
+    retardMin: Math.round((Date.now() - d.derniereBougie) / 60000),
+    hors: d.hors, etat: d.etat, dir: d.dir, score: d.score,
+    dol: d.dol, key: d.key, ifvg: d.ifvg, parTF: d.parTF,
+    trade: d.trade, dernierSignal: d.dernierSignal, cfg: d.cfg
+  };
+  // Marché fermé, rien n'a bougé : n'écrire que l'horodatage produirait un
+  // commit toutes les cinq minutes pour rien — une trentaine par jour, qui
+  // noieraient les vrais relevés. On ne réécrit le fichier que si son
+  // contenu utile a changé. `maj` et `retardMin` ne comptent pas : ils
+  // avancent tout seuls, même quand le marché dort.
+  const utile = o => { const c = Object.assign({}, o); delete c.maj; delete c.retardMin; return JSON.stringify(c); };
+  let ancien = null;
+  try { ancien = JSON.parse(fs.readFileSync(ETAT, 'utf8')); } catch (e) {}
+  if (ancien && utile(ancien) === utile(instantane)) {
+    console.log('Instantané inchangé — rien à réécrire.');
+  } else {
+    fs.writeFileSync(ETAT, JSON.stringify(instantane, null, 1) + '\n');
+  }
+
+  // ── LE SIGNAL EST-IL RECEVABLE ? ────────────────────────────────────
+  // ⚠️ Le test portait sur `d.hors`, qui décrit la DERNIÈRE bougie reçue,
+  // pas celle qui a produit le signal. Or Yahoo livre avec une dizaine de
+  // minutes de retard : quand la bougie de 09 h 55 arrive, la dernière
+  // connue est déjà à 10 h 05, donc `hors` vaut vrai et le signal était
+  // jeté. Mesuré sur le jeu réel, les créneaux 09 h 50 et 09 h 55 pèsent
+  // 6 signaux sur 55 — un sur neuf, perdu en silence.
+  //
+  // Le bon critère est l'heure de la bougie DU SIGNAL.
+  function dansLaFenetre(ts) {
+    const e = Modele.heure(ts);
+    return e.dow >= 1 && e.dow <= 5 &&
+           e.min >= Modele.CFG.ghDeb && e.min < Modele.CFG.ghFin;
+  }
+  const t = d.trade || d.dernierSignal;
+  const neuf = t && dansLaFenetre(t.t) &&
+    !db.signaux.some(s => s.cle === `${t.t}|${t.sens}|${t.entree}`);
+
+  if (neuf) {
+    // Les champs de contexte doivent décrire la bougie DU SIGNAL, pas la
+    // dernière reçue : avec le retard de Yahoo, les deux diffèrent
+    // systématiquement, et un relevé qui mélange les deux est faux.
+    const eSig = Modele.heure(t.t);
+    const hSig = String(Math.floor(eSig.min / 60)).padStart(2, '0') + ':' +
+                 String(eSig.min % 60).padStart(2, '0');
+    db.signaux.push(Object.assign({}, commun, {
+      bougie: new Date(t.t).toISOString(), jour: eSig.jour, heureNY: hSig,
+      prix: t.entree,
+      retardMin: Math.round((Date.now() - t.t) / 60000),
+      cle: `${t.t}|${t.sens}|${t.entree}`,
+      sens: t.sens, entree: t.entree, sl: t.sl, tp1: t.tp1, tp: t.tp,
+      rr: t.rr, uniteIFVG: t.tf, niveauDeclencheur: t.niveau,
+      risquePts: +Math.abs(t.entree - t.sl).toFixed(2),
+      raisonnement:
+        `Biais ${commun.biais} (score ${Math.abs(d.score)}/4). ` +
+        `DOL à ${d.dol}. Niveau clé ${t.niveau}. ` +
+        `Le prix l'a touché, puis une inversion ${t.tf} a été confirmée par clôture de corps. ` +
+        `Entrée ${t.entree}, stop au bord de l'IFVG à ${t.sl} (${Math.abs(t.entree - t.sl).toFixed(1)} pts), ` +
+        `partiel 0,5 R à ${t.tp1} sur 90 % de la taille, le reste court jusqu'à 2,5 R à ${t.tp}.`,
+      statut: 'ouvert', resultat: null, r: null, closTs: null
+    }));
+    console.log(`✅ SIGNAL ${t.sens} · ${eSig.jour} ${hSig} NY · entrée ${t.entree} · stop ${t.sl} · ${t.niveau}`);
+  } else if (f.ouverte || FORCE) {
+    const b = blocage(d);
+    db.passages.push(Object.assign({}, commun, { etapeBloquee: b.etape, dit: b.dit }));
+    console.log(`— ${commun.jour} ${hNY} NY · ${b.dit}`);
+  } else {
+    // Hors fenêtre on rafraîchit l'instantané et rien d'autre : consigner un
+    // « passage » à 3 h du matin n'apprendrait rien à personne.
+    console.log(`Instantané seul — hors fenêtre, ouverture dans ${Math.round(f.ms / 60000)} min.`);
+  }
+
+  // ── SUIVI DES POSITIONS ─────────────────────────────────────────────
+  // Calqué bougie pour bougie sur scripts/mech.js (lignes 229-245). Toute
+  // divergence ici rendrait le relevé en direct incomparable au backtest,
+  // ce qui est précisément ce qu'on cherche à mesurer. L'ordre des tests
+  // compte : le partiel est examiné AVANT le stop, et il déplace le stop au
+  // seuil — sans quoi un stop touché après le partiel serait compté −1 R au
+  // lieu de +0,45 R.
+  const PART = 0.9, TP1R = 0.5, TP2R = 2.5, MAXBARRES = 200;
+  const m5 = brut.m5;
+  db.signaux.filter(s => s.statut === 'ouvert').forEach(s => {
+    const depuis = Date.parse(s.bougie);
+    const apres = m5.filter(c => c.t > depuis);
+    const L = s.sens === 'LONG';
+    let sl = s.sl, part1 = s.part1 === true, n = 0;
+    for (const c of apres) {
+      n++;
+      const touche = niv => L ? c.h >= niv : c.l <= niv;
+      const stoppe = () => L ? c.l <= sl : c.h >= sl;
+      if (!part1 && touche(s.tp1)) { part1 = true; sl = s.entree; }   // partiel + seuil
+      if (part1 && touche(s.tp)) {
+        s.statut = 'clos'; s.resultat = 'gagné';
+        s.r = +(PART * TP1R + (1 - PART) * TP2R).toFixed(3);
+      } else if (stoppe()) {
+        if (part1) { s.statut = 'clos'; s.resultat = 'gagné'; s.r = +(PART * TP1R).toFixed(3); }
+        else       { s.statut = 'clos'; s.resultat = 'perdu'; s.r = -1; }
+      } else if (n > MAXBARRES) {
+        const rBrut = (L ? c.c - s.entree : s.entree - c.c) / s.risquePts;
+        s.statut = 'clos'; s.resultat = 'expiré';
+        s.r = +(part1 ? PART * TP1R + (1 - PART) * Math.max(0, Math.min(TP2R, rBrut))
+                      : Math.max(-1, Math.min(TP2R, rBrut))).toFixed(3);
+      }
+      if (s.statut === 'clos') { s.closTs = new Date(c.t).toISOString(); s.barres = n; break; }
+    }
+    // Mémorisé pour le passage suivant : le partiel a pu tomber sur une
+    // bougie déjà dépassée, et la fenêtre de bougies recule à chaque relevé.
+    s.part1 = part1;
+    if (s.statut === 'ouvert') s.slCourant = sl;
+  });
+
+  const clos = db.signaux.filter(s => s.statut === 'clos');
+  const g = clos.filter(s => s.r > 0);
+  db.bilan = {
+    maj: maintenant, total: db.signaux.length, clos: clos.length,
+    ouverts: db.signaux.length - clos.length,
+    reussite: clos.length ? +(g.length / clos.length * 100).toFixed(1) : null,
+    cumulR: +clos.reduce((a, s) => a + (s.r || 0), 0).toFixed(3),
+    passages: db.passages.length
+  };
+  const ecrit = ecrire(db);
+  console.log(`Journal : ${db.bilan.total} signaux (${db.bilan.clos} clos, ${db.bilan.ouverts} ouverts) · ` +
+    `${db.bilan.passages} passages consignés` + (ecrit ? '' : ' — inchangé, non réécrit'));
+})();

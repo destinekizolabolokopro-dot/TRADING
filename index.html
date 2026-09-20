@@ -1,0 +1,1071 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#161826">
+<meta name="description" content="TRADEassist — signaux MECH sur le Nasdaq 100 future.">
+<title>TRADEassist</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23161826'/><circle cx='16' cy='16' r='5' fill='%239184d9'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════════════════════
+   NOCTURNE — système de design fourni avec la maquette Méridien.
+   Fond sombre bleu-gris, JAMAIS de noir pur ni de blanc pur. Un seul accent,
+   utilisé en trait et en halo, jamais en aplat. L'élévation est une hairline
+   de 1 px, pas une pile d'ombres. Les titres ne dépassent jamais la graisse
+   500 : la hiérarchie se fait par la taille et l'espace.
+
+   Écart assumé n° 1 — vert/rouge. Nocturne est une palette mono et ne porte
+   aucune sémantique de gain/perte. La maquette ajoute #6cc0a0 et #dd7f8e, à
+   n'employer QUE sur des chiffres et des traits de 1 px, en aplat au plus à
+   16 % d'alpha.
+
+   Écart assumé n° 2 — le responsive. Le handoff dit « non conçu, cadre fixe
+   1440 px, terminal de bureau ». Ce site se consulte sur iPad et sur
+   téléphone : les règles de repli ci-dessous sont les miennes, pas celles du
+   designer.
+   ═══════════════════════════════════════════════════════════════════════ */
+:root{
+  --bg:#161826; --surface:#232532; --panel:rgba(35,37,50,.70);
+  --ink:#e9e9ed; --acc:#9184d9;
+  --a200:#e7e5fe; --a300:#d2cefd; --a400:#b5abfc; --a700:#5d5294; --a800:#423a6a;
+  --n400:#b2b6ca; --n500:#9397ab; --n600:#75798c; --n800:#3f424d; --n900:#292b31;
+  --gain:#6cc0a0; --loss:#dd7f8e;
+  --muted:rgba(233,233,237,.55); --dim:rgba(233,233,237,.42); --faint:rgba(233,233,237,.30);
+  --rule:rgba(233,233,237,.06); --rule2:rgba(233,233,237,.09); --div:rgba(233,233,237,.16);
+  --hair:0 0 0 1px var(--n800);
+  --r4:4px; --r6:6px; --r8:8px; --r14:14px; --pill:40px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{
+  background:var(--bg); color:var(--ink);
+  font:400 13.5px/1.5 Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+  min-height:100vh; overflow-x:hidden;
+}
+/* Les prix ne doivent jamais trembler quand ils tickent. */
+.mono,.num,input,table{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
+h1,h2,h3{font-weight:500;letter-spacing:-.02em}
+a{color:inherit}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-radius:2px}
+
+/* ── barre d'en-tête ─────────────────────────────────────────────────── */
+.top{
+  display:flex;align-items:center;gap:18px;padding:15px 26px;
+  border-bottom:1px solid var(--rule2);background:rgba(22,24,38,.92);
+  backdrop-filter:blur(8px);position:sticky;top:0;z-index:40;
+}
+.brand{display:flex;align-items:center;gap:9px;flex:none}
+.logo{
+  width:20px;height:20px;border-radius:var(--r6);display:grid;place-items:center;
+  box-shadow:inset 0 0 0 1px var(--acc);flex:none;
+}
+.logo i{width:7px;height:7px;border-radius:50%;background:var(--acc);
+  box-shadow:0 0 10px rgba(145,132,217,.7);display:block}
+.wm{font-size:16px;font-weight:600;letter-spacing:-.01em;white-space:nowrap}
+.wm span{color:var(--dim);font-weight:400;margin-left:6px}
+.nav{display:flex;gap:2px;flex:none}
+.nav a{
+  padding:6px 11px;border-radius:var(--r6);font-size:13px;color:var(--muted);
+  text-decoration:none;white-space:nowrap;transition:background .12s,color .12s;
+}
+.nav a:hover{color:var(--ink)}
+.nav a.on{background:rgba(145,132,217,.14);color:var(--a300)}
+.sp{flex:1 1 auto;min-width:0}
+.stats{display:flex;align-items:center;gap:20px;flex:none}
+.st{display:flex;flex-direction:column;gap:1px;line-height:1.25}
+.st b{font-size:13.5px;font-weight:600;letter-spacing:-.01em}
+.st i{font-size:10.5px;font-style:normal;color:var(--dim);text-transform:uppercase;letter-spacing:.09em}
+.st b.pos{color:var(--gain)} .st b.neg{color:var(--loss)}
+.btn{
+  padding:7px 15px;border-radius:var(--pill);background:transparent;cursor:pointer;
+  box-shadow:inset 0 0 0 1px var(--acc);color:var(--a300);font-size:12.5px;
+  border:0;white-space:nowrap;transition:background .12s;
+}
+.btn:hover{background:rgba(145,132,217,.14)}
+.btn.q{box-shadow:inset 0 0 0 1px var(--div);color:var(--muted)}
+.btn.q:hover{background:rgba(233,233,237,.05);color:var(--ink)}
+.btn.on{background:rgba(145,132,217,.16);color:var(--a200)}
+.btn[disabled]{opacity:.4;cursor:not-allowed}
+
+/* ── grille principale ───────────────────────────────────────────────── */
+.wrap{display:flex;align-items:stretch;min-height:calc(100vh - 53px)}
+.left{flex:1 1 auto;min-width:0;padding:22px 26px 28px;border-right:1px solid var(--rule2)}
+.right{flex:0 0 420px;width:420px;display:flex;flex-direction:column;gap:14px;padding:22px 22px 28px}
+
+.lede{display:flex;align-items:flex-end;gap:20px;margin-bottom:18px;flex-wrap:wrap}
+.eyebrow{font-size:11px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;color:var(--a400)}
+.lede h1{font-size:27px;margin-top:6px;max-width:22ch}
+.lede p{font-size:13.5px;color:var(--muted);max-width:44ch;margin-top:7px;text-wrap:pretty}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto}
+.chip{
+  padding:5px 12px;border-radius:var(--pill);font-size:11.5px;cursor:pointer;border:0;
+  background:transparent;box-shadow:inset 0 0 0 1px var(--div);color:var(--muted);
+  transition:background .12s,color .12s,box-shadow .12s;white-space:nowrap;
+}
+.chip:hover{color:var(--ink)}
+.chip.on{background:rgba(145,132,217,.16);box-shadow:inset 0 0 0 1px var(--acc);color:var(--a300)}
+
+/* ── le radar ────────────────────────────────────────────────────────── */
+.scope{position:relative;display:grid;place-items:center;min-height:420px}
+.scope::before{
+  content:"";position:absolute;width:min(470px,86%);aspect-ratio:1;border-radius:50%;
+  background:radial-gradient(circle,rgba(145,132,217,.20),transparent 68%);
+  filter:blur(12px);pointer-events:none;
+}
+#radar{display:block;max-width:100%;height:auto;position:relative}
+.ov{position:absolute;bottom:2px;font-size:11.5px;pointer-events:none}
+.ov.l{left:0}
+.ov.r{right:0;text-align:right}
+.lg{display:flex;align-items:center;gap:7px;color:var(--dim);margin-top:5px}
+.lg s{width:8px;height:8px;border-radius:2px;display:block;flex:none}
+.ov.r .k{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--dim)}
+.ov.r .v{font-size:22px;font-weight:600;letter-spacing:-.02em;margin-top:2px}
+.ov.r .s{font-size:12.5px;color:var(--muted)}
+
+/* ── tuiles par unité de temps ───────────────────────────────────────── */
+.tiles{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-top:22px}
+.tile{
+  padding:12px 13px;border-radius:var(--r8);
+  box-shadow:inset 0 0 0 1px rgba(145,132,217,.25);background:rgba(145,132,217,.07);
+}
+.tile.off{box-shadow:inset 0 0 0 1px rgba(233,233,237,.12);background:transparent}
+.tile.ret{box-shadow:inset 0 0 0 1px var(--acc);background:rgba(145,132,217,.16)}
+.tile k{display:block;font-size:11.5px;color:var(--muted);font-weight:400}
+.tile v{display:block;font-size:19px;font-weight:600;letter-spacing:-.02em;margin:3px 0 1px}
+.tile s{display:block;font-size:12px;color:var(--dim);text-decoration:none}
+.tile.off v{color:var(--faint)}
+
+/* ── panneaux ────────────────────────────────────────────────────────── */
+.pan{background:var(--panel);border-radius:var(--r14);box-shadow:var(--hair);overflow:hidden}
+.pan-h{display:flex;align-items:center;gap:10px;padding:13px 16px 11px;border-bottom:1px solid var(--rule)}
+.pan-h h2{font-size:11px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.tag{margin-left:auto;font-size:11px;font-weight:600;color:var(--dim);white-space:nowrap}
+.pan-b{padding:14px 16px}
+.empty{padding:20px 16px;color:var(--dim);font-size:12.5px;line-height:1.6}
+.empty b{display:block;color:var(--muted);font-weight:500;font-size:13.5px;margin-bottom:3px}
+.empty .hint{display:block;margin-top:7px;color:var(--faint);font-size:11.5px}
+
+/* ── état de séance ──────────────────────────────────────────────────── */
+.sess{padding:15px 16px}
+.sess-t{display:flex;align-items:center;gap:9px}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--n600);flex:none}
+.dot.on{background:var(--acc);box-shadow:0 0 10px rgba(145,132,217,.75);animation:br 2.2s ease-in-out infinite}
+@keyframes br{0%,100%{opacity:1}50%{opacity:.35}}
+.sess-t b{font-size:11.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase}
+.sess-t .tag{font-size:11px}
+.px{font-size:34px;font-weight:600;letter-spacing:-.03em;margin:9px 0 2px;line-height:1}
+.sess-s{font-size:12.5px;color:var(--muted)}
+.sess-w{
+  margin-top:12px;padding-top:12px;border-top:1px solid var(--rule);
+  font-size:12.5px;color:var(--dim);line-height:1.6;
+}
+.sess-w b{color:var(--a300);font-weight:500}
+.cd{font-size:19px;font-weight:600;letter-spacing:-.02em;color:var(--ink);display:block;margin-top:4px}
+
+/* ── la chaîne ───────────────────────────────────────────────────────── */
+.gauge{height:2px;background:rgba(233,233,237,.08)}
+.gauge i{display:block;height:100%;width:0;background:var(--acc);transition:width .4s ease;
+  box-shadow:0 0 8px rgba(145,132,217,.8)}
+.step{display:flex;align-items:flex-start;gap:11px;padding:11px 16px;border-top:1px solid var(--rule)}
+.step:first-child{border-top:0}
+.step::before{
+  content:"";width:7px;height:7px;border-radius:50%;flex:none;margin-top:5px;
+  background:transparent;box-shadow:inset 0 0 0 1px var(--n600);
+}
+.step.ok::before{background:var(--acc);box-shadow:0 0 9px rgba(145,132,217,.7)}
+.step.wait::before{box-shadow:inset 0 0 0 1px var(--acc);animation:br 2.2s ease-in-out infinite}
+.step-b{flex:1;min-width:0}
+.step-t{display:block;font-size:13px;font-weight:500}
+.step-d{display:block;font-size:12px;color:var(--dim);margin-top:2px;text-wrap:pretty}
+.step.ok .step-d{color:var(--muted)}
+.step-s{font-size:10.5px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--dim);flex:none;margin-top:3px}
+.step.ok .step-s{color:var(--a400)}
+
+/* ── la position ─────────────────────────────────────────────────────── */
+.trade{padding:15px 16px}
+.t-head{display:flex;align-items:center;gap:9px;margin-bottom:13px}
+.t-dir{font-size:11px;font-weight:600;letter-spacing:.1em;padding:3px 9px;border-radius:var(--pill)}
+.t-dir.long{color:var(--gain);background:rgba(108,192,160,.16)}
+.t-dir.short{color:var(--loss);background:rgba(221,127,142,.16)}
+.t-tf,.t-rr{font-size:11.5px;color:var(--dim)}
+.t-rr{margin-left:auto;font-weight:600;color:var(--muted)}
+.t-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--rule);
+  border-radius:var(--r8);overflow:hidden}
+.t-cell{background:var(--bg);padding:11px 13px}
+.t-k{font-size:10.5px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--dim)}
+.t-v{font-size:18px;font-weight:600;letter-spacing:-.02em;margin-top:3px}
+.t-v.sl{color:var(--loss)} .t-v.tp{color:var(--gain)}
+.t-sub{font-size:11px;color:var(--dim);margin-top:2px}
+.t-why{font-size:12px;color:var(--dim);margin-top:11px;line-height:1.6;text-wrap:pretty}
+
+/* ── bilan + journal ─────────────────────────────────────────────────── */
+.bilan{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--rule)}
+.bilan>div{background:var(--panel);padding:11px 14px}
+.bk{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bv{font-size:17px;font-weight:600;letter-spacing:-.02em;margin-top:3px;white-space:nowrap}
+.bv.pos{color:var(--gain)} .bv.neg{color:var(--loss)}
+.bsub{font-size:11px;font-weight:400;color:var(--dim)}
+.jr{display:grid;grid-template-columns:auto auto 1fr auto;gap:3px 9px;align-items:baseline;
+  padding:10px 16px;border-top:1px solid var(--rule);font-size:12px}
+.jr-d{color:var(--faint);font-size:11px}
+.jr-s{font-size:10.5px;font-weight:600;letter-spacing:.08em}
+.jr-s.long{color:var(--gain)} .jr-s.short{color:var(--loss)}
+.jr-p{grid-column:1/-1;color:var(--dim);font-size:11.5px;min-width:0}
+.jr-r{text-align:right;line-height:1.3;white-space:nowrap}
+.jv{display:block;font-size:11.5px;font-weight:500}
+.jn{display:block;font-size:11px;color:var(--dim)}
+.jr-r.pos .jv{color:var(--gain)} .jr-r.neg .jv{color:var(--loss)} .jr-r.open .jv{color:var(--a400)}
+
+.jfilters{display:flex;gap:6px;padding:11px 16px;border-bottom:1px solid var(--rule)}
+.jfilters .chip{padding:4px 10px;font-size:11px}
+#journal{max-height:360px;overflow-y:auto;overscroll-behavior:contain}
+.jr-t{font-size:9.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--faint);box-shadow:inset 0 0 0 1px var(--div);border-radius:3px;padding:1px 5px}
+.note{padding:11px 16px;font-size:11.5px;color:var(--dim);line-height:1.6;
+  border-top:1px solid var(--rule)}
+.note b{color:var(--a300);font-weight:500}
+
+/* ── réglages ────────────────────────────────────────────────────────── */
+#settings{display:none}
+#settings.open{display:block}
+.fld{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;
+  padding:10px 16px;border-top:1px solid var(--rule)}
+.fld label{font-size:12.5px;color:var(--muted)}
+.fld input,.fld select{
+  background:var(--bg);border:0;box-shadow:inset 0 0 0 1px var(--div);border-radius:var(--r6);
+  padding:6px 10px;font-size:12.5px;width:170px;max-width:46vw;
+}
+.fld input:focus,.fld select:focus{box-shadow:inset 0 0 0 1px var(--acc)}
+.acts{display:flex;gap:8px;flex-wrap:wrap;padding:13px 16px;border-top:1px solid var(--rule)}
+.msg{padding:0 16px 14px;font-size:11.5px;color:var(--dim);line-height:1.6}
+.msg b{color:var(--a300);font-weight:500}
+.foot{padding:14px 26px 26px;font-size:11.5px;color:var(--faint);
+  border-top:1px solid var(--rule2);line-height:1.7}
+
+/* ── repli — écart assumé, voir l'en-tête ────────────────────────────── */
+@media (max-width:1180px){
+  .top{gap:12px}
+  .stats{gap:14px}
+  .wrap{flex-direction:column}
+  .left{border-right:0;border-bottom:1px solid var(--rule2)}
+  .right{flex:1 1 auto;width:auto;padding:18px 22px 26px}
+  .tiles{grid-template-columns:repeat(3,1fr)}
+}
+@media (max-width:720px){
+  .top{padding:12px 16px;gap:12px;flex-wrap:wrap}
+  .sp{display:none}
+  .nav{order:3;width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .stats{gap:14px;margin-left:auto}
+  .st i{display:none}
+  .left{padding:18px 16px 22px}
+  .right{padding:16px 16px 24px}
+  .lede h1{font-size:22px}
+  .chips{margin-left:0;width:100%}
+  .tiles{grid-template-columns:repeat(2,1fr)}
+  .scope{min-height:320px}
+  .px{font-size:28px}
+  .bilan{grid-template-columns:repeat(2,1fr)}
+  .jr{grid-template-columns:auto auto 1fr;row-gap:3px}
+  .jr-r{grid-column:1/-1;text-align:left;display:flex;gap:8px;align-items:baseline}
+  .foot{padding:14px 16px 24px}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.01ms!important;transition-duration:.01ms!important}
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <span class="logo"><i></i></span>
+    <span class="wm">TRADEassist<span>MECH</span></span>
+  </div>
+  <nav class="nav">
+    <a href="#scope" class="on">Radar</a>
+    <a href="#pan-chain">Chaîne</a>
+    <a href="#pan-journal">Historique</a>
+    <a href="#settings" id="n-set">Réglages</a>
+  </nav>
+  <span class="sp"></span>
+  <div class="stats">
+    <div class="st"><i>Nasdaq 100</i><b class="mono" id="px-top">—</b></div>
+    <div class="st"><i>Capital</i><b class="mono" id="cap-top">—</b></div>
+    <div class="st"><i>Cumulé</i><b class="mono" id="pnl-top">—</b></div>
+  </div>
+  <button class="btn" id="b-alert" title="Activer les alertes">Alertes</button>
+</header>
+
+<div class="wrap">
+
+  <!-- ── colonne gauche : le balayage ──────────────────────────────── -->
+  <main class="left">
+    <div class="lede">
+      <div>
+        <div class="eyebrow" id="tf-tag">09 h 30 – 10 h 00 NY</div>
+        <h1>Où se forme le signal</h1>
+        <p>Chaque point est un niveau clé encore valide dans le sens du biais.
+           Le rayon est sa distance au prix : plus il est proche du centre,
+           plus le prix en est près.</p>
+      </div>
+      <div class="chips" id="chips"></div>
+    </div>
+
+    <section class="scope" id="scope">
+      <canvas id="radar" width="620" height="560"
+              aria-label="Niveaux clés valides par unité de temps"></canvas>
+      <div class="ov l">
+        <div class="lg"><s style="background:#d2cefd"></s>Balayé à l’instant</div>
+        <div class="lg"><s style="background:rgba(145,132,217,.5)"></s>Rayon = distance au prix</div>
+        <div class="lg"><s style="background:rgba(233,233,237,.25)"></s>Angle = unité de temps</div>
+      </div>
+      <div class="ov r">
+        <div class="k">Le plus proche</div>
+        <div class="v mono" id="near-v">—</div>
+        <div class="s" id="near-s">en attente des bougies</div>
+      </div>
+    </section>
+
+    <div class="tiles" id="tfs"></div>
+  </main>
+
+  <!-- ── colonne droite : l’état, la position, le journal ──────────── -->
+  <aside class="right">
+
+    <section class="pan">
+      <div class="sess">
+        <div class="sess-t">
+          <span class="dot" id="sdot"></span>
+          <b id="stxt">Séance</b>
+          <span class="tag mono" id="age">—</span>
+        </div>
+        <div class="px mono" id="px">—</div>
+        <div class="sess-s" id="chg">Nasdaq 100 future · NQ</div>
+        <div class="sess-w" id="sess-why"></div>
+      </div>
+    </section>
+
+    <section class="pan" id="pan-trade">
+      <div id="trade"></div>
+    </section>
+
+    <section class="pan" id="pan-chain">
+      <div class="pan-h"><h2>La chaîne</h2><span class="tag" id="chain-tag">—</span></div>
+      <div class="gauge"><i id="gauge"></i></div>
+      <div id="chain"></div>
+    </section>
+
+    <section class="pan" id="pan-journal">
+      <div class="pan-h"><h2>Historique</h2><span class="tag" id="j-tag">—</span></div>
+      <div class="jfilters" id="jchips"></div>
+      <div id="bilan"></div>
+      <div id="journal"></div>
+    </section>
+
+    <section class="pan" id="settings">
+      <div class="pan-h"><h2>Réglages</h2></div>
+      <div class="fld"><label for="c-capital">Capital</label>
+        <input id="c-capital" type="number" min="100" step="100" class="mono"></div>
+      <div class="fld"><label for="c-devise">Devise</label>
+        <select id="c-devise"><option value="EUR">EUR</option><option value="USD">USD</option></select></div>
+      <div class="fld"><label for="c-risque">Risque par position (%)</label>
+        <input id="c-risque" type="number" min="0.05" max="5" step="0.05" class="mono"></div>
+      <div class="fld"><label for="c-contrat">Contrat</label>
+        <select id="c-contrat"><option value="MNQ">MNQ (micro)</option><option value="NQ">NQ (plein)</option></select></div>
+      <div class="msg" id="c-msg"></div>
+      <div class="fld"><label for="tok">Jeton OANDA (temps réel)</label>
+        <input id="tok" type="password" autocomplete="off" spellcheck="false"
+               placeholder="xxxxxxxx-xxxxxxxxxxxxxxxx"></div>
+      <div class="acts">
+        <button class="btn" id="b-save">Enregistrer</button>
+        <button class="btn q" id="b-clear">Retirer</button>
+        <button class="btn q" id="b-corr">Vérifier la corrélation</button>
+        <button class="btn q" id="b-reset">Vider le journal</button>
+      </div>
+      <div class="msg" id="setmsg">
+        Le jeton reste dans ce navigateur. Sans lui, les bougies viennent de
+        Yahoo avec environ dix minutes de retard.
+      </div>
+    </section>
+
+  </aside>
+</div>
+
+<footer class="foot">
+  NQ seul · bougies 5 min · fenêtre 09 h 30 → 10 h 00 à New York.
+  Mesuré du 13 juillet au 18 septembre : 55 signaux, 80,0 % de réussite, +0,184 R par signal
+  net de frais, profit factor 1,90.
+  Le seuil d’équilibre est de 68 % — la marge n’est que de douze points, et l’avantage ne se
+  retrouve ni sur l’ES ni sur une autre unité d’exécution. Aucun ordre n’est passé : ce site
+  signale, il n’exécute pas.
+</footer>
+<script src="js/cfd.js"></script>
+<script src="js/nq.js"></script>
+<script src="js/structure.js"></script>
+<script src="js/modele.js"></script>
+<script src="js/compte.js"></script>
+<script src="js/history.js"></script>
+<script src="js/mesure.js"></script>
+<script src="js/notif.js"></script>
+<script>
+'use strict';
+const $ = s => document.querySelector(s);
+const fmt = n => n == null ? '—' : Number(n).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmt0 = n => n == null ? '—' : Math.round(n).toLocaleString('fr-FR');
+// Le handoff impose le vrai signe moins U+2212, pas un trait d'union.
+const sgn = (v,d=2) => (v>0?'+':v<0?'−':'') + Math.abs(v).toFixed(d);
+let D = null, FILTRE = 'Toutes';
+
+const ACC='#9184d9', ACC3='#d2cefd', INK='#e9e9ed';
+const hexA=(h,a)=>{const n=parseInt(h.slice(1),16);
+  return 'rgba('+(n>>16&255)+','+(n>>8&255)+','+(n&255)+','+a+')';};
+
+const TFS = ['M5','M15','M30','H1','H4'];
+const hh = m => String(Math.floor(m/60)).padStart(2,'0') + ' h ' + String(m%60).padStart(2,'0');
+
+/* ── en-tête + état de séance ───────────────────────────────────────── */
+function duree(ms){
+  if(ms == null) return '—';
+  const m = Math.round(ms/60000), j = Math.floor(m/1440), h = Math.floor(m%1440/60), r = m%60;
+  if(j) return j + ' j ' + h + ' h';
+  if(h) return h + ' h ' + String(r).padStart(2,'0');
+  return r + ' min';
+}
+// « dans 1 j 0 h » ne dit rien à personne. On nomme le moment : « lundi
+// 15 h 30 », à l'heure de celui qui regarde l'écran.
+function moment(ms){
+  if(ms == null) return '—';
+  const d = new Date(Date.now() + ms);
+  const j = d.toLocaleDateString('fr-FR',{weekday:'long'});
+  const h = d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}).replace(':','\u00a0h\u00a0');
+  const auj = new Date();
+  const dem = ms < 36*3600000 && d.getDate() !== auj.getDate();
+  return (dem && (d - auj) < 36*3600000 && d.getDay() === (auj.getDay()+1)%7 ? 'demain' : j) + ' ' + h;
+}
+function paintTop(){
+  const p = D ? fmt(D.prix) : '—';
+  $('#px').textContent = p; $('#px-top').textContent = p;
+
+  const age = D && D.derniereBougie ? Math.round((Date.now() - D.derniereBougie)/60000) : null;
+  const src = D && D.source === 'cfd' ? 'OANDA' : D && D.source === 'robot' ? 'relevé' : 'Yahoo';
+  $('#age').textContent = age == null ? '—' : src + ' · −' + age + ' min';
+
+  const f = window.Modele ? Modele.fenetre() : null;
+  const c = window.Modele ? Modele.CFG : null;
+  if(f){
+    $('#sdot').className = 'dot' + (f.ouverte ? ' on' : '');
+    $('#stxt').textContent = f.ouverte ? 'Fenêtre ouverte' : 'Hors fenêtre';
+    // La raison du silence est écrite noir sur blanc : c'est exactement ce
+    // qui manquait — le site se taisait sans dire pourquoi.
+    $('#sess-why').innerHTML = f.ouverte
+      ? 'Le modèle regarde le marché. Il reste <b>' + duree(f.ms) + '</b> avant la fermeture ' +
+        'de la fenêtre.<span class="cd">' + duree(f.ms) + ' de balayage</span>'
+      : 'Le modèle n’émet de position que du lundi au vendredi, entre <b>' +
+        hh(c.ghDeb) + '</b> et <b>' + hh(c.ghFin) + '</b> à New York — ' +
+        'soit 15 h 30 → 16 h 00 à Paris. En dehors, il ne se prononce pas.' +
+        '<span class="cd">Ouverture ' + moment(f.ms) + '</span>' +
+        '<span style="color:var(--faint);font-size:11.5px">dans ' + duree(f.ms) + '</span>';
+  }
+  if(window.Compte){
+    const r = Compte.lire();
+    $('#cap-top').textContent = fmt0(r.capital) + ' ' + Compte.sym(r.devise);
+  }
+  if(window.History){
+    const b = History.bilan('MECH'), uR = window.Compte ? Compte.uniteR() : 0;
+    const e = $('#pnl-top');
+    e.textContent = b.total ? sgn(b.rsum,1) + ' R' : '—';
+    e.className = 'mono' + (b.rsum > 0 ? ' pos' : b.rsum < 0 ? ' neg' : '');
+    e.title = b.total ? Math.round(b.rsum*uR) + ' ' + (window.Compte?Compte.sym(Compte.lire().devise):'') : '';
+  }
+}
+
+/* ── la chaîne du modèle mesuré ─────────────────────────────────────── */
+function paintChain(){
+  const box = $('#chain');
+  if(!D){ box.innerHTML = '<div class="empty"><b>Aucune donnée</b>Récupération des bougies NQ…</div>'; return; }
+  const c = Modele.CFG;
+
+  const etapes = [
+    { t:'Biais haute unité',
+      ok: D.dir !== 0,
+      d: D.dir === 0 ? 'Neutre — score ' + D.score + '/4, il en faut ' + c.seuil + '.'
+                     : (D.dir > 0 ? 'Haussier' : 'Baissier') + ' — score ' + Math.abs(D.score) + '/4.',
+      long:'Respect des FVG en 1 jour, 4 h, 1 h et 15 min. Neutre = aucune position.' },
+    { t:'Draw on liquidity',
+      ok: D.dol != null,
+      d: D.dol != null ? 'Liquidité intacte à ' + fmt(D.dol) + '.' : 'Plus de liquidité intacte dans ce sens.',
+      long:'Swing 1 h non encore balayé, le plus proche dans le sens du biais.' },
+    { t:'Niveau clé',
+      ok: !!D.key,
+      d: D.key ? D.key.type + ' ' + D.key.tf + ' · ' + fmt(D.key.bas) + ' – ' + fmt(D.key.haut)
+               : 'Aucun niveau valide du bon côté.',
+      long:'FVG, ITL/ITH, CISD ou Rejection Block, de M5 à H4.' },
+    { t:'Touche',
+      ok: D.etat === 'ATTEND_IFVG',
+      attente: D.etat === 'ATTEND_TOUCHE',
+      d: D.etat === 'ATTEND_IFVG' ? 'Le prix est entré dans la zone.'
+         : D.etat === 'ATTEND_TOUCHE' ? 'Niveau repéré, le prix n’y est pas encore.'
+         : D.hors ? 'Suivie seulement pendant la fenêtre.' : 'Pas de niveau en attente.',
+      long:'On n’entre pas parce que le niveau existe : il faut que le prix y vienne.' },
+    { t:'IFVG confirmé',
+      ok: !!D.ifvg,
+      attente: D.etat === 'ATTEND_IFVG' && !D.ifvg,
+      d: D.ifvg ? 'Inversion ' + D.ifvg.tf + ' validée par clôture de corps.'
+                : D.hors ? 'Cherchée seulement pendant la fenêtre.' : 'Aucune inversion dans la jambe.',
+      long:'Plus haute unité disponible de 5 min vers 1 min. Le simple contact ne suffit pas.' }
+  ];
+
+  box.innerHTML = etapes.map(e => {
+    const cls = e.ok ? 'ok' : e.attente ? 'wait' : 'todo';
+    const lbl = e.ok ? 'validé' : e.attente ? 'en attente' : '';
+    const ti = e.long ? ' title="' + e.long.replace(/"/g,'&quot;') + '"' : '';
+    return '<div class="step ' + cls + '"' + ti + '>' +
+           '<span class="step-b"><span class="step-t">' + e.t + '</span>' +
+           '<span class="step-d">' + e.d + '</span></span>' +
+           (lbl ? '<span class="step-s">' + lbl + '</span>' : '') + '</div>';
+  }).join('');
+
+  const n = etapes.filter(e => e.ok).length;
+  $('#chain-tag').textContent = n + '/' + etapes.length;
+  $('#gauge').style.width = Math.round(n / etapes.length * 100) + '%';
+  $('#tf-tag').textContent = hh(c.ghDeb) + ' – ' + hh(c.ghFin) + ' NY';
+}
+
+/* ── la position ────────────────────────────────────────────────────── */
+function paintTrade(){
+  const box = $('#trade');
+  const t = D && (D.trade || D.dernierSignal);
+  const frais = D && D.trade && !D.hors;
+  const tete = '<div class="pan-h"><h2>Position</h2>' +
+               '<span class="tag">' + (frais ? 'à prendre' : t ? 'dernier signal' : '—') + '</span></div>';
+  const vide = h => tete + '<div class="empty">' + h + '</div>';
+
+  if(!D){ box.innerHTML = vide('<b>Aucune position</b>En attente des données du marché.'); return; }
+  if(!t){
+    const f = Modele.fenetre();
+    box.innerHTML = vide('<b>Aucune position</b>' +
+      (f.ouverte ? 'La chaîne n’est pas complète sur cette bougie.'
+                 : 'Hors fenêtre : le modèle ne se prononce pas.') +
+      '<span class="hint">prochaine ouverture ' + moment(f.ms) + '</span>');
+    return;
+  }
+  const L = t.sens === 'LONG';
+  // Distances SIGNÉES par rapport au sens du trade. `Math.abs` affichait
+  // « +200 pts » pour un objectif situé 200 points SOUS un achat.
+  const dp = L ? t.entree - t.sl : t.sl - t.entree;     // > 0 si le stop est du bon côté
+  const dt = L ? t.tp - t.entree : t.entree - t.tp;     // > 0 si l'objectif est du bon côté
+  const okSL = dp > 0, okTP = dt > 0;
+  const k = window.Compte ? Compte.calibrer(t.entree, t.sl, t.tp) : null;
+  const dev = k ? Compte.sym(k.devise) : '';
+  const quand = t.t ? new Date(t.t).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
+  box.innerHTML = tete +
+    '<div class="trade">' +
+      '<div class="t-head"><span class="t-dir ' + (L ? 'long' : 'short') + '">' + t.sens + '</span>' +
+        '<span class="t-tf">' + (t.niveau || '') + '</span>' +
+        '<span class="t-rr">RR ' + Number(t.rr).toFixed(2) + '</span></div>' +
+      '<div class="t-grid">' +
+        '<div class="t-cell"><div class="t-k">Entrée</div><div class="t-v mono">' + fmt(t.entree) + '</div></div>' +
+        '<div class="t-cell"><div class="t-k">Stop</div><div class="t-v sl mono">' + fmt(t.sl) + '</div>' +
+          '<div class="t-sub">' + (okSL ? '−' + dp.toFixed(1) + ' pts'
+            : '<span style="color:var(--loss)">du mauvais côté</span>') + '</div></div>' +
+        '<div class="t-cell"><div class="t-k">Objectif</div><div class="t-v tp mono">' + fmt(t.tp) + '</div>' +
+          '<div class="t-sub">' + (okTP ? '+' + dt.toFixed(1) + ' pts'
+            : '<span style="color:var(--loss)">du mauvais côté</span>') + '</div></div>' +
+        '<div class="t-cell"><div class="t-k">Taille</div>' +
+          (k && !k.tropPetit
+            ? '<div class="t-v mono">' + k.contrats + ' ' + Compte.lire().contrat + '</div>' +
+              '<div class="t-sub">risque ' + k.risqueDev + dev +
+                (k.gainDev != null ? ' · gain ' + k.gainDev + dev
+                                   : ' · <span style="color:var(--loss)">objectif incohérent</span>') + '</div>'
+            : '<div class="t-v" style="color:var(--dim)">—</div>' +
+              '<div class="t-sub">stop trop large pour ce capital</div>') +
+        '</div>' +
+      '</div>' +
+      '<div class="t-why">' +
+        (!okSL || !okTP
+          ? '<span style="color:var(--loss)">Ce signal est incohérent : stop et objectif doivent ' +
+            'encadrer l\u2019entrée. Ne le prends pas.</span>'
+        : frais ? 'Signal armé sur la bougie en cours. Partiel à 0,5 R sur 90 % de la taille, le reste court jusqu’à 2,5 R.'
+               : 'Ce signal date du ' + quand + '. Il est affiché pour mémoire — ce n’est pas une position à prendre maintenant.') +
+      '</div>' +
+    '</div>';
+}
+
+/* ── le radar (canvas Nocturne) ─────────────────────────────────────── */
+let blips = [], rafId = null;
+function majBlips(){
+  blips = [];
+  const vs = D && D.parTF; if(!Array.isArray(vs)) return;
+  const maxD = Math.max(1, ...vs.flatMap(v => (v.liste||[]).map(x => x.d)));
+  vs.forEach((v, i) => {
+    if(FILTRE !== 'Toutes' && FILTRE !== v.tf) return;
+    const base = i / TFS.length * Math.PI * 2;
+    (v.liste || []).forEach((z, j) => {
+      const jitter = (((j * 37) % 23) / 23 - 0.5) * (42 * Math.PI / 180);
+      blips.push({ ang: base + jitter, rad: 0.22 + (z.d / maxD) * 0.70,
+                   sym: z.type, tf: v.tf, ret: D.key && D.key.tf === v.tf && D.key.type === z.type && j === 0 });
+    });
+  });
+}
+function drawRadar(t){
+  const c = $('#radar'); if(!c) return;
+  const ctx = c.getContext('2d'); if(!ctx) return;
+  const dpr = window.devicePixelRatio || 1;
+  const W = 620, H = 560;
+  if(c.width !== W * dpr){ c.width = W * dpr; c.height = H * dpr; c.style.width = W + 'px'; c.style.height = H + 'px'; }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const cx = W / 2, cy = H / 2 - 8, R = 218;
+  ctx.clearRect(0, 0, W, H);
+
+  for(let i = 1; i <= 4; i++){
+    ctx.strokeStyle = hexA(INK, i === 4 ? .12 : .07); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(cx, cy, R * i / 4, 0, Math.PI * 2); ctx.stroke();
+  }
+  for(let i = 0; i < 20; i++){
+    const a = i / 20 * Math.PI * 2;
+    ctx.strokeStyle = hexA(INK, i % 4 === 0 ? .1 : .05);
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(a) * R, cy + Math.sin(a) * R); ctx.stroke();
+  }
+
+  const sweep = (t * 0.00055) % (Math.PI * 2);
+  const span = 0.85;
+  for(let k = 0; k < 26; k++){
+    const a = sweep - k / 26 * span;
+    ctx.strokeStyle = hexA(ACC, .16 * (1 - k / 26)); ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(a) * R, cy + Math.sin(a) * R); ctx.stroke();
+  }
+  ctx.strokeStyle = hexA(ACC3, .75); ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(sweep) * R, cy + Math.sin(sweep) * R); ctx.stroke();
+
+  TFS.forEach((nom, i) => {
+    const a = i / TFS.length * Math.PI * 2 - Math.PI / 2;
+    ctx.fillStyle = hexA(INK, FILTRE === 'Toutes' || FILTRE === nom ? .38 : .14);
+    ctx.font = '11px Inter, sans-serif';
+    ctx.textAlign = Math.cos(a) > .2 ? 'left' : Math.cos(a) < -.2 ? 'right' : 'center';
+    ctx.fillText(nom, cx + Math.cos(a) * (R + 14), cy + Math.sin(a) * (R + 14) + 4);
+  });
+  ctx.textAlign = 'left';
+
+  blips.forEach(b => {
+    const a = b.ang - Math.PI / 2;
+    const x = cx + Math.cos(a) * b.rad * R, y = cy + Math.sin(a) * b.rad * R;
+    let d = sweep - a; while(d < 0) d += Math.PI * 2; while(d > Math.PI * 2) d -= Math.PI * 2;
+    const lit = d < 1.6 ? 1 - d / 1.6 : 0;
+    ctx.strokeStyle = hexA(ACC, .1 + lit * .55); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(x, y, 5 + lit * 13, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = hexA(ACC3, .35 + lit * .65);
+    if(lit > .4){ ctx.shadowColor = ACC; ctx.shadowBlur = 12 * lit; }
+    ctx.beginPath(); ctx.arc(x, y, b.ret ? 4.2 : 3.2, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowBlur = 0;
+    if(lit > .25 || b.ret){
+      ctx.fillStyle = hexA(INK, .32 + lit * .5);
+      ctx.font = (lit > .5 || b.ret ? '600 ' : '') + '11px Inter, sans-serif';
+      ctx.fillText(b.sym, x + 9, y + 3.5);
+    }
+  });
+
+  ctx.fillStyle = hexA(ACC, .9);
+  ctx.beginPath(); ctx.arc(cx, cy, 2.6, 0, Math.PI * 2); ctx.fill();
+}
+function boucle(t){ drawRadar(t); rafId = requestAnimationFrame(boucle); }
+
+function paintRadar(){
+  majBlips();
+  const n = $('#near-v'), s = $('#near-s');
+  const vs = D && D.parTF;
+  const tous = Array.isArray(vs) ? vs.filter(v => v.distance != null) : [];
+  if(!tous.length){
+    n.textContent = '—';
+    s.textContent = D && D.dir === 0 ? 'biais neutre, aucun niveau retenu' : 'aucun niveau du bon côté';
+    return;
+  }
+  const best = tous.reduce((a, b) => b.distance < a.distance ? b : a);
+  n.textContent = best.distance.toFixed(1) + ' pts';
+  s.textContent = best.type + ' ' + best.tf;
+}
+
+/* ── tuiles par unité ───────────────────────────────────────────────── */
+function paintTFs(){
+  const box = $('#tfs');
+  const vs = D && D.parTF;
+  if(!Array.isArray(vs)){ box.innerHTML = ''; return; }
+  box.innerHTML = vs.map(v => {
+    const ret = D.key && D.key.tf === v.tf;
+    return '<div class="tile ' + (ret ? 'ret' : v.n ? '' : 'off') + '">' +
+      '<k>' + v.tf + '</k>' +
+      '<v class="mono">' + v.n + '</v>' +
+      '<s>' + (v.n ? (v.distance != null ? v.distance.toFixed(0) + ' pts · ' + v.type : 'niveaux valides')
+                   : 'aucun niveau') + '</s></div>';
+  }).join('');
+}
+
+/* ── filtres ────────────────────────────────────────────────────────── */
+function paintChips(){
+  $('#chips').innerHTML = ['Toutes'].concat(TFS)
+    .map(k => '<button class="chip' + (k === FILTRE ? ' on' : '') + '" data-k="' + k + '">' + k + '</button>').join('');
+}
+$('#chips').addEventListener('click', e => {
+  const b = e.target.closest('.chip'); if(!b) return;
+  FILTRE = b.dataset.k; paintChips(); majBlips();
+});
+
+function paintAll(){ paintTop(); paintChain(); paintTrade(); paintJournal(); paintRadar(); paintTFs(); }
+
+/* ── cycle de rafraîchissement ──────────────────────────────────────── */
+const SERIES = [['1m','8d'],['2m','60d'],['5m','60d'],['15m','60d'],['60m','3mo'],['1d','1y']];
+const CLES   = ['m1','m2','m5','m15','h1','d1'];
+
+async function charger(){
+  const out = {};
+  for(let i=0;i<SERIES.length;i++){
+    const [iv,rg] = SERIES[i];
+    const r = await NQ.candles('NQ=F', iv, rg).catch(()=>null);
+    out[CLES[i]] = r && r.candles ? r.candles : (Array.isArray(r) ? r : null);
+    if(!out[CLES[i]]) return null;
+  }
+  return out;
+}
+
+// Yahoo ne sert pas d'en-tête CORS, et les quatre relais publics que ce
+// site utilisait sont tous morts (500, 429, 429, 522 au dernier test). Un
+// navigateur ne peut donc plus joindre Yahoo depuis cette page.
+//
+// L'instantané est désormais produit par la tâche automatique — Node n'a
+// pas cette contrainte — et servi par GitHub avec `access-control-allow-
+// origin: *`. Le site le lit. Quand un jeton OANDA est enregistré, on
+// reprend le calcul local : ce flux-là est joignable directement, et en
+// temps réel.
+// Un instantané mal formé ne doit pas casser la page. On vérifie sa forme
+// UNE fois, ici, à la frontière — plutôt que de semer des gardes partout.
+// Un `parTF` qui n'est pas un tableau faisait planter le radar sur
+// `flatMap`, et un prix non numérique s'affichait « NaN ».
+function etatValide(j){
+  if(!j || typeof j !== 'object') return false;
+  if(typeof j.prix !== 'number' || !isFinite(j.prix) || j.prix <= 0) return false;
+  if(j.parTF != null && !Array.isArray(j.parTF)) return false;
+  if(j.dir != null && typeof j.dir !== 'number') return false;
+  if(j.trade != null && typeof j.trade !== 'object') return false;
+  return true;
+}
+
+async function etatDistant(){
+  // Servi par GitHub Pages à côté de la page : même origine, pas de CORS,
+  // pas de dépendance à un domaine tiers.
+  try{
+    const r = await fetch('data/etat.json?t=' + Date.now(), { cache:'no-store' });
+    if(r.ok){ const j = await r.json(); if(etatValide(j)) return j; }
+  }catch(e){ /* page ouverte en local : on passe par le dépôt */ }
+  for(const br of BRANCHES){
+    try{
+      const u = 'https://raw.githubusercontent.com/' + DEPOT + '/' +
+                encodeURIComponent(br).replace(/%2F/g,'/') + '/data/etat.json?t=' + Date.now();
+      const r = await fetch(u, { cache:'no-store' });
+      if(!r.ok) continue;
+      const j = await r.json();
+      if(etatValide(j)) return j;
+    }catch(e){ /* branche suivante */ }
+  }
+  return null;
+}
+
+async function refresh(){
+  try{
+    if(window.CFD && CFD.actif()){
+      const brut = await charger();
+      D = brut ? Modele.evaluer(brut) : null;
+      if(D) D.source = 'cfd';
+    } else {
+      D = await etatDistant();
+      if(D){ D.source = 'robot';
+        if(D.eurusd && window.Compte) Compte.setTaux(D.eurusd); }
+    }
+  }catch(e){ D = null; }
+  if(D && window.History){
+    History.evaluate({ NQ: D.prix });
+    const t = D.trade;
+    // Pas de test sur un champ `possible` : le modèle n'en produit pas. C'est
+    // exactement la faute qui vidait le journal.
+    // La clé identifie LE SIGNAL : bougie qui l'a produit + sens + entrée.
+    // Deux signaux du même sens à cinq minutes d'intervalle sont deux
+    // signaux, et doivent tous les deux entrer au journal.
+    if(t && !D.hors)
+      History.record([{ sym:'NQ', dir:t.sens, entry:t.entree, sl:t.sl, tp:t.tp, rr:t.rr,
+        key: t.t + '|' + t.sens + '|' + t.entree, ts: t.t,
+        note:'IFVG ' + t.tf + ' sur ' + t.niveau, tf:t.tf, price:D.prix }], 'MECH');
+  }
+  await chargerDistant();
+  paintAll();
+  if(D && window.Notif) Notif.verifier(D);
+}
+
+/* ── journal tenu à distance ────────────────────────────────────────── */
+// La GitHub Action fait tourner le modèle pendant la fenêtre, que le site
+// soit ouvert ou non, et versionne le résultat dans data/signaux.json. On le
+// lit ici : c'est le seul historique qui survive à un onglet fermé.
+const DEPOT = 'destinekizolabolokopro-dot/TRADING';
+const BRANCHES = ['claude/trading-ict-smc-site-h1n3i7', 'main'];
+let DISTANT = null, DISTANT_ETAT = 'chargement';
+
+async function chargerDistant(){
+  try{
+    const r = await fetch('data/signaux.json?t=' + Date.now(), { cache:'no-store' });
+    if(r.ok){ const j = await r.json();
+      if(j && Array.isArray(j.signaux)){ DISTANT = j; DISTANT_ETAT = 'ok'; return; } }
+  }catch(e){ /* page ouverte en local : on passe par le dépôt */ }
+  for(const br of BRANCHES){
+    try{
+      const u = 'https://raw.githubusercontent.com/' + DEPOT + '/' +
+                encodeURIComponent(br).replace(/%2F/g,'/') + '/data/signaux.json?t=' + Date.now();
+      const r = await fetch(u, { cache: 'no-store' });
+      if(!r.ok) continue;
+      const j = await r.json();
+      if(j && Array.isArray(j.signaux)){ DISTANT = j; DISTANT_ETAT = 'ok'; return; }
+    }catch(e){ /* on essaie la branche suivante */ }
+  }
+  DISTANT_ETAT = 'indisponible';
+}
+
+// Les signaux du dépôt prennent la forme des lignes du journal.
+function distantEnLignes(){
+  if(!DISTANT) return [];
+  return DISTANT.signaux.map(s => ({
+    ts: Date.parse(s.bougie), source:'DIRECT', symbol:'NQ', direction:s.sens,
+    entry:s.entree, sl:s.sl, tp:s.tp, rr:s.rr,
+    r: s.r, status: s.statut === 'clos' ? 'closed' : 'open',
+    motif: s.raisonnement, heureNY: s.heureNY, jour: s.jour,
+    niveau: s.niveauDeclencheur, retard: s.retardMin
+  }));
+}
+
+/* ── journal ────────────────────────────────────────────────────────── */
+// Deux jeux de signaux, JAMAIS confondus :
+//   MECH   — émis en direct par ce site, stockés dans ce navigateur
+//   MESURE — les 55 signaux reconstitués sur les bougies réelles, en dur
+//            dans js/mesure.js, que « Vider le journal » ne touche pas
+let JFILTRE = 'Tout';
+
+function jeuJournal(){
+  const local = window.History ? History.load().filter(x => x.source === 'MECH') : [];
+  const dist  = distantEnLignes();
+  // Un signal relevé par l'Action et un signal vu par l'onglet ouvert sont le
+  // même événement : on dédoublonne sur la bougie et le prix d'entrée.
+  const vus = new Set(dist.map(x => x.ts + '|' + x.entry));
+  const live = dist.concat(local.filter(x => !vus.has(x.ts + '|' + x.entry)));
+  const mes  = window.Mesure ? Mesure.liste() : [];
+  const rows = JFILTRE === 'En direct' ? live
+             : JFILTRE === 'Mesuré'    ? mes
+             : live.concat(mes);
+  return { rows: rows.slice().sort((a,b) => b.ts - a.ts), live, mes };
+}
+
+// Statistiques calculées sur la sélection courante, quelle qu'elle soit.
+function stats(rows){
+  const clos = rows.filter(x => x.status === 'closed');
+  const open = rows.length - clos.length;
+  const g = clos.filter(x => (x.r||0) > 0), p = clos.filter(x => (x.r||0) < 0);
+  const rsum = clos.reduce((a,x) => a + (x.r||0), 0);
+  const moy = a => a.length ? a.reduce((s,x) => s + x.r, 0) / a.length : null;
+  return { n: clos.length, open, rate: clos.length ? g.length/clos.length*100 : null,
+    rsum, gainMoy: moy(g), perteMoy: moy(p),
+    rrVise: rows.length ? rows.reduce((a,x) => a + (+x.rr||0), 0) / rows.length : null,
+    esp: clos.length ? rsum/clos.length : null };
+}
+
+function paintChipsJ(){
+  const j = jeuJournal();
+  const lbl = { 'Tout': 'Tout', 'Mesuré': 'Mesuré ' + j.mes.length, 'En direct': 'En direct ' + j.live.length };
+  $('#jchips').innerHTML = ['Tout','Mesuré','En direct']
+    .map(k => '<button class="chip' + (k === JFILTRE ? ' on' : '') + '" data-j="' + k + '">' + lbl[k] + '</button>').join('');
+}
+$('#jchips').addEventListener('click', e => {
+  const b = e.target.closest('.chip'); if(!b) return;
+  JFILTRE = b.dataset.j; paintChipsJ(); paintJournal();
+});
+
+function paintJournal(){
+  const bx = $('#bilan'), jx = $('#journal');
+  if(!window.History) return;
+  const j = jeuJournal(), rows = j.rows, st = stats(rows);
+  const uR = window.Compte ? Compte.uniteR() : 0;
+  const dev = window.Compte ? Compte.sym(Compte.lire().devise) : '';
+  const nR = v => v == null ? '—' : sgn(v) + ' R';
+
+  $('#j-tag').textContent = st.n + ' clos' + (st.open ? ' + ' + st.open + ' en cours' : '');
+  paintChipsJ();
+
+  // Deux RR à ne pas confondre : celui qu'on VISE au signal, et celui qu'on
+  // ENCAISSE. L'écart entre les deux dit si le modèle atteint ses cibles.
+  bx.innerHTML =
+    '<div class="bilan">' +
+      '<div><div class="bk">Signaux clos</div><div class="bv mono">' + st.n +
+        (st.open ? '<span class="bsub"> +' + st.open + '</span>' : '') + '</div></div>' +
+      '<div><div class="bk">Réussite</div><div class="bv mono">' +
+        (st.rate == null ? '—' : st.rate.toFixed(1) + ' %') + '</div></div>' +
+      '<div><div class="bk">RR visé</div><div class="bv mono">' +
+        (st.rrVise == null ? '—' : st.rrVise.toFixed(2)) + '</div></div>' +
+      '<div><div class="bk">Gain moyen</div><div class="bv mono ' + (st.gainMoy ? 'pos' : '') + '">' +
+        nR(st.gainMoy) + '</div></div>' +
+      '<div><div class="bk">Perte moy.</div><div class="bv mono ' + (st.perteMoy ? 'neg' : '') + '">' +
+        nR(st.perteMoy) + '</div></div>' +
+      '<div><div class="bk">Cumulé</div><div class="bv mono ' +
+        (st.rsum > 0 ? 'pos' : st.rsum < 0 ? 'neg' : '') + '">' + sgn(st.rsum,1) + ' R' +
+        '<span class="bsub"> ' + sgn(Math.round(st.rsum * uR),0) + dev + '</span></div></div>' +
+    '</div>';
+
+  bx.insertAdjacentHTML('beforeend',
+    '<div class="note">1 R = <b>' + uR + dev + '</b> · ' +
+    (window.Compte ? Compte.lire().risque : '—') + ' % de ' +
+    (window.Compte ? Number(Compte.lire().capital).toLocaleString('fr-FR') : '—') + dev + '</div>');
+
+  if(!rows.length){
+    jx.innerHTML = '<div class="empty"><b>Aucun signal</b>' +
+      (JFILTRE !== 'En direct' ? 'Jeu de données introuvable.'
+       : DISTANT_ETAT === 'chargement' ? 'Lecture du journal en cours\u2026'
+       : DISTANT_ETAT === 'indisponible'
+         ? 'Journal distant injoignable. Il est tenu par une tâche automatique sur le dépôt ; ' +
+           'vérifie que l\u2019action « Journal des signaux » est bien activée.'
+       : 'Aucun signal relevé pour l\u2019instant. La tâche automatique passe toutes les cinq ' +
+         'minutes pendant la fenêtre, du lundi au vendredi de 15 h 30 à 16 h 00' +
+         (DISTANT && DISTANT.bilan ? ' — ' + DISTANT.bilan.passages + ' passages déjà consignés, ' +
+           'aucun n\u2019a réuni les cinq conditions.' : '.')) + '</div>';
+    return;
+  }
+
+  jx.innerHTML = rows.slice(0, 60).map(x => {
+    const d = new Date(x.ts);
+    const jour = String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') +
+                 ' ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+    const ouvert = x.status === 'open';
+    const r = ouvert ? null : (x.r || 0);
+    // Le verdict est écrit en toutes lettres AVANT les chiffres.
+    const verdict = ouvert ? 'en cours' : r > 0 ? 'gagné' : 'perdu';
+    const recon = x.source === 'MESURE';
+    return '<div class="jr" title="' + (x.motif || '').replace(/"/g,'&quot;') + '">' +
+      '<span class="jr-d mono">' + jour + '</span>' +
+      '<span class="jr-s ' + (x.direction === 'LONG' ? 'long' : 'short') + '">' + x.direction + '</span>' +
+      '<span>' + (recon ? '<span class="jr-t">reconstitué</span>'
+                : x.heureNY ? '<span class="jr-t">' + x.heureNY + ' NY</span>' : '') + '</span>' +
+      '<span class="jr-r ' + (ouvert ? 'open' : r > 0 ? 'pos' : 'neg') + '">' +
+        '<span class="jv">' + verdict + '</span>' +
+        (ouvert ? '' : '<span class="jn mono">' + sgn(r) + ' R · ' + sgn(Math.round(r * uR),0) + dev + '</span>') +
+      '</span>' +
+      '<span class="jr-p mono">entrée ' + fmt(x.entry) + ' · cible ' + fmt(x.tp) +
+        ' · stop ' + fmt(x.sl) + '</span></div>';
+  }).join('') +
+  (JFILTRE !== 'En direct'
+    ? '<div class="note"><b>Reconstitué</b> = ce que le modèle aurait produit sur les bougies ' +
+      'réelles du 13 juillet au 18 septembre. Ces signaux n\u2019ont jamais été envoyés : un bug ' +
+      'coupait la chaîne. Ils sont là pour que tu voies le modèle travailler, pas comme un relevé ' +
+      'de compte.</div>'
+    : '');
+}
+
+/* ── réglages ───────────────────────────────────────────────────────── */
+function setMsg(t){ $('#setmsg').innerHTML = t; }
+function ouvrirReglages(){
+  $('#settings').classList.toggle('open');
+  if($('#settings').classList.contains('open'))
+    $('#settings').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+$('#n-set').addEventListener('click', e => { e.preventDefault(); ouvrirReglages(); });
+$('#b-save').addEventListener('click', () => {
+  const v = $('#tok').value.trim();
+  if(v) CFD.setToken(v);
+  if(!CFD.actif()){ setMsg('Colle d’abord un jeton.'); return; }
+  setMsg('Test en cours…');
+  CFD.tester().then(r => {
+    if(!r.ok){ setMsg('Refusé : ' + r.msg); return; }
+    $('#tok').value = ''; $('#tok').placeholder = 'jeton enregistré';
+    setMsg('Connecté — ' + r.msg);
+    refresh();
+  });
+});
+$('#b-clear').addEventListener('click', () => {
+  CFD.setToken(''); $('#tok').value = ''; $('#tok').placeholder = 'xxxxxxxx-xxxxxxxxxxxxxxxx';
+  setMsg('Jeton retiré — retour aux données Yahoo différées.'); refresh();
+});
+$('#b-corr').addEventListener('click', () => {
+  if(!CFD.actif()){ setMsg('Enregistre un jeton d’abord.'); return; }
+  setMsg('Comparaison en cours…');
+  // On compare les VARIATIONS, pas les niveaux : c'est ce qui décide si le
+  // CFD est un substitut acceptable. QQQ donnait 0,924 et ce n'était pas assez.
+  Promise.all([CFD.candles('5m', 500), NQ.brut('NQ=F', '5m', '5d')]).then(([a, b]) => {
+    const r = CFD.correlation(a, b && b.candles ? b.candles : b);
+    if(!r || r.r == null){ setMsg('Pas assez de bougies communes.'); return; }
+    const v = r.r;
+    setMsg('Corrélation sur ' + r.n + ' bougies 5 min : <b>' + v.toFixed(4) + '</b><br>' +
+      (v >= 0.985 ? 'Excellent — utilisable tel quel.'
+       : v >= 0.96 ? 'Correct, mais surveille les écarts.'
+       : 'Insuffisant : QQQ faisait 0,924 et l’avantage y disparaissait.'));
+  }).catch(() => setMsg('Comparaison impossible.'));
+});
+$('#b-reset').addEventListener('click', () => {
+  if(!window.History) return;
+  History.reset(); setMsg('Journal vidé.'); paintAll();
+});
+
+function compteInit(){
+  if(!window.Compte) return;
+  const r = Compte.lire();
+  $('#c-capital').value = r.capital;
+  $('#c-devise').value  = r.devise;
+  $('#c-risque').value  = r.risque;
+  $('#c-contrat').value = r.contrat;
+  const maj = () => {
+    const o = Compte.ecrire({
+      capital: Math.max(100, +$('#c-capital').value || Compte.DEF.capital),
+      devise:  $('#c-devise').value,
+      risque:  Math.min(5, Math.max(0.05, +$('#c-risque').value || Compte.DEF.risque)),
+      contrat: $('#c-contrat').value
+    });
+    const c = Compte.CONTRATS[o.contrat];
+    $('#c-msg').innerHTML = '1 R = <b>' + Compte.uniteR() + Compte.sym(o.devise) + '</b> · ' +
+      c.nom + ', ' + c.point + ' $ le point' +
+      (o.devise === 'EUR' ? ' · EUR/USD ' + o.taux : '');
+    paintAll();
+  };
+  ['#c-capital','#c-devise','#c-risque','#c-contrat'].forEach(id =>
+    $(id).addEventListener('change', maj));
+  // On ne sollicite le réseau que si l'instantané n'a pas déjà donné le taux.
+  (Compte.tauxFrais() ? Promise.resolve() : Compte.majTaux()).then(maj);
+  maj();
+}
+
+/* ── alertes ────────────────────────────────────────────────────────── */
+function paintAlert(){
+  const b = $('#b-alert');
+  if(!window.Notif || !Notif.supporte()){ b.disabled = true; b.title = 'Non supporté par ce navigateur'; return; }
+  const on = Notif.actif() && Notif.permis();
+  b.className = 'btn' + (on ? ' on' : '');
+  b.textContent = on ? 'Alertes activées' : 'Alertes';
+}
+$('#b-alert').addEventListener('click', () => {
+  if(Notif.actif()){ Notif.desactiver(); paintAlert(); }
+  else Notif.activer().then(paintAlert);
+});
+
+/* ── démarrage ──────────────────────────────────────────────────────── */
+paintChips(); paintAll(); paintAlert();
+// L'instantané porte le taux : on l'applique avant d'initialiser le compte.
+etatDistant().then(e => {
+  if(e && e.eurusd && window.Compte) Compte.setTaux(e.eurusd);
+  compteInit();
+});
+chargerDistant().then(paintJournal);
+if(window.CFD && CFD.actif()) $('#tok').placeholder = 'jeton enregistré';
+if(!window.matchMedia('(prefers-reduced-motion: reduce)').matches) boucle(performance.now());
+else drawRadar(0);
+setInterval(paintTop, 1000);
+refresh();
+setInterval(refresh, 300000);   // le modèle travaille en M5/M15 : 5 minutes suffisent
+</script>
+</body>
+</html>

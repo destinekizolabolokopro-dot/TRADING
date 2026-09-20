@@ -1,0 +1,501 @@
+//@version=6
+// =============================================================================
+// BLAKE'S MECHANICAL MODEL — STRATEGY (backtest)  |  Pine Script v6
+// =============================================================================
+// Version "strategy()" de pine/BLAKE_MECH_indicator.pine — MÊME LOGIQUE, avec
+// passage d'ordres, sizing par risque, break-even, runner et statistiques.
+//
+//   LIQUIDITY SWEEP → STRUCTURE → INVERSION → FVG NON MITIGÉ → ENTRÉE
+//   → 1R → BREAK-EVEN → FVG / LIQUIDITÉ EXTERNE
+//
+// RAPPEL DES POINTS DE LA SPEC (respectés tels quels) :
+//  • PAS de biais HTF obligatoire. La STRUCTURE prime.
+//  • Ce sont les HIGHS/LOWS qui sont sweepés. Le FVG n'est PAS la liquidité :
+//    c'est le DRAW / la CIBLE, choisi AVANT l'entrée.
+//  • LONG  : Swing Low → Swing High → LOWER LOW qui sweep une liquidité.
+//    SHORT : Swing High → Swing Low → HIGHER HIGH qui sweep une liquidité.
+//  • On n'entre PAS au sweep : Sweep → INVERSION → Entrée.
+//  • À +1R : SL → Entry (break-even). Puis runner vers la liquidité externe.
+//  • SMT à contre-sens = NO TRADE.
+//  • Macros : 09:30–11:00 et 13:00–15:00 EST. On évite le lunch.
+//
+// ⚠️ "INVERSION" et "SMT" n'ont PAS de définition universelle (point signalé
+//    par l'utilisateur). Elles sont donc des MODES SÉLECTIONNABLES, à tester
+//    SÉPARÉMENT. Aucune n'est présentée comme "la" définition officielle.
+//
+// ⚠️ On ne cherche pas à forcer un taux de réussite : le tableau affiche
+//    l'ESPÉRANCE (expectancy), qui seule dit si le modèle est rentable.
+// =============================================================================
+
+strategy("Blake Mech Model — Strategy", "MECH-S", overlay = true,
+     initial_capital        = 10000,
+     default_qty_type       = strategy.fixed,
+     default_qty_value      = 1,
+     pyramiding             = 0,
+     calc_on_every_tick     = false,
+     process_orders_on_close= true,
+     commission_type        = strategy.commission.cash_per_order,
+     commission_value       = 0.0,
+     slippage               = 0,
+     max_boxes_count        = 500,
+     max_lines_count        = 500,
+     max_labels_count       = 500)
+
+// ============================== PARAMÈTRES ===================================
+gStruct = "① Structure & liquidité"
+pivLen      = input.int(5, "Longueur des pivots (swings)", minval = 2, group = gStruct,
+     tooltip = "Un swing est confirmé après ce nombre de bougies de chaque côté (non-repaint).")
+sweepTolPct = input.float(0.0, "Tolérance de sweep (%)", minval = 0.0, step = 0.01, group = gStruct)
+setupExpiry = input.int(30, "Validité du setup après le sweep (bougies)", minval = 3, group = gStruct)
+eqTolPct    = input.float(0.05, "Tolérance Equal High/Low (%)", minval = 0.0, step = 0.01, group = gStruct)
+
+gLiq = "② Sources de liquidité (ce qui est sweepé)"
+usePDHL   = input.bool(true, "Previous Day High / Low",  group = gLiq)
+useSess   = input.bool(true, "Highs / Lows de session",  group = gLiq)
+useSwings = input.bool(true, "Swing Highs / Lows",       group = gLiq)
+useEqual  = input.bool(true, "Equal Highs / Lows",       group = gLiq)
+showLiq   = input.bool(true, "Afficher les niveaux",     group = gLiq)
+
+gSess = "③ Sessions & macros (EST)"
+tz       = input.string("America/New_York", "Fuseau horaire", group = gSess)
+asiaSess = input.session("2000-0000", "Asie",    group = gSess)
+lonSess  = input.session("0300-0600", "Londres", group = gSess)
+amSess   = input.session("0930-1100", "AM (NY)", group = gSess)
+macro1   = input.session("0930-1100", "Macro 1 — fenêtre de trade", group = gSess)
+macro2   = input.session("1300-1500", "Macro 2 — fenêtre de trade", group = gSess)
+useWallSt  = input.bool(true, "Filtrer par les fenêtres de trading", group = gSess,
+     tooltip = "Deux créneaux : ouverture de Wall Street → 17 h 00 (Paris), et 19 h 00 → 21 h 00 (Paris). Les deux fuseaux sont lus séparément : la France et les USA ne changent pas d'heure les mêmes semaines, donc l'ouverture tombe à 14 h 30 ou 15 h 30 à Paris selon la période. Le filtre reste juste toute l'année.")
+nyOpenSess = input.session("0930-1600", "Séance New York (fuseau NY)", group = gSess)
+parisCut   = input.session("0000-1700", "Fenêtre 1 — coupure (fuseau Paris)", group = gSess)
+parisSoir  = input.session("1900-2100", "Fenêtre 2 — soirée (fuseau Paris)", group = gSess)
+useMacro = input.bool(true, "N'autoriser les entrées que dans les macros", group = gSess)
+flatEOD  = input.bool(true, "Tout clôturer en fin de journée", group = gSess)
+eodSess  = input.session("1555-1600", "Fenêtre de clôture forcée", group = gSess)
+
+gInv = "④ INVERSION — à tester séparément"
+invMode  = input.string("CISD (clôture au-delà des opens)", "Définition de l'inversion",
+     options = ["CISD (clôture au-delà des opens)", "MSS (cassure du dernier swing)", "Engulfing + displacement", "Création d'un FVG"],
+     group = gInv, tooltip = "Aucune définition universelle : teste chaque mode séparément.")
+dispMult = input.float(1.0, "Displacement : corps > ATR(14) ×", minval = 0.1, step = 0.1, group = gInv)
+cisdLook = input.int(5, "CISD : nb de bougies opposées à dépasser", minval = 1, group = gInv)
+
+gFvg = "⑤ FVG (la CIBLE / draw, pas la liquidité)"
+fvgMinPct = input.float(0.02, "Taille minimale du FVG (%)", minval = 0.0, step = 0.01, group = gFvg)
+fvgMaxAge = input.int(300, "Âge maximum d'un FVG (bougies)", minval = 10, group = gFvg)
+mitigMode = input.string("Partielle (au 1er contact)", "Mitigation",
+     options = ["Partielle (au 1er contact)", "Complète (gap rempli)"], group = gFvg)
+showFvg   = input.bool(true, "Afficher les FVG non mitigés", group = gFvg)
+
+gSMT = "⑥ SMT — à tester séparément"
+useSMT = input.bool(true, "Filtre SMT actif (contre-sens = NO TRADE)", group = gSMT)
+smtSym = input.symbol("CME_MINI:ES1!", "Actif corrélé", group = gSMT,
+     tooltip = "Pour le NQ, la référence est le S&P 500 (ES).")
+smtLen = input.int(20, "Fenêtre SMT (bougies)", minval = 5, group = gSMT)
+
+gRisk = "⑦ Risque & gestion"
+slBufPct  = input.float(0.02, "Buffer du SL (%)", minval = 0.0, step = 0.01, group = gRisk)
+minRR     = input.float(1.0, "RR minimum pour valider", minval = 0.1, step = 0.1, group = gRisk)
+useBE     = input.bool(true, "Break-even activé", group = gRisk)
+beAtR     = input.float(1.0, "Break-even à (R)", minval = 0.1, step = 0.1, group = gRisk)
+usePartial= input.bool(true, "Prise partielle sur le FVG cible", group = gRisk)
+partPct   = input.float(50, "% clôturé sur la cible FVG", minval = 1, maxval = 100, step = 5, group = gRisk)
+useRunner = input.bool(true, "Runner vers la liquidité externe", group = gRisk)
+riskPct   = input.float(1.0, "Risque par trade (% du capital)", minval = 0.01, step = 0.05, group = gRisk)
+maxTrades = input.int(3, "Trades max / jour", minval = 1, group = gRisk)
+maxLosses = input.int(2, "Pertes max / jour", minval = 1, group = gRisk)
+ptValue   = input.float(1.0, "Valeur du point ($ par point et par contrat)", minval = 0.000001, group = gRisk,
+     tooltip = "NQ = 20 $/pt, MNQ = 2 $/pt, actions/forex-CFD = 1. Sert au calcul de la taille.")
+minQty    = input.float(1.0, "Taille minimale (contrats)", minval = 0.000001, group = gRisk)
+qtyStep   = input.float(1.0, "Pas de taille", minval = 0.000001, group = gRisk)
+
+gWF = "⑧ Fenêtre de test (walk-forward)"
+useWindow = input.bool(false, "Limiter le backtest à une période", group = gWF)
+startDate = input.time(timestamp("01 Jan 2023 00:00 +0000"), "Début", group = gWF)
+endDate   = input.time(timestamp("01 Jan 2030 00:00 +0000"), "Fin",   group = gWF)
+
+gUI = "⑨ Affichage"
+showTable = input.bool(true, "Tableau de bord", group = gUI)
+
+// ============================== OUTILS =======================================
+atr14 = ta.atr(14)
+inSess(s) => not na(time(timeframe.period, s, tz))
+inAsia  = inSess(asiaSess)
+inLon   = inSess(lonSess)
+inAM    = inSess(amSess)
+inMacro = inSess(macro1) or inSess(macro2)
+inNYopen     = not na(time(timeframe.period, nyOpenSess, "America/New_York"))
+inParisCut   = not na(time(timeframe.period, parisCut,   "Europe/Paris"))
+inParisSoir  = not na(time(timeframe.period, parisSoir,  "Europe/Paris"))
+// Fenêtre 1 : de l'ouverture de New York jusqu'à 17 h à Paris.
+// Fenêtre 2 : 19 h → 21 h à Paris, soit la macro de l'après-midi à New York.
+inWallWindow = (inNYopen and inParisCut) or inParisSoir
+inEOD   = inSess(eodSess)
+inWindow = not useWindow or (time >= startDate and time <= endDate)
+
+// --- Extrêmes de session
+var float asiaH = na, asiaL = na, lonH = na, lonL = na, amH = na, amL = na
+if inAsia and not inAsia[1]
+    asiaH := high
+    asiaL := low
+else if inAsia
+    asiaH := math.max(nz(asiaH, high), high)
+    asiaL := math.min(nz(asiaL, low), low)
+if inLon and not inLon[1]
+    lonH := high
+    lonL := low
+else if inLon
+    lonH := math.max(nz(lonH, high), high)
+    lonL := math.min(nz(lonL, low), low)
+if inAM and not inAM[1]
+    amH := high
+    amL := low
+else if inAM
+    amH := math.max(nz(amH, high), high)
+    amL := math.min(nz(amL, low), low)
+
+// --- PDH / PDL : jour PRÉCÉDENT, donc figé (anti-repaint)
+pdh = request.security(syminfo.tickerid, "D", high[1], lookahead = barmerge.lookahead_off)
+pdl = request.security(syminfo.tickerid, "D", low[1],  lookahead = barmerge.lookahead_off)
+
+// --- Swings confirmés (décalés de pivLen)
+phv = ta.pivothigh(high, pivLen, pivLen)
+plv = ta.pivotlow(low,  pivLen, pivLen)
+var float sH1 = na, sH2 = na, sL1 = na, sL2 = na
+if not na(phv)
+    sH2 := sH1
+    sH1 := phv
+if not na(plv)
+    sL2 := sL1
+    sL1 := plv
+
+eqTolAbs = close * eqTolPct / 100.0
+hasEqH = not na(sH1) and not na(sH2) and math.abs(sH1 - sH2) <= eqTolAbs
+hasEqL = not na(sL1) and not na(sL2) and math.abs(sL1 - sL2) <= eqTolAbs
+
+// ============================== FVG (CIBLES) =================================
+type Fvg
+    float top
+    float bot
+    bool  bull
+    int   born
+    bool  active
+
+var array<Fvg> fvgs = array.new<Fvg>()
+fvgMinAbs  = close * fvgMinPct / 100.0
+newBullFvg = low > high[2] and (low - high[2]) >= fvgMinAbs
+newBearFvg = high < low[2] and (low[2] - high) >= fvgMinAbs
+
+if barstate.isconfirmed
+    if newBullFvg
+        array.push(fvgs, Fvg.new(low, high[2], true, bar_index, true))
+    if newBearFvg
+        array.push(fvgs, Fvg.new(low[2], high, false, bar_index, true))
+
+if array.size(fvgs) > 0
+    for i = array.size(fvgs) - 1 to 0
+        f = array.get(fvgs, i)
+        if f.active
+            touched = low <= f.top and high >= f.bot
+            filled  = f.bull ? low <= f.bot : high >= f.top
+            if (mitigMode == "Complète (gap rempli)" ? filled : touched)
+                f.active := false
+            if bar_index - f.born > fvgMaxAge
+                f.active := false
+            array.set(fvgs, i, f)
+
+f_drawAbove() =>
+    float best = na
+    if array.size(fvgs) > 0
+        for i = 0 to array.size(fvgs) - 1
+            f = array.get(fvgs, i)
+            if f.active
+                mid = (f.top + f.bot) / 2.0
+                if mid > close and (na(best) or mid < best)
+                    best := mid
+    best
+f_drawBelow() =>
+    float best = na
+    if array.size(fvgs) > 0
+        for i = 0 to array.size(fvgs) - 1
+            f = array.get(fvgs, i)
+            if f.active
+                mid = (f.top + f.bot) / 2.0
+                if mid < close and (na(best) or mid > best)
+                    best := mid
+    best
+
+drawUp   = f_drawAbove()    // cible d'un LONG
+drawDown = f_drawBelow()    // cible d'un SHORT
+
+// Liquidité externe (destination du runner)
+extUp   = na(pdh) ? sH1 : math.max(nz(pdh, sH1), nz(sH1, pdh))
+extDown = na(pdl) ? sL1 : math.min(nz(pdl, sL1), nz(sL1, pdl))
+
+// ============================== SWEEP DE LIQUIDITÉ ===========================
+tolAbs = close * sweepTolPct / 100.0
+f_tookLiqBelow(float px) =>
+    bool hit = false
+    if usePDHL and not na(pdl) and px <= pdl + tolAbs
+        hit := true
+    if useSess and ((not na(asiaL) and px <= asiaL + tolAbs) or (not na(lonL) and px <= lonL + tolAbs) or (not na(amL) and px <= amL + tolAbs))
+        hit := true
+    if useSwings and not na(sL2) and px <= sL2 + tolAbs
+        hit := true
+    if useEqual and hasEqL and not na(sL1) and px <= sL1 + tolAbs
+        hit := true
+    hit
+f_tookLiqAbove(float px) =>
+    bool hit = false
+    if usePDHL and not na(pdh) and px >= pdh - tolAbs
+        hit := true
+    if useSess and ((not na(asiaH) and px >= asiaH - tolAbs) or (not na(lonH) and px >= lonH - tolAbs) or (not na(amH) and px >= amH - tolAbs))
+        hit := true
+    if useSwings and not na(sH2) and px >= sH2 - tolAbs
+        hit := true
+    if useEqual and hasEqH and not na(sH1) and px >= sH1 - tolAbs
+        hit := true
+    hit
+
+// ====================== STRUCTURE DU SETUP ===================================
+var bool  longArmed = false, shortArmed = false
+var float sweepLow  = na,    sweepHigh  = na
+var int   armedBar  = na
+
+if not na(plv)
+    isLowerLow = not na(sL2) and plv < sL2
+    if isLowerLow and f_tookLiqBelow(plv) and not na(sH1)
+        longArmed  := true
+        shortArmed := false
+        sweepLow   := plv
+        armedBar   := bar_index
+if not na(phv)
+    isHigherHigh = not na(sH2) and phv > sH2
+    if isHigherHigh and f_tookLiqAbove(phv) and not na(sL1)
+        shortArmed := true
+        longArmed  := false
+        sweepHigh  := phv
+        armedBar   := bar_index
+
+if not na(armedBar) and bar_index - armedBar > setupExpiry
+    longArmed  := false
+    shortArmed := false
+
+// ====================== INVERSION (4 modes) ==================================
+body        = math.abs(close - open)
+hasDisp     = body > atr14 * dispMult
+highestOpen = ta.highest(open, cisdLook)
+lowestOpen  = ta.lowest(open,  cisdLook)
+
+invBull = switch invMode
+    "CISD (clôture au-delà des opens)" => close > highestOpen[1] and close > open
+    "MSS (cassure du dernier swing)"   => not na(sH1) and close > sH1
+    "Engulfing + displacement"         => close > open and close > high[1] and hasDisp
+    => newBullFvg
+
+invBear = switch invMode
+    "CISD (clôture au-delà des opens)" => close < lowestOpen[1] and close < open
+    "MSS (cassure du dernier swing)"   => not na(sL1) and close < sL1
+    "Engulfing + displacement"         => close < open and close < low[1] and hasDisp
+    => newBearFvg
+
+// ====================== SMT ==================================================
+corrH = request.security(smtSym, timeframe.period, high, lookahead = barmerge.lookahead_off)
+corrL = request.security(smtSym, timeframe.period, low,  lookahead = barmerge.lookahead_off)
+selfHH = high >= ta.highest(high, smtLen)
+selfLL = low  <= ta.lowest(low,  smtLen)
+corrHH = not na(corrH) and corrH >= ta.highest(corrH, smtLen)
+corrLL = not na(corrL) and corrL <= ta.lowest(corrL, smtLen)
+smtBear = selfHH and not corrHH
+smtBull = selfLL and not corrLL
+blockLong  = useSMT and smtBear
+blockShort = useSMT and smtBull
+
+// ====================== LIMITES JOURNALIÈRES =================================
+var int tradesToday = 0, lossesToday = 0
+var int lastClosed  = 0
+newDay = ta.change(time("D")) != 0
+if newDay
+    tradesToday := 0
+    lossesToday := 0
+// compte les pertes réellement réalisées (et pas les BE)
+if strategy.closedtrades > lastClosed
+    for i = lastClosed to strategy.closedtrades - 1
+        if strategy.closedtrades.profit(i) < 0
+            lossesToday += 1
+    lastClosed := strategy.closedtrades
+limitOK = tradesToday < maxTrades and lossesToday < maxLosses
+
+// ====================== CONDITIONS FINALES ===================================
+macroOK = (not useMacro or inMacro) and (not useWallSt or inWallWindow)
+buf     = close * slBufPct / 100.0
+flat    = strategy.position_size == 0
+
+longSL    = nz(sweepLow, low) - buf
+shortSL   = nz(sweepHigh, high) + buf
+longRisk  = close - longSL
+shortRisk = shortSL - close
+longRR    = longRisk  > 0 and not na(drawUp)   ? (drawUp - close)   / longRisk  : 0.0
+shortRR   = shortRisk > 0 and not na(drawDown) ? (close - drawDown) / shortRisk : 0.0
+
+VALID_LONG  = longArmed  and invBull and not na(drawUp)   and not blockLong  and macroOK and limitOK and longRR  >= minRR and inWindow and flat and barstate.isconfirmed
+VALID_SHORT = shortArmed and invBear and not na(drawDown) and not blockShort and macroOK and limitOK and shortRR >= minRR and inWindow and flat and barstate.isconfirmed
+
+NO_TRADE_REASON = not (longArmed or shortArmed) ? "Pas de structure + sweep" :
+     not (invBull or invBear) ? "Pas d'inversion confirmée" :
+     (longArmed and na(drawUp)) or (shortArmed and na(drawDown)) ? "Aucun FVG non mitigé comme cible" :
+     (blockLong or blockShort) ? "SMT à contre-sens" :
+     not (not useWallSt or inWallWindow) ? "Hors fenêtres (WS→17 h / 19 h→21 h Paris)" :
+     not macroOK ? "Hors fenêtre macro" :
+     not limitOK ? "Limite journalière atteinte" :
+     (longArmed and longRR < minRR) or (shortArmed and shortRR < minRR) ? "RR insuffisant" : "OK"
+
+// ====================== TAILLE DE POSITION ===================================
+// Risque $ = capital courant × risque %. Taille = risque $ / (distance SL × valeur du point).
+f_qty(float entry, float stop) =>
+    float d = math.abs(entry - stop)
+    float q = 0.0
+    if d > 0 and ptValue > 0
+        riskCash = strategy.equity * riskPct / 100.0
+        q := riskCash / (d * ptValue)
+        q := math.floor(q / qtyStep) * qtyStep      // on ARRONDIT VERS LE BAS (jamais plus de risque que prévu)
+        q := q < minQty ? 0.0 : q
+    q
+
+// ====================== ORDRES ===============================================
+var float ePx = na, eSL0 = na, eTP = na, eRunner = na
+var bool  beDone = false
+
+if VALID_LONG
+    ePx     := close
+    eSL0    := longSL
+    eTP     := drawUp
+    eRunner := nz(extUp, drawUp)
+    beDone  := false
+    q = f_qty(ePx, eSL0)
+    if q > 0
+        strategy.entry("L", strategy.long, qty = q, comment = "MECH LONG")
+        tradesToday += 1
+        longArmed := false
+
+if VALID_SHORT
+    ePx     := close
+    eSL0    := shortSL
+    eTP     := drawDown
+    eRunner := nz(extDown, drawDown)
+    beDone  := false
+    q = f_qty(ePx, eSL0)
+    if q > 0
+        strategy.entry("S", strategy.short, qty = q, comment = "MECH SHORT")
+        tradesToday += 1
+        shortArmed := false
+
+// --- Gestion en position : BE à 1R, partielle sur le FVG, runner ------------
+var float curSL = na
+if strategy.position_size != 0
+    r0 = math.abs(ePx - eSL0)
+    isL = strategy.position_size > 0
+    curSL := na(curSL) ? eSL0 : curSL
+    // Break-even à +beAtR
+    if useBE and not beDone and r0 > 0
+        reached = isL ? high >= ePx + r0 * beAtR : low <= ePx - r0 * beAtR
+        if reached
+            curSL  := ePx
+            beDone := true
+    // Sortie partielle sur la CIBLE (le FVG choisi avant l'entrée)
+    if usePartial
+        strategy.exit(isL ? "TP1-L" : "TP1-S", from_entry = isL ? "L" : "S",
+             qty_percent = partPct, limit = eTP, stop = curSL,
+             comment_profit = "FVG cible", comment_loss = beDone ? "BE" : "SL")
+    // Reste de la position : runner vers la liquidité externe (ou la cible si runner off)
+    finalTP = useRunner and not na(eRunner) ? eRunner : eTP
+    strategy.exit(isL ? "EXIT-L" : "EXIT-S", from_entry = isL ? "L" : "S",
+         limit = finalTP, stop = curSL,
+         comment_profit = useRunner ? "Liquidité externe" : "FVG cible",
+         comment_loss = beDone ? "BE" : "SL")
+else
+    curSL := na
+    beDone := false
+
+// Clôture forcée en fin de journée (pas d'overnight sur un modèle intraday)
+if flatEOD and inEOD and strategy.position_size != 0
+    strategy.close_all(comment = "EOD")
+
+// ====================== STATISTIQUES =========================================
+f_wins() =>
+    int w = 0
+    if strategy.closedtrades > 0
+        for i = 0 to strategy.closedtrades - 1
+            if strategy.closedtrades.profit(i) > 0
+                w += 1
+    w
+nTr   = strategy.closedtrades
+nWin  = f_wins()
+nLoss = nTr - nWin
+wr    = nTr > 0 ? nWin / nTr * 100.0 : 0.0
+avgW  = nWin  > 0 ? strategy.grossprofit / nWin  : 0.0
+avgL  = nLoss > 0 ? strategy.grossloss   / nLoss : 0.0
+// ESPÉRANCE en $ par trade : c'est CE chiffre qui dit si le modèle gagne.
+expectancy = nTr > 0 ? (wr / 100.0) * avgW - (1 - wr / 100.0) * avgL : 0.0
+pf   = strategy.grossloss > 0 ? strategy.grossprofit / strategy.grossloss : na
+ddPct = strategy.initial_capital > 0 ? strategy.max_drawdown / strategy.initial_capital * 100.0 : na
+// Win rate d'équilibre : en dessous, le RR moyen ne suffit plus.
+rrAvg = avgL > 0 ? avgW / avgL : na
+beWR  = not na(rrAvg) ? 100.0 / (1.0 + rrAvg) : na
+// Fiabilité de l'échantillon (anti-surapprentissage)
+fiab = nTr < 20 ? "Trop tôt (<20)" : nTr < 50 ? "Indicatif (20-50)" : "Significatif (50+)"
+
+// ====================== AFFICHAGE ============================================
+plot(showLiq ? pdh : na, "PDH", color.new(color.orange, 0), 1, plot.style_linebr)
+plot(showLiq ? pdl : na, "PDL", color.new(color.orange, 0), 1, plot.style_linebr)
+
+if showFvg and barstate.islast and array.size(fvgs) > 0
+    for i = 0 to array.size(fvgs) - 1
+        f = array.get(fvgs, i)
+        if f.active
+            box.new(f.born, f.top, bar_index + 3, f.bot,
+                 border_color = color.new(f.bull ? color.green : color.red, 65),
+                 bgcolor = color.new(f.bull ? color.green : color.red, 90))
+
+plotshape(VALID_LONG,  "LONG",  shape.labelup,   location.belowbar, color.new(color.green, 0), text = "🟢", size = size.tiny)
+plotshape(VALID_SHORT, "SHORT", shape.labeldown, location.abovebar, color.new(color.red, 0),   text = "🔴", size = size.tiny)
+
+ok(bool c) => c ? "✅" : "❌"
+if showTable and barstate.islast
+    var table t = table.new(position.top_right, 2, 14, border_width = 1)
+    table.cell(t, 0, 0,  "MECH — BACKTEST", bgcolor = color.new(color.blue, 70), text_color = color.white)
+    table.cell(t, 1, 0,  fiab,              bgcolor = color.new(color.blue, 70), text_color = color.white)
+    table.cell(t, 0, 1,  "Structure+Sweep"); table.cell(t, 1, 1, ok(longArmed or shortArmed))
+    table.cell(t, 0, 2,  "Inversion");       table.cell(t, 1, 2, ok(invBull or invBear))
+    table.cell(t, 0, 3,  "FVG cible");       table.cell(t, 1, 3, ok(not na(drawUp) or not na(drawDown)))
+    table.cell(t, 0, 4,  "SMT OK");          table.cell(t, 1, 4, ok(not blockLong and not blockShort))
+    table.cell(t, 0, 5,  "Statut");          table.cell(t, 1, 5, strategy.position_size != 0 ? "EN POSITION" : NO_TRADE_REASON)
+    table.cell(t, 0, 6,  "Trades");          table.cell(t, 1, 6, str.tostring(nTr))
+    table.cell(t, 0, 7,  "Win rate");        table.cell(t, 1, 7, str.tostring(wr, "#.#") + " %")
+    table.cell(t, 0, 8,  "WR d'équilibre");  table.cell(t, 1, 8, na(beWR) ? "—" : str.tostring(beWR, "#.#") + " %")
+    table.cell(t, 0, 9,  "Gain moy.");       table.cell(t, 1, 9, str.tostring(avgW, "#.##"))
+    table.cell(t, 0, 10, "Perte moy.");      table.cell(t, 1, 10, str.tostring(avgL, "#.##"))
+    table.cell(t, 0, 11, "ESPÉRANCE / trade", bgcolor = color.new(expectancy > 0 ? color.green : color.red, 70), text_color = color.white)
+    table.cell(t, 1, 11, str.tostring(expectancy, "#.##"),        bgcolor = color.new(expectancy > 0 ? color.green : color.red, 70), text_color = color.white)
+    table.cell(t, 0, 12, "Profit factor");   table.cell(t, 1, 12, na(pf) ? "—" : str.tostring(pf, "#.##"))
+    table.cell(t, 0, 13, "Max drawdown");    table.cell(t, 1, 13, na(ddPct) ? "—" : str.tostring(ddPct, "#.#") + " %")
+
+// ====================== ALERTES ==============================================
+if VALID_LONG or VALID_SHORT
+    alert(syminfo.ticker + " | MECH " + (VALID_LONG ? "LONG" : "SHORT") +
+         " | Entrée " + str.tostring(close, format.mintick) +
+         " | SL " + str.tostring(VALID_LONG ? longSL : shortSL, format.mintick) +
+         " | TP " + str.tostring(VALID_LONG ? drawUp : drawDown, format.mintick) +
+         " | RR " + str.tostring(VALID_LONG ? longRR : shortRR, "#.##"), alert.freq_once_per_bar_close)
+
+// ====================== ANTI-REPAINT =========================================
+// 1) request.security(...) : lookahead = barmerge.lookahead_off partout.
+// 2) PDH/PDL pris sur la veille ([1]) : valeur définitivement figée.
+// 3) Swings via ta.pivothigh/pivotlow : confirmés après pivLen bougies.
+// 4) FVG enregistrés uniquement sur barstate.isconfirmed.
+// 5) Entrées conditionnées par barstate.isconfirmed + process_orders_on_close.
+// 6) calc_on_every_tick = false : pas de signal intra-bougie qui disparaît.
+// => Le backtest correspond à ce qui se serait produit en direct.
+//
+// LIMITE CONNUE : sur la même bougie, Pine ne sait pas si le SL ou le TP a été
+// touché en premier. Sur un modèle intraday, teste sur une timeframe plus fine
+// (ou coche "Recalculate on bar close" seulement) pour réduire cet effet.

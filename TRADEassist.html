@@ -1,0 +1,3015 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#161826">
+<meta name="description" content="TRADEassist — signaux MECH sur le Nasdaq 100 future.">
+<title>TRADEassist</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23161826'/><circle cx='16' cy='16' r='5' fill='%239184d9'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════════════════════
+   NOCTURNE — système de design fourni avec la maquette Méridien.
+   Fond sombre bleu-gris, JAMAIS de noir pur ni de blanc pur. Un seul accent,
+   utilisé en trait et en halo, jamais en aplat. L'élévation est une hairline
+   de 1 px, pas une pile d'ombres. Les titres ne dépassent jamais la graisse
+   500 : la hiérarchie se fait par la taille et l'espace.
+
+   Écart assumé n° 1 — vert/rouge. Nocturne est une palette mono et ne porte
+   aucune sémantique de gain/perte. La maquette ajoute #6cc0a0 et #dd7f8e, à
+   n'employer QUE sur des chiffres et des traits de 1 px, en aplat au plus à
+   16 % d'alpha.
+
+   Écart assumé n° 2 — le responsive. Le handoff dit « non conçu, cadre fixe
+   1440 px, terminal de bureau ». Ce site se consulte sur iPad et sur
+   téléphone : les règles de repli ci-dessous sont les miennes, pas celles du
+   designer.
+   ═══════════════════════════════════════════════════════════════════════ */
+:root{
+  --bg:#161826; --surface:#232532; --panel:rgba(35,37,50,.70);
+  --ink:#e9e9ed; --acc:#9184d9;
+  --a200:#e7e5fe; --a300:#d2cefd; --a400:#b5abfc; --a700:#5d5294; --a800:#423a6a;
+  --n400:#b2b6ca; --n500:#9397ab; --n600:#75798c; --n800:#3f424d; --n900:#292b31;
+  --gain:#6cc0a0; --loss:#dd7f8e;
+  --muted:rgba(233,233,237,.55); --dim:rgba(233,233,237,.42); --faint:rgba(233,233,237,.30);
+  --rule:rgba(233,233,237,.06); --rule2:rgba(233,233,237,.09); --div:rgba(233,233,237,.16);
+  --hair:0 0 0 1px var(--n800);
+  --r4:4px; --r6:6px; --r8:8px; --r14:14px; --pill:40px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{
+  background:var(--bg); color:var(--ink);
+  font:400 13.5px/1.5 Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+  min-height:100vh; overflow-x:hidden;
+}
+/* Les prix ne doivent jamais trembler quand ils tickent. */
+.mono,.num,input,table{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
+h1,h2,h3{font-weight:500;letter-spacing:-.02em}
+a{color:inherit}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-radius:2px}
+
+/* ── barre d'en-tête ─────────────────────────────────────────────────── */
+.top{
+  display:flex;align-items:center;gap:18px;padding:15px 26px;
+  border-bottom:1px solid var(--rule2);background:rgba(22,24,38,.92);
+  backdrop-filter:blur(8px);position:sticky;top:0;z-index:40;
+}
+.brand{display:flex;align-items:center;gap:9px;flex:none}
+.logo{
+  width:20px;height:20px;border-radius:var(--r6);display:grid;place-items:center;
+  box-shadow:inset 0 0 0 1px var(--acc);flex:none;
+}
+.logo i{width:7px;height:7px;border-radius:50%;background:var(--acc);
+  box-shadow:0 0 10px rgba(145,132,217,.7);display:block}
+.wm{font-size:16px;font-weight:600;letter-spacing:-.01em;white-space:nowrap}
+.wm span{color:var(--dim);font-weight:400;margin-left:6px}
+.nav{display:flex;gap:2px;flex:none}
+.nav a{
+  padding:6px 11px;border-radius:var(--r6);font-size:13px;color:var(--muted);
+  text-decoration:none;white-space:nowrap;transition:background .12s,color .12s;
+}
+.nav a:hover{color:var(--ink)}
+.nav a.on{background:rgba(145,132,217,.14);color:var(--a300)}
+.sp{flex:1 1 auto;min-width:0}
+.stats{display:flex;align-items:center;gap:20px;flex:none}
+.st{display:flex;flex-direction:column;gap:1px;line-height:1.25}
+.st b{font-size:13.5px;font-weight:600;letter-spacing:-.01em}
+.st i{font-size:10.5px;font-style:normal;color:var(--dim);text-transform:uppercase;letter-spacing:.09em}
+.st b.pos{color:var(--gain)} .st b.neg{color:var(--loss)}
+.btn{
+  padding:7px 15px;border-radius:var(--pill);background:transparent;cursor:pointer;
+  box-shadow:inset 0 0 0 1px var(--acc);color:var(--a300);font-size:12.5px;
+  border:0;white-space:nowrap;transition:background .12s;
+}
+.btn:hover{background:rgba(145,132,217,.14)}
+.btn.q{box-shadow:inset 0 0 0 1px var(--div);color:var(--muted)}
+.btn.q:hover{background:rgba(233,233,237,.05);color:var(--ink)}
+.btn.on{background:rgba(145,132,217,.16);color:var(--a200)}
+.btn[disabled]{opacity:.4;cursor:not-allowed}
+
+/* ── grille principale ───────────────────────────────────────────────── */
+.wrap{display:flex;align-items:stretch;min-height:calc(100vh - 53px)}
+.left{flex:1 1 auto;min-width:0;padding:22px 26px 28px;border-right:1px solid var(--rule2)}
+.right{flex:0 0 420px;width:420px;display:flex;flex-direction:column;gap:14px;padding:22px 22px 28px}
+
+.lede{display:flex;align-items:flex-end;gap:20px;margin-bottom:18px;flex-wrap:wrap}
+.eyebrow{font-size:11px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;color:var(--a400)}
+.lede h1{font-size:27px;margin-top:6px;max-width:22ch}
+.lede p{font-size:13.5px;color:var(--muted);max-width:44ch;margin-top:7px;text-wrap:pretty}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto}
+.chip{
+  padding:5px 12px;border-radius:var(--pill);font-size:11.5px;cursor:pointer;border:0;
+  background:transparent;box-shadow:inset 0 0 0 1px var(--div);color:var(--muted);
+  transition:background .12s,color .12s,box-shadow .12s;white-space:nowrap;
+}
+.chip:hover{color:var(--ink)}
+.chip.on{background:rgba(145,132,217,.16);box-shadow:inset 0 0 0 1px var(--acc);color:var(--a300)}
+
+/* ── le radar ────────────────────────────────────────────────────────── */
+.scope{position:relative;display:grid;place-items:center;min-height:420px}
+.scope::before{
+  content:"";position:absolute;width:min(470px,86%);aspect-ratio:1;border-radius:50%;
+  background:radial-gradient(circle,rgba(145,132,217,.20),transparent 68%);
+  filter:blur(12px);pointer-events:none;
+}
+#radar{display:block;max-width:100%;height:auto;position:relative}
+.ov{position:absolute;bottom:2px;font-size:11.5px;pointer-events:none}
+.ov.l{left:0}
+.ov.r{right:0;text-align:right}
+.lg{display:flex;align-items:center;gap:7px;color:var(--dim);margin-top:5px}
+.lg s{width:8px;height:8px;border-radius:2px;display:block;flex:none}
+.ov.r .k{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--dim)}
+.ov.r .v{font-size:22px;font-weight:600;letter-spacing:-.02em;margin-top:2px}
+.ov.r .s{font-size:12.5px;color:var(--muted)}
+
+/* ── tuiles par unité de temps ───────────────────────────────────────── */
+.tiles{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-top:22px}
+.tile{
+  padding:12px 13px;border-radius:var(--r8);
+  box-shadow:inset 0 0 0 1px rgba(145,132,217,.25);background:rgba(145,132,217,.07);
+}
+.tile.off{box-shadow:inset 0 0 0 1px rgba(233,233,237,.12);background:transparent}
+.tile.ret{box-shadow:inset 0 0 0 1px var(--acc);background:rgba(145,132,217,.16)}
+.tile k{display:block;font-size:11.5px;color:var(--muted);font-weight:400}
+.tile v{display:block;font-size:19px;font-weight:600;letter-spacing:-.02em;margin:3px 0 1px}
+.tile s{display:block;font-size:12px;color:var(--dim);text-decoration:none}
+.tile.off v{color:var(--faint)}
+
+/* ── panneaux ────────────────────────────────────────────────────────── */
+.pan{background:var(--panel);border-radius:var(--r14);box-shadow:var(--hair);overflow:hidden}
+.pan-h{display:flex;align-items:center;gap:10px;padding:13px 16px 11px;border-bottom:1px solid var(--rule)}
+.pan-h h2{font-size:11px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.tag{margin-left:auto;font-size:11px;font-weight:600;color:var(--dim);white-space:nowrap}
+.pan-b{padding:14px 16px}
+.empty{padding:20px 16px;color:var(--dim);font-size:12.5px;line-height:1.6}
+.empty b{display:block;color:var(--muted);font-weight:500;font-size:13.5px;margin-bottom:3px}
+.empty .hint{display:block;margin-top:7px;color:var(--faint);font-size:11.5px}
+
+/* ── état de séance ──────────────────────────────────────────────────── */
+.sess{padding:15px 16px}
+.sess-t{display:flex;align-items:center;gap:9px}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--n600);flex:none}
+.dot.on{background:var(--acc);box-shadow:0 0 10px rgba(145,132,217,.75);animation:br 2.2s ease-in-out infinite}
+@keyframes br{0%,100%{opacity:1}50%{opacity:.35}}
+.sess-t b{font-size:11.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase}
+.sess-t .tag{font-size:11px}
+.px{font-size:34px;font-weight:600;letter-spacing:-.03em;margin:9px 0 2px;line-height:1}
+.sess-s{font-size:12.5px;color:var(--muted)}
+.sess-w{
+  margin-top:12px;padding-top:12px;border-top:1px solid var(--rule);
+  font-size:12.5px;color:var(--dim);line-height:1.6;
+}
+.sess-w b{color:var(--a300);font-weight:500}
+.cd{font-size:19px;font-weight:600;letter-spacing:-.02em;color:var(--ink);display:block;margin-top:4px}
+
+/* ── la chaîne ───────────────────────────────────────────────────────── */
+.gauge{height:2px;background:rgba(233,233,237,.08)}
+.gauge i{display:block;height:100%;width:0;background:var(--acc);transition:width .4s ease;
+  box-shadow:0 0 8px rgba(145,132,217,.8)}
+.step{display:flex;align-items:flex-start;gap:11px;padding:11px 16px;border-top:1px solid var(--rule)}
+.step:first-child{border-top:0}
+.step::before{
+  content:"";width:7px;height:7px;border-radius:50%;flex:none;margin-top:5px;
+  background:transparent;box-shadow:inset 0 0 0 1px var(--n600);
+}
+.step.ok::before{background:var(--acc);box-shadow:0 0 9px rgba(145,132,217,.7)}
+.step.wait::before{box-shadow:inset 0 0 0 1px var(--acc);animation:br 2.2s ease-in-out infinite}
+.step-b{flex:1;min-width:0}
+.step-t{display:block;font-size:13px;font-weight:500}
+.step-d{display:block;font-size:12px;color:var(--dim);margin-top:2px;text-wrap:pretty}
+.step.ok .step-d{color:var(--muted)}
+.step-s{font-size:10.5px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--dim);flex:none;margin-top:3px}
+.step.ok .step-s{color:var(--a400)}
+
+/* ── la position ─────────────────────────────────────────────────────── */
+.trade{padding:15px 16px}
+.t-head{display:flex;align-items:center;gap:9px;margin-bottom:13px}
+.t-dir{font-size:11px;font-weight:600;letter-spacing:.1em;padding:3px 9px;border-radius:var(--pill)}
+.t-dir.long{color:var(--gain);background:rgba(108,192,160,.16)}
+.t-dir.short{color:var(--loss);background:rgba(221,127,142,.16)}
+.t-tf,.t-rr{font-size:11.5px;color:var(--dim)}
+.t-rr{margin-left:auto;font-weight:600;color:var(--muted)}
+.t-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--rule);
+  border-radius:var(--r8);overflow:hidden}
+.t-cell{background:var(--bg);padding:11px 13px}
+.t-k{font-size:10.5px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--dim)}
+.t-v{font-size:18px;font-weight:600;letter-spacing:-.02em;margin-top:3px}
+.t-v.sl{color:var(--loss)} .t-v.tp{color:var(--gain)}
+.t-sub{font-size:11px;color:var(--dim);margin-top:2px}
+.t-why{font-size:12px;color:var(--dim);margin-top:11px;line-height:1.6;text-wrap:pretty}
+
+/* ── bilan + journal ─────────────────────────────────────────────────── */
+.bilan{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--rule)}
+.bilan>div{background:var(--panel);padding:11px 14px}
+.bk{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bv{font-size:17px;font-weight:600;letter-spacing:-.02em;margin-top:3px;white-space:nowrap}
+.bv.pos{color:var(--gain)} .bv.neg{color:var(--loss)}
+.bsub{font-size:11px;font-weight:400;color:var(--dim)}
+.jr{display:grid;grid-template-columns:auto auto 1fr auto;gap:3px 9px;align-items:baseline;
+  padding:10px 16px;border-top:1px solid var(--rule);font-size:12px}
+.jr-d{color:var(--faint);font-size:11px}
+.jr-s{font-size:10.5px;font-weight:600;letter-spacing:.08em}
+.jr-s.long{color:var(--gain)} .jr-s.short{color:var(--loss)}
+.jr-p{grid-column:1/-1;color:var(--dim);font-size:11.5px;min-width:0}
+.jr-r{text-align:right;line-height:1.3;white-space:nowrap}
+.jv{display:block;font-size:11.5px;font-weight:500}
+.jn{display:block;font-size:11px;color:var(--dim)}
+.jr-r.pos .jv{color:var(--gain)} .jr-r.neg .jv{color:var(--loss)} .jr-r.open .jv{color:var(--a400)}
+
+.jfilters{display:flex;gap:6px;padding:11px 16px;border-bottom:1px solid var(--rule)}
+.jfilters .chip{padding:4px 10px;font-size:11px}
+#journal{max-height:360px;overflow-y:auto;overscroll-behavior:contain}
+.jr-t{font-size:9.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--faint);box-shadow:inset 0 0 0 1px var(--div);border-radius:3px;padding:1px 5px}
+.note{padding:11px 16px;font-size:11.5px;color:var(--dim);line-height:1.6;
+  border-top:1px solid var(--rule)}
+.note b{color:var(--a300);font-weight:500}
+
+/* ── réglages ────────────────────────────────────────────────────────── */
+#settings{display:none}
+#settings.open{display:block}
+.fld{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;
+  padding:10px 16px;border-top:1px solid var(--rule)}
+.fld label{font-size:12.5px;color:var(--muted)}
+.fld input,.fld select{
+  background:var(--bg);border:0;box-shadow:inset 0 0 0 1px var(--div);border-radius:var(--r6);
+  padding:6px 10px;font-size:12.5px;width:170px;max-width:46vw;
+}
+.fld input:focus,.fld select:focus{box-shadow:inset 0 0 0 1px var(--acc)}
+.acts{display:flex;gap:8px;flex-wrap:wrap;padding:13px 16px;border-top:1px solid var(--rule)}
+.msg{padding:0 16px 14px;font-size:11.5px;color:var(--dim);line-height:1.6}
+.msg b{color:var(--a300);font-weight:500}
+.foot{padding:14px 26px 26px;font-size:11.5px;color:var(--faint);
+  border-top:1px solid var(--rule2);line-height:1.7}
+
+/* ── repli — écart assumé, voir l'en-tête ────────────────────────────── */
+@media (max-width:1180px){
+  .top{gap:12px}
+  .stats{gap:14px}
+  .wrap{flex-direction:column}
+  .left{border-right:0;border-bottom:1px solid var(--rule2)}
+  .right{flex:1 1 auto;width:auto;padding:18px 22px 26px}
+  .tiles{grid-template-columns:repeat(3,1fr)}
+}
+@media (max-width:720px){
+  .top{padding:12px 16px;gap:12px;flex-wrap:wrap}
+  .sp{display:none}
+  .nav{order:3;width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .stats{gap:14px;margin-left:auto}
+  .st i{display:none}
+  .left{padding:18px 16px 22px}
+  .right{padding:16px 16px 24px}
+  .lede h1{font-size:22px}
+  .chips{margin-left:0;width:100%}
+  .tiles{grid-template-columns:repeat(2,1fr)}
+  .scope{min-height:320px}
+  .px{font-size:28px}
+  .bilan{grid-template-columns:repeat(2,1fr)}
+  .jr{grid-template-columns:auto auto 1fr;row-gap:3px}
+  .jr-r{grid-column:1/-1;text-align:left;display:flex;gap:8px;align-items:baseline}
+  .foot{padding:14px 16px 24px}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.01ms!important;transition-duration:.01ms!important}
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <span class="logo"><i></i></span>
+    <span class="wm">TRADEassist<span>MECH</span></span>
+  </div>
+  <nav class="nav">
+    <a href="#scope" class="on">Radar</a>
+    <a href="#pan-chain">Chaîne</a>
+    <a href="#pan-journal">Historique</a>
+    <a href="#settings" id="n-set">Réglages</a>
+  </nav>
+  <span class="sp"></span>
+  <div class="stats">
+    <div class="st"><i>Nasdaq 100</i><b class="mono" id="px-top">—</b></div>
+    <div class="st"><i>Capital</i><b class="mono" id="cap-top">—</b></div>
+    <div class="st"><i>Cumulé</i><b class="mono" id="pnl-top">—</b></div>
+  </div>
+  <button class="btn" id="b-alert" title="Activer les alertes">Alertes</button>
+</header>
+
+<div class="wrap">
+
+  <!-- ── colonne gauche : le balayage ──────────────────────────────── -->
+  <main class="left">
+    <div class="lede">
+      <div>
+        <div class="eyebrow" id="tf-tag">09 h 30 – 10 h 00 NY</div>
+        <h1>Où se forme le signal</h1>
+        <p>Chaque point est un niveau clé encore valide dans le sens du biais.
+           Le rayon est sa distance au prix : plus il est proche du centre,
+           plus le prix en est près.</p>
+      </div>
+      <div class="chips" id="chips"></div>
+    </div>
+
+    <section class="scope" id="scope">
+      <canvas id="radar" width="620" height="560"
+              aria-label="Niveaux clés valides par unité de temps"></canvas>
+      <div class="ov l">
+        <div class="lg"><s style="background:#d2cefd"></s>Balayé à l’instant</div>
+        <div class="lg"><s style="background:rgba(145,132,217,.5)"></s>Rayon = distance au prix</div>
+        <div class="lg"><s style="background:rgba(233,233,237,.25)"></s>Angle = unité de temps</div>
+      </div>
+      <div class="ov r">
+        <div class="k">Le plus proche</div>
+        <div class="v mono" id="near-v">—</div>
+        <div class="s" id="near-s">en attente des bougies</div>
+      </div>
+    </section>
+
+    <div class="tiles" id="tfs"></div>
+  </main>
+
+  <!-- ── colonne droite : l’état, la position, le journal ──────────── -->
+  <aside class="right">
+
+    <section class="pan">
+      <div class="sess">
+        <div class="sess-t">
+          <span class="dot" id="sdot"></span>
+          <b id="stxt">Séance</b>
+          <span class="tag mono" id="age">—</span>
+        </div>
+        <div class="px mono" id="px">—</div>
+        <div class="sess-s" id="chg">Nasdaq 100 future · NQ</div>
+        <div class="sess-w" id="sess-why"></div>
+      </div>
+    </section>
+
+    <section class="pan" id="pan-trade">
+      <div id="trade"></div>
+    </section>
+
+    <section class="pan" id="pan-chain">
+      <div class="pan-h"><h2>La chaîne</h2><span class="tag" id="chain-tag">—</span></div>
+      <div class="gauge"><i id="gauge"></i></div>
+      <div id="chain"></div>
+    </section>
+
+    <section class="pan" id="pan-journal">
+      <div class="pan-h"><h2>Historique</h2><span class="tag" id="j-tag">—</span></div>
+      <div class="jfilters" id="jchips"></div>
+      <div id="bilan"></div>
+      <div id="journal"></div>
+    </section>
+
+    <section class="pan" id="settings">
+      <div class="pan-h"><h2>Réglages</h2></div>
+      <div class="fld"><label for="c-capital">Capital</label>
+        <input id="c-capital" type="number" min="100" step="100" class="mono"></div>
+      <div class="fld"><label for="c-devise">Devise</label>
+        <select id="c-devise"><option value="EUR">EUR</option><option value="USD">USD</option></select></div>
+      <div class="fld"><label for="c-risque">Risque par position (%)</label>
+        <input id="c-risque" type="number" min="0.05" max="5" step="0.05" class="mono"></div>
+      <div class="fld"><label for="c-contrat">Contrat</label>
+        <select id="c-contrat"><option value="MNQ">MNQ (micro)</option><option value="NQ">NQ (plein)</option></select></div>
+      <div class="msg" id="c-msg"></div>
+      <div class="fld"><label for="tok">Jeton OANDA (temps réel)</label>
+        <input id="tok" type="password" autocomplete="off" spellcheck="false"
+               placeholder="xxxxxxxx-xxxxxxxxxxxxxxxx"></div>
+      <div class="acts">
+        <button class="btn" id="b-save">Enregistrer</button>
+        <button class="btn q" id="b-clear">Retirer</button>
+        <button class="btn q" id="b-corr">Vérifier la corrélation</button>
+        <button class="btn q" id="b-reset">Vider le journal</button>
+      </div>
+      <div class="msg" id="setmsg">
+        Le jeton reste dans ce navigateur. Sans lui, les bougies viennent de
+        Yahoo avec environ dix minutes de retard.
+      </div>
+    </section>
+
+  </aside>
+</div>
+
+<footer class="foot">
+  NQ seul · bougies 5 min · fenêtre 09 h 30 → 10 h 00 à New York.
+  Mesuré du 13 juillet au 18 septembre : 55 signaux, 80,0 % de réussite, +0,184 R par signal
+  net de frais, profit factor 1,90.
+  Le seuil d’équilibre est de 68 % — la marge n’est que de douze points, et l’avantage ne se
+  retrouve ni sur l’ES ni sur une autre unité d’exécution. Aucun ordre n’est passé : ce site
+  signale, il n’exécute pas.
+</footer>
+<script>
+'use strict';
+/**
+ * FLUX TEMPS RÉEL PAR CFD — OANDA (compte démo gratuit)
+ *
+ * POURQUOI. Yahoo sert le NQ avec environ 10 minutes de retard : mesuré, pas
+ * supposé. Les indices QQQ et ^NDX sont bien en temps réel mais ne le
+ * remplacent pas — corrélation des variations en 5 min de 0,92 et 0,91, et
+ * l'avantage de la stratégie tombe de +0,262 R à +0,013 R puis −0,075 R.
+ *
+ * Un CFD « NAS100 » est différent : il n'est pas calculé sur l'indice cash, il
+ * est dérivé du FUTURE lui-même et coté 23 h sur 24. Il devrait donc suivre le
+ * NQ de bien plus près. « Devrait » : le module fournit `correlation()` pour le
+ * VÉRIFIER au lieu de le croire, en comparant au NQ de Yahoo.
+ *
+ * SÉCURITÉ. L'API d'OANDA autorise l'appel direct depuis le navigateur — elle
+ * renvoie `access-control-allow-origin` et accepte l'en-tête `Authorization`.
+ * Aucun relais tiers n'est utilisé : le jeton ne transite par personne d'autre
+ * qu'OANDA. Il reste dans le localStorage du navigateur et n'est jamais écrit
+ * dans le dépôt.
+ *
+ * Utiliser un compte PRATIQUE (démo). Le jeton d'un compte réel n'a rien à
+ * faire dans un navigateur.
+ */
+var CFD = (function () {
+
+  var API = 'https://api-fxpractice.oanda.com/v3';
+  var CLE = 'cfd.oanda.token';
+  var INSTR = 'NAS100_USD';
+  // Correspondance avec les symboles Yahoo utilisés par le reste du site.
+  // Le S&P est gardé : c'est lui qui sert à la divergence SMT.
+  var MAP = { 'NQ=F': 'NAS100_USD', 'ES=F': 'SPX500_USD' };
+
+  function token()      { try { return localStorage.getItem(CLE) || ''; } catch (e) { return ''; } }
+  function setToken(t)  { try { localStorage.setItem(CLE, (t || '').trim()); } catch (e) {} }
+  function actif()      { return !!token(); }
+
+  // OANDA : M1, M2, M5, M15, M30, H1, H4, D
+  var GRAN = { '1m': 'M1', '2m': 'M2', '5m': 'M5', '15m': 'M15', '30m': 'M30',
+               '60m': 'H1', '1h': 'H1', '4h': 'H4', '1d': 'D' };
+
+  /**
+   * Bougies OHLC, au même format que le reste du site : { t, o, h, l, c }.
+   * @param interval clé de GRAN
+   * @param count    nombre de bougies (max 5000 chez OANDA)
+   */
+  function candles(interval, count, sym) {
+    var tk = token();
+    if (!tk || typeof fetch === 'undefined') return Promise.resolve(null);
+    var inst = sym ? MAP[sym] : INSTR;
+    if (!inst) return Promise.resolve(null);          // symbole sans équivalent CFD
+    var g = GRAN[interval] || 'M5';
+    var u = API + '/instruments/' + inst + '/candles?granularity=' + g +
+            '&count=' + (count || 500) + '&price=M';
+    return fetch(u, { headers: { 'Authorization': 'Bearer ' + tk,
+                                 'Accept-Datetime-Format': 'UNIX' } })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (j) {
+        if (!j || !j.candles) return null;
+        var out = [];
+        j.candles.forEach(function (c) {
+          // `complete: false` = bougie en cours. On l'écarte : toutes les
+          // décisions du modèle se prennent sur clôture.
+          if (!c.complete || !c.mid) return;
+          out.push({ t: Math.round(parseFloat(c.time) * 1000),
+                     o: +c.mid.o, h: +c.mid.h, l: +c.mid.l, c: +c.mid.c });
+        });
+        return out.length ? out : null;
+      })
+      .catch(function () { return null; });
+  }
+
+  /** Âge de la dernière bougie close, en minutes. */
+  function fraicheur(cs) {
+    if (!cs || !cs.length) return null;
+    return Math.round((Date.now() - cs[cs.length - 1].t) / 60000);
+  }
+
+  /**
+   * Corrélation des VARIATIONS entre le CFD et le NQ de Yahoo, sur les bougies
+   * de même horodatage. C'est la mesure qui décide si ce flux est utilisable :
+   * QQQ donnait 0,924 et ce n'était pas assez.
+   * @return { n, r, ratio } ou null
+   */
+  function correlation(cfdCs, nqCs) {
+    if (!cfdCs || !nqCs) return null;
+    var m = {}; nqCs.forEach(function (x) { m[x.t] = x.c; });
+    var pa = [], pb = [];
+    cfdCs.forEach(function (x) { if (m[x.t] != null) { pa.push(x.c); pb.push(m[x.t]); } });
+    if (pa.length < 30) return null;
+    var ra = [], rb = [];
+    for (var i = 1; i < pa.length; i++) { ra.push(pa[i] / pa[i - 1] - 1); rb.push(pb[i] / pb[i - 1] - 1); }
+    var moy = function (v) { return v.reduce(function (a, b) { return a + b; }, 0) / v.length; };
+    var ma = moy(ra), mb = moy(rb), cov = 0, sa = 0, sb = 0;
+    for (var k = 0; k < ra.length; k++) {
+      cov += (ra[k] - ma) * (rb[k] - mb); sa += Math.pow(ra[k] - ma, 2); sb += Math.pow(rb[k] - mb, 2);
+    }
+    var r = (sa > 0 && sb > 0) ? cov / Math.sqrt(sa * sb) : null;
+    return { n: pa.length, r: r,
+             ratio: pb[pb.length - 1] / pa[pa.length - 1] };   // NQ / CFD : la base
+  }
+
+  /** Vérifie que le jeton fonctionne et renvoie un diagnostic lisible. */
+  function tester() {
+    if (!actif()) return Promise.resolve({ ok: false, msg: 'Aucun jeton enregistré.' });
+    return candles('5m', 60).then(function (cs) {
+      if (!cs) return { ok: false, msg: 'Jeton refusé ou instrument indisponible.' };
+      var age = fraicheur(cs);
+      return { ok: true, n: cs.length, age: age, prix: cs[cs.length - 1].c,
+               msg: cs.length + ' bougies · dernière close il y a ' + age + ' min · ' + cs[cs.length - 1].c };
+    });
+  }
+
+  return { actif: actif, token: token, setToken: setToken, candles: candles,
+           fraicheur: fraicheur, correlation: correlation, tester: tester,
+           INSTR: INSTR, MAP: MAP };
+})();
+if (typeof window !== 'undefined') window.CFD = CFD;
+
+</script>
+<script>
+/*
+ * nq.js — MECH MODEL sur le NASDAQ (NQ) avec SMT contre le S&P 500 (ES)
+ * -----------------------------------------------------------------------------
+ * Le MECH Model de PB Blake se trade sur le Nasdaq futures (NQ/MNQ). Ce module
+ * fournit au site TOUT ce que le modèle exige :
+ *   - les bougies NQ (contexte D1 + exécution M15/M5)
+ *   - les bougies ES (S&P 500) UNIQUEMENT pour la divergence SMT
+ *   - le PDH/PDL (plus-haut / plus-bas de la veille)
+ *   - les GAPS NON COMBLÉS (le cœur du modèle) avec leur EQ (équilibre = cible)
+ *   - la divergence SMT NQ vs ES (filtre éliminatoire du MECH)
+ *
+ * Données : Yahoo Finance, via un proxy CORS (même technique que le calendrier
+ * éco) pour que ça marche depuis un fichier local dans le navigateur.
+ * Pédagogique — pas un conseil financier.
+ */
+(function (root) {
+  'use strict';
+
+  // Plusieurs relais : un proxy public gratuit tombe régulièrement (j'ai eu des
+  // erreurs 520/522 en le testant). On essaie les suivants avant d'abandonner.
+  // Relais CORS. Yahoo n'autorise pas l'appel direct depuis un navigateur, il
+  // faut passer par un intermédiaire. Les services gratuits ferment ou
+  // deviennent payants les uns après les autres — corsproxy.io exige
+  // désormais une clé, codetabs répond 522 — donc on en garde plusieurs et on
+  // bascule au premier échec. Le flux OANDA, lui, se passe de relais : c'est
+  // la seule voie qui ne dépend de personne.
+  var PROXIES = [
+    'https://api.allorigins.win/raw?url=',
+    'https://api.cors.lol/?url=',
+    'https://test.cors.workers.dev/?',
+    'https://api.codetabs.com/v1/proxy/?quest='
+  ];
+  var YF = 'https://query1.finance.yahoo.com/v8/finance/chart/';
+  var SYM = { nq: 'NQ=F', es: 'ES=F' };   // Nasdaq 100 futures / S&P 500 futures
+
+  function url(proxy, sym, interval, range) {
+    return proxy + encodeURIComponent(YF + encodeURIComponent(sym) + '?interval=' + interval + '&range=' + range);
+  }
+
+  // Combien de bougies demander au CFD pour couvrir la même profondeur que
+  // la plage Yahoo correspondante.
+  var PROFONDEUR = { '1m': 2000, '2m': 2000, '5m': 2500, '15m': 2000,
+                     '30m': 1500, '60m': 1500, '1h': 1500, '1d': 400 };
+
+  // Récupère les bougies OHLC d'un symbole.
+  //
+  // Quand un jeton CFD est enregistré, ce flux PRIME sur Yahoo : il est en
+  // temps réel là où Yahoo accuse une dizaine de minutes de retard sur le NQ.
+  // Si le CFD échoue — jeton expiré, réseau, instrument sans équivalent — on
+  // retombe silencieusement sur Yahoo plutôt que de ne rien afficher.
+  function candles(sym, interval, range) {
+    if (typeof fetch === 'undefined') return Promise.resolve(null);
+
+    if (typeof CFD !== 'undefined' && CFD.actif() && CFD.MAP[sym]) {
+      return CFD.candles(interval, PROFONDEUR[interval] || 1000, sym)
+        .then(function (cs) {
+          if (!cs || cs.length < 60) return yahoo(sym, interval, range);
+          // On rend EXACTEMENT la forme attendue par le reste du module :
+          // { sym, price, chg, candles }. Le prix est la dernière clôture —
+          // le CFD ne fournit pas de « regularMarketPrice » séparé.
+          var d = cs[cs.length - 1], v = cs.length > 1 ? cs[0] : null;
+          return { sym: CFD.MAP[sym], source: 'cfd',
+                   price: d.c, chg: v ? (d.c / v.c - 1) * 100 : null,
+                   tz: 'UTC', candles: cs };
+        })
+        .catch(function () { return yahoo(sym, interval, range); });
+    }
+    return yahoo(sym, interval, range);
+  }
+
+  function yahoo(sym, interval, range) {
+
+    function tryProxy(i) {
+      if (i >= PROXIES.length) return Promise.resolve(null);
+      return fetchOne(url(PROXIES[i], sym, interval, range))
+        .then(function (r) { return r || tryProxy(i + 1); })
+        .catch(function () { return tryProxy(i + 1); });
+    }
+    return tryProxy(0);
+  }
+
+  // Cache par requête : une bougie H1 ne bouge pas toutes les 5 minutes, et un
+  // relais public gratuit finit par limiter si on le bombarde. Chaque unité a
+  // donc sa propre durée de fraîcheur.
+  // Un appel, une réponse normalisée. Renvoie null plutôt que de lever : la
+  // couche au-dessus enchaîne alors sur le relais suivant.
+  function fetchOne(u) {
+    return fetch(u)
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (j) {
+        var res = j && j.chart && j.chart.result && j.chart.result[0];
+        if (!res || !res.timestamp) return null;
+        var q = res.indicators.quote[0], out = [];
+        for (var i = 0; i < res.timestamp.length; i++) {
+          if (q.open[i] == null || q.close[i] == null) continue;
+          out.push({ t: res.timestamp[i] * 1000, o: q.open[i], h: q.high[i], l: q.low[i], c: q.close[i] });
+        }
+        return { sym: res.meta.symbol, price: res.meta.regularMarketPrice,
+          chg: res.meta.regularMarketChangePercent, tz: res.meta.exchangeTimezoneName, candles: out };
+      })
+      .catch(function () { return null; });
+  }
+
+  // Cache des requêtes. Il vit AUSSI dans le localStorage : sans cela, chaque
+  // rechargement de page relançait onze appels à travers des relais qui
+  // limitent le débit, et la page restait vide.
+  var RAW = {};
+  var CLE_RAW = 'nq.cache.v1';
+  try {
+    var brut = JSON.parse(localStorage.getItem(CLE_RAW) || '{}');
+    Object.keys(brut).forEach(function (k) { RAW[k] = brut[k]; });
+  } catch (e) {}
+  var ecritPrevu = null;
+  function persiste() {
+    if (ecritPrevu) return;
+    ecritPrevu = setTimeout(function () {
+      ecritPrevu = null;
+      try {
+        var out = {}, n = 0;
+        Object.keys(RAW).forEach(function (k) {
+          // on ne garde que le frais et on plafonne, le stockage est limité
+          if (n < 14 && RAW[k] && Date.now() - RAW[k].t < 12 * 3600e3) { out[k] = RAW[k]; n++; }
+        });
+        localStorage.setItem(CLE_RAW, JSON.stringify(out));
+      } catch (e) {}
+    }, 1500);
+  }
+
+  function candlesCached(sym, interval, range, ttl) {
+    var k = sym + '|' + interval + '|' + range;
+    var e = RAW[k];
+    if (e && Date.now() - e.t < ttl) return Promise.resolve(e.v);
+    return candles(sym, interval, range).then(function (v) {
+      if (v) { RAW[k] = { t: Date.now(), v: v }; persiste(); return v; }
+      return e ? e.v : null;          // périmé vaut mieux que rien
+    });
+  }
+
+  // --- GAPS NON COMBLÉS (le cœur du MECH Model) -------------------------------
+  // Deux familles :
+  //  1) gap "vrai" de session : le bas d'une bougie est au-dessus du haut de la
+  //     précédente (ou l'inverse) — typique des futures qui ferment la nuit.
+  //  2) FVG (imbalance 3 bougies) : trou laissé par un mouvement rapide.
+  // Un gap est NON COMBLÉ tant que le prix n'est pas revenu dedans après coup.
+  function findGaps(cs, fenetre) {
+    // On ne remonte que les `fenetre` dernières bougies : au-delà, un gap
+    // n'est plus une cible réaliste, et la recherche coûte cher (O(n²)).
+    if (fenetre && cs.length > fenetre) cs = cs.slice(cs.length - fenetre);
+    var gaps = [], i;
+    function unfilled(lo, hi, from) {        // le prix est-il revenu dans la zone ?
+      for (var k = from; k < cs.length; k++) { if (cs[k].l <= hi && cs[k].h >= lo) return false; }
+      return true;
+    }
+    for (i = 1; i < cs.length; i++) {
+      if (cs[i].l > cs[i - 1].h) {           // gap haussier
+        var lo1 = cs[i - 1].h, hi1 = cs[i].l;
+        if (unfilled(lo1, hi1, i + 1)) gaps.push({ type: 'gap', dir: 'haussier', lo: lo1, hi: hi1, eq: (lo1 + hi1) / 2, t: cs[i].t });
+      } else if (cs[i].h < cs[i - 1].l) {    // gap baissier
+        var lo2 = cs[i].h, hi2 = cs[i - 1].l;
+        if (unfilled(lo2, hi2, i + 1)) gaps.push({ type: 'gap', dir: 'baissier', lo: lo2, hi: hi2, eq: (lo2 + hi2) / 2, t: cs[i].t });
+      }
+    }
+    for (i = 2; i < cs.length; i++) {        // FVG (3 bougies)
+      if (cs[i].l > cs[i - 2].h) {
+        var a = cs[i - 2].h, b = cs[i].l;
+        if (unfilled(a, b, i + 1)) gaps.push({ type: 'fvg', dir: 'haussier', lo: a, hi: b, eq: (a + b) / 2, t: cs[i].t });
+      } else if (cs[i].h < cs[i - 2].l) {
+        var c = cs[i].h, d = cs[i - 2].l;
+        if (unfilled(c, d, i + 1)) gaps.push({ type: 'fvg', dir: 'baissier', lo: c, hi: d, eq: (c + d) / 2, t: cs[i].t });
+      }
+    }
+    return gaps.sort(function (x, y) { return y.t - x.t; }).slice(0, 8); // les plus récents
+  }
+
+  // --- DIVERGENCE SMT : NQ vs ES (filtre éliminatoire du MECH) ---------------
+  // Principe : deux actifs corrélés doivent faire le même extrême. Si l'un fait
+  // un nouveau plus-haut et PAS l'autre, le mouvement manque de conviction.
+  function smt(nq, es, n) {
+    n = n || 20;
+    if (!nq || !es || nq.length < 2 * n || es.length < 2 * n) return null;
+    function mx(a, s, e) { return Math.max.apply(null, a.slice(s, e).map(function (x) { return x.h; })); }
+    function mn(a, s, e) { return Math.min.apply(null, a.slice(s, e).map(function (x) { return x.l; })); }
+    var nHiR = mx(nq, nq.length - n), nHiP = mx(nq, nq.length - 2 * n, nq.length - n);
+    var eHiR = mx(es, es.length - n), eHiP = mx(es, es.length - 2 * n, es.length - n);
+    var nLoR = mn(nq, nq.length - n), nLoP = mn(nq, nq.length - 2 * n, nq.length - n);
+    var eLoR = mn(es, es.length - n), eLoP = mn(es, es.length - 2 * n, es.length - n);
+    var nqHH = nHiR > nHiP, esHH = eHiR > eHiP;
+    var nqLL = nLoR < nLoP, esLL = eLoR < eLoP;
+    if (nqHH !== esHH) {
+      return { type: 'baissière', detail: nqHH ? 'NQ fait un nouveau plus-haut mais le S&P (ES) NON'
+        : 'ES fait un nouveau plus-haut mais le NQ NON',
+        consigne: 'Divergence SMT BAISSIÈRE — n’achète PAS (le MECH interdit de trader contre la SMT).' };
+    }
+    if (nqLL !== esLL) {
+      return { type: 'haussière', detail: nqLL ? 'NQ fait un nouveau plus-bas mais le S&P (ES) NON'
+        : 'ES fait un nouveau plus-bas mais le NQ NON',
+        consigne: 'Divergence SMT HAUSSIÈRE — ne vends PAS (le MECH interdit de trader contre la SMT).' };
+    }
+    return { type: 'aucune', detail: 'NQ et ES font les mêmes extrêmes (pas de divergence).',
+      consigne: 'Pas de divergence SMT — ce filtre ne bloque aucun sens.' };
+  }
+
+  // ===========================================================================
+  // STRUCTURE DU MECH : SWEEP → SÉQUENCE → INVERSION
+  // ---------------------------------------------------------------------------
+  // C'est le DÉCLENCHEUR du modèle. Avant, le site ne le calculait pas : il
+  // donnait les cibles (gaps) et les filtres (SMT) mais laissait le bot DEVINER
+  // la structure. Maintenant elle est calculée sur les vraies bougies, comme
+  // dans le script Pine — donc vérifiable, et non-repeinte.
+  //
+  // ⚠️ HONNÊTETÉ : « inversion » n'a pas de définition universelle. Celle codée
+  // ici est le CISD (clôture au-delà des opens opposés) + displacement. C'est UN
+  // choix, indiqué tel quel dans les sorties — pas « la » définition officielle.
+  // ===========================================================================
+
+  // Heure de New York d'un timestamp (les sessions du MECH sont définies en ET).
+  var _etFmt = null;
+  function etParts(ts) {
+    if (!_etFmt) _etFmt = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/New_York', hour12: false,
+      year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'
+    });
+    var o = {};
+    _etFmt.formatToParts(new Date(ts)).forEach(function (p) { o[p.type] = p.value; });
+    var h = parseInt(o.hour, 10); if (h === 24) h = 0;
+    return { jour: o.year + '-' + o.month + '-' + o.day, min: h * 60 + parseInt(o.minute, 10) };
+  }
+
+  // Extrêmes des sessions ASIE et LONDRES sur les dernières 48 h : ce sont des
+  // POOLS DE LIQUIDITÉ, donc des niveaux susceptibles d'être balayés.
+  function sessionPools(cs) {
+    var cut = cs.length ? cs[cs.length - 1].t - 48 * 3600 * 1000 : 0;
+    var asia = { h: null, l: null }, lon = { h: null, l: null };
+    cs.forEach(function (c) {
+      if (c.t < cut) return;
+      var e = etParts(c.t);
+      // Asie : 20 h 00 → minuit (ET). Londres : 03 h 00 → 06 h 00 (ET).
+      var inAsia = e.min >= 20 * 60;
+      var inLon = e.min >= 3 * 60 && e.min < 6 * 60;
+      if (inAsia) {
+        asia.h = asia.h == null ? c.h : Math.max(asia.h, c.h);
+        asia.l = asia.l == null ? c.l : Math.min(asia.l, c.l);
+      }
+      if (inLon) {
+        lon.h = lon.h == null ? c.h : Math.max(lon.h, c.h);
+        lon.l = lon.l == null ? c.l : Math.min(lon.l, c.l);
+      }
+    });
+    return { asia: asia, londres: lon };
+  }
+
+  // Swings CONFIRMÉS : un pivot n'existe qu'après `len` bougies de chaque côté.
+  // Il ne peut donc jamais apparaître puis disparaître (anti-repeint).
+  function swings(cs, len) {
+    len = len || 5;
+    var hi = [], lo = [], i, k, ok;
+    for (i = len; i < cs.length - len; i++) {
+      ok = true;
+      for (k = i - len; k <= i + len; k++) { if (k !== i && cs[k].h >= cs[i].h) { ok = false; break; } }
+      if (ok) hi.push({ prix: cs[i].h, i: i, t: cs[i].t });
+      ok = true;
+      for (k = i - len; k <= i + len; k++) { if (k !== i && cs[k].l <= cs[i].l) { ok = false; break; } }
+      if (ok) lo.push({ prix: cs[i].l, i: i, t: cs[i].t });
+    }
+    return { hauts: hi, bas: lo };
+  }
+
+  function atr(cs, n) {
+    n = n || 14;
+    if (cs.length < n + 1) return null;
+    var sum = 0;
+    for (var i = cs.length - n; i < cs.length; i++) {
+      var pc = cs[i - 1].c;
+      sum += Math.max(cs[i].h - cs[i].l, Math.abs(cs[i].h - pc), Math.abs(cs[i].l - pc));
+    }
+    return sum / n;
+  }
+
+  // --- INVERSION, version IFVG (la plus mécanique) ---------------------------
+  // Un FVG qui se fait TRAVERSER change de camp : le prix clôture au-delà, et
+  // la zone devient support (ou résistance) dans l'autre sens.
+  //   FVG baissier dont le prix CLÔTURE au-dessus  -> inversion HAUSSIÈRE
+  //   FVG haussier dont le prix CLÔTURE en dessous -> inversion BAISSIÈRE
+  // Aucun seuil arbitraire, aucune appréciation : c'est la seule définition
+  // d'« inversion » entièrement mécanique. Le backtest 60 jours la place devant
+  // le CISD, le MSS et l'engulfing — c'est pour ça qu'elle est utilisée par défaut.
+  var IFVG_AGE = 120;
+
+  function zonesFVG(cs) {
+    var z = [], i, k;
+    for (i = 2; i < cs.length; i++) {
+      if (cs[i].l > cs[i - 2].h) z.push({ bas: cs[i - 2].h, haut: cs[i].l, haussier: true, ne: i, casse: null });
+      else if (cs[i].h < cs[i - 2].l) z.push({ bas: cs[i].h, haut: cs[i - 2].l, haussier: false, ne: i, casse: null });
+    }
+    z.forEach(function (x) {
+      for (k = x.ne + 1; k < cs.length; k++) {
+        if (k - x.ne > IFVG_AGE) break;
+        if (x.haussier ? cs[k].c < x.bas : cs[k].c > x.haut) { x.casse = k; break; }
+      }
+    });
+    return z;
+  }
+
+  // Première inversion IFVG dans le bon sens, après la bougie `from`.
+  function inversionIFVG(cs, from, haussiere) {
+    var z = zonesFVG(cs), best = null;
+    z.forEach(function (x) {
+      if (x.casse == null || x.casse <= from) return;
+      if (haussiere !== !x.haussier) return;      // FVG baissier cassé au-dessus = inversion haussière
+      if (best == null || x.casse < best.casse) best = x;
+    });
+    if (!best) return null;
+    var i = best.casse;
+    return { i: i, t: cs[i].t, prix: cs[i].c,
+      bas: Math.min(cs[i].l, best.bas), haut: Math.max(cs[i].h, best.haut),
+      zone: [+best.bas.toFixed(2), +best.haut.toFixed(2)],
+      definition: 'IFVG (FVG traversé, la zone change de camp)' };
+  }
+
+  // INVERSION (définition CISD + displacement) cherchée APRÈS la bougie du sweep.
+  function inversion(cs, from, haussiere, look, a) {
+    look = look || 5;
+    for (var i = Math.max(from + 1, look); i < cs.length; i++) {
+      var corps = Math.abs(cs[i].c - cs[i].o);
+      var disp = a ? corps > a : true;          // mouvement franc, pas une bougie molle
+      var ext = cs[i - 1].o;
+      for (var k = i - look; k < i; k++) {
+        if (k < 0) continue;
+        ext = haussiere ? Math.max(ext, cs[k].o) : Math.min(ext, cs[k].o);
+      }
+      var ok = haussiere ? (cs[i].c > ext && cs[i].c > cs[i].o)
+                         : (cs[i].c < ext && cs[i].c < cs[i].o);
+      if (ok && disp) {
+        // La bougie d'inversion et les deux qui la précèdent = « la structure de
+        // l'inversion ». C'est LÀ que se place le stop (voir trade()).
+        var lo = cs[i].l, hi = cs[i].h;
+        for (var j = Math.max(0, i - 2); j <= i; j++) { lo = Math.min(lo, cs[j].l); hi = Math.max(hi, cs[j].h); }
+        return { i: i, t: cs[i].t, prix: cs[i].c, bas: lo, haut: hi, definition: 'CISD + displacement' };
+      }
+    }
+    return null;
+  }
+
+  // La séquence complète du MECH.
+  //   LONG  : swing low → swing high → LOWER LOW qui balaye une liquidité → inversion haussière
+  //   SHORT : swing high → swing low → HIGHER HIGH qui balaye une liquidité → inversion baissière
+  function structure(cs, niveaux, opts) {
+    opts = opts || {};
+    var len = opts.pivots || 5;
+    var expire = opts.expire || 30;      // le setup meurt s'il n'y a pas d'inversion
+    var sw = swings(cs, len);
+    var a = atr(cs, 14);
+    var mode = opts.inversion || 'ifvg';
+    var out = {
+      sens: null, valide: false, sweep: null, inversion: null,
+      mode_inversion: mode,
+      definition_inversion: mode === 'ifvg'
+        ? 'IFVG : un FVG traversé change de camp et devient support/résistance'
+        : 'CISD (clôture au-delà des opens opposés) + corps > ATR(14)',
+      detail: ''
+    };
+    if (sw.bas.length < 2 || sw.hauts.length < 2) {
+      out.detail = 'Pas assez de swings confirmés sur les bougies disponibles.';
+      return out;
+    }
+
+    // Quels niveaux comptent comme liquidité ?
+    function pools(bas) {
+      var p = [];
+      function add(v, nom) { if (v != null) p.push({ prix: v, quoi: nom }); }
+      if (bas) {
+        add(niveaux.pdl, 'PDL (plus-bas de la veille)');
+        add(niveaux.asiaL, "plus-bas de la session ASIE");
+        add(niveaux.lonL, 'plus-bas de la session LONDRES');
+        add(sw.bas.length >= 2 ? sw.bas[sw.bas.length - 2].prix : null, 'swing low précédent');
+      } else {
+        add(niveaux.pdh, 'PDH (plus-haut de la veille)');
+        add(niveaux.asiaH, "plus-haut de la session ASIE");
+        add(niveaux.lonH, 'plus-haut de la session LONDRES');
+        add(sw.hauts.length >= 2 ? sw.hauts[sw.hauts.length - 2].prix : null, 'swing high précédent');
+      }
+      return p;
+    }
+
+    var fin = cs.length - 1;
+
+    // On ne regarde pas QUE le dernier swing : un setup armé il y a 20 bougies
+    // est encore vivant tant qu'il n'a pas expiré. On remonte donc les swings
+    // récents et on garde le plus récent qui coche la séquence complète.
+    function chercher(bas) {
+      var liste = bas ? sw.bas : sw.hauts;
+      var autre = bas ? sw.hauts : sw.bas;
+      var p = pools(bas);
+      for (var n = liste.length - 1; n >= 1; n--) {
+        var cur = liste[n], prec = liste[n - 1];
+        if (fin - cur.i > expire) break;                       // trop vieux : setup mort
+        var casse = bas ? (cur.prix < prec.prix) : (cur.prix > prec.prix);
+        if (!casse) continue;                                   // pas un lower low / higher high
+        var entre = autre.filter(function (x) { return x.i > prec.i && x.i < cur.i; }).length > 0;
+        if (!entre) continue;                                   // séquence incomplète
+        var pris = null;
+        p.forEach(function (x) {
+          var touche = bas ? (cur.prix <= x.prix) : (cur.prix >= x.prix);
+          if (!touche) return;
+          if (!pris) { pris = x; return; }
+          // le pool le plus "proche" du prix balayé est le plus significatif
+          if (bas ? x.prix > pris.prix : x.prix < pris.prix) pris = x;
+        });
+        if (pris) return { swing: cur, pool: pris };
+      }
+      return null;
+    }
+
+    var L = chercher(true), S = chercher(false);
+    var choix = null, sens = null;
+    if (L && S) { choix = L.swing.i >= S.swing.i ? L : S; sens = (choix === L) ? 'LONG' : 'SHORT'; }
+    else if (L) { choix = L; sens = 'LONG'; }
+    else if (S) { choix = S; sens = 'SHORT'; }
+
+    if (choix) {
+      var haussier = sens === 'LONG';
+      out.sens = sens;
+      out.sweep = { niveau: +choix.pool.prix.toFixed(2), quoi: choix.pool.quoi,
+                    prix_atteint: +choix.swing.prix.toFixed(2), t: choix.swing.t,
+                    bougies_depuis: fin - choix.swing.i };
+      var inv = mode === 'ifvg' ? inversionIFVG(cs, choix.swing.i, haussier)
+                                : inversion(cs, choix.swing.i, haussier, 5, a);
+      if (inv && inv.i - choix.swing.i <= expire) {
+        out.inversion = inv;
+        out.valide = true;
+        out.detail = 'Séquence ' + sens + ' complète : balayage du ' + choix.pool.quoi + ' à ' +
+          choix.pool.prix.toFixed(2) + ' (prix descendu/monté à ' + choix.swing.prix.toFixed(2) +
+          '), puis inversion ' + (haussier ? 'haussière' : 'baissière') + ' confirmée à ' + inv.prix.toFixed(2) + '.';
+      } else {
+        out.detail = 'Balayage du ' + choix.pool.quoi + ' à ' + choix.pool.prix.toFixed(2) +
+          ' constaté il y a ' + (fin - choix.swing.i) + ' bougies, mais AUCUNE inversion ' +
+          (haussier ? 'haussière' : 'baissière') + ' confirmée depuis. On attend — on n\'entre jamais sur le balayage lui-même.';
+      }
+      return out;
+    }
+
+    out.detail = 'Aucun balayage de liquidité suivi d\'une structure valide sur les bougies récentes.';
+    return out;
+  }
+
+  // PDH / PDL : plus-haut et plus-bas de la veille (bougie D1 précédente).
+  function pdhl(daily) {
+    if (!daily || daily.length < 2) return null;
+    var y = daily[daily.length - 2];
+    return { pdh: y.h, pdl: y.l, date: y.t };
+  }
+
+  // ===========================================================================
+  // LE TRADE : entrée, stop, objectif, RR — déduits des règles du MECH.
+  // ---------------------------------------------------------------------------
+  //   ENTRÉE   : le prix de l'inversion (le modèle n'entre PAS sur le balayage).
+  //   STOP     : au-delà de l'extrême balayé, plus un petit tampon.
+  //   OBJECTIF : l'EQ du gap non comblé le plus proche dans le sens du trade.
+  //   RR       : rapport des deux. Sous 1, on ne prend pas.
+  // ===========================================================================
+  var BUFFER_PCT = 0.02;      // tampon du stop, en % du prix
+  var RR_MIN = 1.0;
+
+  function trade(d, opts) {
+    opts = opts || {};
+    if (!d || !d.structure || !d.structure.valide) return null;
+    var st = d.structure;
+    var long = st.sens === 'LONG';
+    var entree = st.inversion ? st.inversion.prix : d.nq.prix;
+    if (entree == null) return null;
+
+    var buf = entree * BUFFER_PCT / 100;
+
+    // --- STOP : sous/au-dessus de la STRUCTURE DE L'INVERSION (règle de Blake),
+    // et non au balayage. C'est la différence qui change tout : un stop au
+    // balayage est souvent 5 à 10 fois plus loin, ce qui écrase le RR et fait
+    // refuser des setups parfaitement valides.
+    var slInv = null;
+    if (st.inversion && st.inversion.bas != null) {
+      slInv = long ? st.inversion.bas - buf : st.inversion.haut + buf;
+    }
+    var slBal = long ? st.sweep.prix_atteint - buf : st.sweep.prix_atteint + buf;
+    var sl = slInv != null ? slInv : slBal;
+    var slSource = slInv != null ? "structure de l'inversion" : 'balayage';
+
+    // Un stop plus serré que la moitié de l'ATR serait balayé par le bruit :
+    // dans ce cas on recule jusqu'au balayage, comme le permet la règle
+    // (« sous le bas de l'inversion, ou sous l'order block/la structure »).
+    if (d.atr && Math.abs(entree - sl) < d.atr * 0.5) {
+      sl = slBal;
+      slSource = 'balayage (l’inversion était trop serrée pour l’ATR)';
+    }
+
+    // --- OBJECTIF : un gap NON COMBLÉ, en privilégiant l'unité la PLUS HAUTE
+    // disponible (règle de Blake : « preference for higher timeframe gaps »).
+    var candidats = opts.gaps || (d.gaps_non_comblés || []).map(function (g) {
+      return { tf: d.tf || '?', rang: 0, eq: g.eq_cible, sens: g.sens, zone: g.zone, type: g.type };
+    });
+    var tp = null, cible = null;
+    candidats.forEach(function (g) {
+      if (long ? g.eq <= entree : g.eq >= entree) return;
+      if (!cible) { cible = g; tp = g.eq; return; }
+      // unité plus haute d'abord ; à unité égale, le gap le plus proche
+      if (g.rang > cible.rang || (g.rang === cible.rang && (long ? g.eq < cible.eq : g.eq > cible.eq))) {
+        cible = g; tp = g.eq;
+      }
+    });
+    if (tp == null) {
+      return { possible: false, sens: st.sens, entree: +entree.toFixed(2), sl: +sl.toFixed(2),
+        sl_source: slSource,
+        raison: "Aucun gap non comblé au-delà de l'entrée, sur aucune unité : le modèle n'a pas d'objectif, donc pas de trade." };
+    }
+
+    var risque = Math.abs(entree - sl);
+    if (!(risque > 0)) return { possible: false, sens: st.sens, raison: 'Stop confondu avec l\'entrée.' };
+    var rr = Math.abs(tp - entree) / risque;
+
+    if (d.atr && risque < d.atr * 0.5) {
+      return { possible: false, sens: st.sens, entree: +entree.toFixed(2), sl: +sl.toFixed(2),
+        tp: +tp.toFixed(2), rr: +rr.toFixed(2), sl_source: slSource,
+        raison: 'Stop trop serré (' + risque.toFixed(2) + ' pts pour un ATR de ' + d.atr.toFixed(2) +
+          ') : il serait balayé par le bruit, et le RR de ' + rr.toFixed(2) + ' est un mirage.' };
+    }
+
+    // --- BREAK-EVEN au 1:1 (règle de Blake : stop à l'entrée une fois le 1:1
+    // atteint, ou dès que le gap interne est touché). C'est le mécanisme qui
+    // fait le taux de réussite : au pire on sort à zéro.
+    var be = long ? entree + risque : entree - risque;
+
+    // --- RUNNER : après le break-even, la liquidité EXTERNE.
+    var runner = null;
+    if (opts.liquidite) {
+      opts.liquidite.forEach(function (n) {
+        if (n == null) return;
+        if (long ? n <= tp : n >= tp) return;
+        if (runner == null || (long ? n < runner : n > runner)) runner = n;
+      });
+    }
+
+    return {
+      possible: rr >= RR_MIN,
+      sens: st.sens,
+      entree: +entree.toFixed(2),
+      sl: +sl.toFixed(2),
+      sl_source: slSource,
+      tp: +tp.toFixed(2),
+      be: +be.toFixed(2),
+      runner: runner != null ? +runner.toFixed(2) : null,
+      rr: +rr.toFixed(2),
+      risque_points: +risque.toFixed(2),
+      gain_points: +Math.abs(tp - entree).toFixed(2),
+      cible: cible ? ((cible.type || 'gap') + ' ' + cible.sens + ' en ' + cible.tf +
+                      ' — zone ' + cible.zone[0] + '–' + cible.zone[1]) : null,
+      cible_tf: cible ? cible.tf : null,
+      htf_aligne: opts.htf == null ? null : (opts.htf === st.sens),
+      raison: rr >= RR_MIN
+        ? ('Entrée sur l\'inversion à ' + entree.toFixed(2) + ', stop sous la ' + slSource +
+           ' (' + sl.toFixed(2) + '), objectif le gap non comblé de plus haute unité (' +
+           (cible ? cible.tf : '?') + ') à ' + tp.toFixed(2) + '. Break-even au 1:1 = ' + be.toFixed(2) + '.')
+        : ('RR de ' + rr.toFixed(2) + ' : sous le minimum de ' + RR_MIN + ', le modèle passe son tour.'),
+      motif: 'MECH — balayage ' + st.sweep.quoi + ' à ' + st.sweep.niveau +
+             ', inversion ' + (st.inversion ? st.inversion.definition : '—') +
+             ' à ' + (st.inversion ? st.inversion.prix : '—') +
+             ', stop sur ' + slSource + ', cible EQ ' + tp.toFixed(2) +
+             (cible ? ' (' + cible.tf + ')' : '') + ', BE au 1:1 à ' + be.toFixed(2) + '.'
+    };
+  }
+
+  // ===========================================================================
+  // BALAYAGE DE TOUTES LES TIMEFRAMES
+  // ---------------------------------------------------------------------------
+  // Le MECH ne vit pas sur une seule unité : la cible se lit en M5/M15, mais
+  // l'inversion peut se confirmer en M1. On analyse donc CHAQUE unité de la
+  // même façon, et on remonte celle qui donne le meilleur trade.
+  //
+  // M1 est plafonné à 2 jours : Yahoo n'autorise que 8 jours de M1 par requête,
+  // et au-delà de quelques centaines de bougies un gap n'est plus une cible.
+  // ===========================================================================
+  var TFS = [
+    { id: 'M1',  iv: '1m',  range: '2d',  fenetre: 400, pivots: 5, expire: 60, ttl: 4 },
+    { id: 'M5',  iv: '5m',  range: '5d',  fenetre: 400, pivots: 5, expire: 40, ttl: 4 },
+    { id: 'M15', iv: '15m', range: '5d',  fenetre: 400, pivots: 5, expire: 30, ttl: 9 },
+    { id: 'M30', iv: '30m', range: '1mo', fenetre: 300, pivots: 5, expire: 24, ttl: 19 },
+    { id: 'H1',  iv: '60m', range: '3mo', fenetre: 300, pivots: 5, expire: 20, ttl: 39 }
+  ];
+
+  function analyseTF(tf, nqC, esC, niveaux, prix) {
+    if (!nqC || nqC.length < 60) return { tf: tf.id, dispo: false, detail: 'Pas assez de bougies.' };
+    var gaps = findGaps(nqC, tf.fenetre);
+    var pools = sessionPools(nqC);
+    var lv = {
+      pdh: niveaux.pdh, pdl: niveaux.pdl,
+      asiaH: pools.asia.h, asiaL: pools.asia.l,
+      lonH: pools.londres.h, lonL: pools.londres.l
+    };
+    var struct = structure(nqC, lv, { pivots: tf.pivots, expire: tf.expire });
+    var div = esC ? smt(nqC, esC, 20) : null;
+    var vue = {
+      tf: tf.id, dispo: true, bougies: nqC.length,
+      // horodatage de la dernière bougie : sert à afficher l'âge réel de la donnée
+      derniere_bougie: nqC[nqC.length - 1] ? nqC[nqC.length - 1].t : null,
+      sessions: pools,
+      gaps_non_comblés: gaps.map(function (g) {
+        return { type: g.type === 'fvg' ? 'FVG' : 'gap de session', sens: g.dir,
+          zone: [+g.lo.toFixed(2), +g.hi.toFixed(2)], eq_cible: +g.eq.toFixed(2) };
+      }),
+      smt: div, structure: struct, nq: { prix: prix }, atr: atr(nqC, 14)
+    };
+    vue.tf = tf.id;
+    vue.trade = trade(vue);
+    // La SMT est un filtre ÉLIMINATOIRE : un trade contre elle n'existe pas.
+    if (vue.trade && vue.trade.possible && div && div.type !== 'aucune') {
+      var contre = (div.type === 'baissière' && vue.trade.sens === 'LONG') ||
+                   (div.type === 'haussière' && vue.trade.sens === 'SHORT');
+      if (contre) {
+        vue.trade.possible = false;
+        vue.trade.raison = 'Refusé par la SMT ' + div.type + ' : ' + div.consigne;
+      }
+    }
+    return vue;
+  }
+
+  // Parmi toutes les unités, laquelle retenir ?
+  // PAS celle qui affiche le plus gros RR : un RR énorme vient presque toujours
+  // d'un stop trop serré, donc d'un trade qui saute. Le MECH vise 1:1 à 1:1,5
+  // avec un TAUX DE RÉUSSITE élevé. On prend donc l'unité la PLUS BASSE qui
+  // valide — c'est là que l'entrée est la plus précise, et la spec dit que
+  // l'inversion M1 suffit.
+  function meilleur(vues) {
+    var ordre = TFS.map(function (t) { return t.id; });
+    var ok = vues.filter(function (v) { return v.dispo && v.trade && v.trade.possible; });
+    if (!ok.length) return null;
+    ok.sort(function (a, b) { return ordre.indexOf(a.tf) - ordre.indexOf(b.tf); });
+    return ok[0];
+  }
+
+  // Dernier instantané chargé : le prompt du Bot IA peut le relire sans
+  // refaire d'appel réseau (même principe que le calendrier économique).
+  var CACHE = null, CACHE_T = 0;
+  var TTL = 5 * 60 * 1000;   // 5 minutes : le MECH travaille en M5/M15
+
+  function data() { return CACHE; }
+
+  // Charge tout ce dont le MECH a besoin.
+  function load(force) {
+    if (!force && CACHE && (Date.now() - CACHE_T) < TTL) return Promise.resolve(CACHE);
+    return loadFresh();
+  }
+
+  function loadFresh() {
+    var MIN = 60 * 1000;
+    // Le PDH/PDL de la veille est figé : inutile de le redemander toutes les 5 min.
+    // Les appels partent EN FILE, espacés, et non tous en même temps : onze
+    // requêtes simultanées à travers un relais gratuit se font jeter pour
+    // dépassement de débit, et la page reste vide. Ce qui est déjà en cache
+    // ne coûte rien et n'attend pas.
+    var plan = [[SYM.nq, '1d', '3mo', 60 * MIN]];
+    TFS.forEach(function (tf) { plan.push([SYM.nq, tf.iv, tf.range, tf.ttl * MIN]); });
+    TFS.forEach(function (tf) { plan.push([SYM.es, tf.iv, tf.range, tf.ttl * MIN]); });
+
+    function enFile(i, acc) {
+      if (i >= plan.length) return Promise.resolve(acc);
+      var a = plan[i], k = a[0] + '|' + a[1] + '|' + a[2];
+      var frais = RAW[k] && Date.now() - RAW[k].t < a[3];
+      return candlesCached(a[0], a[1], a[2], a[3]).then(function (v) {
+        acc.push(v);
+        if (frais) return enFile(i + 1, acc);                   // servi par le cache
+        return new Promise(function (r) { setTimeout(r, 160); }).then(function () { return enFile(i + 1, acc); });
+      });
+    }
+
+    return enFile(0, []).then(function (r) {
+      var nqD = r[0];
+      if (!nqD) return null;
+      var lv = pdhl(nqD.candles);
+      var niveaux = { pdh: lv ? lv.pdh : null, pdl: lv ? lv.pdl : null };
+      var prix = nqD.price;
+
+      var vues = TFS.map(function (tf, i) {
+        var nqC = r[1 + i], esC = r[1 + TFS.length + i];
+        return analyseTF(tf, nqC && nqC.candles, esC && esC.candles, niveaux, prix);
+      });
+      if (!vues.some(function (v) { return v.dispo; })) return null;
+
+      // ---- DEUXIÈME PASSAGE ----
+      // Blake privilégie le gap non comblé de la PLUS HAUTE unité disponible.
+      // On rassemble donc les cibles de toutes les unités, puis on recalcule
+      // chaque trade avec ce vivier commun (et pas seulement ses propres gaps).
+      // La source distingue deux niveaux de cible :
+      //   INTERNE — un gap non comblé d'unité BASSE (M1 à M15). C'est l'objectif
+      //             réel, celui qui est atteint souvent : c'est lui qui fait le
+      //             taux de réussite.
+      //   EXTERNE — la liquidité et les gaps d'unité haute, visés seulement par
+      //             le runner, APRÈS le passage au break-even.
+      // Viser directement un gap H1 depuis une entrée M1 gonfle le RR affiché
+      // et écroule le taux de réussite : exactement l'inverse du but.
+      var INTERNES = ['M1', 'M5', 'M15'];
+      var gapsGlobaux = [], gapsExternes = [];
+      vues.forEach(function (v, i) {
+        if (!v.dispo) return;
+        var interne = INTERNES.indexOf(v.tf) >= 0;
+        v.gaps_non_comblés.forEach(function (g) {
+          var o = { tf: v.tf, rang: i, eq: g.eq_cible, sens: g.sens, zone: g.zone, type: g.type };
+          if (interne) gapsGlobaux.push(o); else gapsExternes.push(g.eq_cible);
+        });
+      });
+
+      // Biais de l'unité haute : le modèle n'en exige pas, mais sa probabilité
+      // monte nettement quand le trade va dans le même sens.
+      var vueH1 = vues.filter(function (v) { return v.dispo && v.tf === 'H1'; })[0];
+      var htf = vueH1 && vueH1.structure && vueH1.structure.valide ? vueH1.structure.sens : null;
+
+      // Liquidité externe = destination du runner après le break-even.
+      var liq = [niveaux.pdh, niveaux.pdl].concat(gapsExternes);
+      vues.forEach(function (v) {
+        if (!v.dispo || !v.sessions) return;
+        liq.push(v.sessions.asia.h, v.sessions.asia.l, v.sessions.londres.h, v.sessions.londres.l);
+      });
+
+      vues.forEach(function (v) {
+        if (!v.dispo) return;
+        v.trade = trade(v, { gaps: gapsGlobaux, htf: htf, liquidite: liq });
+        if (v.trade && v.trade.possible && v.smt && v.smt.type !== 'aucune') {
+          var contre = (v.smt.type === 'baissière' && v.trade.sens === 'LONG') ||
+                       (v.smt.type === 'haussière' && v.trade.sens === 'SHORT');
+          if (contre) {
+            v.trade.possible = false;
+            v.trade.raison = 'Refusé par la SMT ' + v.smt.type + ' : ' + v.smt.consigne;
+          }
+        }
+      });
+
+      var best = meilleur(vues);
+      // La vue par défaut (affichage principal) : celle qui donne un trade, sinon M15.
+      var base = best || vues.filter(function (v) { return v.dispo && v.tf === 'M15'; })[0]
+                      || vues.filter(function (v) { return v.dispo; })[0];
+      var esPrix = null;
+      for (var k = 0; k < TFS.length; k++) { if (r[1 + TFS.length + k]) { esPrix = r[1 + TFS.length + k].price; break; } }
+
+      var out = {
+        nq: { prix: prix, variation_pct: nqD.chg != null ? +nqD.chg.toFixed(2) : null },
+        es: esPrix != null ? { prix: esPrix } : null,
+        pdh: lv ? +lv.pdh.toFixed(2) : null,
+        pdl: lv ? +lv.pdl.toFixed(2) : null,
+        timeframes: vues,
+        tf_retenue: base ? base.tf : null,
+        biais_htf: htf,
+        // Raccourcis vers la vue retenue, pour tout le code existant.
+        gaps_non_comblés: base ? base.gaps_non_comblés : [],
+        smt: base ? base.smt : null,
+        sessions: base ? base.sessions : null,
+        structure: base ? base.structure : null,
+        trade: base ? base.trade : null,
+        // Date de la DERNIÈRE bougie reçue, pas de l'appel réseau : c'est elle
+        // qui dit à quel point la donnée est fraîche. Yahoo sert le NQ avec
+        // environ 10 minutes de retard.
+        // Fraîcheur : on prend la bougie la PLUS RÉCENTE de toutes les unités,
+        // pas celle de l'unité retenue — une M15 a naturellement jusqu'à quinze
+        // minutes de retard, ce qui n'a rien à voir avec le retard du flux.
+        derniere_bougie: vues.reduce(function (m, v) {
+          return v.derniere_bougie && v.derniere_bougie > m ? v.derniere_bougie : m; }, 0) || null,
+        // D'où viennent les prix : 'cfd' en temps réel, sinon Yahoo différé.
+        source: nqD.source === 'cfd' ? 'cfd' : 'yahoo',
+        maj: Date.now()
+      };
+      CACHE = out;
+      CACHE_T = Date.now();
+      return out;
+    }).catch(function () { return null; });
+  }
+
+  // Bloc texte injecté dans le prompt du Bot IA.
+  function promptBlock(d) {
+    if (d === undefined) d = CACHE;
+    if (!d) return "=== DONNÉES NASDAQ (NQ) ===\nFlux NQ/ES injoignable pour le moment : tu n'as NI les gaps non comblés, NI le PDH/PDL, NI la SMT. "
+      + "Sans ces données le MECH Model ne peut PAS être validé — renvoie \"idees\": [] et explique-le dans \"marche\".";
+    var t = "=== DONNÉES NASDAQ (NQ) POUR LE MECH MODEL ===\n";
+    t += "NQ : " + d.nq.prix + (d.nq.variation_pct != null ? ' (' + (d.nq.variation_pct >= 0 ? '+' : '') + d.nq.variation_pct + '%)' : '') + "\n";
+    t += "PDH (plus-haut veille) : " + d.pdh + " · PDL (plus-bas veille) : " + d.pdl + "\n";
+    if (d.timeframes && d.timeframes.length) {
+      t += "BALAYAGE DE TOUTES LES UNITÉS DE TEMPS (chaque ligne est calculée, pas estimée) :\n";
+      d.timeframes.forEach(function (v) {
+        if (!v.dispo) { t += "  " + v.tf + " : indisponible\n"; return; }
+        var st = v.structure.valide ? ('structure VALIDE ' + v.structure.sens) : 'structure non valide';
+        var tr = v.trade ? (v.trade.possible
+              ? ('TRADE ' + v.trade.sens + ' · entrée ' + v.trade.entree + ' · stop ' + v.trade.sl +
+                 ' · objectif ' + v.trade.tp + ' · RR ' + v.trade.rr)
+              : ('pas de trade — ' + v.trade.raison)) : 'pas de trade';
+        t += "  " + v.tf + " : " + st + " · " + v.gaps_non_comblés.length + " gap(s) non comblé(s) · SMT " +
+             (v.smt ? v.smt.type : '—') + " · " + tr + "\n";
+      });
+      t += "UNITÉ RETENUE : " + (d.tf_retenue || '—') +
+           " — on garde la plus BASSE qui valide (entrée la plus précise), pas celle qui affiche le plus gros RR : " +
+           "un RR énorme vient presque toujours d'un stop trop serré.\n";
+    }
+    if (d.sessions) {
+      var p = d.sessions;
+      t += "Pools de liquidité récents — ASIE : haut " + (p.asia.h != null ? p.asia.h.toFixed(2) : '—') +
+        " / bas " + (p.asia.l != null ? p.asia.l.toFixed(2) : '—') +
+        " · LONDRES : haut " + (p.londres.h != null ? p.londres.h.toFixed(2) : '—') +
+        " / bas " + (p.londres.l != null ? p.londres.l.toFixed(2) : '—') + "\n";
+    }
+    if (d.structure) {
+      var st = d.structure;
+      t += "STRUCTURE (calculée sur les bougies M15, pas estimée) :\n";
+      t += "  Séquence : " + (st.valide ? "✅ VALIDE — sens " + st.sens : "❌ NON valide") + "\n";
+      if (st.sweep) {
+        t += "  Balayage : " + st.sweep.quoi + " à " + st.sweep.niveau +
+          " (le prix est allé jusqu'à " + st.sweep.prix_atteint + ")\n";
+      } else { t += "  Balayage : aucun balayage de liquidité identifié.\n"; }
+      t += "  Inversion : " + (st.inversion ? "confirmée à " + st.inversion.prix + " (" + st.inversion.definition + ")"
+                                            : "PAS encore confirmée") + "\n";
+      t += "  Lecture : " + st.detail + "\n";
+      t += "  ⚠️ La définition d'inversion utilisée ici est : " + st.definition_inversion +
+        ". Il n'existe pas de définition universelle — ne présente pas celle-ci comme officielle.\n";
+      if (!st.valide) {
+        t += "  ⛔ Sans séquence valide (balayage + structure + inversion), le MECH INTERDIT le trade : renvoie \"idees\": [].\n";
+      }
+    }
+    if (d.gaps_non_comblés.length) {
+      t += "GAPS NON COMBLÉS sur NQ (M15) — ce sont TES CIBLES (vise l'EQ) :\n";
+      d.gaps_non_comblés.forEach(function (g) {
+        t += "  • " + g.type + " " + g.sens + " : zone " + g.zone[0] + "–" + g.zone[1] + " · EQ (cible) = " + g.eq_cible + "\n";
+      });
+    } else { t += "Aucun gap non comblé détecté en M15 — sans cible de gap, le MECH ne donne pas de trade.\n"; }
+    if (d.trade) {
+      var tr = d.trade;
+      if (tr.possible) {
+        t += "TRADE CALCULÉ PAR LES RÈGLES (entrée/stop/objectif déjà déduits — reprends CES chiffres) :\n";
+        t += "  " + tr.sens + " · entrée " + tr.entree + " · stop " + tr.sl + " (" + tr.sl_source + ")" +
+             " · objectif " + tr.tp + " (" + tr.cible_tf + ") · RR " + tr.rr + "\n";
+        t += "  Break-even au 1:1 = " + tr.be + (tr.runner != null ? " · runner (liquidité externe) = " + tr.runner : "") + "\n";
+        if (tr.htf_aligne != null) {
+          t += "  Biais H1 : " + (tr.htf_aligne ? "ALIGNÉ avec le trade (la probabilité monte nettement)"
+                                                : "OPPOSÉ au trade (le modèle reste valable mais la probabilité baisse)") + "\n";
+        }
+        t += "  " + tr.raison + "\n";
+      } else {
+        t += "TRADE : impossible — " + tr.raison + "\n";
+      }
+    }
+    if (d.smt) {
+      t += "SMT (NQ vs S&P 500 / ES) : " + d.smt.type + " — " + d.smt.detail + "\n";
+      t += "  ⚠️ " + d.smt.consigne + "\n";
+    }
+    t += "RAPPEL : tu ne trades QUE le NQ avec le MECH Model, et la SMT se lit contre le S&P 500 (ES).\n";
+    return t;
+  }
+
+  root.NQ = { load: load, data: data, promptBlock: promptBlock, candles: candles,
+    // accès direct à Yahoo, sans passer par le CFD : sert à comparer les deux
+    brut: yahoo,
+    findGaps: findGaps, smt: smt, swings: swings, structure: structure,
+    sessionPools: sessionPools, trade: trade, TFS: TFS, analyseTF: analyseTF,
+    zonesFVG: zonesFVG, inversionIFVG: inversionIFVG };
+})(typeof window !== 'undefined' ? window : this);
+
+</script>
+<script>
+'use strict';
+/**
+ * STRUCTURE — briques de détection, version navigateur.
+ *
+ * Portage littéral de scripts/lib/structure.js, le module utilisé par le
+ * backtest. Le site et la mesure doivent partager EXACTEMENT le même code de
+ * détection : sinon les signaux affichés ne sont pas ceux qui ont été mesurés,
+ * ce qui était précisément le décalage à corriger.
+ */
+(function (root) {
+  /**
+   * Briques de structure de marché. AUCUNE décision de trading ici — uniquement
+   * la détection, pour qu'elle soit partagée, testable et identique d'une version
+   * à l'autre du modèle.
+   *
+   * Marquage : [ICT] canonique · [COMM] implémentation communautaire ·
+   * [HYP] hypothèse non sourcée.
+   */
+
+  // ───────────────────────────────────────────────── agrégation d'unités ─────
+  /** Regroupe n bougies en une. Sert à fabriquer le 4H, absent de Yahoo. */
+  function agreger(cs, n) {
+    const out = [];
+    for (let i = 0; i + n <= cs.length; i += n) {
+      const p = cs.slice(i, i + n);
+      out.push({ t: p[0].t, o: p[0].o, c: p[n - 1].c,
+        h: Math.max(...p.map(x => x.h)), l: Math.min(...p.map(x => x.l)) });
+    }
+    return out;
+  }
+
+  // ───────────────────────────────────────────────────────────── FVG [ICT] ────
+  /**
+   * Motif à 3 bougies dont les mèches 1 et 3 ne se chevauchent pas.
+   * `casse` = index de la première bougie qui CLÔTURE au-delà de la zone, du
+   * côté opposé — c'est ce qui invalide le gap et, à l'inverse, ce qui crée
+   * l'inversion (IFVG).
+   */
+  function fvgs(cs) {
+    const z = [];
+    for (let i = 2; i < cs.length; i++) {
+      if (cs[i].l > cs[i - 2].h)
+        z.push({ bas: cs[i - 2].h, haut: cs[i].l, haussier: true, ne: i, t: cs[i].t });
+      else if (cs[i].h < cs[i - 2].l)
+        z.push({ bas: cs[i].h, haut: cs[i - 2].l, haussier: false, ne: i, t: cs[i].t });
+    }
+    z.forEach(x => {
+      x.casse = null; x.tCasse = null; x.touche = null; x.tTouche = null;
+      for (let k = x.ne + 1; k < cs.length; k++) {
+        if (x.touche == null && cs[k].l <= x.haut && cs[k].h >= x.bas) { x.touche = k; x.tTouche = cs[k].t; }
+        if (x.haussier ? cs[k].c < x.bas : cs[k].c > x.haut) { x.casse = k; x.tCasse = cs[k].t; break; }
+      }
+    });
+    return z;
+  }
+
+  /**
+   * État d'un FVG à un instant donné, pour le score de biais.  [HYP] — la source
+   * parle de FVG « respectés ou non », sans définir les deux mots.
+   *
+   *   RESPECTÉ     le prix est entré dans la zone et en est ressorti du bon côté,
+   *                sans qu'une bougie clôture au-delà
+   *   NON RESPECTÉ une bougie a clôturé au-delà de la zone, du côté opposé
+   *   EN ATTENTE   le prix n'a pas encore interagi avec la zone
+   */
+  function etatFVG(z, idx) {
+    if (z.ne > idx) return 'futur';
+    if (z.casse != null && z.casse <= idx) return 'non-respecte';
+    if (z.touche != null && z.touche <= idx) return 'respecte';
+    return 'attente';
+  }
+
+  // ──────────────────────────────── hiérarchie STL / ITL / LTL — [ICT] ────────
+  /**
+   * Définition canonique, FRACTALE et SANS PARAMÈTRE :
+   *
+   *   STL  un creux encadré d'un creux PLUS HAUT de chaque côté
+   *   ITL  un STL encadré d'un STL PLUS HAUT de chaque côté
+   *   LTL  un ITL encadré d'un ITL PLUS HAUT de chaque côté
+   *
+   * Il n'y a donc ni longueur de lookback ni distance minimale à régler : toute
+   * valeur de ce genre serait une invention.
+   *
+   * `vu` = instant où le niveau devient CONNAISSABLE, c'est-à-dire quand
+   * l'élément de droite est lui-même confirmé. C'est cet horodatage qui doit
+   * être utilisé par un backtest, jamais celui de l'extrême : sinon on lit
+   * l'avenir.
+   */
+  function niveau1(cs, bas) {                       // STL / STH
+    const out = [];
+    for (let i = 1; i < cs.length - 1; i++) {
+      const a = cs[i - 1], m = cs[i], b = cs[i + 1];
+      if (bas ? (a.l > m.l && b.l > m.l) : (a.h < m.h && b.h < m.h))
+        out.push({ prix: bas ? m.l : m.h, i, t: m.t, vu: b.t });
+    }
+    return out;
+  }
+  function niveauSup(pts, bas) {                    // ITL depuis STL, LTL depuis ITL
+    const out = [];
+    for (let i = 1; i < pts.length - 1; i++) {
+      const a = pts[i - 1], m = pts[i], b = pts[i + 1];
+      if (bas ? (a.prix > m.prix && b.prix > m.prix) : (a.prix < m.prix && b.prix < m.prix))
+        out.push({ prix: m.prix, i: m.i, t: m.t, vu: b.vu });   // connu quand celui de droite est confirmé
+    }
+    return out;
+  }
+  function hierarchie(cs) {
+    const stl = niveau1(cs, true),  sth = niveau1(cs, false);
+    const itl = niveauSup(stl, true), ith = niveauSup(sth, false);
+    return { stl, sth, itl, ith, ltl: niveauSup(itl, true), lth: niveauSup(ith, false) };
+  }
+
+  // ──────────────────────────────────────────────────────── CISD — [HYP] ─────
+  /**
+   * Change in State of Delivery. Plusieurs variantes circulent ; celle-ci est la
+   * plus répandue et la plus mécanique :
+   *
+   *   dernière série consécutive de bougies BAISSIÈRES qui produit un plus-bas,
+   *   puis une CLÔTURE au-dessus de l'OPEN de la première bougie de la série
+   *   → changement d'état haussier. Zone = [plus-bas de la série, cet open].
+   *
+   * UNCONFIRMED ASSUMPTION : la source cite « CISD » sans le définir.
+   */
+  function cisd(cs) {
+    const out = [];
+    for (let i = 2; i < cs.length; i++) {
+      for (const haussier of [true, false]) {
+        // série de bougies de sens opposé qui précède i
+        let j = i - 1, ext = haussier ? Infinity : -Infinity;
+        while (j >= 0 && (haussier ? cs[j].c < cs[j].o : cs[j].c > cs[j].o)) {
+          ext = haussier ? Math.min(ext, cs[j].l) : Math.max(ext, cs[j].h); j--;
+        }
+        const deb = j + 1;
+        if (deb > i - 1) continue;                       // pas de série
+        const ouv = cs[deb].o;
+        if (haussier ? cs[i].c > ouv : cs[i].c < ouv) {
+          out.push({ bas: haussier ? ext : ouv, haut: haussier ? ouv : ext,
+            haussier, ne: i, t: cs[i].t, type: 'CISD' });
+        }
+      }
+    }
+    return out;
+  }
+
+  // ──────────────────────────────────────────── Rejection Block — [HYP] ──────
+  /**
+   * La MÈCHE — et non le corps — de la bougie qui marque un extrême rejeté.
+   * Zone = [extrémité du corps, extrémité de la mèche].
+   *
+   * UNCONFIRMED ASSUMPTION : la source cite « Rejection Block » sans le définir.
+   * Le seuil « la mèche fait au moins la moitié du range » est de nous.
+   */
+  function rejectionBlocks(cs, ratio) {
+    const r = ratio == null ? 0.5 : ratio, out = [];
+    for (let i = 1; i < cs.length - 1; i++) {
+      const c = cs[i], rng = c.h - c.l; if (rng <= 0) continue;
+      const corpsH = Math.max(c.o, c.c), corpsB = Math.min(c.o, c.c);
+      // mèche basse longue + creux local → bloc haussier
+      if ((corpsB - c.l) / rng >= r && cs[i - 1].l > c.l && cs[i + 1].l > c.l)
+        out.push({ bas: c.l, haut: corpsB, haussier: true, ne: i, t: c.t, type: 'RB' });
+      if ((c.h - corpsH) / rng >= r && cs[i - 1].h < c.h && cs[i + 1].h < c.h)
+        out.push({ bas: corpsH, haut: c.h, haussier: false, ne: i, t: c.t, type: 'RB' });
+    }
+    return out;
+  }
+
+  // ───────────────────────────────────────────────────────────────── ATR ─────
+  function atr(cs, n) {
+    const p = n || 14, a = new Array(cs.length).fill(null);
+    const tr = new Array(cs.length).fill(0);
+    for (let i = 1; i < cs.length; i++)
+      tr[i] = Math.max(cs[i].h - cs[i].l, Math.abs(cs[i].h - cs[i - 1].c), Math.abs(cs[i].l - cs[i - 1].c));
+    let s = 0;
+    for (let i = 1; i < cs.length; i++) {
+      s += tr[i];
+      if (i > p) s -= tr[i - p];
+      if (i >= p) a[i] = s / p;
+    }
+    return a;
+  }
+
+  /** Index de la dernière bougie dont l'horodatage est ≤ t (anti-anticipation). */
+  function idxA(serie, t) {
+    let lo = 0, hi = serie.length - 1, r = -1;
+    while (lo <= hi) { const m = (lo + hi) >> 1; if (serie[m].t <= t) { r = m; lo = m + 1; } else hi = m - 1; }
+    return r;
+  }
+  root.ST = { agreger: agreger, fvgs: fvgs, etatFVG: etatFVG, hierarchie: hierarchie,
+    niveau1: niveau1, niveauSup: niveauSup, cisd: cisd, rejectionBlocks: rejectionBlocks,
+    atr: atr, idxA: idxA };
+})(typeof window !== 'undefined' ? window : this);
+
+</script>
+<script>
+'use strict';
+/**
+ * LE MODÈLE — version navigateur, calquée sur scripts/mech.js.
+ *
+ * Même chaîne, mêmes définitions, mêmes réglages que ceux qui ont été
+ * MESURÉS :
+ *
+ *   NQ seul · bougies 5 min · 09 h 30 → 10 h 00 New York
+ *   56 trades · 83,9 % de réussite · espérance +0,237 R · profit factor 2,45
+ *   drawdown maximal 2,21 R    (voir scripts/REGLAGES.md)
+ *
+ * Réserve, à garder en tête : ce réglage est le meilleur de 263 essais menés
+ * sur la même période de soixante jours. Il tient sur deux blocs de trente
+ * jours et résiste au déplacement de ses paramètres, mais il ne transfère ni
+ * à l'ES ni à une autre unité d'exécution. Le seuil d'équilibre est de 68 %
+ * de trades non perdants : la marge n'est que de quinze points.
+ *
+ *   BIAIS HTF → DOL → NIVEAU CLÉ → TOUCHE → IFVG (clôture de corps) → ENTRÉE
+ */
+(function (root) {
+
+  var CFG = {
+    ghDeb: 9 * 60 + 30, ghFin: 10 * 60,   // fenêtre mesurée, heure de New York
+    seuil: 2, fvgn: 1,                    // biais : score minimum, FVG comptés par unité
+    keyAge: 400, react: 12,               // âge d'un niveau, bougies entre touche et IFVG
+    tp1: 0.5, tp2: 2.5, part: 0.9,        // partiel à 0,5 R, runner à 2,5 R
+    buf: 0.02, atrMin: 0.3,               // tampon du stop en %, stop minimum en fraction d'ATR
+    maxJour: 2
+  };
+
+  var NY = 'America/New_York';
+  var fmtET = new Intl.DateTimeFormat('en-US', { timeZone: NY, hour12: false,
+    weekday: 'short', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+  var DOW = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+  function heure(t) {
+    var o = {}; fmtET.formatToParts(new Date(t)).forEach(function (p) { o[p.type] = p.value; });
+    var h = +o.hour; if (h === 24) h = 0;
+    return { jour: o.year + '-' + o.month + '-' + o.day, dow: DOW[o.weekday], min: h * 60 + (+o.minute) };
+  }
+
+  // ── biais : score de respect des FVG sur 1D, 4H, 1H, 15M ────────── [COMM]
+  // Respecté : le prix est entré dans la zone et en est ressorti du bon côté.
+  // Non respecté : une bougie a clôturé au-delà, du côté opposé.
+  function prepareBiais(series) {
+    return series.map(function (cs) {
+      var out = [];
+      ST.fvgs(cs).forEach(function (z) {
+        var iRes = z.casse != null ? z.casse : z.touche;
+        if (iRes == null) return;
+        var respecte = z.casse == null;
+        out.push({ t: cs[iRes].t, c: (z.haussier ? 1 : -1) * (respecte ? 1 : -1) });
+      });
+      return out.sort(function (a, b) { return a.t - b.t; });
+    });
+  }
+  function biaisA(prep, t) {
+    var score = 0;
+    prep.forEach(function (serie) {
+      var d = serie.filter(function (r) { return r.t <= t; }).slice(-CFG.fvgn);
+      var s = d.reduce(function (a, r) { return a + r.c; }, 0);
+      score += s > 0 ? 1 : s < 0 ? -1 : 0;
+    });
+    return { score: score, dir: score >= CFG.seuil ? 1 : score <= -CFG.seuil ? -1 : 0 };
+  }
+
+  /**
+   * Évalue le modèle sur les bougies fournies et rend l'état COURANT.
+   * @param D { m1, m2, m5, m15, h1, d1 }
+   */
+  function evaluer(D) {
+    if (!D || !D.m5 || D.m5.length < 80 || !D.h1 || !D.d1 || !D.m15) return null;
+    var clock = D.m5;
+    var m30 = ST.agreger(D.m15, 2), h4 = ST.agreger(D.h1, 4);
+    var prep = prepareBiais([D.d1, h4, D.h1, D.m15]);
+    var hierH1 = ST.hierarchie(D.h1);
+
+    // ── niveaux clés : quatre familles, cinq unités ────────────────── [COMM]
+    var UNITES = [{ cs: D.m5, n: 'M5' }, { cs: D.m15, n: 'M15' }, { cs: m30, n: 'M30' },
+                  { cs: D.h1, n: 'H1' }, { cs: h4, n: 'H4' }];
+    var niveaux = [];
+    UNITES.forEach(function (u) {
+      var push = function (zs, type) { zs.forEach(function (z) {
+        niveaux.push({ type: type, tf: u.n, cs: u.cs, bas: z.bas, haut: z.haut,
+          haussier: z.haussier, ne: z.ne, casse: z.casse == null ? null : z.casse }); }); };
+      push(ST.fvgs(u.cs), 'FVG');
+      push(ST.cisd(u.cs), 'CISD');
+      push(ST.rejectionBlocks(u.cs), 'RB');
+      var h = ST.hierarchie(u.cs);
+      h.itl.forEach(function (x) { niveaux.push({ type: 'ITL', tf: u.n, cs: u.cs, bas: x.prix,
+        haut: u.cs[x.i].h, haussier: true, ne: x.i, casse: null, vu: x.vu }); });
+      h.ith.forEach(function (x) { niveaux.push({ type: 'ITH', tf: u.n, cs: u.cs, bas: u.cs[x.i].l,
+        haut: x.prix, haussier: false, ne: x.i, casse: null, vu: x.vu }); });
+    });
+
+    var zIF = { '5m': ST.fvgs(D.m5), '2m': D.m2 ? ST.fvgs(D.m2) : [], '1m': D.m1 ? ST.fvgs(D.m1) : [] };
+    var atrC = ST.atr(clock);
+
+    // DOL : la liquidité intacte LA PLUS PROCHE dans le sens du biais.
+    function dolNiveau(t, dir, px) {
+      var idx = ST.idxA(D.h1, t); if (idx < 0) return null;
+      var liste = dir > 0 ? hierH1.ith : hierH1.itl, best = null;
+      for (var i = 0; i < liste.length; i++) {
+        var sw = liste[i];
+        if (sw.vu > t) continue;
+        if (dir > 0 ? sw.prix <= px : sw.prix >= px) continue;
+        var pris = false;
+        for (var k = sw.i + 1; k <= idx; k++)
+          if (dir > 0 ? D.h1[k].h > sw.prix : D.h1[k].l < sw.prix) { pris = true; break; }
+        if (pris) continue;
+        if (best == null || Math.abs(sw.prix - px) < Math.abs(best - px)) best = sw.prix;
+      }
+      return best;
+    }
+
+    // ── machine à états, identique au backtest ─────────────────────────────
+    var etat = 'CHERCHE', dir = 0, key = null, legDeb = 0, tTouche = 0;
+    var parJour = {}, dernier = null, etapes = null;
+
+    for (var i = 60; i < clock.length; i++) {
+      var bar = clock[i], e = heure(bar.t), px = bar.c;
+      if (parJour[e.jour] === undefined) { parJour[e.jour] = 0; etat = 'CHERCHE'; key = null; }
+      if (e.dow < 1 || e.dow > 5 || e.min < CFG.ghDeb || e.min >= CFG.ghFin) continue;
+      if (parJour[e.jour] >= CFG.maxJour) continue;
+
+      var b = biaisA(prep, bar.t);
+      var etapeCourante = { score: b.score, dir: b.dir, dol: null, key: null, ifvg: null, t: bar.t };
+      if (b.dir === 0) { etapes = etapeCourante; continue; }
+      if (b.dir !== dir) { dir = b.dir; etat = 'CHERCHE'; key = null; }
+
+      var dol = dolNiveau(bar.t, dir, px);
+      etapeCourante.dol = dol;
+      if (dol == null) { etapes = etapeCourante; continue; }
+
+      if (etat === 'CHERCHE') {
+        var best = null;
+        for (var n = 0; n < niveaux.length; n++) {
+          var z = niveaux[n], idx = ST.idxA(z.cs, bar.t);
+          if (z.ne == null || z.ne > idx || idx - z.ne > CFG.keyAge) continue;
+          if (z.vu && z.vu > bar.t) continue;
+          if (z.casse != null && z.casse <= idx) continue;
+          if (z.haussier !== (dir > 0)) continue;
+          var d = dir > 0 ? px - z.haut : z.bas - px;
+          if (d < 0) continue;
+          if (!best || d < best.d) best = { z: z, d: d };
+        }
+        if (best) { key = best.z; etat = 'ATTEND_TOUCHE'; }
+      }
+      etapeCourante.key = key;
+
+      if (etat === 'ATTEND_TOUCHE' && key) {
+        if (bar.l <= key.haut && bar.h >= key.bas) { etat = 'ATTEND_IFVG'; tTouche = bar.t; legDeb = i; }
+        else if (dir > 0 ? px < key.bas : px > key.haut) { key = null; etat = 'CHERCHE'; }
+      }
+
+      if (etat === 'ATTEND_IFVG' && key) {
+        if (i - legDeb > CFG.react) { etat = 'CHERCHE'; key = null; etapes = etapeCourante; continue; }
+        var choisi = null, ordre = ['5m', '2m', '1m'];
+        for (var o = 0; o < ordre.length && !choisi; o++) {
+          var zs = zIF[ordre[o]];
+          for (var q = 0; q < zs.length; q++) {
+            var zz = zs[q];
+            if (zz.tCasse == null || zz.tCasse < tTouche || zz.tCasse > bar.t) continue;
+            if ((zz.haussier ? -1 : 1) !== dir) continue;
+            choisi = { z: zz, tf: ordre[o] }; break;
+          }
+        }
+        etapeCourante.ifvg = choisi;
+        if (choisi) {
+          var L = dir > 0, entree = px, buf = entree * CFG.buf / 100;
+          var sl = L ? choisi.z.bas - buf : choisi.z.haut + buf;   // stop au bord de l'IFVG
+          var risq = Math.abs(entree - sl);
+          if (risq > 0 && atrC[i] && risq >= atrC[i] * CFG.atrMin) {
+            dernier = { sens: L ? 'LONG' : 'SHORT', t: bar.t, entree: +entree.toFixed(2),
+              sl: +sl.toFixed(2), risq: risq,
+              tp1: +(L ? entree + risq * CFG.tp1 : entree - risq * CFG.tp1).toFixed(2),
+              tp: +(L ? entree + risq * CFG.tp2 : entree - risq * CFG.tp2).toFixed(2),
+              rr: CFG.part * CFG.tp1 + (1 - CFG.part) * CFG.tp2,
+              tf: choisi.tf, niveau: key.type + ' ' + key.tf, dol: dol,
+              barre: i, derniere: i >= clock.length - 2 };
+            parJour[e.jour]++; etat = 'CHERCHE'; key = null;
+          }
+        }
+      }
+      etapes = etapeCourante;
+    }
+
+    // ── HORS FENÊTRE ────────────────────────────────────────────────────
+    // La boucle ci-dessus ne regarde que 09 h 30 → 10 h 00, du lundi au
+    // vendredi. Vingt-trois heures et demie par jour elle ne tourne pas, et
+    // le site restait alors entièrement vide : aucun biais, aucun niveau,
+    // aucune explication. On refait donc ici une lecture d'AFFICHAGE sur la
+    // dernière bougie connue, sans machine à états et sans jamais produire de
+    // trade. Rien de ce qui suit ne peut modifier un signal.
+    var finB = clock[clock.length - 1], eFin = heure(finB.t);
+    var horsFenetre = eFin.dow < 1 || eFin.dow > 5 ||
+                      eFin.min < CFG.ghDeb || eFin.min >= CFG.ghFin;
+    // ⚠️ La condition était `etapes == null`. Or `etapes` conserve la
+    // DERNIÈRE bougie vue dans la fenêtre — celle de vendredi 09 h 55 si on
+    // est dimanche. Elle n'est donc presque jamais nulle, et l'écran
+    // affichait l'état de la séance précédente comme s'il était courant.
+    // Hors fenêtre, on relit toujours la dernière bougie connue.
+    if (horsFenetre || etapes == null) {
+      var bAff = biaisA(prep, finB.t);
+      dir = bAff.dir;
+      etapes = { score: bAff.score, dir: bAff.dir, t: finB.t, ifvg: null,
+                 dol: bAff.dir === 0 ? null : dolNiveau(finB.t, bAff.dir, finB.c),
+                 key: null };
+      if (bAff.dir !== 0) {
+        var meilleur = null, iFin = clock.length - 1;
+        for (var nn = 0; nn < niveaux.length; nn++) {
+          var zA = niveaux[nn], idxA = ST.idxA(zA.cs, finB.t);
+          if (zA.ne == null || zA.ne > idxA || idxA - zA.ne > CFG.keyAge) continue;
+          if (zA.vu && zA.vu > finB.t) continue;
+          if (zA.casse != null && zA.casse <= idxA) continue;
+          if (zA.haussier !== (bAff.dir > 0)) continue;
+          var dA = bAff.dir > 0 ? finB.c - zA.haut : zA.bas - finB.c;
+          if (dA < 0) continue;
+          if (meilleur == null || dA < meilleur.d) meilleur = { z: zA, d: dA };
+        }
+        if (meilleur) etapes.key = { type: meilleur.z.type, tf: meilleur.z.tf,
+                                     bas: meilleur.z.bas, haut: meilleur.z.haut };
+      }
+    }
+
+    // Pour l'affichage : ce que chaque unité offre comme niveaux clés valides
+    // dans le sens du biais. C'est la matière du radar et de la liste.
+    var fin = clock[clock.length - 1];
+    var parTF = ['M5', 'M15', 'M30', 'H1', 'H4'].map(function (nom) {
+      var n = 0, proche = null, type = null, liste = [];
+      if (dir !== 0) niveaux.forEach(function (z) {
+        if (z.tf !== nom) return;
+        var idx = ST.idxA(z.cs, fin.t);
+        if (z.ne == null || z.ne > idx || idx - z.ne > CFG.keyAge) return;
+        if (z.vu && z.vu > fin.t) return;
+        if (z.casse != null && z.casse <= idx) return;
+        if (z.haussier !== (dir > 0)) return;
+        var d = dir > 0 ? fin.c - z.haut : z.bas - fin.c;
+        if (d < 0) return;
+        n++;
+        // Le radar a besoin des niveaux un par un, pas seulement de leur
+        // nombre : un point par niveau, placé à sa distance du prix.
+        liste.push({ type: z.type, d: d, bas: z.bas, haut: z.haut });
+        if (proche == null || d < proche) { proche = d; type = z.type; }
+      });
+      liste.sort(function (a, b) { return a.d - b.d; });
+      return { tf: nom, n: n, distance: proche, type: type, liste: liste.slice(0, 14) };
+    });
+
+    return {
+      prix: fin.c, derniereBougie: fin.t,
+      etat: etat,
+      // Le sens et le score rendus sont ceux de la DERNIÈRE bougie évaluée, pas
+      // ceux que la machine à états traîne depuis une bougie antérieure :
+      // sinon on affiche « haussier » avec un score nul, ce qui se contredit.
+      dir: etapes ? etapes.dir : 0,
+      score: etapes ? etapes.score : 0,
+      dol: etapes ? etapes.dol : null,
+      key: etapes ? etapes.key : null,
+      ifvg: etapes ? etapes.ifvg : null,
+      // un signal n'est « vivant » que s'il vient d'être produit
+      parTF: parTF,
+      trade: dernier && dernier.derniere ? dernier : null,
+      dernierSignal: dernier,
+      hors: horsFenetre,
+      cfg: CFG
+    };
+  }
+
+  // ── quand le modèle peut-il parler ? ───────────────────────────────────
+  // Le site n'émet de position que du lundi au vendredi entre 09 h 30 et
+  // 10 h 00 à New York. Le reste du temps il doit le DIRE, pas se taire.
+  function fenetre(now) {
+    now = now || Date.now();
+    var e = heure(now);
+    var ouverte = e.dow >= 1 && e.dow <= 5 && e.min >= CFG.ghDeb && e.min < CFG.ghFin;
+    if (ouverte) return { ouverte: true, ms: (CFG.ghFin - e.min) * 60000 };
+    var t = now, d = e, ecoule = 0;
+    for (var k = 0; k < 9; k++) {
+      if (d.dow >= 1 && d.dow <= 5 && d.min < CFG.ghDeb)
+        return { ouverte: false, ms: ecoule + (CFG.ghDeb - d.min) * 60000 };
+      var saut = (24 * 60 - d.min) * 60000;         // jusqu'à minuit à New York
+      ecoule += saut; t += saut; d = heure(t);
+    }
+    return { ouverte: false, ms: null };
+  }
+
+  root.Modele = { evaluer: evaluer, CFG: CFG, heure: heure, fenetre: fenetre };
+})(typeof window !== 'undefined' ? window : this);
+
+</script>
+<script>
+'use strict';
+/**
+ * COMPTE — calibrage des positions sur un capital réel.
+ *
+ * Le modèle raisonne en R : une unité de risque. Ce module traduit le R en
+ * euros et en contrats, ce qui est la seule chose qui compte pour passer un
+ * ordre.
+ *
+ *   risque en devise du compte = capital × risque%
+ *   distance du stop en points = |entrée − stop|
+ *   contrats                   = risque converti ÷ (points × valeur du point)
+ *
+ * Le contrat est libellé en dollars, le compte peut être en euros : le taux
+ * EUR/USD est récupéré une fois par séance, et reste modifiable à la main si
+ * le flux est injoignable.
+ */
+var Compte = (function () {
+
+  var CLE = 'compte.reglages';
+  var DEF = { capital: 50000, devise: 'EUR', risque: 0.5, contrat: 'MNQ', taux: 1.08 };
+
+  // Valeur d'un point d'indice, en dollars.
+  var CONTRATS = {
+    MNQ: { nom: 'Micro E-mini Nasdaq', point: 2,  tick: 0.25 },
+    NQ:  { nom: 'E-mini Nasdaq',        point: 20, tick: 0.25 }
+  };
+
+  function lire() {
+    try { return Object.assign({}, DEF, JSON.parse(localStorage.getItem(CLE) || '{}')); }
+    catch (e) { return Object.assign({}, DEF); }
+  }
+  function ecrire(o) {
+    var r = Object.assign(lire(), o || {});
+    try { localStorage.setItem(CLE, JSON.stringify(r)); } catch (e) {}
+    return r;
+  }
+
+  /** Taux EUR/USD, rafraîchi au plus une fois par heure. */
+  var tauxT = 0;
+  // Le taux peut être relevé côté serveur par la tâche automatique et livré
+  // avec l'instantané. Quand c'est le cas, le navigateur n'a plus rien à
+  // chercher : il appelait pour cela les relais CORS, qui sont tous morts.
+  function setTaux(v) {
+    if (!(v > 0.5 && v < 2)) return false;
+    tauxT = Date.now(); ecrire({ taux: +v.toFixed(4) }); return true;
+  }
+  function tauxFrais() { return Date.now() - tauxT < 3600e3; }
+
+  function majTaux() {
+    var r = lire();
+    if (r.devise !== 'EUR') return Promise.resolve(1);
+    if (Date.now() - tauxT < 3600e3) return Promise.resolve(r.taux);
+    if (typeof NQ === 'undefined' || !NQ.brut) return Promise.resolve(r.taux);
+    return NQ.brut('EURUSD=X', '1d', '5d').then(function (d) {
+      var p = d && d.price;
+      if (p && p > 0.5 && p < 2) { tauxT = Date.now(); ecrire({ taux: +p.toFixed(4) }); return p; }
+      return r.taux;
+    }).catch(function () { return r.taux; });
+  }
+
+  /**
+   * Calibre une position.
+   * @param entree, stop, tp  niveaux du modèle
+   * @return { contrats, risqueDev, gainDev, points, pointsTP, valeurPoint,
+   *           risqueUnit, tropPetit }  — montants dans la devise du compte
+   */
+  function calibrer(entree, stop, tp) {
+    var r = lire(), c = CONTRATS[r.contrat] || CONTRATS.MNQ;
+    var points = Math.abs(entree - stop);
+    if (!(points > 0)) return null;
+
+    // ⚠️ `Math.abs` efface le signe. Un objectif placé du MAUVAIS CÔTÉ de
+    // l'entrée rendait donc un gain positif imaginaire — une perte affichée
+    // comme un profit, sans la moindre erreur. Le sens se déduit du stop :
+    // stop en dessous = achat, l'objectif doit être au-dessus. S'il ne l'est
+    // pas, le trade est incohérent et on refuse de chiffrer un gain.
+    var achat = stop < entree;
+    var coherent = tp == null || (achat ? tp > entree : tp < entree);
+    var pointsTP = (tp != null && coherent) ? Math.abs(tp - entree) : null;
+
+    // Le risque visé, exprimé dans la devise du compte puis converti en dollars.
+    var risqueDevVise = r.capital * r.risque / 100;
+    var enUSD = r.devise === 'EUR' ? risqueDevVise * r.taux : risqueDevVise;
+
+    var parContrat = points * c.point;                 // dollars risqués par contrat
+    var contrats = Math.floor(enUSD / parContrat);
+
+    // Le risque RÉEL tient au nombre entier de contrats, pas au risque visé.
+    var risqueUSD = contrats * parContrat;
+    var gainUSD = pointsTP != null ? contrats * pointsTP * c.point : null;
+    var conv = function (usd) { return r.devise === 'EUR' ? usd / r.taux : usd; };
+
+    return {
+      contrats: contrats,
+      tropPetit: contrats < 1,
+      incoherent: !coherent,
+      points: +points.toFixed(2),
+      pointsTP: pointsTP != null ? +pointsTP.toFixed(2) : null,
+      valeurPoint: c.point,
+      contratNom: c.nom,
+      devise: r.devise,
+      risqueVise: Math.round(risqueDevVise),
+      risqueDev: Math.round(conv(risqueUSD)),
+      gainDev: gainUSD != null ? Math.round(conv(gainUSD)) : null,
+      // Combien vaut 1 R sur ce compte : sert à traduire tout l'historique.
+      unite: Math.round(conv(risqueUSD)) || Math.round(risqueDevVise)
+    };
+  }
+
+  /** Valeur d'un R en devise du compte, indépendamment d'un trade précis. */
+  function uniteR() {
+    var r = lire();
+    return Math.round(r.capital * r.risque / 100);
+  }
+
+  function sym(d) { return d === 'EUR' ? ' €' : ' $'; }
+
+  return { lire: lire, ecrire: ecrire, calibrer: calibrer, uniteR: uniteR,
+           majTaux: majTaux, setTaux: setTaux, tauxFrais: tauxFrais,
+           CONTRATS: CONTRATS, sym: sym, DEF: DEF };
+})();
+if (typeof window !== 'undefined') window.Compte = Compte;
+
+</script>
+<script>
+/*
+ * Historique des trades — journal local (localStorage).
+ * Enregistre chaque trade proposé par les bots (avec la SOURCE : quel bot),
+ * clôture au TP (gagné) ou au SL (perdu) selon le prix courant, et calcule le bilan.
+ */
+(function (root) {
+  'use strict';
+  var STORE = 'tradeassist.history.v2'; // v2 : ignore l'ancien historique gonflé/faux
+  var COOLDOWN = 6 * 3600 * 1000; // 6 h avant de rouvrir le même trade après clôture
+  // Nettoyage des anciens journaux pourris (bug des faux gains empilés).
+  try { localStorage.removeItem('tradeassist.history'); localStorage.removeItem('ictsmc.history'); } catch (e) {}
+
+  function load() { try { return JSON.parse(localStorage.getItem(STORE) || '[]'); } catch (e) { return []; } }
+  function save(h) { try { localStorage.setItem(STORE, JSON.stringify(h)); } catch (e) {} }
+
+  // Ajoute les nouveaux trades (t = {sym,dir,entry,sl,tp,rr}) pour une source donnée.
+  function record(list, source) {
+    var h = load(), added = 0;
+    (list || []).forEach(function (t) {
+      if (!t || t.dir === 'WAIT' || t.rr == null || t.entry == null || t.sl == null || t.tp == null) return;
+      // Si le prix courant a DÉJÀ dépassé le TP ou le SL, l'entrée est manquée/invalide -> on n'enregistre pas
+      // (évite les faux "gagné/perdu" instantanés dès la création du trade).
+      if (t.price != null) {
+        var pr = +t.price, lg = t.dir === 'LONG';
+        if (lg && (pr >= +t.tp || pr <= +t.sl)) return;
+        if (!lg && (pr <= +t.tp || pr >= +t.sl)) return;
+      }
+      // ── DÉDOUBLONNAGE ────────────────────────────────────────────────
+      // Quand l'appelant fournit une CLÉ, elle identifie le signal lui-même
+      // (bougie + sens + prix d'entrée) et c'est le seul critère retenu.
+      //
+      // Sans clé, on retombe sur l'ancien garde-fou : un seul trade ouvert
+      // par sens, puis six heures de carence. Il convient à un bot qui
+      // pourrait re-signaler le même setup en boucle, mais il est ruineux
+      // pour le modèle MECH, qui se limite déjà tout seul à deux signaux
+      // par jour et en produit couramment deux du même sens à cinq minutes
+      // d'intervalle : mesuré, il en avalait 19 sur 55, soit 35 %.
+      if (t.key != null) {
+        if (h.some(function (x) { return x.key === t.key; })) return;
+      } else {
+        var open = h.some(function (x) { return x.status === 'open' && x.symbol === t.sym && x.source === source && x.direction === t.dir; });
+        var cd = h.some(function (x) { return x.status === 'closed' && x.symbol === t.sym && x.source === source && x.direction === t.dir && x.closedTs && (Date.now() - x.closedTs) < COOLDOWN; });
+        if (open || cd) return;
+      }
+      h.push({ id: Date.now() + '-' + t.sym + '-' + source + '-' + Math.random().toString(36).slice(2, 6),
+        ts: t.ts || Date.now(), key: t.key != null ? t.key : null,
+        source: source, symbol: t.sym, direction: t.dir,
+        entry: +t.entry, sl: +t.sl, tp: +t.tp, rr: +t.rr, motif: t.note || '',
+        tf: t.tf || null, style: t.style || null,
+        status: 'open', result: null, r: null });
+      added++;
+    });
+    if (added) save(h);
+    return added;
+  }
+
+  // Clôture les trades ouverts selon le prix courant {symbole: prix}.
+  function evaluate(priceBySym) {
+    var h = load(), changed = false;
+    h.forEach(function (x) {
+      if (x.status !== 'open') return;
+      var p = priceBySym[x.symbol]; if (p == null) return;
+      var hit = null;
+      if (x.direction === 'LONG') { if (p <= x.sl) hit = 'loss'; else if (p >= x.tp) hit = 'win'; }
+      else { if (p >= x.sl) hit = 'loss'; else if (p <= x.tp) hit = 'win'; }
+      if (hit) { x.status = 'closed'; x.result = hit; x.closedTs = Date.now(); x.r = hit === 'win' ? x.rr : -1; changed = true; }
+    });
+    if (changed) save(h);
+  }
+
+  function bilan(source) {
+    var all = load();
+    if (source) all = all.filter(function (x) { return x.source === source; });
+    var closed = all.filter(function (x) { return x.status === 'closed'; });
+    var wins = closed.filter(function (x) { return x.result === 'win'; }).length;
+    var rsum = closed.reduce(function (a, x) { return a + (x.r || 0); }, 0);
+    return { total: closed.length, wins: wins, loss: closed.length - wins,
+      open: all.filter(function (x) { return x.status === 'open'; }).length,
+      rate: closed.length ? Math.round(wins / closed.length * 100) : null, rsum: +rsum.toFixed(1) };
+  }
+
+  // Liste des sources (bots) présentes dans le journal.
+  function sources() {
+    var seen = {}, out = [];
+    load().forEach(function (x) { if (x.source && !seen[x.source]) { seen[x.source] = 1; out.push(x.source); } });
+    return out;
+  }
+
+  // Statistiques avancées, globales ou filtrées par source.
+  // R = multiple de risque (1 R = le risque du trade). 1 R ≈ 1 % du capital => 100 € sur 10 000 €.
+  function stats(source) {
+    var all = load();
+    if (source) all = all.filter(function (x) { return x.source === source; });
+    var openCount = all.filter(function (x) { return x.status === 'open'; }).length;
+    var closed = all.filter(function (x) { return x.status === 'closed'; })
+      .sort(function (a, b) { return (a.closedTs || a.ts) - (b.closedTs || b.ts); });
+    var wins = closed.filter(function (x) { return x.result === 'win'; });
+    var losses = closed.filter(function (x) { return x.result === 'loss'; });
+    var grossWin = wins.reduce(function (a, x) { return a + (x.r || 0); }, 0);
+    var grossLoss = Math.abs(losses.reduce(function (a, x) { return a + (x.r || 0); }, 0));
+    var rsum = grossWin - grossLoss;
+    var pf = grossLoss > 0 ? +(grossWin / grossLoss).toFixed(2) : (grossWin > 0 ? null : 0); // null = pas encore de perte (∞)
+    // Courbe d'équité cumulée (en R) + drawdown max.
+    var eq = [], run = 0, peak = 0, maxdd = 0;
+    closed.forEach(function (x) {
+      run += (x.r || 0); eq.push(+run.toFixed(2));
+      if (run > peak) peak = run;
+      if (peak - run > maxdd) maxdd = peak - run;
+    });
+    // Meilleur / pire trade (en R).
+    var best = null, worst = null;
+    closed.forEach(function (x) {
+      if (best == null || (x.r || 0) > (best.r || 0)) best = x;
+      if (worst == null || (x.r || 0) < (worst.r || 0)) worst = x;
+    });
+    // Série en cours (gains/pertes consécutifs, depuis la fin).
+    var streak = 0, streakType = null;
+    for (var i = closed.length - 1; i >= 0; i--) {
+      if (streakType == null) { streakType = closed[i].result; streak = 1; }
+      else if (closed[i].result === streakType) streak++;
+      else break;
+    }
+    return {
+      total: closed.length, wins: wins.length, loss: losses.length, open: openCount,
+      rate: closed.length ? Math.round(wins.length / closed.length * 100) : null,
+      rsum: +rsum.toFixed(1), eur: Math.round(rsum * 100),
+      pf: pf, maxdd: +maxdd.toFixed(1),
+      avgWin: wins.length ? +(grossWin / wins.length).toFixed(2) : null,
+      avgLoss: losses.length ? +(grossLoss / losses.length).toFixed(2) : null,
+      rrPlanned: closed.length ? +(closed.reduce(function (a, x) { return a + (x.rr || 0); }, 0) / closed.length).toFixed(2) : null,
+      best: best ? { sym: best.symbol, r: best.r } : null,
+      worst: worst ? { sym: worst.symbol, r: worst.r } : null,
+      streak: streak, streakType: streakType, equity: eq,
+      avgR: closed.length ? +(rsum / closed.length).toFixed(2) : null, // gain moyen par trade (R)
+      avgDurMs: closed.length ? Math.round(closed.reduce(function (a, x) { return a + ((x.closedTs || x.ts) - x.ts); }, 0) / closed.length) : null
+    };
+  }
+
+  function reset() { save([]); }
+
+  root.History = { load: load, record: record, evaluate: evaluate, bilan: bilan, stats: stats, sources: sources, reset: reset };
+})(typeof window !== 'undefined' ? window : this);
+
+</script>
+<script>
+'use strict';
+/**
+ * HISTORIQUE MESURÉ — les 55 signaux que le modèle produit sur les vraies
+ * bougies NQ du 13 juillet au 18 septembre 2026.
+ *
+ * ⚠️ CE NE SONT PAS DES POSITIONS QUI ONT ÉTÉ ENVOYÉES. Rien n'a jamais été
+ * envoyé : un test sur un champ inexistant coupait la chaîne. Ce sont des
+ * signaux RECONSTITUÉS a posteriori, au prix de clôture exact de la bougie
+ * qui les a déclenchés, avec la configuration retenue :
+ *
+ *   09 h 30 → 10 h 00 New York · partiel 0,5 R sur 90 % · runner 2,5 R
+ *   stop au bord de l'IFVG · 2 signaux par jour au maximum
+ *
+ * Le R affiché est NET DE FRAIS : 0,25 point de slippage par côté et 4,00 $
+ * de commission aller-retour, soit 0,7 point retiré de chaque trade. Le R
+ * brut est conservé en dernière colonne pour pouvoir vérifier l'écart.
+ *
+ *   brut  +11,55 R  (+2 887 €)      net  +10,12 R  (+2 531 €)
+ *   réussite 80,0 %  ·  profit factor 1,90  ·  +0,184 R par signal
+ *
+ * ⚠️ CES CHIFFRES NE SONT PAS REPRODUCTIBLES. La même commande, relancée
+ * deux heures plus tard, a rendu 54 signaux au lieu de 55, 85,2 % de
+ * réussite au lieu de 80,0 %, et 3 445 € au lieu de 2 531 € — 914 € d'écart
+ * sur la même période et la même configuration. Cinq signaux avaient
+ * disparu, quatre étaient apparus.
+ *
+ * La cause est la profondeur des séries Yahoo, bien plus courte qu'annoncée
+ * et glissante :
+ *
+ *   1 min    8 jours       2 min   ~36 jours      5 min   60 jours
+ *
+ * Or 11 des 55 signaux ont leur IFVG sur le 1 min ou le 2 min (20 %), et
+ * ils pèsent 4,25 R sur 11,55 R, soit 37 % du résultat. Chaque jour qui
+ * passe en efface un peu. Ce jeu est donc un CLICHÉ d'une mesure faite le
+ * 20 septembre 2026, pas une vérité qu'on peut revérifier.
+ *
+ * Ils sont affichés à part, étiquetés « reconstitué », et JAMAIS mélangés
+ * aux signaux réellement émis en direct. Vider le journal ne les touche pas :
+ * ils ne vivent pas dans le localStorage.
+ *
+ * Colonnes : jour, minute NY, sens, niveau, unité, entrée, stop, objectif,
+ *            RR visé, R net, R brut, sortie, horodatage, durée en minutes.
+ */
+var Mesure = (function () {
+  var BRUT = [
+  ["2026-07-13",570,"SHORT","CISD H4","5m",29644.75,29693.18,29523.68,0.7,0.436,0.45,"gain partiel",1783949400000,5],
+  ["2026-07-13",580,"SHORT","CISD M5","5m",29596,29615.17,29548.08,0.7,0.663,0.7,"gain",1783950000000,5],
+  ["2026-07-15",575,"SHORT","CISD M5","5m",29882.25,29938.48,29741.68,0.7,0.438,0.45,"gain partiel",1784122500000,5],
+  ["2026-07-15",585,"SHORT","ITH M5","5m",29784.75,29806.71,29729.85,0.7,0.418,0.45,"gain partiel",1784123100000,5],
+  ["2026-07-16",575,"SHORT","CISD H1","5m",29386,29426.63,29284.43,0.7,0.433,0.45,"gain partiel",1784208900000,5],
+  ["2026-07-16",580,"SHORT","CISD H1","5m",29317.75,29361.61,29208.1,0.7,0.434,0.45,"gain partiel",1784209200000,5],
+  ["2026-07-20",570,"LONG","CISD H4","5m",29136.5,29019.92,29427.95,0.7,-1.006,-1,"perte",1784554200000,25],
+  ["2026-07-22",570,"LONG","CISD M5","5m",29151,29118.17,29233.08,0.7,-1.021,-1,"perte",1784727000000,5],
+  ["2026-07-22",575,"LONG","RB M5","5m",29155.75,29139.92,29195.33,0.7,0.406,0.45,"gain partiel",1784727300000,5],
+  ["2026-07-23",585,"SHORT","ITH M15","5m",28760,28802.75,28653.13,0.7,0.434,0.45,"gain partiel",1784814300000,5],
+  ["2026-07-23",595,"SHORT","CISD H4","5m",28707.75,28742.49,28620.9,0.7,-1.02,-1,"perte",1784814900000,5],
+  ["2026-07-24",580,"SHORT","CISD M5","5m",28485,28544.95,28335.13,0.7,0.438,0.45,"gain partiel",1784900400000,5],
+  ["2026-07-28",570,"SHORT","RB M15","5m",27877,27904.33,27808.68,0.7,0.674,0.7,"gain",1785245400000,5],
+  ["2026-07-29",590,"SHORT","ITH M30","5m",27753.5,27817.05,27594.63,0.7,0.439,0.45,"gain partiel",1785333000000,10],
+  ["2026-07-31",580,"SHORT","ITH H4","5m",28419,28468.93,28294.18,0.7,0.436,0.45,"gain partiel",1785505200000,5],
+  ["2026-07-31",585,"SHORT","FVG H1","5m",28360.5,28385.42,28298.2,0.7,0.672,0.7,"gain",1785505500000,5],
+  ["2026-08-03",570,"SHORT","CISD M5","5m",28380.75,28604.93,27820.3,0.7,-1.003,-1,"perte",1785763800000,25],
+  ["2026-08-04",570,"LONG","CISD H4","5m",29382.75,29349.62,29465.58,0.7,0.429,0.45,"gain partiel",1785850200000,5],
+  ["2026-08-05",570,"LONG","CISD H4","5m",30013,29968.75,30123.63,0.7,-1.016,-1,"perte",1785936600000,5],
+  ["2026-08-05",580,"LONG","RB M5","5m",30052,30029.74,30107.65,0.7,0.419,0.45,"gain partiel",1785937200000,5],
+  ["2026-08-06",575,"LONG","CISD H4","5m",29385.5,29363.12,29441.45,0.7,0.669,0.7,"gain",1786023300000,5],
+  ["2026-08-06",580,"LONG","CISD M5","5m",29458.75,29398.61,29609.1,0.7,0.438,0.45,"gain partiel",1786023600000,5],
+  ["2026-08-07",570,"LONG","FVG M15","5m",29806,29777.29,29877.78,0.7,-1.024,-1,"perte",1786109400000,5],
+  ["2026-08-11",570,"SHORT","CISD M5","5m",29737.5,29777.45,29637.63,0.7,0.432,0.45,"gain partiel",1786455000000,5],
+  ["2026-08-11",575,"SHORT","CISD M5","5m",29702.25,29734.19,29622.4,0.7,-1.022,-1,"perte",1786455300000,5],
+  ["2026-08-14",570,"SHORT","ITH M5","5m",30206.25,30226.54,30155.53,0.7,0.416,0.45,"gain partiel",1786714200000,5],
+  ["2026-08-17",580,"SHORT","CISD M5","2m",30196.5,30227.79,30118.28,0.7,0.428,0.45,"gain partiel",1786974000000,5],
+  ["2026-08-18",585,"SHORT","CISD M5","5m",29657.25,29681.18,29597.43,0.7,0.421,0.45,"gain partiel",1787060700000,5],
+  ["2026-08-21",570,"SHORT","ITH M5","5m",29362.25,29408.37,29246.95,0.7,0.435,0.45,"gain partiel",1787319000000,5],
+  ["2026-08-21",575,"SHORT","CISD M30","5m",29350,29360.37,29324.08,0.7,0.632,0.7,"gain",1787319300000,5],
+  ["2026-08-24",570,"SHORT","RB H4","5m",29112.75,29131.57,29065.7,0.7,0.413,0.45,"gain partiel",1787578200000,5],
+  ["2026-08-24",575,"SHORT","CISD H4","5m",29080,29119.32,28981.7,0.7,0.682,0.7,"gain",1787578500000,5],
+  ["2026-08-25",585,"SHORT","ITH M15","2m",29393,29356.38,29301.45,0.7,0.431,0.45,"gain partiel",1787665500000,5],
+  ["2026-08-27",590,"SHORT","ITH M15","2m",29543.25,29493.66,29419.28,0.7,0.436,0.45,"gain partiel",1787838600000,5],
+  ["2026-08-31",575,"SHORT","RB M5","5m",29398.75,29420.88,29343.43,0.7,-1.032,-1,"perte",1788183300000,5],
+  ["2026-09-01",570,"SHORT","CISD H4","2m",29099,29107.07,29078.83,0.7,0.613,0.7,"gain",1788269400000,5],
+  ["2026-09-01",585,"SHORT","CISD M15","2m",29143.25,29075.83,28974.7,0.7,0.44,0.45,"gain partiel",1788270300000,5],
+  ["2026-09-03",575,"LONG","CISD M30","5m",29328.75,29277.13,29457.8,0.7,0.436,0.45,"gain partiel",1788442500000,5],
+  ["2026-09-03",580,"LONG","RB M15","2m",29345.5,29329.38,29385.8,0.7,0.407,0.45,"gain partiel",1788442800000,5],
+  ["2026-09-04",595,"LONG","ITL H1","5m",29691,29659.81,29768.98,0.7,-1.022,-1,"perte",1788530100000,5],
+  ["2026-09-08",570,"SHORT","RB H4","5m",29600.5,29627.42,29533.2,0.7,0.424,0.45,"gain partiel",1788874200000,5],
+  ["2026-09-08",575,"SHORT","RB M15","5m",29568,29596.91,29495.73,0.7,0.676,0.7,"gain",1788874500000,5],
+  ["2026-09-09",570,"LONG","ITL H4","5m",29478.75,29461.1,29522.88,0.7,0.41,0.45,"gain partiel",1788960600000,5],
+  ["2026-09-09",585,"LONG","RB M5","5m",29499.5,29479.6,29549.25,0.7,0.415,0.45,"gain partiel",1788961500000,5],
+  ["2026-09-10",590,"SHORT","FVG M30","5m",29105.75,29138.82,29023.08,0.7,0.429,0.45,"gain partiel",1789048200000,5],
+  ["2026-09-11",575,"LONG","CISD M30","1m",29400.75,29372.87,29470.45,0.7,0.425,0.45,"gain partiel",1789133700000,5],
+  ["2026-09-11",580,"LONG","RB M5","2m",29433.75,29409.11,29495.35,0.7,0.422,0.45,"gain partiel",1789134000000,5],
+  ["2026-09-14",575,"LONG","FVG M30","1m",28889,28904.97,28928.93,0.7,0.656,0.7,"gain",1789392900000,5],
+  ["2026-09-14",580,"LONG","RB M5","5m",28951.5,28933.71,28995.98,0.7,0.661,0.7,"gain",1789393200000,5],
+  ["2026-09-15",575,"LONG","RB M5","5m",29430.5,29419.61,29457.73,0.7,0.386,0.45,"gain partiel",1789479300000,5],
+  ["2026-09-16",585,"LONG","FVG M15","5m",29461.75,29438.86,29518.98,0.7,0.419,0.45,"gain partiel",1789566300000,5],
+  ["2026-09-16",595,"LONG","FVG M15","1m",29478.75,29453.35,29542.25,0.7,-1.028,-1,"perte",1789566900000,5],
+  ["2026-09-17",570,"SHORT","CISD H4","5m",29641.75,29687.93,29526.3,0.7,0.435,0.45,"gain partiel",1789651800000,5],
+  ["2026-09-17",575,"SHORT","ITH H1","5m",29620.5,29668.42,29500.7,0.7,-1.015,-1,"perte",1789652100000,10],
+  ["2026-09-18",585,"SHORT","RB M5","1m",29795.25,29828.46,29712.23,0.7,0.679,0.7,"gain",1789739100000,20]
+  ];
+  var CLES = ['jour','minNY','sens','niveau','tf','entry','sl','tp','rr','r','rBrut','sortie','ts','duree'];
+  var LISTE = BRUT.map(function (l) {
+    var o = {}; CLES.forEach(function (k, i) { o[k] = l[i]; });
+    o.source = 'MESURE'; o.symbol = 'NQ'; o.direction = o.sens;
+    o.status = 'closed'; o.result = o.r > 0 ? 'win' : 'loss';
+    o.motif = o.sortie + ' · IFVG ' + o.tf + ' sur ' + o.niveau +
+              ' · brut ' + (o.rBrut > 0 ? '+' : '') + o.rBrut + ' R';
+    return o;
+  });
+  function liste() { return LISTE.slice(); }
+  return { liste: liste };
+})();
+if (typeof window !== 'undefined') window.Mesure = Mesure;
+
+</script>
+<script>
+'use strict';
+/**
+ * NOTIFICATIONS — le site prévient au lieu d'attendre qu'on le regarde.
+ *
+ * ⚠️ HONNÊTETÉ SUR LE DÉLAI. Yahoo Finance sert le NQ avec environ 10 minutes
+ * de retard : c'est mesuré, pas supposé. Une notification d'ici n'est donc PAS
+ * un signal d'entrée en temps réel — c'est une alerte de surveillance. Le
+ * temps réel demande TradingView (pine/MECH_LIVE.pine) ou le flux Rithmic /
+ * Tradovate d'un compte prop firm.
+ *
+ * Le module affiche systématiquement l'âge de la donnée dans la notification,
+ * pour qu'on ne puisse pas se tromper là-dessus.
+ */
+var Notif = (function () {
+
+  var CLE_ETAT = 'notif.actif';
+  var CLE_VUS  = 'notif.vus';
+
+  function supporte() { return typeof Notification !== 'undefined'; }
+  function actif()    { try { return localStorage.getItem(CLE_ETAT) === '1'; } catch (e) { return false; } }
+  function permis()   { return supporte() && Notification.permission === 'granted'; }
+
+  function activer() {
+    if (!supporte()) return Promise.resolve(false);
+    return Notification.requestPermission().then(function (p) {
+      var ok = p === 'granted';
+      try { localStorage.setItem(CLE_ETAT, ok ? '1' : '0'); } catch (e) {}
+      return ok;
+    });
+  }
+  function desactiver() { try { localStorage.setItem(CLE_ETAT, '0'); } catch (e) {} }
+
+  // Mémoire des signaux déjà notifiés, pour ne pas sonner à chaque rafraîchissement.
+  function dejaVu(id) {
+    try {
+      var v = JSON.parse(localStorage.getItem(CLE_VUS) || '[]');
+      if (v.indexOf(id) >= 0) return true;
+      v.push(id);
+      if (v.length > 60) v = v.slice(-60);
+      localStorage.setItem(CLE_VUS, JSON.stringify(v));
+      return false;
+    } catch (e) { return false; }
+  }
+
+  /** Âge de la dernière bougie reçue, en minutes. */
+  // Le modèle renvoie `derniereBougie`. Ce module lisait `derniere_bougie`,
+  // qui n'a jamais existé : l'âge était donc toujours nul et la notification
+  // annonçait « retard inconnu ».
+  function ageMin(d) {
+    if (!d || !d.derniereBougie) return null;
+    return Math.round((Date.now() - d.derniereBougie) / 60000);
+  }
+
+  /**
+   * Notifie s'il y a un trade possible non encore signalé.
+   * @param d instantané renvoyé par Modele.evaluer()  (ce module lisait la
+   *          forme de NQ.load(), qui n'est plus appelée nulle part)
+   */
+  function verifier(d) {
+    // ⚠️ CORRIGÉ. La condition était `!d.trade.possible`. Or le modèle ne
+    // produit AUCUN champ `possible` : il renvoie sens, entree, sl, tp, rr,
+    // tf, niveau. `undefined` étant faux, cette ligne coupait TOUTES les
+    // notifications, y compris sur un signal parfaitement valide. C'est la
+    // raison pour laquelle le bot n'a jamais rien envoyé.
+    if (!d || !d.trade) return null;
+    // La fenêtre à respecter est celle du MODÈLE (09 h 30 → 10 h 00 à New
+    // York), pas celle de session.js, qui couvre toute la séance de Wall
+    // Street et n'a rien à voir.
+    if (d.hors) return null;
+    if (window.Modele && Modele.fenetre && !Modele.fenetre().ouverte) return null;
+
+    var t = d.trade, unite = t.tf || '?';
+    // Identité d'un signal : jour + sens + entrée + unité. Deux
+    // rafraîchissements du même setup donnent le même identifiant.
+    var id = [new Date().toISOString().slice(0, 10), t.sens, t.entree, unite].join('|');
+    if (dejaVu(id)) return null;
+
+    var age = ageMin(d);
+    var retard = age == null ? 'retard inconnu' : 'donnée vieille de ' + age + ' min';
+    var corps = t.sens + ' NQ · entrée ' + t.entree + ' · stop ' + t.sl +
+                ' · objectif ' + t.tp + ' (RR ' + t.rr + ')\n' +
+                (t.niveau || unite) + ' — ' + retard + ', vérifie le graphique avant d\'agir.';
+
+    if (permis() && actif()) {
+      try {
+        new Notification('Signal MECH — ' + t.sens + ' NQ', {
+          body: corps, tag: id, requireInteraction: false
+        });
+      } catch (e) {}
+    }
+    return { id: id, sens: t.sens, corps: corps, age: age };
+  }
+
+  return { supporte: supporte, actif: actif, permis: permis,
+           activer: activer, desactiver: desactiver,
+           verifier: verifier, ageMin: ageMin };
+})();
+if (typeof window !== 'undefined') window.Notif = Notif;
+
+</script>
+<script>
+'use strict';
+const $ = s => document.querySelector(s);
+const fmt = n => n == null ? '—' : Number(n).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmt0 = n => n == null ? '—' : Math.round(n).toLocaleString('fr-FR');
+// Le handoff impose le vrai signe moins U+2212, pas un trait d'union.
+const sgn = (v,d=2) => (v>0?'+':v<0?'−':'') + Math.abs(v).toFixed(d);
+let D = null, FILTRE = 'Toutes';
+
+const ACC='#9184d9', ACC3='#d2cefd', INK='#e9e9ed';
+const hexA=(h,a)=>{const n=parseInt(h.slice(1),16);
+  return 'rgba('+(n>>16&255)+','+(n>>8&255)+','+(n&255)+','+a+')';};
+
+const TFS = ['M5','M15','M30','H1','H4'];
+const hh = m => String(Math.floor(m/60)).padStart(2,'0') + ' h ' + String(m%60).padStart(2,'0');
+
+/* ── en-tête + état de séance ───────────────────────────────────────── */
+function duree(ms){
+  if(ms == null) return '—';
+  const m = Math.round(ms/60000), j = Math.floor(m/1440), h = Math.floor(m%1440/60), r = m%60;
+  if(j) return j + ' j ' + h + ' h';
+  if(h) return h + ' h ' + String(r).padStart(2,'0');
+  return r + ' min';
+}
+// « dans 1 j 0 h » ne dit rien à personne. On nomme le moment : « lundi
+// 15 h 30 », à l'heure de celui qui regarde l'écran.
+function moment(ms){
+  if(ms == null) return '—';
+  const d = new Date(Date.now() + ms);
+  const j = d.toLocaleDateString('fr-FR',{weekday:'long'});
+  const h = d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}).replace(':','\u00a0h\u00a0');
+  const auj = new Date();
+  const dem = ms < 36*3600000 && d.getDate() !== auj.getDate();
+  return (dem && (d - auj) < 36*3600000 && d.getDay() === (auj.getDay()+1)%7 ? 'demain' : j) + ' ' + h;
+}
+function paintTop(){
+  const p = D ? fmt(D.prix) : '—';
+  $('#px').textContent = p; $('#px-top').textContent = p;
+
+  const age = D && D.derniereBougie ? Math.round((Date.now() - D.derniereBougie)/60000) : null;
+  const src = D && D.source === 'cfd' ? 'OANDA' : D && D.source === 'robot' ? 'relevé' : 'Yahoo';
+  $('#age').textContent = age == null ? '—' : src + ' · −' + age + ' min';
+
+  const f = window.Modele ? Modele.fenetre() : null;
+  const c = window.Modele ? Modele.CFG : null;
+  if(f){
+    $('#sdot').className = 'dot' + (f.ouverte ? ' on' : '');
+    $('#stxt').textContent = f.ouverte ? 'Fenêtre ouverte' : 'Hors fenêtre';
+    // La raison du silence est écrite noir sur blanc : c'est exactement ce
+    // qui manquait — le site se taisait sans dire pourquoi.
+    $('#sess-why').innerHTML = f.ouverte
+      ? 'Le modèle regarde le marché. Il reste <b>' + duree(f.ms) + '</b> avant la fermeture ' +
+        'de la fenêtre.<span class="cd">' + duree(f.ms) + ' de balayage</span>'
+      : 'Le modèle n’émet de position que du lundi au vendredi, entre <b>' +
+        hh(c.ghDeb) + '</b> et <b>' + hh(c.ghFin) + '</b> à New York — ' +
+        'soit 15 h 30 → 16 h 00 à Paris. En dehors, il ne se prononce pas.' +
+        '<span class="cd">Ouverture ' + moment(f.ms) + '</span>' +
+        '<span style="color:var(--faint);font-size:11.5px">dans ' + duree(f.ms) + '</span>';
+  }
+  if(window.Compte){
+    const r = Compte.lire();
+    $('#cap-top').textContent = fmt0(r.capital) + ' ' + Compte.sym(r.devise);
+  }
+  if(window.History){
+    const b = History.bilan('MECH'), uR = window.Compte ? Compte.uniteR() : 0;
+    const e = $('#pnl-top');
+    e.textContent = b.total ? sgn(b.rsum,1) + ' R' : '—';
+    e.className = 'mono' + (b.rsum > 0 ? ' pos' : b.rsum < 0 ? ' neg' : '');
+    e.title = b.total ? Math.round(b.rsum*uR) + ' ' + (window.Compte?Compte.sym(Compte.lire().devise):'') : '';
+  }
+}
+
+/* ── la chaîne du modèle mesuré ─────────────────────────────────────── */
+function paintChain(){
+  const box = $('#chain');
+  if(!D){ box.innerHTML = '<div class="empty"><b>Aucune donnée</b>Récupération des bougies NQ…</div>'; return; }
+  const c = Modele.CFG;
+
+  const etapes = [
+    { t:'Biais haute unité',
+      ok: D.dir !== 0,
+      d: D.dir === 0 ? 'Neutre — score ' + D.score + '/4, il en faut ' + c.seuil + '.'
+                     : (D.dir > 0 ? 'Haussier' : 'Baissier') + ' — score ' + Math.abs(D.score) + '/4.',
+      long:'Respect des FVG en 1 jour, 4 h, 1 h et 15 min. Neutre = aucune position.' },
+    { t:'Draw on liquidity',
+      ok: D.dol != null,
+      d: D.dol != null ? 'Liquidité intacte à ' + fmt(D.dol) + '.' : 'Plus de liquidité intacte dans ce sens.',
+      long:'Swing 1 h non encore balayé, le plus proche dans le sens du biais.' },
+    { t:'Niveau clé',
+      ok: !!D.key,
+      d: D.key ? D.key.type + ' ' + D.key.tf + ' · ' + fmt(D.key.bas) + ' – ' + fmt(D.key.haut)
+               : 'Aucun niveau valide du bon côté.',
+      long:'FVG, ITL/ITH, CISD ou Rejection Block, de M5 à H4.' },
+    { t:'Touche',
+      ok: D.etat === 'ATTEND_IFVG',
+      attente: D.etat === 'ATTEND_TOUCHE',
+      d: D.etat === 'ATTEND_IFVG' ? 'Le prix est entré dans la zone.'
+         : D.etat === 'ATTEND_TOUCHE' ? 'Niveau repéré, le prix n’y est pas encore.'
+         : D.hors ? 'Suivie seulement pendant la fenêtre.' : 'Pas de niveau en attente.',
+      long:'On n’entre pas parce que le niveau existe : il faut que le prix y vienne.' },
+    { t:'IFVG confirmé',
+      ok: !!D.ifvg,
+      attente: D.etat === 'ATTEND_IFVG' && !D.ifvg,
+      d: D.ifvg ? 'Inversion ' + D.ifvg.tf + ' validée par clôture de corps.'
+                : D.hors ? 'Cherchée seulement pendant la fenêtre.' : 'Aucune inversion dans la jambe.',
+      long:'Plus haute unité disponible de 5 min vers 1 min. Le simple contact ne suffit pas.' }
+  ];
+
+  box.innerHTML = etapes.map(e => {
+    const cls = e.ok ? 'ok' : e.attente ? 'wait' : 'todo';
+    const lbl = e.ok ? 'validé' : e.attente ? 'en attente' : '';
+    const ti = e.long ? ' title="' + e.long.replace(/"/g,'&quot;') + '"' : '';
+    return '<div class="step ' + cls + '"' + ti + '>' +
+           '<span class="step-b"><span class="step-t">' + e.t + '</span>' +
+           '<span class="step-d">' + e.d + '</span></span>' +
+           (lbl ? '<span class="step-s">' + lbl + '</span>' : '') + '</div>';
+  }).join('');
+
+  const n = etapes.filter(e => e.ok).length;
+  $('#chain-tag').textContent = n + '/' + etapes.length;
+  $('#gauge').style.width = Math.round(n / etapes.length * 100) + '%';
+  $('#tf-tag').textContent = hh(c.ghDeb) + ' – ' + hh(c.ghFin) + ' NY';
+}
+
+/* ── la position ────────────────────────────────────────────────────── */
+function paintTrade(){
+  const box = $('#trade');
+  const t = D && (D.trade || D.dernierSignal);
+  const frais = D && D.trade && !D.hors;
+  const tete = '<div class="pan-h"><h2>Position</h2>' +
+               '<span class="tag">' + (frais ? 'à prendre' : t ? 'dernier signal' : '—') + '</span></div>';
+  const vide = h => tete + '<div class="empty">' + h + '</div>';
+
+  if(!D){ box.innerHTML = vide('<b>Aucune position</b>En attente des données du marché.'); return; }
+  if(!t){
+    const f = Modele.fenetre();
+    box.innerHTML = vide('<b>Aucune position</b>' +
+      (f.ouverte ? 'La chaîne n’est pas complète sur cette bougie.'
+                 : 'Hors fenêtre : le modèle ne se prononce pas.') +
+      '<span class="hint">prochaine ouverture ' + moment(f.ms) + '</span>');
+    return;
+  }
+  const L = t.sens === 'LONG';
+  // Distances SIGNÉES par rapport au sens du trade. `Math.abs` affichait
+  // « +200 pts » pour un objectif situé 200 points SOUS un achat.
+  const dp = L ? t.entree - t.sl : t.sl - t.entree;     // > 0 si le stop est du bon côté
+  const dt = L ? t.tp - t.entree : t.entree - t.tp;     // > 0 si l'objectif est du bon côté
+  const okSL = dp > 0, okTP = dt > 0;
+  const k = window.Compte ? Compte.calibrer(t.entree, t.sl, t.tp) : null;
+  const dev = k ? Compte.sym(k.devise) : '';
+  const quand = t.t ? new Date(t.t).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
+  box.innerHTML = tete +
+    '<div class="trade">' +
+      '<div class="t-head"><span class="t-dir ' + (L ? 'long' : 'short') + '">' + t.sens + '</span>' +
+        '<span class="t-tf">' + (t.niveau || '') + '</span>' +
+        '<span class="t-rr">RR ' + Number(t.rr).toFixed(2) + '</span></div>' +
+      '<div class="t-grid">' +
+        '<div class="t-cell"><div class="t-k">Entrée</div><div class="t-v mono">' + fmt(t.entree) + '</div></div>' +
+        '<div class="t-cell"><div class="t-k">Stop</div><div class="t-v sl mono">' + fmt(t.sl) + '</div>' +
+          '<div class="t-sub">' + (okSL ? '−' + dp.toFixed(1) + ' pts'
+            : '<span style="color:var(--loss)">du mauvais côté</span>') + '</div></div>' +
+        '<div class="t-cell"><div class="t-k">Objectif</div><div class="t-v tp mono">' + fmt(t.tp) + '</div>' +
+          '<div class="t-sub">' + (okTP ? '+' + dt.toFixed(1) + ' pts'
+            : '<span style="color:var(--loss)">du mauvais côté</span>') + '</div></div>' +
+        '<div class="t-cell"><div class="t-k">Taille</div>' +
+          (k && !k.tropPetit
+            ? '<div class="t-v mono">' + k.contrats + ' ' + Compte.lire().contrat + '</div>' +
+              '<div class="t-sub">risque ' + k.risqueDev + dev +
+                (k.gainDev != null ? ' · gain ' + k.gainDev + dev
+                                   : ' · <span style="color:var(--loss)">objectif incohérent</span>') + '</div>'
+            : '<div class="t-v" style="color:var(--dim)">—</div>' +
+              '<div class="t-sub">stop trop large pour ce capital</div>') +
+        '</div>' +
+      '</div>' +
+      '<div class="t-why">' +
+        (!okSL || !okTP
+          ? '<span style="color:var(--loss)">Ce signal est incohérent : stop et objectif doivent ' +
+            'encadrer l\u2019entrée. Ne le prends pas.</span>'
+        : frais ? 'Signal armé sur la bougie en cours. Partiel à 0,5 R sur 90 % de la taille, le reste court jusqu’à 2,5 R.'
+               : 'Ce signal date du ' + quand + '. Il est affiché pour mémoire — ce n’est pas une position à prendre maintenant.') +
+      '</div>' +
+    '</div>';
+}
+
+/* ── le radar (canvas Nocturne) ─────────────────────────────────────── */
+let blips = [], rafId = null;
+function majBlips(){
+  blips = [];
+  const vs = D && D.parTF; if(!Array.isArray(vs)) return;
+  const maxD = Math.max(1, ...vs.flatMap(v => (v.liste||[]).map(x => x.d)));
+  vs.forEach((v, i) => {
+    if(FILTRE !== 'Toutes' && FILTRE !== v.tf) return;
+    const base = i / TFS.length * Math.PI * 2;
+    (v.liste || []).forEach((z, j) => {
+      const jitter = (((j * 37) % 23) / 23 - 0.5) * (42 * Math.PI / 180);
+      blips.push({ ang: base + jitter, rad: 0.22 + (z.d / maxD) * 0.70,
+                   sym: z.type, tf: v.tf, ret: D.key && D.key.tf === v.tf && D.key.type === z.type && j === 0 });
+    });
+  });
+}
+function drawRadar(t){
+  const c = $('#radar'); if(!c) return;
+  const ctx = c.getContext('2d'); if(!ctx) return;
+  const dpr = window.devicePixelRatio || 1;
+  const W = 620, H = 560;
+  if(c.width !== W * dpr){ c.width = W * dpr; c.height = H * dpr; c.style.width = W + 'px'; c.style.height = H + 'px'; }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const cx = W / 2, cy = H / 2 - 8, R = 218;
+  ctx.clearRect(0, 0, W, H);
+
+  for(let i = 1; i <= 4; i++){
+    ctx.strokeStyle = hexA(INK, i === 4 ? .12 : .07); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(cx, cy, R * i / 4, 0, Math.PI * 2); ctx.stroke();
+  }
+  for(let i = 0; i < 20; i++){
+    const a = i / 20 * Math.PI * 2;
+    ctx.strokeStyle = hexA(INK, i % 4 === 0 ? .1 : .05);
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(a) * R, cy + Math.sin(a) * R); ctx.stroke();
+  }
+
+  const sweep = (t * 0.00055) % (Math.PI * 2);
+  const span = 0.85;
+  for(let k = 0; k < 26; k++){
+    const a = sweep - k / 26 * span;
+    ctx.strokeStyle = hexA(ACC, .16 * (1 - k / 26)); ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(a) * R, cy + Math.sin(a) * R); ctx.stroke();
+  }
+  ctx.strokeStyle = hexA(ACC3, .75); ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(sweep) * R, cy + Math.sin(sweep) * R); ctx.stroke();
+
+  TFS.forEach((nom, i) => {
+    const a = i / TFS.length * Math.PI * 2 - Math.PI / 2;
+    ctx.fillStyle = hexA(INK, FILTRE === 'Toutes' || FILTRE === nom ? .38 : .14);
+    ctx.font = '11px Inter, sans-serif';
+    ctx.textAlign = Math.cos(a) > .2 ? 'left' : Math.cos(a) < -.2 ? 'right' : 'center';
+    ctx.fillText(nom, cx + Math.cos(a) * (R + 14), cy + Math.sin(a) * (R + 14) + 4);
+  });
+  ctx.textAlign = 'left';
+
+  blips.forEach(b => {
+    const a = b.ang - Math.PI / 2;
+    const x = cx + Math.cos(a) * b.rad * R, y = cy + Math.sin(a) * b.rad * R;
+    let d = sweep - a; while(d < 0) d += Math.PI * 2; while(d > Math.PI * 2) d -= Math.PI * 2;
+    const lit = d < 1.6 ? 1 - d / 1.6 : 0;
+    ctx.strokeStyle = hexA(ACC, .1 + lit * .55); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(x, y, 5 + lit * 13, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = hexA(ACC3, .35 + lit * .65);
+    if(lit > .4){ ctx.shadowColor = ACC; ctx.shadowBlur = 12 * lit; }
+    ctx.beginPath(); ctx.arc(x, y, b.ret ? 4.2 : 3.2, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowBlur = 0;
+    if(lit > .25 || b.ret){
+      ctx.fillStyle = hexA(INK, .32 + lit * .5);
+      ctx.font = (lit > .5 || b.ret ? '600 ' : '') + '11px Inter, sans-serif';
+      ctx.fillText(b.sym, x + 9, y + 3.5);
+    }
+  });
+
+  ctx.fillStyle = hexA(ACC, .9);
+  ctx.beginPath(); ctx.arc(cx, cy, 2.6, 0, Math.PI * 2); ctx.fill();
+}
+function boucle(t){ drawRadar(t); rafId = requestAnimationFrame(boucle); }
+
+function paintRadar(){
+  majBlips();
+  const n = $('#near-v'), s = $('#near-s');
+  const vs = D && D.parTF;
+  const tous = Array.isArray(vs) ? vs.filter(v => v.distance != null) : [];
+  if(!tous.length){
+    n.textContent = '—';
+    s.textContent = D && D.dir === 0 ? 'biais neutre, aucun niveau retenu' : 'aucun niveau du bon côté';
+    return;
+  }
+  const best = tous.reduce((a, b) => b.distance < a.distance ? b : a);
+  n.textContent = best.distance.toFixed(1) + ' pts';
+  s.textContent = best.type + ' ' + best.tf;
+}
+
+/* ── tuiles par unité ───────────────────────────────────────────────── */
+function paintTFs(){
+  const box = $('#tfs');
+  const vs = D && D.parTF;
+  if(!Array.isArray(vs)){ box.innerHTML = ''; return; }
+  box.innerHTML = vs.map(v => {
+    const ret = D.key && D.key.tf === v.tf;
+    return '<div class="tile ' + (ret ? 'ret' : v.n ? '' : 'off') + '">' +
+      '<k>' + v.tf + '</k>' +
+      '<v class="mono">' + v.n + '</v>' +
+      '<s>' + (v.n ? (v.distance != null ? v.distance.toFixed(0) + ' pts · ' + v.type : 'niveaux valides')
+                   : 'aucun niveau') + '</s></div>';
+  }).join('');
+}
+
+/* ── filtres ────────────────────────────────────────────────────────── */
+function paintChips(){
+  $('#chips').innerHTML = ['Toutes'].concat(TFS)
+    .map(k => '<button class="chip' + (k === FILTRE ? ' on' : '') + '" data-k="' + k + '">' + k + '</button>').join('');
+}
+$('#chips').addEventListener('click', e => {
+  const b = e.target.closest('.chip'); if(!b) return;
+  FILTRE = b.dataset.k; paintChips(); majBlips();
+});
+
+function paintAll(){ paintTop(); paintChain(); paintTrade(); paintJournal(); paintRadar(); paintTFs(); }
+
+/* ── cycle de rafraîchissement ──────────────────────────────────────── */
+const SERIES = [['1m','8d'],['2m','60d'],['5m','60d'],['15m','60d'],['60m','3mo'],['1d','1y']];
+const CLES   = ['m1','m2','m5','m15','h1','d1'];
+
+async function charger(){
+  const out = {};
+  for(let i=0;i<SERIES.length;i++){
+    const [iv,rg] = SERIES[i];
+    const r = await NQ.candles('NQ=F', iv, rg).catch(()=>null);
+    out[CLES[i]] = r && r.candles ? r.candles : (Array.isArray(r) ? r : null);
+    if(!out[CLES[i]]) return null;
+  }
+  return out;
+}
+
+// Yahoo ne sert pas d'en-tête CORS, et les quatre relais publics que ce
+// site utilisait sont tous morts (500, 429, 429, 522 au dernier test). Un
+// navigateur ne peut donc plus joindre Yahoo depuis cette page.
+//
+// L'instantané est désormais produit par la tâche automatique — Node n'a
+// pas cette contrainte — et servi par GitHub avec `access-control-allow-
+// origin: *`. Le site le lit. Quand un jeton OANDA est enregistré, on
+// reprend le calcul local : ce flux-là est joignable directement, et en
+// temps réel.
+// Un instantané mal formé ne doit pas casser la page. On vérifie sa forme
+// UNE fois, ici, à la frontière — plutôt que de semer des gardes partout.
+// Un `parTF` qui n'est pas un tableau faisait planter le radar sur
+// `flatMap`, et un prix non numérique s'affichait « NaN ».
+function etatValide(j){
+  if(!j || typeof j !== 'object') return false;
+  if(typeof j.prix !== 'number' || !isFinite(j.prix) || j.prix <= 0) return false;
+  if(j.parTF != null && !Array.isArray(j.parTF)) return false;
+  if(j.dir != null && typeof j.dir !== 'number') return false;
+  if(j.trade != null && typeof j.trade !== 'object') return false;
+  return true;
+}
+
+async function etatDistant(){
+  // Servi par GitHub Pages à côté de la page : même origine, pas de CORS,
+  // pas de dépendance à un domaine tiers.
+  try{
+    const r = await fetch('data/etat.json?t=' + Date.now(), { cache:'no-store' });
+    if(r.ok){ const j = await r.json(); if(etatValide(j)) return j; }
+  }catch(e){ /* page ouverte en local : on passe par le dépôt */ }
+  for(const br of BRANCHES){
+    try{
+      const u = 'https://raw.githubusercontent.com/' + DEPOT + '/' +
+                encodeURIComponent(br).replace(/%2F/g,'/') + '/data/etat.json?t=' + Date.now();
+      const r = await fetch(u, { cache:'no-store' });
+      if(!r.ok) continue;
+      const j = await r.json();
+      if(etatValide(j)) return j;
+    }catch(e){ /* branche suivante */ }
+  }
+  return null;
+}
+
+async function refresh(){
+  try{
+    if(window.CFD && CFD.actif()){
+      const brut = await charger();
+      D = brut ? Modele.evaluer(brut) : null;
+      if(D) D.source = 'cfd';
+    } else {
+      D = await etatDistant();
+      if(D){ D.source = 'robot';
+        if(D.eurusd && window.Compte) Compte.setTaux(D.eurusd); }
+    }
+  }catch(e){ D = null; }
+  if(D && window.History){
+    History.evaluate({ NQ: D.prix });
+    const t = D.trade;
+    // Pas de test sur un champ `possible` : le modèle n'en produit pas. C'est
+    // exactement la faute qui vidait le journal.
+    // La clé identifie LE SIGNAL : bougie qui l'a produit + sens + entrée.
+    // Deux signaux du même sens à cinq minutes d'intervalle sont deux
+    // signaux, et doivent tous les deux entrer au journal.
+    if(t && !D.hors)
+      History.record([{ sym:'NQ', dir:t.sens, entry:t.entree, sl:t.sl, tp:t.tp, rr:t.rr,
+        key: t.t + '|' + t.sens + '|' + t.entree, ts: t.t,
+        note:'IFVG ' + t.tf + ' sur ' + t.niveau, tf:t.tf, price:D.prix }], 'MECH');
+  }
+  await chargerDistant();
+  paintAll();
+  if(D && window.Notif) Notif.verifier(D);
+}
+
+/* ── journal tenu à distance ────────────────────────────────────────── */
+// La GitHub Action fait tourner le modèle pendant la fenêtre, que le site
+// soit ouvert ou non, et versionne le résultat dans data/signaux.json. On le
+// lit ici : c'est le seul historique qui survive à un onglet fermé.
+const DEPOT = 'destinekizolabolokopro-dot/TRADING';
+const BRANCHES = ['claude/trading-ict-smc-site-h1n3i7', 'main'];
+let DISTANT = null, DISTANT_ETAT = 'chargement';
+
+async function chargerDistant(){
+  try{
+    const r = await fetch('data/signaux.json?t=' + Date.now(), { cache:'no-store' });
+    if(r.ok){ const j = await r.json();
+      if(j && Array.isArray(j.signaux)){ DISTANT = j; DISTANT_ETAT = 'ok'; return; } }
+  }catch(e){ /* page ouverte en local : on passe par le dépôt */ }
+  for(const br of BRANCHES){
+    try{
+      const u = 'https://raw.githubusercontent.com/' + DEPOT + '/' +
+                encodeURIComponent(br).replace(/%2F/g,'/') + '/data/signaux.json?t=' + Date.now();
+      const r = await fetch(u, { cache: 'no-store' });
+      if(!r.ok) continue;
+      const j = await r.json();
+      if(j && Array.isArray(j.signaux)){ DISTANT = j; DISTANT_ETAT = 'ok'; return; }
+    }catch(e){ /* on essaie la branche suivante */ }
+  }
+  DISTANT_ETAT = 'indisponible';
+}
+
+// Les signaux du dépôt prennent la forme des lignes du journal.
+function distantEnLignes(){
+  if(!DISTANT) return [];
+  return DISTANT.signaux.map(s => ({
+    ts: Date.parse(s.bougie), source:'DIRECT', symbol:'NQ', direction:s.sens,
+    entry:s.entree, sl:s.sl, tp:s.tp, rr:s.rr,
+    r: s.r, status: s.statut === 'clos' ? 'closed' : 'open',
+    motif: s.raisonnement, heureNY: s.heureNY, jour: s.jour,
+    niveau: s.niveauDeclencheur, retard: s.retardMin
+  }));
+}
+
+/* ── journal ────────────────────────────────────────────────────────── */
+// Deux jeux de signaux, JAMAIS confondus :
+//   MECH   — émis en direct par ce site, stockés dans ce navigateur
+//   MESURE — les 55 signaux reconstitués sur les bougies réelles, en dur
+//            dans js/mesure.js, que « Vider le journal » ne touche pas
+let JFILTRE = 'Tout';
+
+function jeuJournal(){
+  const local = window.History ? History.load().filter(x => x.source === 'MECH') : [];
+  const dist  = distantEnLignes();
+  // Un signal relevé par l'Action et un signal vu par l'onglet ouvert sont le
+  // même événement : on dédoublonne sur la bougie et le prix d'entrée.
+  const vus = new Set(dist.map(x => x.ts + '|' + x.entry));
+  const live = dist.concat(local.filter(x => !vus.has(x.ts + '|' + x.entry)));
+  const mes  = window.Mesure ? Mesure.liste() : [];
+  const rows = JFILTRE === 'En direct' ? live
+             : JFILTRE === 'Mesuré'    ? mes
+             : live.concat(mes);
+  return { rows: rows.slice().sort((a,b) => b.ts - a.ts), live, mes };
+}
+
+// Statistiques calculées sur la sélection courante, quelle qu'elle soit.
+function stats(rows){
+  const clos = rows.filter(x => x.status === 'closed');
+  const open = rows.length - clos.length;
+  const g = clos.filter(x => (x.r||0) > 0), p = clos.filter(x => (x.r||0) < 0);
+  const rsum = clos.reduce((a,x) => a + (x.r||0), 0);
+  const moy = a => a.length ? a.reduce((s,x) => s + x.r, 0) / a.length : null;
+  return { n: clos.length, open, rate: clos.length ? g.length/clos.length*100 : null,
+    rsum, gainMoy: moy(g), perteMoy: moy(p),
+    rrVise: rows.length ? rows.reduce((a,x) => a + (+x.rr||0), 0) / rows.length : null,
+    esp: clos.length ? rsum/clos.length : null };
+}
+
+function paintChipsJ(){
+  const j = jeuJournal();
+  const lbl = { 'Tout': 'Tout', 'Mesuré': 'Mesuré ' + j.mes.length, 'En direct': 'En direct ' + j.live.length };
+  $('#jchips').innerHTML = ['Tout','Mesuré','En direct']
+    .map(k => '<button class="chip' + (k === JFILTRE ? ' on' : '') + '" data-j="' + k + '">' + lbl[k] + '</button>').join('');
+}
+$('#jchips').addEventListener('click', e => {
+  const b = e.target.closest('.chip'); if(!b) return;
+  JFILTRE = b.dataset.j; paintChipsJ(); paintJournal();
+});
+
+function paintJournal(){
+  const bx = $('#bilan'), jx = $('#journal');
+  if(!window.History) return;
+  const j = jeuJournal(), rows = j.rows, st = stats(rows);
+  const uR = window.Compte ? Compte.uniteR() : 0;
+  const dev = window.Compte ? Compte.sym(Compte.lire().devise) : '';
+  const nR = v => v == null ? '—' : sgn(v) + ' R';
+
+  $('#j-tag').textContent = st.n + ' clos' + (st.open ? ' + ' + st.open + ' en cours' : '');
+  paintChipsJ();
+
+  // Deux RR à ne pas confondre : celui qu'on VISE au signal, et celui qu'on
+  // ENCAISSE. L'écart entre les deux dit si le modèle atteint ses cibles.
+  bx.innerHTML =
+    '<div class="bilan">' +
+      '<div><div class="bk">Signaux clos</div><div class="bv mono">' + st.n +
+        (st.open ? '<span class="bsub"> +' + st.open + '</span>' : '') + '</div></div>' +
+      '<div><div class="bk">Réussite</div><div class="bv mono">' +
+        (st.rate == null ? '—' : st.rate.toFixed(1) + ' %') + '</div></div>' +
+      '<div><div class="bk">RR visé</div><div class="bv mono">' +
+        (st.rrVise == null ? '—' : st.rrVise.toFixed(2)) + '</div></div>' +
+      '<div><div class="bk">Gain moyen</div><div class="bv mono ' + (st.gainMoy ? 'pos' : '') + '">' +
+        nR(st.gainMoy) + '</div></div>' +
+      '<div><div class="bk">Perte moy.</div><div class="bv mono ' + (st.perteMoy ? 'neg' : '') + '">' +
+        nR(st.perteMoy) + '</div></div>' +
+      '<div><div class="bk">Cumulé</div><div class="bv mono ' +
+        (st.rsum > 0 ? 'pos' : st.rsum < 0 ? 'neg' : '') + '">' + sgn(st.rsum,1) + ' R' +
+        '<span class="bsub"> ' + sgn(Math.round(st.rsum * uR),0) + dev + '</span></div></div>' +
+    '</div>';
+
+  bx.insertAdjacentHTML('beforeend',
+    '<div class="note">1 R = <b>' + uR + dev + '</b> · ' +
+    (window.Compte ? Compte.lire().risque : '—') + ' % de ' +
+    (window.Compte ? Number(Compte.lire().capital).toLocaleString('fr-FR') : '—') + dev + '</div>');
+
+  if(!rows.length){
+    jx.innerHTML = '<div class="empty"><b>Aucun signal</b>' +
+      (JFILTRE !== 'En direct' ? 'Jeu de données introuvable.'
+       : DISTANT_ETAT === 'chargement' ? 'Lecture du journal en cours\u2026'
+       : DISTANT_ETAT === 'indisponible'
+         ? 'Journal distant injoignable. Il est tenu par une tâche automatique sur le dépôt ; ' +
+           'vérifie que l\u2019action « Journal des signaux » est bien activée.'
+       : 'Aucun signal relevé pour l\u2019instant. La tâche automatique passe toutes les cinq ' +
+         'minutes pendant la fenêtre, du lundi au vendredi de 15 h 30 à 16 h 00' +
+         (DISTANT && DISTANT.bilan ? ' — ' + DISTANT.bilan.passages + ' passages déjà consignés, ' +
+           'aucun n\u2019a réuni les cinq conditions.' : '.')) + '</div>';
+    return;
+  }
+
+  jx.innerHTML = rows.slice(0, 60).map(x => {
+    const d = new Date(x.ts);
+    const jour = String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') +
+                 ' ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+    const ouvert = x.status === 'open';
+    const r = ouvert ? null : (x.r || 0);
+    // Le verdict est écrit en toutes lettres AVANT les chiffres.
+    const verdict = ouvert ? 'en cours' : r > 0 ? 'gagné' : 'perdu';
+    const recon = x.source === 'MESURE';
+    return '<div class="jr" title="' + (x.motif || '').replace(/"/g,'&quot;') + '">' +
+      '<span class="jr-d mono">' + jour + '</span>' +
+      '<span class="jr-s ' + (x.direction === 'LONG' ? 'long' : 'short') + '">' + x.direction + '</span>' +
+      '<span>' + (recon ? '<span class="jr-t">reconstitué</span>'
+                : x.heureNY ? '<span class="jr-t">' + x.heureNY + ' NY</span>' : '') + '</span>' +
+      '<span class="jr-r ' + (ouvert ? 'open' : r > 0 ? 'pos' : 'neg') + '">' +
+        '<span class="jv">' + verdict + '</span>' +
+        (ouvert ? '' : '<span class="jn mono">' + sgn(r) + ' R · ' + sgn(Math.round(r * uR),0) + dev + '</span>') +
+      '</span>' +
+      '<span class="jr-p mono">entrée ' + fmt(x.entry) + ' · cible ' + fmt(x.tp) +
+        ' · stop ' + fmt(x.sl) + '</span></div>';
+  }).join('') +
+  (JFILTRE !== 'En direct'
+    ? '<div class="note"><b>Reconstitué</b> = ce que le modèle aurait produit sur les bougies ' +
+      'réelles du 13 juillet au 18 septembre. Ces signaux n\u2019ont jamais été envoyés : un bug ' +
+      'coupait la chaîne. Ils sont là pour que tu voies le modèle travailler, pas comme un relevé ' +
+      'de compte.</div>'
+    : '');
+}
+
+/* ── réglages ───────────────────────────────────────────────────────── */
+function setMsg(t){ $('#setmsg').innerHTML = t; }
+function ouvrirReglages(){
+  $('#settings').classList.toggle('open');
+  if($('#settings').classList.contains('open'))
+    $('#settings').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+$('#n-set').addEventListener('click', e => { e.preventDefault(); ouvrirReglages(); });
+$('#b-save').addEventListener('click', () => {
+  const v = $('#tok').value.trim();
+  if(v) CFD.setToken(v);
+  if(!CFD.actif()){ setMsg('Colle d’abord un jeton.'); return; }
+  setMsg('Test en cours…');
+  CFD.tester().then(r => {
+    if(!r.ok){ setMsg('Refusé : ' + r.msg); return; }
+    $('#tok').value = ''; $('#tok').placeholder = 'jeton enregistré';
+    setMsg('Connecté — ' + r.msg);
+    refresh();
+  });
+});
+$('#b-clear').addEventListener('click', () => {
+  CFD.setToken(''); $('#tok').value = ''; $('#tok').placeholder = 'xxxxxxxx-xxxxxxxxxxxxxxxx';
+  setMsg('Jeton retiré — retour aux données Yahoo différées.'); refresh();
+});
+$('#b-corr').addEventListener('click', () => {
+  if(!CFD.actif()){ setMsg('Enregistre un jeton d’abord.'); return; }
+  setMsg('Comparaison en cours…');
+  // On compare les VARIATIONS, pas les niveaux : c'est ce qui décide si le
+  // CFD est un substitut acceptable. QQQ donnait 0,924 et ce n'était pas assez.
+  Promise.all([CFD.candles('5m', 500), NQ.brut('NQ=F', '5m', '5d')]).then(([a, b]) => {
+    const r = CFD.correlation(a, b && b.candles ? b.candles : b);
+    if(!r || r.r == null){ setMsg('Pas assez de bougies communes.'); return; }
+    const v = r.r;
+    setMsg('Corrélation sur ' + r.n + ' bougies 5 min : <b>' + v.toFixed(4) + '</b><br>' +
+      (v >= 0.985 ? 'Excellent — utilisable tel quel.'
+       : v >= 0.96 ? 'Correct, mais surveille les écarts.'
+       : 'Insuffisant : QQQ faisait 0,924 et l’avantage y disparaissait.'));
+  }).catch(() => setMsg('Comparaison impossible.'));
+});
+$('#b-reset').addEventListener('click', () => {
+  if(!window.History) return;
+  History.reset(); setMsg('Journal vidé.'); paintAll();
+});
+
+function compteInit(){
+  if(!window.Compte) return;
+  const r = Compte.lire();
+  $('#c-capital').value = r.capital;
+  $('#c-devise').value  = r.devise;
+  $('#c-risque').value  = r.risque;
+  $('#c-contrat').value = r.contrat;
+  const maj = () => {
+    const o = Compte.ecrire({
+      capital: Math.max(100, +$('#c-capital').value || Compte.DEF.capital),
+      devise:  $('#c-devise').value,
+      risque:  Math.min(5, Math.max(0.05, +$('#c-risque').value || Compte.DEF.risque)),
+      contrat: $('#c-contrat').value
+    });
+    const c = Compte.CONTRATS[o.contrat];
+    $('#c-msg').innerHTML = '1 R = <b>' + Compte.uniteR() + Compte.sym(o.devise) + '</b> · ' +
+      c.nom + ', ' + c.point + ' $ le point' +
+      (o.devise === 'EUR' ? ' · EUR/USD ' + o.taux : '');
+    paintAll();
+  };
+  ['#c-capital','#c-devise','#c-risque','#c-contrat'].forEach(id =>
+    $(id).addEventListener('change', maj));
+  // On ne sollicite le réseau que si l'instantané n'a pas déjà donné le taux.
+  (Compte.tauxFrais() ? Promise.resolve() : Compte.majTaux()).then(maj);
+  maj();
+}
+
+/* ── alertes ────────────────────────────────────────────────────────── */
+function paintAlert(){
+  const b = $('#b-alert');
+  if(!window.Notif || !Notif.supporte()){ b.disabled = true; b.title = 'Non supporté par ce navigateur'; return; }
+  const on = Notif.actif() && Notif.permis();
+  b.className = 'btn' + (on ? ' on' : '');
+  b.textContent = on ? 'Alertes activées' : 'Alertes';
+}
+$('#b-alert').addEventListener('click', () => {
+  if(Notif.actif()){ Notif.desactiver(); paintAlert(); }
+  else Notif.activer().then(paintAlert);
+});
+
+/* ── démarrage ──────────────────────────────────────────────────────── */
+paintChips(); paintAll(); paintAlert();
+// L'instantané porte le taux : on l'applique avant d'initialiser le compte.
+etatDistant().then(e => {
+  if(e && e.eurusd && window.Compte) Compte.setTaux(e.eurusd);
+  compteInit();
+});
+chargerDistant().then(paintJournal);
+if(window.CFD && CFD.actif()) $('#tok').placeholder = 'jeton enregistré';
+if(!window.matchMedia('(prefers-reduced-motion: reduce)').matches) boucle(performance.now());
+else drawRadar(0);
+setInterval(paintTop, 1000);
+refresh();
+setInterval(refresh, 300000);   // le modèle travaille en M5/M15 : 5 minutes suffisent
+</script>
+</body>
+</html>
