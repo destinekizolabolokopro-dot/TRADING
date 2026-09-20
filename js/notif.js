@@ -43,30 +43,43 @@ var Notif = (function () {
   }
 
   /** Âge de la dernière bougie reçue, en minutes. */
+  // Le modèle renvoie `derniereBougie`. Ce module lisait `derniere_bougie`,
+  // qui n'a jamais existé : l'âge était donc toujours nul et la notification
+  // annonçait « retard inconnu ».
   function ageMin(d) {
-    if (!d || !d.derniere_bougie) return null;
-    return Math.round((Date.now() - d.derniere_bougie) / 60000);
+    if (!d || !d.derniereBougie) return null;
+    return Math.round((Date.now() - d.derniereBougie) / 60000);
   }
 
   /**
    * Notifie s'il y a un trade possible non encore signalé.
-   * @param d instantané renvoyé par NQ.load()
+   * @param d instantané renvoyé par Modele.evaluer()  (ce module lisait la
+   *          forme de NQ.load(), qui n'est plus appelée nulle part)
    */
   function verifier(d) {
-    if (!d || !d.trade || !d.trade.possible) return null;
-    if (window.WINDOW && !WINDOW.isOpen()) return null;     // hors fenêtre de trading
+    // ⚠️ CORRIGÉ. La condition était `!d.trade.possible`. Or le modèle ne
+    // produit AUCUN champ `possible` : il renvoie sens, entree, sl, tp, rr,
+    // tf, niveau. `undefined` étant faux, cette ligne coupait TOUTES les
+    // notifications, y compris sur un signal parfaitement valide. C'est la
+    // raison pour laquelle le bot n'a jamais rien envoyé.
+    if (!d || !d.trade) return null;
+    // La fenêtre à respecter est celle du MODÈLE (09 h 30 → 10 h 00 à New
+    // York), pas celle de session.js, qui couvre toute la séance de Wall
+    // Street et n'a rien à voir.
+    if (d.hors) return null;
+    if (window.Modele && Modele.fenetre && !Modele.fenetre().ouverte) return null;
 
-    var t = d.trade;
-    // identité d'un signal : sens + entrée + unité + jour. Deux rafraîchissements
-    // du même setup donnent le même identifiant.
-    var id = [new Date().toISOString().slice(0, 10), t.sens, t.entree, d.tf_retenue].join('|');
+    var t = d.trade, unite = t.tf || '?';
+    // Identité d'un signal : jour + sens + entrée + unité. Deux
+    // rafraîchissements du même setup donnent le même identifiant.
+    var id = [new Date().toISOString().slice(0, 10), t.sens, t.entree, unite].join('|');
     if (dejaVu(id)) return null;
 
     var age = ageMin(d);
     var retard = age == null ? 'retard inconnu' : 'donnée vieille de ' + age + ' min';
     var corps = t.sens + ' NQ · entrée ' + t.entree + ' · stop ' + t.sl +
                 ' · objectif ' + t.tp + ' (RR ' + t.rr + ')\n' +
-                d.tf_retenue + ' — ' + retard + ', vérifie le graphique avant d\'agir.';
+                (t.niveau || unite) + ' — ' + retard + ', vérifie le graphique avant d\'agir.';
 
     if (permis() && actif()) {
       try {

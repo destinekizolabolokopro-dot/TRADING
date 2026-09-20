@@ -717,7 +717,9 @@ async function refresh(){
   if(D && window.History){
     History.evaluate({ NQ: D.prix });
     const t = D.trade;
-    if(t && t.possible !== false && !D.hors)
+    // Pas de test sur un champ `possible` : le modèle n'en produit pas. C'est
+    // exactement la faute qui vidait le journal.
+    if(t && !D.hors)
       History.record([{ sym:'NQ', dir:t.sens, entry:t.entree, sl:t.sl, tp:t.tp, rr:t.rr,
         note:'IFVG ' + t.tf + ' sur ' + t.niveau, tf:t.tf, price:D.prix }], 'MECH');
   }
@@ -774,7 +776,8 @@ function paintJournal(){
     const r = ouvert ? null : (x.r || 0);
     // Le verdict est écrit en toutes lettres AVANT les chiffres.
     const verdict = ouvert ? 'en cours' : r > 0 ? 'gagné' : 'perdu';
-    return '<div class="jr" title="' + (x.note || '').replace(/"/g,'&quot;') + '">' +
+    // history.js stocke le motif sous la clé `motif`, pas `note`.
+    return '<div class="jr" title="' + (x.motif || '').replace(/"/g,'&quot;') + '">' +
       '<span class="jr-d mono">' + jour + '</span>' +
       '<span class="jr-s ' + (x.direction === 'LONG' ? 'long' : 'short') + '">' + x.direction + '</span>' +
       '<span class="jr-p mono">entrée ' + fmt(x.entry) + ' · cible ' + fmt(x.tp) + ' · stop ' + fmt(x.sl) + '</span>' +
