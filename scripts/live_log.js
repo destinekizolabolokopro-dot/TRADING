@@ -70,7 +70,15 @@ function ecrire(db) {
   // largement, mais le fichier ne doit pas gonfler indéfiniment.
   db.passages = db.passages.slice(-3000);
   fs.mkdirSync(path.dirname(FICHIER), { recursive: true });
+  // Même précaution que pour l'instantané : `bilan.maj` avance à chaque
+  // passage, y compris quand rien n'a changé. Réécrire pour ça seul
+  // produirait un commit toutes les cinq minutes.
+  const utile = o => JSON.stringify({ signaux: o.signaux, passages: o.passages });
+  let ancien = null;
+  try { ancien = JSON.parse(fs.readFileSync(FICHIER, 'utf8')); } catch (e) {}
+  if (ancien && utile(ancien) === utile(db)) return false;
   fs.writeFileSync(FICHIER, JSON.stringify(db, null, 1) + '\n');
+  return true;
 }
 
 // Quelle étape de la chaîne a bloqué ? C'est le « raisonnement » que
@@ -134,14 +142,27 @@ function blocage(d) {
   // cette contrainte. C'est donc ici qu'on récupère le marché, une fois,
   // et le site se contente de lire ce fichier — servi par GitHub avec
   // `access-control-allow-origin: *`.
-  fs.writeFileSync(ETAT, JSON.stringify({
+  const instantane = {
     maj: maintenant, source: 'yahoo', eurusd: eurusd,
     prix: d.prix, derniereBougie: d.derniereBougie,
     retardMin: Math.round((Date.now() - d.derniereBougie) / 60000),
     hors: d.hors, etat: d.etat, dir: d.dir, score: d.score,
     dol: d.dol, key: d.key, ifvg: d.ifvg, parTF: d.parTF,
     trade: d.trade, dernierSignal: d.dernierSignal, cfg: d.cfg
-  }, null, 1) + '\n');
+  };
+  // Marché fermé, rien n'a bougé : n'écrire que l'horodatage produirait un
+  // commit toutes les cinq minutes pour rien — une trentaine par jour, qui
+  // noieraient les vrais relevés. On ne réécrit le fichier que si son
+  // contenu utile a changé. `maj` et `retardMin` ne comptent pas : ils
+  // avancent tout seuls, même quand le marché dort.
+  const utile = o => { const c = Object.assign({}, o); delete c.maj; delete c.retardMin; return JSON.stringify(c); };
+  let ancien = null;
+  try { ancien = JSON.parse(fs.readFileSync(ETAT, 'utf8')); } catch (e) {}
+  if (ancien && utile(ancien) === utile(instantane)) {
+    console.log('Instantané inchangé — rien à réécrire.');
+  } else {
+    fs.writeFileSync(ETAT, JSON.stringify(instantane, null, 1) + '\n');
+  }
 
   // ── LE SIGNAL EST-IL RECEVABLE ? ────────────────────────────────────
   // ⚠️ Le test portait sur `d.hors`, qui décrit la DERNIÈRE bougie reçue,
@@ -243,6 +264,7 @@ function blocage(d) {
     cumulR: +clos.reduce((a, s) => a + (s.r || 0), 0).toFixed(3),
     passages: db.passages.length
   };
-  ecrire(db);
-  console.log(`Journal : ${db.bilan.total} signaux (${db.bilan.clos} clos, ${db.bilan.ouverts} ouverts) · ${db.bilan.passages} passages consignés`);
+  const ecrit = ecrire(db);
+  console.log(`Journal : ${db.bilan.total} signaux (${db.bilan.clos} clos, ${db.bilan.ouverts} ouverts) · ` +
+    `${db.bilan.passages} passages consignés` + (ecrit ? '' : ' — inchangé, non réécrit'));
 })();
