@@ -67,8 +67,16 @@ var Compte = (function () {
   function calibrer(entree, stop, tp) {
     var r = lire(), c = CONTRATS[r.contrat] || CONTRATS.MNQ;
     var points = Math.abs(entree - stop);
-    var pointsTP = tp != null ? Math.abs(tp - entree) : null;
     if (!(points > 0)) return null;
+
+    // ⚠️ `Math.abs` efface le signe. Un objectif placé du MAUVAIS CÔTÉ de
+    // l'entrée rendait donc un gain positif imaginaire — une perte affichée
+    // comme un profit, sans la moindre erreur. Le sens se déduit du stop :
+    // stop en dessous = achat, l'objectif doit être au-dessus. S'il ne l'est
+    // pas, le trade est incohérent et on refuse de chiffrer un gain.
+    var achat = stop < entree;
+    var coherent = tp == null || (achat ? tp > entree : tp < entree);
+    var pointsTP = (tp != null && coherent) ? Math.abs(tp - entree) : null;
 
     // Le risque visé, exprimé dans la devise du compte puis converti en dollars.
     var risqueDevVise = r.capital * r.risque / 100;
@@ -85,6 +93,7 @@ var Compte = (function () {
     return {
       contrats: contrats,
       tropPetit: contrats < 1,
+      incoherent: !coherent,
       points: +points.toFixed(2),
       pointsTP: pointsTP != null ? +pointsTP.toFixed(2) : null,
       valeurPoint: c.point,

@@ -1941,8 +1941,16 @@ var Compte = (function () {
   function calibrer(entree, stop, tp) {
     var r = lire(), c = CONTRATS[r.contrat] || CONTRATS.MNQ;
     var points = Math.abs(entree - stop);
-    var pointsTP = tp != null ? Math.abs(tp - entree) : null;
     if (!(points > 0)) return null;
+
+    // ⚠️ `Math.abs` efface le signe. Un objectif placé du MAUVAIS CÔTÉ de
+    // l'entrée rendait donc un gain positif imaginaire — une perte affichée
+    // comme un profit, sans la moindre erreur. Le sens se déduit du stop :
+    // stop en dessous = achat, l'objectif doit être au-dessus. S'il ne l'est
+    // pas, le trade est incohérent et on refuse de chiffrer un gain.
+    var achat = stop < entree;
+    var coherent = tp == null || (achat ? tp > entree : tp < entree);
+    var pointsTP = (tp != null && coherent) ? Math.abs(tp - entree) : null;
 
     // Le risque visé, exprimé dans la devise du compte puis converti en dollars.
     var risqueDevVise = r.capital * r.risque / 100;
@@ -1959,6 +1967,7 @@ var Compte = (function () {
     return {
       contrats: contrats,
       tropPetit: contrats < 1,
+      incoherent: !coherent,
       points: +points.toFixed(2),
       pointsTP: pointsTP != null ? +pointsTP.toFixed(2) : null,
       valeurPoint: c.point,
@@ -2492,7 +2501,12 @@ function paintTrade(){
       '<span class="hint">prochaine ouverture ' + moment(f.ms) + '</span>');
     return;
   }
-  const L = t.sens === 'LONG', dp = Math.abs(t.entree - t.sl), dt = Math.abs(t.tp - t.entree);
+  const L = t.sens === 'LONG';
+  // Distances SIGNÉES par rapport au sens du trade. `Math.abs` affichait
+  // « +200 pts » pour un objectif situé 200 points SOUS un achat.
+  const dp = L ? t.entree - t.sl : t.sl - t.entree;     // > 0 si le stop est du bon côté
+  const dt = L ? t.tp - t.entree : t.entree - t.tp;     // > 0 si l'objectif est du bon côté
+  const okSL = dp > 0, okTP = dt > 0;
   const k = window.Compte ? Compte.calibrer(t.entree, t.sl, t.tp) : null;
   const dev = k ? Compte.sym(k.devise) : '';
   const quand = t.t ? new Date(t.t).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
@@ -2503,18 +2517,27 @@ function paintTrade(){
         '<span class="t-rr">RR ' + Number(t.rr).toFixed(2) + '</span></div>' +
       '<div class="t-grid">' +
         '<div class="t-cell"><div class="t-k">Entrée</div><div class="t-v mono">' + fmt(t.entree) + '</div></div>' +
-        '<div class="t-cell"><div class="t-k">Stop</div><div class="t-v sl mono">' + fmt(t.sl) + '</div><div class="t-sub">−' + dp.toFixed(1) + ' pts</div></div>' +
-        '<div class="t-cell"><div class="t-k">Objectif</div><div class="t-v tp mono">' + fmt(t.tp) + '</div><div class="t-sub">+' + dt.toFixed(1) + ' pts</div></div>' +
+        '<div class="t-cell"><div class="t-k">Stop</div><div class="t-v sl mono">' + fmt(t.sl) + '</div>' +
+          '<div class="t-sub">' + (okSL ? '−' + dp.toFixed(1) + ' pts'
+            : '<span style="color:var(--loss)">du mauvais côté</span>') + '</div></div>' +
+        '<div class="t-cell"><div class="t-k">Objectif</div><div class="t-v tp mono">' + fmt(t.tp) + '</div>' +
+          '<div class="t-sub">' + (okTP ? '+' + dt.toFixed(1) + ' pts'
+            : '<span style="color:var(--loss)">du mauvais côté</span>') + '</div></div>' +
         '<div class="t-cell"><div class="t-k">Taille</div>' +
           (k && !k.tropPetit
             ? '<div class="t-v mono">' + k.contrats + ' ' + Compte.lire().contrat + '</div>' +
-              '<div class="t-sub">risque ' + k.risqueDev + dev + ' · gain ' + k.gainDev + dev + '</div>'
+              '<div class="t-sub">risque ' + k.risqueDev + dev +
+                (k.gainDev != null ? ' · gain ' + k.gainDev + dev
+                                   : ' · <span style="color:var(--loss)">objectif incohérent</span>') + '</div>'
             : '<div class="t-v" style="color:var(--dim)">—</div>' +
               '<div class="t-sub">stop trop large pour ce capital</div>') +
         '</div>' +
       '</div>' +
       '<div class="t-why">' +
-        (frais ? 'Signal armé sur la bougie en cours. Partiel à 0,5 R sur 90 % de la taille, le reste court jusqu’à 2,5 R.'
+        (!okSL || !okTP
+          ? '<span style="color:var(--loss)">Ce signal est incohérent : stop et objectif doivent ' +
+            'encadrer l\u2019entrée. Ne le prends pas.</span>'
+        : frais ? 'Signal armé sur la bougie en cours. Partiel à 0,5 R sur 90 % de la taille, le reste court jusqu’à 2,5 R.'
                : 'Ce signal date du ' + quand + '. Il est affiché pour mémoire — ce n’est pas une position à prendre maintenant.') +
       '</div>' +
     '</div>';
@@ -2524,7 +2547,7 @@ function paintTrade(){
 let blips = [], rafId = null;
 function majBlips(){
   blips = [];
-  const vs = D && D.parTF; if(!vs) return;
+  const vs = D && D.parTF; if(!Array.isArray(vs)) return;
   const maxD = Math.max(1, ...vs.flatMap(v => (v.liste||[]).map(x => x.d)));
   vs.forEach((v, i) => {
     if(FILTRE !== 'Toutes' && FILTRE !== v.tf) return;
@@ -2602,7 +2625,7 @@ function paintRadar(){
   majBlips();
   const n = $('#near-v'), s = $('#near-s');
   const vs = D && D.parTF;
-  const tous = vs ? vs.filter(v => v.distance != null) : [];
+  const tous = Array.isArray(vs) ? vs.filter(v => v.distance != null) : [];
   if(!tous.length){
     n.textContent = '—';
     s.textContent = D && D.dir === 0 ? 'biais neutre, aucun niveau retenu' : 'aucun niveau du bon côté';
@@ -2617,7 +2640,7 @@ function paintRadar(){
 function paintTFs(){
   const box = $('#tfs');
   const vs = D && D.parTF;
-  if(!vs){ box.innerHTML = ''; return; }
+  if(!Array.isArray(vs)){ box.innerHTML = ''; return; }
   box.innerHTML = vs.map(v => {
     const ret = D.key && D.key.tf === v.tf;
     return '<div class="tile ' + (ret ? 'ret' : v.n ? '' : 'off') + '">' +
@@ -2664,12 +2687,25 @@ async function charger(){
 // origin: *`. Le site le lit. Quand un jeton OANDA est enregistré, on
 // reprend le calcul local : ce flux-là est joignable directement, et en
 // temps réel.
+// Un instantané mal formé ne doit pas casser la page. On vérifie sa forme
+// UNE fois, ici, à la frontière — plutôt que de semer des gardes partout.
+// Un `parTF` qui n'est pas un tableau faisait planter le radar sur
+// `flatMap`, et un prix non numérique s'affichait « NaN ».
+function etatValide(j){
+  if(!j || typeof j !== 'object') return false;
+  if(typeof j.prix !== 'number' || !isFinite(j.prix) || j.prix <= 0) return false;
+  if(j.parTF != null && !Array.isArray(j.parTF)) return false;
+  if(j.dir != null && typeof j.dir !== 'number') return false;
+  if(j.trade != null && typeof j.trade !== 'object') return false;
+  return true;
+}
+
 async function etatDistant(){
   // Servi par GitHub Pages à côté de la page : même origine, pas de CORS,
   // pas de dépendance à un domaine tiers.
   try{
     const r = await fetch('data/etat.json?t=' + Date.now(), { cache:'no-store' });
-    if(r.ok){ const j = await r.json(); if(j && j.prix != null) return j; }
+    if(r.ok){ const j = await r.json(); if(etatValide(j)) return j; }
   }catch(e){ /* page ouverte en local : on passe par le dépôt */ }
   for(const br of BRANCHES){
     try{
@@ -2678,7 +2714,7 @@ async function etatDistant(){
       const r = await fetch(u, { cache:'no-store' });
       if(!r.ok) continue;
       const j = await r.json();
-      if(j && j.prix != null) return j;
+      if(etatValide(j)) return j;
     }catch(e){ /* branche suivante */ }
   }
   return null;
