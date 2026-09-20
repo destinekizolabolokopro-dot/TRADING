@@ -31,6 +31,7 @@ require(path.join(__dirname, '..', 'js', 'structure.js'));
 require(path.join(__dirname, '..', 'js', 'modele.js'));
 
 const FICHIER = path.join(__dirname, '..', 'data', 'signaux.json');
+const ETAT    = path.join(__dirname, '..', 'data', 'etat.json');
 const YF = 'https://query1.finance.yahoo.com/v8/finance/chart/';
 const SERIES = [['1m','8d','m1'],['2m','60d','m2'],['5m','60d','m5'],
                 ['15m','60d','m15'],['60m','3mo','h1'],['1d','1y','d1']];
@@ -91,10 +92,6 @@ function blocage(d) {
 (async () => {
   const f = Modele.fenetre();
   const maintenant = new Date().toISOString();
-  if (!f.ouverte && !FORCE) {
-    console.log(`Hors fenêtre — prochaine ouverture dans ${Math.round(f.ms / 60000)} min. Rien à faire.`);
-    return;
-  }
 
   let brut;
   try {
@@ -121,6 +118,22 @@ function blocage(d) {
     niveauxParUnite: d.parTF.map(v => `${v.tf}:${v.n}`).join(' ')
   };
 
+  // ── INSTANTANÉ DE MARCHÉ ────────────────────────────────────────────
+  // Yahoo ne sert pas d'en-tête CORS : un navigateur ne peut pas l'appeler
+  // directement, et les quatre relais publics que le site utilisait sont
+  // tous morts (500, 429, 429, 522 au dernier test). Node, lui, n'a pas
+  // cette contrainte. C'est donc ici qu'on récupère le marché, une fois,
+  // et le site se contente de lire ce fichier — servi par GitHub avec
+  // `access-control-allow-origin: *`.
+  fs.writeFileSync(ETAT, JSON.stringify({
+    maj: maintenant, source: 'yahoo',
+    prix: d.prix, derniereBougie: d.derniereBougie,
+    retardMin: Math.round((Date.now() - d.derniereBougie) / 60000),
+    hors: d.hors, etat: d.etat, dir: d.dir, score: d.score,
+    dol: d.dol, key: d.key, ifvg: d.ifvg, parTF: d.parTF,
+    trade: d.trade, dernierSignal: d.dernierSignal, cfg: d.cfg
+  }, null, 1) + '\n');
+
   const t = d.trade || d.dernierSignal;
   const neuf = t && !d.hors &&
     !db.signaux.some(s => s.cle === `${t.t}|${t.sens}|${t.entree}`);
@@ -140,10 +153,14 @@ function blocage(d) {
       statut: 'ouvert', resultat: null, r: null, closTs: null
     }));
     console.log(`✅ SIGNAL ${t.sens} · ${commun.jour} ${hNY} NY · entrée ${t.entree} · stop ${t.sl} · ${t.niveau}`);
-  } else {
+  } else if (f.ouverte || FORCE) {
     const b = blocage(d);
     db.passages.push(Object.assign({}, commun, { etapeBloquee: b.etape, dit: b.dit }));
     console.log(`— ${commun.jour} ${hNY} NY · ${b.dit}`);
+  } else {
+    // Hors fenêtre on rafraîchit l'instantané et rien d'autre : consigner un
+    // « passage » à 3 h du matin n'apprendrait rien à personne.
+    console.log(`Instantané seul — hors fenêtre, ouverture dans ${Math.round(f.ms / 60000)} min.`);
   }
 
   // Confronte les signaux encore ouverts au prix courant, bougie par bougie.

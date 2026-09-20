@@ -13,7 +13,12 @@ name: Journal des signaux
 
 on:
   schedule:
+    # Pendant la fenêtre : relevé complet toutes les cinq minutes.
     - cron: '*/5 13-15 * * 1-5'
+    # En dehors : un simple instantané de marché, pour que le site affiche un
+    # prix pas trop vieux quand on l'ouvre le soir. Aucun signal n'est
+    # consigné hors fenêtre, le script s'en charge lui-même.
+    - cron: '7 8,11,17,20,23 * * 1-5'
   workflow_dispatch:
     inputs:
       force:
@@ -43,13 +48,13 @@ jobs:
 
       - name: Versionner le journal
         run: |
-          if git diff --quiet -- data/signaux.json; then
+          if git diff --quiet -- data/; then
             echo "Rien de neuf à enregistrer."
             exit 0
           fi
           git config user.name  "journal-signaux"
           git config user.email "noreply@github.com"
-          git add data/signaux.json
+          git add data/
           git commit -m "Journal : relevé du $(date -u '+%Y-%m-%d %H:%M UTC')"
           # Une autre exécution a pu pousser entre-temps : on rejoue par-dessus.
           for i in 1 2 3 4 5; do

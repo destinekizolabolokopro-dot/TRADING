@@ -2429,7 +2429,7 @@ function paintTop(){
   $('#px').textContent = p; $('#px-top').textContent = p;
 
   const age = D && D.derniereBougie ? Math.round((Date.now() - D.derniereBougie)/60000) : null;
-  const src = D && D.source === 'cfd' ? 'OANDA' : 'Yahoo';
+  const src = D && D.source === 'cfd' ? 'OANDA' : D && D.source === 'robot' ? 'relevé' : 'Yahoo';
   $('#age').textContent = age == null ? '—' : src + ' · −' + age + ' min';
 
   const f = window.Modele ? Modele.fenetre() : null;
@@ -2694,11 +2694,39 @@ async function charger(){
   return out;
 }
 
+// Yahoo ne sert pas d'en-tête CORS, et les quatre relais publics que ce
+// site utilisait sont tous morts (500, 429, 429, 522 au dernier test). Un
+// navigateur ne peut donc plus joindre Yahoo depuis cette page.
+//
+// L'instantané est désormais produit par la tâche automatique — Node n'a
+// pas cette contrainte — et servi par GitHub avec `access-control-allow-
+// origin: *`. Le site le lit. Quand un jeton OANDA est enregistré, on
+// reprend le calcul local : ce flux-là est joignable directement, et en
+// temps réel.
+async function etatDistant(){
+  for(const br of BRANCHES){
+    try{
+      const u = 'https://raw.githubusercontent.com/' + DEPOT + '/' +
+                encodeURIComponent(br).replace(/%2F/g,'/') + '/data/etat.json?t=' + Date.now();
+      const r = await fetch(u, { cache:'no-store' });
+      if(!r.ok) continue;
+      const j = await r.json();
+      if(j && j.prix != null) return j;
+    }catch(e){ /* branche suivante */ }
+  }
+  return null;
+}
+
 async function refresh(){
   try{
-    const brut = await charger();
-    D = brut ? Modele.evaluer(brut) : null;
-    if(D) D.source = (window.CFD && CFD.actif()) ? 'cfd' : 'yahoo';
+    if(window.CFD && CFD.actif()){
+      const brut = await charger();
+      D = brut ? Modele.evaluer(brut) : null;
+      if(D) D.source = 'cfd';
+    } else {
+      D = await etatDistant();
+      if(D) D.source = 'robot';
+    }
   }catch(e){ D = null; }
   if(D && window.History){
     History.evaluate({ NQ: D.prix });
