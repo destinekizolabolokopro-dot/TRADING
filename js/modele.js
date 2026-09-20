@@ -194,7 +194,12 @@
     var finB = clock[clock.length - 1], eFin = heure(finB.t);
     var horsFenetre = eFin.dow < 1 || eFin.dow > 5 ||
                       eFin.min < CFG.ghDeb || eFin.min >= CFG.ghFin;
-    if (etapes == null) {
+    // ⚠️ La condition était `etapes == null`. Or `etapes` conserve la
+    // DERNIÈRE bougie vue dans la fenêtre — celle de vendredi 09 h 55 si on
+    // est dimanche. Elle n'est donc presque jamais nulle, et l'écran
+    // affichait l'état de la séance précédente comme s'il était courant.
+    // Hors fenêtre, on relit toujours la dernière bougie connue.
+    if (horsFenetre || etapes == null) {
       var bAff = biaisA(prep, finB.t);
       dir = bAff.dir;
       etapes = { score: bAff.score, dir: bAff.dir, t: finB.t, ifvg: null,

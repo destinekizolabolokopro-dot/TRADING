@@ -740,8 +740,43 @@ async function refresh(){
         key: t.t + '|' + t.sens + '|' + t.entree, ts: t.t,
         note:'IFVG ' + t.tf + ' sur ' + t.niveau, tf:t.tf, price:D.prix }], 'MECH');
   }
+  await chargerDistant();
   paintAll();
   if(D && window.Notif) Notif.verifier(D);
+}
+
+/* ── journal tenu à distance ────────────────────────────────────────── */
+// La GitHub Action fait tourner le modèle pendant la fenêtre, que le site
+// soit ouvert ou non, et versionne le résultat dans data/signaux.json. On le
+// lit ici : c'est le seul historique qui survive à un onglet fermé.
+const DEPOT = 'destinekizolabolokopro-dot/TRADING';
+const BRANCHES = ['claude/trading-ict-smc-site-h1n3i7', 'main'];
+let DISTANT = null, DISTANT_ETAT = 'chargement';
+
+async function chargerDistant(){
+  for(const br of BRANCHES){
+    try{
+      const u = 'https://raw.githubusercontent.com/' + DEPOT + '/' +
+                encodeURIComponent(br).replace(/%2F/g,'/') + '/data/signaux.json?t=' + Date.now();
+      const r = await fetch(u, { cache: 'no-store' });
+      if(!r.ok) continue;
+      const j = await r.json();
+      if(j && Array.isArray(j.signaux)){ DISTANT = j; DISTANT_ETAT = 'ok'; return; }
+    }catch(e){ /* on essaie la branche suivante */ }
+  }
+  DISTANT_ETAT = 'indisponible';
+}
+
+// Les signaux du dépôt prennent la forme des lignes du journal.
+function distantEnLignes(){
+  if(!DISTANT) return [];
+  return DISTANT.signaux.map(s => ({
+    ts: Date.parse(s.bougie), source:'DIRECT', symbol:'NQ', direction:s.sens,
+    entry:s.entree, sl:s.sl, tp:s.tp, rr:s.rr,
+    r: s.r, status: s.statut === 'clos' ? 'closed' : 'open',
+    motif: s.raisonnement, heureNY: s.heureNY, jour: s.jour,
+    niveau: s.niveauDeclencheur, retard: s.retardMin
+  }));
 }
 
 /* ── journal ────────────────────────────────────────────────────────── */
@@ -752,7 +787,12 @@ async function refresh(){
 let JFILTRE = 'Tout';
 
 function jeuJournal(){
-  const live = window.History ? History.load().filter(x => x.source === 'MECH') : [];
+  const local = window.History ? History.load().filter(x => x.source === 'MECH') : [];
+  const dist  = distantEnLignes();
+  // Un signal relevé par l'Action et un signal vu par l'onglet ouvert sont le
+  // même événement : on dédoublonne sur la bougie et le prix d'entrée.
+  const vus = new Set(dist.map(x => x.ts + '|' + x.entry));
+  const live = dist.concat(local.filter(x => !vus.has(x.ts + '|' + x.entry)));
   const mes  = window.Mesure ? Mesure.liste() : [];
   const rows = JFILTRE === 'En direct' ? live
              : JFILTRE === 'Mesuré'    ? mes
@@ -821,10 +861,15 @@ function paintJournal(){
 
   if(!rows.length){
     jx.innerHTML = '<div class="empty"><b>Aucun signal</b>' +
-      (JFILTRE === 'En direct'
-        ? 'Rien n\u2019a encore été émis en direct. Le premier signal arrivera pendant la fenêtre, ' +
-          'du lundi au vendredi entre 15 h 30 et 16 h 00.'
-        : 'Jeu de données introuvable.') + '</div>';
+      (JFILTRE !== 'En direct' ? 'Jeu de données introuvable.'
+       : DISTANT_ETAT === 'chargement' ? 'Lecture du journal en cours\u2026'
+       : DISTANT_ETAT === 'indisponible'
+         ? 'Journal distant injoignable. Il est tenu par une tâche automatique sur le dépôt ; ' +
+           'vérifie que l\u2019action « Journal des signaux » est bien activée.'
+       : 'Aucun signal relevé pour l\u2019instant. La tâche automatique passe toutes les cinq ' +
+         'minutes pendant la fenêtre, du lundi au vendredi de 15 h 30 à 16 h 00' +
+         (DISTANT && DISTANT.bilan ? ' — ' + DISTANT.bilan.passages + ' passages déjà consignés, ' +
+           'aucun n\u2019a réuni les cinq conditions.' : '.')) + '</div>';
     return;
   }
 
@@ -840,7 +885,8 @@ function paintJournal(){
     return '<div class="jr" title="' + (x.motif || '').replace(/"/g,'&quot;') + '">' +
       '<span class="jr-d mono">' + jour + '</span>' +
       '<span class="jr-s ' + (x.direction === 'LONG' ? 'long' : 'short') + '">' + x.direction + '</span>' +
-      '<span>' + (recon ? '<span class="jr-t">reconstitué</span>' : '') + '</span>' +
+      '<span>' + (recon ? '<span class="jr-t">reconstitué</span>'
+                : x.heureNY ? '<span class="jr-t">' + x.heureNY + ' NY</span>' : '') + '</span>' +
       '<span class="jr-r ' + (ouvert ? 'open' : r > 0 ? 'pos' : 'neg') + '">' +
         '<span class="jv">' + verdict + '</span>' +
         (ouvert ? '' : '<span class="jn mono">' + sgn(r) + ' R · ' + sgn(Math.round(r * uR),0) + dev + '</span>') +
@@ -941,6 +987,7 @@ $('#b-alert').addEventListener('click', () => {
 
 /* ── démarrage ──────────────────────────────────────────────────────── */
 paintChips(); paintAll(); paintAlert(); compteInit();
+chargerDistant().then(paintJournal);
 if(window.CFD && CFD.actif()) $('#tok').placeholder = 'jeton enregistré';
 if(!window.matchMedia('(prefers-reduced-motion: reduce)').matches) boucle(performance.now());
 else drawRadar(0);

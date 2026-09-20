@@ -1,0 +1,63 @@
+{
+ "version": 1,
+ "signaux": [],
+ "passages": [
+  {
+   "ts": "2026-09-20T13:56:17.749Z",
+   "bougie": "2026-09-18T20:59:59.000Z",
+   "jour": "2026-09-18",
+   "heureNY": "16:59",
+   "prix": 29917.25,
+   "retardMin": 2456,
+   "biais": "baissier",
+   "score": -2,
+   "dol": 29648,
+   "niveau": "ITH H4",
+   "etat": "CHERCHE",
+   "niveauxParUnite": "M5:11 M15:3 M30:1 H1:2 H4:15",
+   "etapeBloquee": "stop",
+   "dit": "Inversion 5m confirmée sur ITH H4 (29788 – 30074), mais le stop était trop serré face à l'ATR."
+  },
+  {
+   "ts": "2026-09-20T13:56:44.167Z",
+   "bougie": "2026-09-18T20:59:59.000Z",
+   "jour": "2026-09-18",
+   "heureNY": "16:59",
+   "prix": 29917.25,
+   "retardMin": 2457,
+   "biais": "baissier",
+   "score": -2,
+   "dol": 29648,
+   "niveau": "FVG M5",
+   "etat": "CHERCHE",
+   "niveauxParUnite": "M5:11 M15:3 M30:1 H1:2 H4:15",
+   "etapeBloquee": "ifvg",
+   "dit": "Le prix a touché FVG M5 (29917.25 – 29958.25), mais aucune inversion confirmée par clôture de corps."
+  },
+  {
+   "ts": "2026-09-20T13:57:15.435Z",
+   "bougie": "2026-09-18T20:59:59.000Z",
+   "jour": "2026-09-18",
+   "heureNY": "16:59",
+   "prix": 29917.25,
+   "retardMin": 2457,
+   "biais": "baissier",
+   "score": -2,
+   "dol": 29648,
+   "niveau": "FVG M5",
+   "etat": "CHERCHE",
+   "niveauxParUnite": "M5:11 M15:3 M30:1 H1:2 H4:15",
+   "etapeBloquee": "fenetre",
+   "dit": "Hors fenêtre. Biais baissier, DOL à 29648, niveau le plus proche FVG M5 (29917.25 – 29958.25)."
+  }
+ ],
+ "bilan": {
+  "maj": "2026-09-20T13:57:15.435Z",
+  "total": 0,
+  "clos": 0,
+  "ouverts": 0,
+  "reussite": null,
+  "cumulR": 0,
+  "passages": 3
+ }
+}

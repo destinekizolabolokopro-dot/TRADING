@@ -1,0 +1,61 @@
+# ── JOURNAL EN DIRECT ──────────────────────────────────────────────────────
+# Fait tourner le modèle sur le marché réel pendant la fenêtre de trading,
+# que quelqu'un regarde le site ou non, et versionne le résultat.
+#
+# Aucun ordre n'est passé. C'est un test à blanc : on veut savoir si le
+# modèle tient sur des données réelles avant de lui confier un centime.
+#
+# L'heure de New York bascule entre EDT (UTC−4) et EST (UTC−5) selon la
+# saison. Plutôt que de maintenir deux plannings, on déclenche largement de
+# 13 h à 15 h UTC et c'est le script qui décide, lui, s'il est bien dans la
+# fenêtre 09 h 30 → 10 h 00 heure de New York.
+name: Journal des signaux
+
+on:
+  schedule:
+    - cron: '*/5 13-15 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Ignorer la fenêtre (pour tester)'
+        type: boolean
+        default: false
+
+concurrency:
+  group: journal-signaux
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  releve:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Relever les signaux
+        run: node scripts/live_log.js ${{ inputs.force && '--force' || '' }}
+
+      - name: Versionner le journal
+        run: |
+          if git diff --quiet -- data/signaux.json; then
+            echo "Rien de neuf à enregistrer."
+            exit 0
+          fi
+          git config user.name  "journal-signaux"
+          git config user.email "noreply@github.com"
+          git add data/signaux.json
+          git commit -m "Journal : relevé du $(date -u '+%Y-%m-%d %H:%M UTC')"
+          # Une autre exécution a pu pousser entre-temps : on rejoue par-dessus.
+          for i in 1 2 3 4 5; do
+            git pull --rebase --autostash origin "${GITHUB_REF_NAME}" && \
+            git push origin "HEAD:${GITHUB_REF_NAME}" && exit 0
+            sleep $((i * 3))
+          done
+          echo "Poussée impossible après cinq tentatives." >&2
+          exit 1
