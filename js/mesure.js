@@ -18,6 +18,22 @@
  *   brut  +11,55 R  (+2 887 €)      net  +10,12 R  (+2 531 €)
  *   réussite 80,0 %  ·  profit factor 1,90  ·  +0,184 R par signal
  *
+ * ⚠️ CES CHIFFRES NE SONT PAS REPRODUCTIBLES. La même commande, relancée
+ * deux heures plus tard, a rendu 54 signaux au lieu de 55, 85,2 % de
+ * réussite au lieu de 80,0 %, et 3 445 € au lieu de 2 531 € — 914 € d'écart
+ * sur la même période et la même configuration. Cinq signaux avaient
+ * disparu, quatre étaient apparus.
+ *
+ * La cause est la profondeur des séries Yahoo, bien plus courte qu'annoncée
+ * et glissante :
+ *
+ *   1 min    8 jours       2 min   ~36 jours      5 min   60 jours
+ *
+ * Or 11 des 55 signaux ont leur IFVG sur le 1 min ou le 2 min (20 %), et
+ * ils pèsent 4,25 R sur 11,55 R, soit 37 % du résultat. Chaque jour qui
+ * passe en efface un peu. Ce jeu est donc un CLICHÉ d'une mesure faite le
+ * 20 septembre 2026, pas une vérité qu'on peut revérifier.
+ *
  * Ils sont affichés à part, étiquetés « reconstitué », et JAMAIS mélangés
  * aux signaux réellement émis en direct. Vider le journal ne les touche pas :
  * ils ne vivent pas dans le localStorage.
