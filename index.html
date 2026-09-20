@@ -758,7 +758,8 @@ async function refresh(){
       if(D) D.source = 'cfd';
     } else {
       D = await etatDistant();
-      if(D) D.source = 'robot';
+      if(D){ D.source = 'robot';
+        if(D.eurusd && window.Compte) Compte.setTaux(D.eurusd); }
     }
   }catch(e){ D = null; }
   if(D && window.History){
@@ -1007,7 +1008,8 @@ function compteInit(){
   };
   ['#c-capital','#c-devise','#c-risque','#c-contrat'].forEach(id =>
     $(id).addEventListener('change', maj));
-  Compte.majTaux().then(maj);
+  // On ne sollicite le réseau que si l'instantané n'a pas déjà donné le taux.
+  (Compte.tauxFrais() ? Promise.resolve() : Compte.majTaux()).then(maj);
   maj();
 }
 
@@ -1025,7 +1027,12 @@ $('#b-alert').addEventListener('click', () => {
 });
 
 /* ── démarrage ──────────────────────────────────────────────────────── */
-paintChips(); paintAll(); paintAlert(); compteInit();
+paintChips(); paintAll(); paintAlert();
+// L'instantané porte le taux : on l'applique avant d'initialiser le compte.
+etatDistant().then(e => {
+  if(e && e.eurusd && window.Compte) Compte.setTaux(e.eurusd);
+  compteInit();
+});
 chargerDistant().then(paintJournal);
 if(window.CFD && CFD.actif()) $('#tok').placeholder = 'jeton enregistré';
 if(!window.matchMedia('(prefers-reduced-motion: reduce)').matches) boucle(performance.now());

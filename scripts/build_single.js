@@ -13,16 +13,30 @@ const ROOT = path.join(__dirname, '..');
 const out = process.argv[2] || path.join(ROOT, 'TRADEassist.html');
 let html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
 
-['js/session.js', 'js/cfd.js', 'js/nq.js', 'js/structure.js', 'js/modele.js', 'js/compte.js', 'js/history.js', 'js/notif.js'].forEach((rel) => {
+// La liste était écrite en dur, et js/mesure.js n'y figurait pas : sa balise
+// restait une référence relative. Le fichier autonome marchait donc tant qu'on
+// l'ouvrait à côté du dossier js/, et perdait silencieusement le module dès
+// qu'on le déplaçait — c'est-à-dire dans le seul cas où « autonome » compte.
+// On lit désormais les balises DANS la page : plus rien ne peut être oublié.
+const balises = [...html.matchAll(/<script src="(js\/[^"]+\.js)"><\/script>/g)].map(m => m[1]);
+if (!balises.length) { console.error('Aucune balise <script src="js/…"> trouvée.'); process.exit(1); }
+console.log('Modules à inliner :', balises.length, '·', balises.map(b => b.slice(3)).join(' '));
+balises.forEach((rel) => {
   const tag = `<script src="${rel}"></script>`;
-  if (html.indexOf(tag) === -1) { console.warn('⚠️ balise absente :', tag); return; }
-  const code = fs.readFileSync(path.join(ROOT, rel), 'utf8');
+  const abs = path.join(ROOT, rel);
+  if (!fs.existsSync(abs)) { console.error('⚠️ fichier introuvable :', rel); process.exit(1); }
+  const code = fs.readFileSync(abs, 'utf8');
   // Remplacement par FONCTION, et non par chaîne : dans une chaîne de
   // remplacement, $' et $` sont des motifs spéciaux. Le code d'un module qui
   // contient « $' » — par exemple le symbole d'une devise — réinjectait tout
   // le reste du document et dupliquait le script.
   html = html.replace(tag, () => '<script>\n' + code + '\n</script>');
 });
+
+// Garde-fou : aucune référence relative ne doit survivre dans un fichier
+// censé être autonome.
+const reste = [...html.matchAll(/<script src="([^"]+)"><\/script>/g)].map(m => m[1]);
+if (reste.length) { console.error('⚠️ références non inlinées :', reste.join(', ')); process.exit(1); }
 
 fs.writeFileSync(out, html);
 console.log('✅ Écrit :', out, '(' + Math.round(html.length / 1024) + ' Ko)');

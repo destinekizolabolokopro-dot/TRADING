@@ -1,9 +1,10 @@
 {
- "maj": "2026-09-20T14:06:48.948Z",
+ "maj": "2026-09-20T16:03:50.225Z",
  "source": "yahoo",
+ "eurusd": 1.149,
  "prix": 29917.25,
  "derniereBougie": 1789765199000,
- "retardMin": 2467,
+ "retardMin": 2584,
  "hors": true,
  "etat": "CHERCHE",
  "dir": -1,

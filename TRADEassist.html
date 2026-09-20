@@ -2076,6 +2076,15 @@ var Compte = (function () {
 
   /** Taux EUR/USD, rafraîchi au plus une fois par heure. */
   var tauxT = 0;
+  // Le taux peut être relevé côté serveur par la tâche automatique et livré
+  // avec l'instantané. Quand c'est le cas, le navigateur n'a plus rien à
+  // chercher : il appelait pour cela les relais CORS, qui sont tous morts.
+  function setTaux(v) {
+    if (!(v > 0.5 && v < 2)) return false;
+    tauxT = Date.now(); ecrire({ taux: +v.toFixed(4) }); return true;
+  }
+  function tauxFrais() { return Date.now() - tauxT < 3600e3; }
+
   function majTaux() {
     var r = lire();
     if (r.devise !== 'EUR') return Promise.resolve(1);
@@ -2137,7 +2146,8 @@ var Compte = (function () {
   function sym(d) { return d === 'EUR' ? ' €' : ' $'; }
 
   return { lire: lire, ecrire: ecrire, calibrer: calibrer, uniteR: uniteR,
-           majTaux: majTaux, CONTRATS: CONTRATS, sym: sym, DEF: DEF };
+           majTaux: majTaux, setTaux: setTaux, tauxFrais: tauxFrais,
+           CONTRATS: CONTRATS, sym: sym, DEF: DEF };
 })();
 if (typeof window !== 'undefined') window.Compte = Compte;
 
@@ -2287,7 +2297,107 @@ if (typeof window !== 'undefined') window.Compte = Compte;
 })(typeof window !== 'undefined' ? window : this);
 
 </script>
-<script src="js/mesure.js"></script>
+<script>
+'use strict';
+/**
+ * HISTORIQUE MESURÉ — les 55 signaux que le modèle produit sur les vraies
+ * bougies NQ du 13 juillet au 18 septembre 2026.
+ *
+ * ⚠️ CE NE SONT PAS DES POSITIONS QUI ONT ÉTÉ ENVOYÉES. Rien n'a jamais été
+ * envoyé : un test sur un champ inexistant coupait la chaîne. Ce sont des
+ * signaux RECONSTITUÉS a posteriori, au prix de clôture exact de la bougie
+ * qui les a déclenchés, avec la configuration retenue :
+ *
+ *   09 h 30 → 10 h 00 New York · partiel 0,5 R sur 90 % · runner 2,5 R
+ *   stop au bord de l'IFVG · 2 signaux par jour au maximum
+ *
+ * Le R affiché est NET DE FRAIS : 0,25 point de slippage par côté et 4,00 $
+ * de commission aller-retour, soit 0,7 point retiré de chaque trade. Le R
+ * brut est conservé en dernière colonne pour pouvoir vérifier l'écart.
+ *
+ *   brut  +11,55 R  (+2 887 €)      net  +10,12 R  (+2 531 €)
+ *   réussite 80,0 %  ·  profit factor 1,90  ·  +0,184 R par signal
+ *
+ * Ils sont affichés à part, étiquetés « reconstitué », et JAMAIS mélangés
+ * aux signaux réellement émis en direct. Vider le journal ne les touche pas :
+ * ils ne vivent pas dans le localStorage.
+ *
+ * Colonnes : jour, minute NY, sens, niveau, unité, entrée, stop, objectif,
+ *            RR visé, R net, R brut, sortie, horodatage, durée en minutes.
+ */
+var Mesure = (function () {
+  var BRUT = [
+  ["2026-07-13",570,"SHORT","CISD H4","5m",29644.75,29693.18,29523.68,0.7,0.436,0.45,"gain partiel",1783949400000,5],
+  ["2026-07-13",580,"SHORT","CISD M5","5m",29596,29615.17,29548.08,0.7,0.663,0.7,"gain",1783950000000,5],
+  ["2026-07-15",575,"SHORT","CISD M5","5m",29882.25,29938.48,29741.68,0.7,0.438,0.45,"gain partiel",1784122500000,5],
+  ["2026-07-15",585,"SHORT","ITH M5","5m",29784.75,29806.71,29729.85,0.7,0.418,0.45,"gain partiel",1784123100000,5],
+  ["2026-07-16",575,"SHORT","CISD H1","5m",29386,29426.63,29284.43,0.7,0.433,0.45,"gain partiel",1784208900000,5],
+  ["2026-07-16",580,"SHORT","CISD H1","5m",29317.75,29361.61,29208.1,0.7,0.434,0.45,"gain partiel",1784209200000,5],
+  ["2026-07-20",570,"LONG","CISD H4","5m",29136.5,29019.92,29427.95,0.7,-1.006,-1,"perte",1784554200000,25],
+  ["2026-07-22",570,"LONG","CISD M5","5m",29151,29118.17,29233.08,0.7,-1.021,-1,"perte",1784727000000,5],
+  ["2026-07-22",575,"LONG","RB M5","5m",29155.75,29139.92,29195.33,0.7,0.406,0.45,"gain partiel",1784727300000,5],
+  ["2026-07-23",585,"SHORT","ITH M15","5m",28760,28802.75,28653.13,0.7,0.434,0.45,"gain partiel",1784814300000,5],
+  ["2026-07-23",595,"SHORT","CISD H4","5m",28707.75,28742.49,28620.9,0.7,-1.02,-1,"perte",1784814900000,5],
+  ["2026-07-24",580,"SHORT","CISD M5","5m",28485,28544.95,28335.13,0.7,0.438,0.45,"gain partiel",1784900400000,5],
+  ["2026-07-28",570,"SHORT","RB M15","5m",27877,27904.33,27808.68,0.7,0.674,0.7,"gain",1785245400000,5],
+  ["2026-07-29",590,"SHORT","ITH M30","5m",27753.5,27817.05,27594.63,0.7,0.439,0.45,"gain partiel",1785333000000,10],
+  ["2026-07-31",580,"SHORT","ITH H4","5m",28419,28468.93,28294.18,0.7,0.436,0.45,"gain partiel",1785505200000,5],
+  ["2026-07-31",585,"SHORT","FVG H1","5m",28360.5,28385.42,28298.2,0.7,0.672,0.7,"gain",1785505500000,5],
+  ["2026-08-03",570,"SHORT","CISD M5","5m",28380.75,28604.93,27820.3,0.7,-1.003,-1,"perte",1785763800000,25],
+  ["2026-08-04",570,"LONG","CISD H4","5m",29382.75,29349.62,29465.58,0.7,0.429,0.45,"gain partiel",1785850200000,5],
+  ["2026-08-05",570,"LONG","CISD H4","5m",30013,29968.75,30123.63,0.7,-1.016,-1,"perte",1785936600000,5],
+  ["2026-08-05",580,"LONG","RB M5","5m",30052,30029.74,30107.65,0.7,0.419,0.45,"gain partiel",1785937200000,5],
+  ["2026-08-06",575,"LONG","CISD H4","5m",29385.5,29363.12,29441.45,0.7,0.669,0.7,"gain",1786023300000,5],
+  ["2026-08-06",580,"LONG","CISD M5","5m",29458.75,29398.61,29609.1,0.7,0.438,0.45,"gain partiel",1786023600000,5],
+  ["2026-08-07",570,"LONG","FVG M15","5m",29806,29777.29,29877.78,0.7,-1.024,-1,"perte",1786109400000,5],
+  ["2026-08-11",570,"SHORT","CISD M5","5m",29737.5,29777.45,29637.63,0.7,0.432,0.45,"gain partiel",1786455000000,5],
+  ["2026-08-11",575,"SHORT","CISD M5","5m",29702.25,29734.19,29622.4,0.7,-1.022,-1,"perte",1786455300000,5],
+  ["2026-08-14",570,"SHORT","ITH M5","5m",30206.25,30226.54,30155.53,0.7,0.416,0.45,"gain partiel",1786714200000,5],
+  ["2026-08-17",580,"SHORT","CISD M5","2m",30196.5,30227.79,30118.28,0.7,0.428,0.45,"gain partiel",1786974000000,5],
+  ["2026-08-18",585,"SHORT","CISD M5","5m",29657.25,29681.18,29597.43,0.7,0.421,0.45,"gain partiel",1787060700000,5],
+  ["2026-08-21",570,"SHORT","ITH M5","5m",29362.25,29408.37,29246.95,0.7,0.435,0.45,"gain partiel",1787319000000,5],
+  ["2026-08-21",575,"SHORT","CISD M30","5m",29350,29360.37,29324.08,0.7,0.632,0.7,"gain",1787319300000,5],
+  ["2026-08-24",570,"SHORT","RB H4","5m",29112.75,29131.57,29065.7,0.7,0.413,0.45,"gain partiel",1787578200000,5],
+  ["2026-08-24",575,"SHORT","CISD H4","5m",29080,29119.32,28981.7,0.7,0.682,0.7,"gain",1787578500000,5],
+  ["2026-08-25",585,"SHORT","ITH M15","2m",29393,29356.38,29301.45,0.7,0.431,0.45,"gain partiel",1787665500000,5],
+  ["2026-08-27",590,"SHORT","ITH M15","2m",29543.25,29493.66,29419.28,0.7,0.436,0.45,"gain partiel",1787838600000,5],
+  ["2026-08-31",575,"SHORT","RB M5","5m",29398.75,29420.88,29343.43,0.7,-1.032,-1,"perte",1788183300000,5],
+  ["2026-09-01",570,"SHORT","CISD H4","2m",29099,29107.07,29078.83,0.7,0.613,0.7,"gain",1788269400000,5],
+  ["2026-09-01",585,"SHORT","CISD M15","2m",29143.25,29075.83,28974.7,0.7,0.44,0.45,"gain partiel",1788270300000,5],
+  ["2026-09-03",575,"LONG","CISD M30","5m",29328.75,29277.13,29457.8,0.7,0.436,0.45,"gain partiel",1788442500000,5],
+  ["2026-09-03",580,"LONG","RB M15","2m",29345.5,29329.38,29385.8,0.7,0.407,0.45,"gain partiel",1788442800000,5],
+  ["2026-09-04",595,"LONG","ITL H1","5m",29691,29659.81,29768.98,0.7,-1.022,-1,"perte",1788530100000,5],
+  ["2026-09-08",570,"SHORT","RB H4","5m",29600.5,29627.42,29533.2,0.7,0.424,0.45,"gain partiel",1788874200000,5],
+  ["2026-09-08",575,"SHORT","RB M15","5m",29568,29596.91,29495.73,0.7,0.676,0.7,"gain",1788874500000,5],
+  ["2026-09-09",570,"LONG","ITL H4","5m",29478.75,29461.1,29522.88,0.7,0.41,0.45,"gain partiel",1788960600000,5],
+  ["2026-09-09",585,"LONG","RB M5","5m",29499.5,29479.6,29549.25,0.7,0.415,0.45,"gain partiel",1788961500000,5],
+  ["2026-09-10",590,"SHORT","FVG M30","5m",29105.75,29138.82,29023.08,0.7,0.429,0.45,"gain partiel",1789048200000,5],
+  ["2026-09-11",575,"LONG","CISD M30","1m",29400.75,29372.87,29470.45,0.7,0.425,0.45,"gain partiel",1789133700000,5],
+  ["2026-09-11",580,"LONG","RB M5","2m",29433.75,29409.11,29495.35,0.7,0.422,0.45,"gain partiel",1789134000000,5],
+  ["2026-09-14",575,"LONG","FVG M30","1m",28889,28904.97,28928.93,0.7,0.656,0.7,"gain",1789392900000,5],
+  ["2026-09-14",580,"LONG","RB M5","5m",28951.5,28933.71,28995.98,0.7,0.661,0.7,"gain",1789393200000,5],
+  ["2026-09-15",575,"LONG","RB M5","5m",29430.5,29419.61,29457.73,0.7,0.386,0.45,"gain partiel",1789479300000,5],
+  ["2026-09-16",585,"LONG","FVG M15","5m",29461.75,29438.86,29518.98,0.7,0.419,0.45,"gain partiel",1789566300000,5],
+  ["2026-09-16",595,"LONG","FVG M15","1m",29478.75,29453.35,29542.25,0.7,-1.028,-1,"perte",1789566900000,5],
+  ["2026-09-17",570,"SHORT","CISD H4","5m",29641.75,29687.93,29526.3,0.7,0.435,0.45,"gain partiel",1789651800000,5],
+  ["2026-09-17",575,"SHORT","ITH H1","5m",29620.5,29668.42,29500.7,0.7,-1.015,-1,"perte",1789652100000,10],
+  ["2026-09-18",585,"SHORT","RB M5","1m",29795.25,29828.46,29712.23,0.7,0.679,0.7,"gain",1789739100000,20]
+  ];
+  var CLES = ['jour','minNY','sens','niveau','tf','entry','sl','tp','rr','r','rBrut','sortie','ts','duree'];
+  var LISTE = BRUT.map(function (l) {
+    var o = {}; CLES.forEach(function (k, i) { o[k] = l[i]; });
+    o.source = 'MESURE'; o.symbol = 'NQ'; o.direction = o.sens;
+    o.status = 'closed'; o.result = o.r > 0 ? 'win' : 'loss';
+    o.motif = o.sortie + ' · IFVG ' + o.tf + ' sur ' + o.niveau +
+              ' · brut ' + (o.rBrut > 0 ? '+' : '') + o.rBrut + ' R';
+    return o;
+  });
+  function liste() { return LISTE.slice(); }
+  return { liste: liste };
+})();
+if (typeof window !== 'undefined') window.Mesure = Mesure;
+
+</script>
 <script>
 'use strict';
 /**
@@ -2731,7 +2841,8 @@ async function refresh(){
       if(D) D.source = 'cfd';
     } else {
       D = await etatDistant();
-      if(D) D.source = 'robot';
+      if(D){ D.source = 'robot';
+        if(D.eurusd && window.Compte) Compte.setTaux(D.eurusd); }
     }
   }catch(e){ D = null; }
   if(D && window.History){
@@ -2980,7 +3091,8 @@ function compteInit(){
   };
   ['#c-capital','#c-devise','#c-risque','#c-contrat'].forEach(id =>
     $(id).addEventListener('change', maj));
-  Compte.majTaux().then(maj);
+  // On ne sollicite le réseau que si l'instantané n'a pas déjà donné le taux.
+  (Compte.tauxFrais() ? Promise.resolve() : Compte.majTaux()).then(maj);
   maj();
 }
 
@@ -2998,7 +3110,12 @@ $('#b-alert').addEventListener('click', () => {
 });
 
 /* ── démarrage ──────────────────────────────────────────────────────── */
-paintChips(); paintAll(); paintAlert(); compteInit();
+paintChips(); paintAll(); paintAlert();
+// L'instantané porte le taux : on l'applique avant d'initialiser le compte.
+etatDistant().then(e => {
+  if(e && e.eurusd && window.Compte) Compte.setTaux(e.eurusd);
+  compteInit();
+});
 chargerDistant().then(paintJournal);
 if(window.CFD && CFD.actif()) $('#tok').placeholder = 'jeton enregistré';
 if(!window.matchMedia('(prefers-reduced-motion: reduce)').matches) boucle(performance.now());

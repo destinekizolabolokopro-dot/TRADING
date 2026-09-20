@@ -37,6 +37,15 @@ var Compte = (function () {
 
   /** Taux EUR/USD, rafraîchi au plus une fois par heure. */
   var tauxT = 0;
+  // Le taux peut être relevé côté serveur par la tâche automatique et livré
+  // avec l'instantané. Quand c'est le cas, le navigateur n'a plus rien à
+  // chercher : il appelait pour cela les relais CORS, qui sont tous morts.
+  function setTaux(v) {
+    if (!(v > 0.5 && v < 2)) return false;
+    tauxT = Date.now(); ecrire({ taux: +v.toFixed(4) }); return true;
+  }
+  function tauxFrais() { return Date.now() - tauxT < 3600e3; }
+
   function majTaux() {
     var r = lire();
     if (r.devise !== 'EUR') return Promise.resolve(1);
@@ -98,6 +107,7 @@ var Compte = (function () {
   function sym(d) { return d === 'EUR' ? ' €' : ' $'; }
 
   return { lire: lire, ecrire: ecrire, calibrer: calibrer, uniteR: uniteR,
-           majTaux: majTaux, CONTRATS: CONTRATS, sym: sym, DEF: DEF };
+           majTaux: majTaux, setTaux: setTaux, tauxFrais: tauxFrais,
+           CONTRATS: CONTRATS, sym: sym, DEF: DEF };
 })();
 if (typeof window !== 'undefined') window.Compte = Compte;

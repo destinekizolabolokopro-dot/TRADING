@@ -102,6 +102,15 @@ function blocage(d) {
     process.exit(1);
   }
 
+  // Le site affiche des euros : il lui faut EUR/USD. Il allait le chercher
+  // lui-même via les relais CORS, qui sont morts. On le relève ici.
+  let eurusd = null;
+  try {
+    const cs = await serie('EURUSD=X', '1d', '5d');
+    const v = cs[cs.length - 1].c;
+    if (v > 0.5 && v < 2) eurusd = +v.toFixed(4);
+  } catch (e) { console.error('EUR/USD indisponible : ' + e.message); }
+
   const d = Modele.evaluer(brut);
   const e = Modele.heure(d.derniereBougie);
   const hNY = String(Math.floor(e.min / 60)).padStart(2, '0') + ':' + String(e.min % 60).padStart(2, '0');
@@ -126,7 +135,7 @@ function blocage(d) {
   // et le site se contente de lire ce fichier — servi par GitHub avec
   // `access-control-allow-origin: *`.
   fs.writeFileSync(ETAT, JSON.stringify({
-    maj: maintenant, source: 'yahoo',
+    maj: maintenant, source: 'yahoo', eurusd: eurusd,
     prix: d.prix, derniereBougie: d.derniereBougie,
     retardMin: Math.round((Date.now() - d.derniereBougie) / 60000),
     hors: d.hors, etat: d.etat, dir: d.dir, score: d.score,
