@@ -143,12 +143,35 @@ function blocage(d) {
     trade: d.trade, dernierSignal: d.dernierSignal, cfg: d.cfg
   }, null, 1) + '\n');
 
+  // ── LE SIGNAL EST-IL RECEVABLE ? ────────────────────────────────────
+  // ⚠️ Le test portait sur `d.hors`, qui décrit la DERNIÈRE bougie reçue,
+  // pas celle qui a produit le signal. Or Yahoo livre avec une dizaine de
+  // minutes de retard : quand la bougie de 09 h 55 arrive, la dernière
+  // connue est déjà à 10 h 05, donc `hors` vaut vrai et le signal était
+  // jeté. Mesuré sur le jeu réel, les créneaux 09 h 50 et 09 h 55 pèsent
+  // 6 signaux sur 55 — un sur neuf, perdu en silence.
+  //
+  // Le bon critère est l'heure de la bougie DU SIGNAL.
+  function dansLaFenetre(ts) {
+    const e = Modele.heure(ts);
+    return e.dow >= 1 && e.dow <= 5 &&
+           e.min >= Modele.CFG.ghDeb && e.min < Modele.CFG.ghFin;
+  }
   const t = d.trade || d.dernierSignal;
-  const neuf = t && !d.hors &&
+  const neuf = t && dansLaFenetre(t.t) &&
     !db.signaux.some(s => s.cle === `${t.t}|${t.sens}|${t.entree}`);
 
   if (neuf) {
+    // Les champs de contexte doivent décrire la bougie DU SIGNAL, pas la
+    // dernière reçue : avec le retard de Yahoo, les deux diffèrent
+    // systématiquement, et un relevé qui mélange les deux est faux.
+    const eSig = Modele.heure(t.t);
+    const hSig = String(Math.floor(eSig.min / 60)).padStart(2, '0') + ':' +
+                 String(eSig.min % 60).padStart(2, '0');
     db.signaux.push(Object.assign({}, commun, {
+      bougie: new Date(t.t).toISOString(), jour: eSig.jour, heureNY: hSig,
+      prix: t.entree,
+      retardMin: Math.round((Date.now() - t.t) / 60000),
       cle: `${t.t}|${t.sens}|${t.entree}`,
       sens: t.sens, entree: t.entree, sl: t.sl, tp1: t.tp1, tp: t.tp,
       rr: t.rr, uniteIFVG: t.tf, niveauDeclencheur: t.niveau,
@@ -161,7 +184,7 @@ function blocage(d) {
         `partiel 0,5 R à ${t.tp1} sur 90 % de la taille, le reste court jusqu'à 2,5 R à ${t.tp}.`,
       statut: 'ouvert', resultat: null, r: null, closTs: null
     }));
-    console.log(`✅ SIGNAL ${t.sens} · ${commun.jour} ${hNY} NY · entrée ${t.entree} · stop ${t.sl} · ${t.niveau}`);
+    console.log(`✅ SIGNAL ${t.sens} · ${eSig.jour} ${hSig} NY · entrée ${t.entree} · stop ${t.sl} · ${t.niveau}`);
   } else if (f.ouverte || FORCE) {
     const b = blocage(d);
     db.passages.push(Object.assign({}, commun, { etapeBloquee: b.etape, dit: b.dit }));
