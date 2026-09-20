@@ -172,28 +172,43 @@ function blocage(d) {
     console.log(`Instantané seul — hors fenêtre, ouverture dans ${Math.round(f.ms / 60000)} min.`);
   }
 
-  // Confronte les signaux encore ouverts au prix courant, bougie par bougie.
+  // ── SUIVI DES POSITIONS ─────────────────────────────────────────────
+  // Calqué bougie pour bougie sur scripts/mech.js (lignes 229-245). Toute
+  // divergence ici rendrait le relevé en direct incomparable au backtest,
+  // ce qui est précisément ce qu'on cherche à mesurer. L'ordre des tests
+  // compte : le partiel est examiné AVANT le stop, et il déplace le stop au
+  // seuil — sans quoi un stop touché après le partiel serait compté −1 R au
+  // lieu de +0,45 R.
+  const PART = 0.9, TP1R = 0.5, TP2R = 2.5, MAXBARRES = 200;
   const m5 = brut.m5;
   db.signaux.filter(s => s.statut === 'ouvert').forEach(s => {
     const depuis = Date.parse(s.bougie);
     const apres = m5.filter(c => c.t > depuis);
     const L = s.sens === 'LONG';
+    let sl = s.sl, part1 = s.part1 === true, n = 0;
     for (const c of apres) {
-      const touchSL = L ? c.l <= s.sl : c.h >= s.sl;
-      const touchTP = L ? c.h >= s.tp : c.l <= s.tp;
-      const touchT1 = L ? c.h >= s.tp1 : c.l <= s.tp1;
-      if (touchSL) { s.statut = 'clos'; s.resultat = 'perdu'; s.r = -1;
-                     s.closTs = new Date(c.t).toISOString(); break; }
-      if (touchTP) { s.statut = 'clos'; s.resultat = 'gagné'; s.r = +(0.9 * 0.5 + 0.1 * 2.5).toFixed(3);
-                     s.closTs = new Date(c.t).toISOString(); break; }
-      if (touchT1 && s.r == null) s.r = 0.45;          // partiel encaissé
+      n++;
+      const touche = niv => L ? c.h >= niv : c.l <= niv;
+      const stoppe = () => L ? c.l <= sl : c.h >= sl;
+      if (!part1 && touche(s.tp1)) { part1 = true; sl = s.entree; }   // partiel + seuil
+      if (part1 && touche(s.tp)) {
+        s.statut = 'clos'; s.resultat = 'gagné';
+        s.r = +(PART * TP1R + (1 - PART) * TP2R).toFixed(3);
+      } else if (stoppe()) {
+        if (part1) { s.statut = 'clos'; s.resultat = 'gagné'; s.r = +(PART * TP1R).toFixed(3); }
+        else       { s.statut = 'clos'; s.resultat = 'perdu'; s.r = -1; }
+      } else if (n > MAXBARRES) {
+        const rBrut = (L ? c.c - s.entree : s.entree - c.c) / s.risquePts;
+        s.statut = 'clos'; s.resultat = 'expiré';
+        s.r = +(part1 ? PART * TP1R + (1 - PART) * Math.max(0, Math.min(TP2R, rBrut))
+                      : Math.max(-1, Math.min(TP2R, rBrut))).toFixed(3);
+      }
+      if (s.statut === 'clos') { s.closTs = new Date(c.t).toISOString(); s.barres = n; break; }
     }
-    // Un signal qui traîne plus de deux heures sans rien toucher est clôturé
-    // au dernier prix : le modèle ne garde pas de position d'un jour à l'autre.
-    if (s.statut === 'ouvert' && apres.length && (Date.now() - depuis) > 2 * 3600 * 1000) {
-      s.statut = 'clos'; s.resultat = s.r > 0 ? 'gagné' : 'expiré';
-      s.r = s.r || 0; s.closTs = new Date(apres[apres.length - 1].t).toISOString();
-    }
+    // Mémorisé pour le passage suivant : le partiel a pu tomber sur une
+    // bougie déjà dépassée, et la fenêtre de bougies recule à chaque relevé.
+    s.part1 = part1;
+    if (s.statut === 'ouvert') s.slCourant = sl;
   });
 
   const clos = db.signaux.filter(s => s.statut === 'clos');
