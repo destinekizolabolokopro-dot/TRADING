@@ -25,11 +25,26 @@
         if (lg && (pr >= +t.tp || pr <= +t.sl)) return;
         if (!lg && (pr <= +t.tp || pr >= +t.sl)) return;
       }
-      var open = h.some(function (x) { return x.status === 'open' && x.symbol === t.sym && x.source === source && x.direction === t.dir; });
-      var cd = h.some(function (x) { return x.status === 'closed' && x.symbol === t.sym && x.source === source && x.direction === t.dir && x.closedTs && (Date.now() - x.closedTs) < COOLDOWN; });
-      if (open || cd) return;
+      // ── DÉDOUBLONNAGE ────────────────────────────────────────────────
+      // Quand l'appelant fournit une CLÉ, elle identifie le signal lui-même
+      // (bougie + sens + prix d'entrée) et c'est le seul critère retenu.
+      //
+      // Sans clé, on retombe sur l'ancien garde-fou : un seul trade ouvert
+      // par sens, puis six heures de carence. Il convient à un bot qui
+      // pourrait re-signaler le même setup en boucle, mais il est ruineux
+      // pour le modèle MECH, qui se limite déjà tout seul à deux signaux
+      // par jour et en produit couramment deux du même sens à cinq minutes
+      // d'intervalle : mesuré, il en avalait 19 sur 55, soit 35 %.
+      if (t.key != null) {
+        if (h.some(function (x) { return x.key === t.key; })) return;
+      } else {
+        var open = h.some(function (x) { return x.status === 'open' && x.symbol === t.sym && x.source === source && x.direction === t.dir; });
+        var cd = h.some(function (x) { return x.status === 'closed' && x.symbol === t.sym && x.source === source && x.direction === t.dir && x.closedTs && (Date.now() - x.closedTs) < COOLDOWN; });
+        if (open || cd) return;
+      }
       h.push({ id: Date.now() + '-' + t.sym + '-' + source + '-' + Math.random().toString(36).slice(2, 6),
-        ts: Date.now(), source: source, symbol: t.sym, direction: t.dir,
+        ts: t.ts || Date.now(), key: t.key != null ? t.key : null,
+        source: source, symbol: t.sym, direction: t.dir,
         entry: +t.entry, sl: +t.sl, tp: +t.tp, rr: +t.rr, motif: t.note || '',
         tf: t.tf || null, style: t.style || null,
         status: 'open', result: null, r: null });

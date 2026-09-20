@@ -208,20 +208,30 @@ button,input,select{font:inherit;color:inherit}
 /* ── bilan + journal ─────────────────────────────────────────────────── */
 .bilan{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--rule)}
 .bilan>div{background:var(--panel);padding:11px 14px}
-.bk{font-size:10px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--dim)}
-.bv{font-size:17px;font-weight:600;letter-spacing:-.02em;margin-top:3px}
+.bk{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bv{font-size:17px;font-weight:600;letter-spacing:-.02em;margin-top:3px;white-space:nowrap}
 .bv.pos{color:var(--gain)} .bv.neg{color:var(--loss)}
 .bsub{font-size:11px;font-weight:400;color:var(--dim)}
-.jr{display:grid;grid-template-columns:auto auto 1fr auto;gap:10px;align-items:center;
+.jr{display:grid;grid-template-columns:auto auto 1fr auto;gap:3px 9px;align-items:baseline;
   padding:10px 16px;border-top:1px solid var(--rule);font-size:12px}
 .jr-d{color:var(--faint);font-size:11px}
 .jr-s{font-size:10.5px;font-weight:600;letter-spacing:.08em}
 .jr-s.long{color:var(--gain)} .jr-s.short{color:var(--loss)}
-.jr-p{color:var(--dim);font-size:11.5px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.jr-r{text-align:right;line-height:1.3}
+.jr-p{grid-column:1/-1;color:var(--dim);font-size:11.5px;min-width:0}
+.jr-r{text-align:right;line-height:1.3;white-space:nowrap}
 .jv{display:block;font-size:11.5px;font-weight:500}
 .jn{display:block;font-size:11px;color:var(--dim)}
 .jr-r.pos .jv{color:var(--gain)} .jr-r.neg .jv{color:var(--loss)} .jr-r.open .jv{color:var(--a400)}
+
+.jfilters{display:flex;gap:6px;padding:11px 16px;border-bottom:1px solid var(--rule)}
+.jfilters .chip{padding:4px 10px;font-size:11px}
+#journal{max-height:360px;overflow-y:auto;overscroll-behavior:contain}
+.jr-t{font-size:9.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--faint);box-shadow:inset 0 0 0 1px var(--div);border-radius:3px;padding:1px 5px}
+.note{padding:11px 16px;font-size:11.5px;color:var(--dim);line-height:1.6;
+  border-top:1px solid var(--rule)}
+.note b{color:var(--a300);font-weight:500}
 
 /* ── réglages ────────────────────────────────────────────────────────── */
 #settings{display:none}
@@ -355,6 +365,7 @@ button,input,select{font:inherit;color:inherit}
 
     <section class="pan" id="pan-journal">
       <div class="pan-h"><h2>Historique</h2><span class="tag" id="j-tag">—</span></div>
+      <div class="jfilters" id="jchips"></div>
       <div id="bilan"></div>
       <div id="journal"></div>
     </section>
@@ -390,8 +401,9 @@ button,input,select{font:inherit;color:inherit}
 
 <footer class="foot">
   NQ seul · bougies 5 min · fenêtre 09 h 30 → 10 h 00 à New York.
-  Mesuré sur 60 jours : 55 signaux, 83,6 % de réussite, espérance +0,237 R, profit factor 2,45.
-  Le seuil d’équilibre est de 68 % — la marge n’est que de quinze points, et l’avantage ne se
+  Mesuré du 13 juillet au 18 septembre : 55 signaux, 80,0 % de réussite, +0,184 R par signal
+  net de frais, profit factor 1,90.
+  Le seuil d’équilibre est de 68 % — la marge n’est que de douze points, et l’avantage ne se
   retrouve ni sur l’ES ni sur une autre unité d’exécution. Aucun ordre n’est passé : ce site
   signale, il n’exécute pas.
 </footer>
@@ -2153,11 +2165,26 @@ if (typeof window !== 'undefined') window.Compte = Compte;
         if (lg && (pr >= +t.tp || pr <= +t.sl)) return;
         if (!lg && (pr <= +t.tp || pr >= +t.sl)) return;
       }
-      var open = h.some(function (x) { return x.status === 'open' && x.symbol === t.sym && x.source === source && x.direction === t.dir; });
-      var cd = h.some(function (x) { return x.status === 'closed' && x.symbol === t.sym && x.source === source && x.direction === t.dir && x.closedTs && (Date.now() - x.closedTs) < COOLDOWN; });
-      if (open || cd) return;
+      // ── DÉDOUBLONNAGE ────────────────────────────────────────────────
+      // Quand l'appelant fournit une CLÉ, elle identifie le signal lui-même
+      // (bougie + sens + prix d'entrée) et c'est le seul critère retenu.
+      //
+      // Sans clé, on retombe sur l'ancien garde-fou : un seul trade ouvert
+      // par sens, puis six heures de carence. Il convient à un bot qui
+      // pourrait re-signaler le même setup en boucle, mais il est ruineux
+      // pour le modèle MECH, qui se limite déjà tout seul à deux signaux
+      // par jour et en produit couramment deux du même sens à cinq minutes
+      // d'intervalle : mesuré, il en avalait 19 sur 55, soit 35 %.
+      if (t.key != null) {
+        if (h.some(function (x) { return x.key === t.key; })) return;
+      } else {
+        var open = h.some(function (x) { return x.status === 'open' && x.symbol === t.sym && x.source === source && x.direction === t.dir; });
+        var cd = h.some(function (x) { return x.status === 'closed' && x.symbol === t.sym && x.source === source && x.direction === t.dir && x.closedTs && (Date.now() - x.closedTs) < COOLDOWN; });
+        if (open || cd) return;
+      }
       h.push({ id: Date.now() + '-' + t.sym + '-' + source + '-' + Math.random().toString(36).slice(2, 6),
-        ts: Date.now(), source: source, symbol: t.sym, direction: t.dir,
+        ts: t.ts || Date.now(), key: t.key != null ? t.key : null,
+        source: source, symbol: t.sym, direction: t.dir,
         entry: +t.entry, sl: +t.sl, tp: +t.tp, rr: +t.rr, motif: t.note || '',
         tf: t.tf || null, style: t.style || null,
         status: 'open', result: null, r: null });
@@ -2255,6 +2282,7 @@ if (typeof window !== 'undefined') window.Compte = Compte;
 })(typeof window !== 'undefined' ? window : this);
 
 </script>
+<script src="js/mesure.js"></script>
 <script>
 'use strict';
 /**
@@ -2672,8 +2700,12 @@ async function refresh(){
     const t = D.trade;
     // Pas de test sur un champ `possible` : le modèle n'en produit pas. C'est
     // exactement la faute qui vidait le journal.
+    // La clé identifie LE SIGNAL : bougie qui l'a produit + sens + entrée.
+    // Deux signaux du même sens à cinq minutes d'intervalle sont deux
+    // signaux, et doivent tous les deux entrer au journal.
     if(t && !D.hors)
       History.record([{ sym:'NQ', dir:t.sens, entry:t.entree, sl:t.sl, tp:t.tp, rr:t.rr,
+        key: t.t + '|' + t.sens + '|' + t.entree, ts: t.t,
         note:'IFVG ' + t.tf + ' sur ' + t.niveau, tf:t.tf, price:D.prix }], 'MECH');
   }
   paintAll();
@@ -2681,47 +2713,90 @@ async function refresh(){
 }
 
 /* ── journal ────────────────────────────────────────────────────────── */
+// Deux jeux de signaux, JAMAIS confondus :
+//   MECH   — émis en direct par ce site, stockés dans ce navigateur
+//   MESURE — les 55 signaux reconstitués sur les bougies réelles, en dur
+//            dans js/mesure.js, que « Vider le journal » ne touche pas
+let JFILTRE = 'Tout';
+
+function jeuJournal(){
+  const live = window.History ? History.load().filter(x => x.source === 'MECH') : [];
+  const mes  = window.Mesure ? Mesure.liste() : [];
+  const rows = JFILTRE === 'En direct' ? live
+             : JFILTRE === 'Mesuré'    ? mes
+             : live.concat(mes);
+  return { rows: rows.slice().sort((a,b) => b.ts - a.ts), live, mes };
+}
+
+// Statistiques calculées sur la sélection courante, quelle qu'elle soit.
+function stats(rows){
+  const clos = rows.filter(x => x.status === 'closed');
+  const open = rows.length - clos.length;
+  const g = clos.filter(x => (x.r||0) > 0), p = clos.filter(x => (x.r||0) < 0);
+  const rsum = clos.reduce((a,x) => a + (x.r||0), 0);
+  const moy = a => a.length ? a.reduce((s,x) => s + x.r, 0) / a.length : null;
+  return { n: clos.length, open, rate: clos.length ? g.length/clos.length*100 : null,
+    rsum, gainMoy: moy(g), perteMoy: moy(p),
+    rrVise: rows.length ? rows.reduce((a,x) => a + (+x.rr||0), 0) / rows.length : null,
+    esp: clos.length ? rsum/clos.length : null };
+}
+
+function paintChipsJ(){
+  const j = jeuJournal();
+  const lbl = { 'Tout': 'Tout', 'Mesuré': 'Mesuré ' + j.mes.length, 'En direct': 'En direct ' + j.live.length };
+  $('#jchips').innerHTML = ['Tout','Mesuré','En direct']
+    .map(k => '<button class="chip' + (k === JFILTRE ? ' on' : '') + '" data-j="' + k + '">' + lbl[k] + '</button>').join('');
+}
+$('#jchips').addEventListener('click', e => {
+  const b = e.target.closest('.chip'); if(!b) return;
+  JFILTRE = b.dataset.j; paintChipsJ(); paintJournal();
+});
+
 function paintJournal(){
-  const bx = $('#bilan'), jx = $('#journal'), tag = $('#j-tag');
+  const bx = $('#bilan'), jx = $('#journal');
   if(!window.History) return;
-  const h = History.load().filter(x => x.source === 'MECH');
-  const b = History.bilan('MECH');
+  const j = jeuJournal(), rows = j.rows, st = stats(rows);
   const uR = window.Compte ? Compte.uniteR() : 0;
   const dev = window.Compte ? Compte.sym(Compte.lire().devise) : '';
+  const nR = v => v == null ? '—' : sgn(v) + ' R';
 
-  tag.textContent = b.total + (b.open ? ' + ' + b.open + ' en cours' : '');
+  $('#j-tag').textContent = st.n + ' clos' + (st.open ? ' + ' + st.open + ' en cours' : '');
+  paintChipsJ();
 
   // Deux RR à ne pas confondre : celui qu'on VISE au signal, et celui qu'on
   // ENCAISSE. L'écart entre les deux dit si le modèle atteint ses cibles.
-  const clos = h.filter(x => x.status === 'closed');
-  const rrVise = h.length ? h.reduce((a, x) => a + (+x.rr || 0), 0) / h.length : null;
-  const gagn = clos.filter(x => (x.r || 0) > 0);
-  const rrMoyGain = gagn.length ? gagn.reduce((a, x) => a + x.r, 0) / gagn.length : null;
-  const esp = clos.length ? b.rsum / clos.length : null;
-  const nR = v => v == null ? '—' : sgn(v) + ' R';
-
   bx.innerHTML =
     '<div class="bilan">' +
-      '<div><div class="bk">Signaux clos</div><div class="bv mono">' + b.total +
-        (b.open ? '<span class="bsub"> +' + b.open + '</span>' : '') + '</div></div>' +
-      '<div><div class="bk">Réussite</div><div class="bv mono">' + (b.rate == null ? '—' : b.rate + ' %') + '</div></div>' +
-      '<div><div class="bk">RR moyen visé</div><div class="bv mono">' +
-        (rrVise == null ? '—' : rrVise.toFixed(2)) + '</div></div>' +
-      '<div><div class="bk">Gain moyen</div><div class="bv mono ' + (rrMoyGain ? 'pos' : '') + '">' +
-        nR(rrMoyGain) + '</div></div>' +
-      '<div><div class="bk">Espérance</div><div class="bv mono ' + (esp > 0 ? 'pos' : esp < 0 ? 'neg' : '') + '">' +
-        nR(esp) + '</div></div>' +
-      '<div><div class="bk">Cumulé · 1 R = ' + uR + dev + '</div><div class="bv mono ' +
-        (b.rsum > 0 ? 'pos' : b.rsum < 0 ? 'neg' : '') + '">' + sgn(b.rsum,1) + ' R' +
-        '<span class="bsub"> ' + sgn(Math.round(b.rsum * uR),0) + dev + '</span></div></div>' +
+      '<div><div class="bk">Signaux clos</div><div class="bv mono">' + st.n +
+        (st.open ? '<span class="bsub"> +' + st.open + '</span>' : '') + '</div></div>' +
+      '<div><div class="bk">Réussite</div><div class="bv mono">' +
+        (st.rate == null ? '—' : st.rate.toFixed(1) + ' %') + '</div></div>' +
+      '<div><div class="bk">RR visé</div><div class="bv mono">' +
+        (st.rrVise == null ? '—' : st.rrVise.toFixed(2)) + '</div></div>' +
+      '<div><div class="bk">Gain moyen</div><div class="bv mono ' + (st.gainMoy ? 'pos' : '') + '">' +
+        nR(st.gainMoy) + '</div></div>' +
+      '<div><div class="bk">Perte moy.</div><div class="bv mono ' + (st.perteMoy ? 'neg' : '') + '">' +
+        nR(st.perteMoy) + '</div></div>' +
+      '<div><div class="bk">Cumulé</div><div class="bv mono ' +
+        (st.rsum > 0 ? 'pos' : st.rsum < 0 ? 'neg' : '') + '">' + sgn(st.rsum,1) + ' R' +
+        '<span class="bsub"> ' + sgn(Math.round(st.rsum * uR),0) + dev + '</span></div></div>' +
     '</div>';
 
-  if(!h.length){
-    jx.innerHTML = '<div class="empty"><b>Journal vide</b>Chaque signal armé pendant la fenêtre ' +
-                   'sera enregistré ici, puis suivi jusqu’à son stop ou son objectif.</div>';
+  bx.insertAdjacentHTML('beforeend',
+    '<div class="note">1 R = <b>' + uR + dev + '</b> · ' +
+    (window.Compte ? Compte.lire().risque : '—') + ' % de ' +
+    (window.Compte ? Number(Compte.lire().capital).toLocaleString('fr-FR') : '—') + dev + '</div>');
+
+  if(!rows.length){
+    jx.innerHTML = '<div class="empty"><b>Aucun signal</b>' +
+      (JFILTRE === 'En direct'
+        ? 'Rien n\u2019a encore été émis en direct. Le premier signal arrivera pendant la fenêtre, ' +
+          'du lundi au vendredi entre 15 h 30 et 16 h 00.'
+        : 'Jeu de données introuvable.') + '</div>';
     return;
   }
-  jx.innerHTML = h.slice().reverse().slice(0, 12).map(x => {
+
+  jx.innerHTML = rows.slice(0, 60).map(x => {
     const d = new Date(x.ts);
     const jour = String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') +
                  ' ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
@@ -2729,16 +2804,24 @@ function paintJournal(){
     const r = ouvert ? null : (x.r || 0);
     // Le verdict est écrit en toutes lettres AVANT les chiffres.
     const verdict = ouvert ? 'en cours' : r > 0 ? 'gagné' : 'perdu';
-    // history.js stocke le motif sous la clé `motif`, pas `note`.
+    const recon = x.source === 'MESURE';
     return '<div class="jr" title="' + (x.motif || '').replace(/"/g,'&quot;') + '">' +
       '<span class="jr-d mono">' + jour + '</span>' +
       '<span class="jr-s ' + (x.direction === 'LONG' ? 'long' : 'short') + '">' + x.direction + '</span>' +
-      '<span class="jr-p mono">entrée ' + fmt(x.entry) + ' · cible ' + fmt(x.tp) + ' · stop ' + fmt(x.sl) + '</span>' +
+      '<span>' + (recon ? '<span class="jr-t">reconstitué</span>' : '') + '</span>' +
       '<span class="jr-r ' + (ouvert ? 'open' : r > 0 ? 'pos' : 'neg') + '">' +
         '<span class="jv">' + verdict + '</span>' +
         (ouvert ? '' : '<span class="jn mono">' + sgn(r) + ' R · ' + sgn(Math.round(r * uR),0) + dev + '</span>') +
-      '</span></div>';
-  }).join('');
+      '</span>' +
+      '<span class="jr-p mono">entrée ' + fmt(x.entry) + ' · cible ' + fmt(x.tp) +
+        ' · stop ' + fmt(x.sl) + '</span></div>';
+  }).join('') +
+  (JFILTRE !== 'En direct'
+    ? '<div class="note"><b>Reconstitué</b> = ce que le modèle aurait produit sur les bougies ' +
+      'réelles du 13 juillet au 18 septembre. Ces signaux n\u2019ont jamais été envoyés : un bug ' +
+      'coupait la chaîne. Ils sont là pour que tu voies le modèle travailler, pas comme un relevé ' +
+      'de compte.</div>'
+    : '');
 }
 
 /* ── réglages ───────────────────────────────────────────────────────── */
