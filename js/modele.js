@@ -184,11 +184,44 @@
       etapes = etapeCourante;
     }
 
+    // ── HORS FENÊTRE ────────────────────────────────────────────────────
+    // La boucle ci-dessus ne regarde que 09 h 30 → 10 h 00, du lundi au
+    // vendredi. Vingt-trois heures et demie par jour elle ne tourne pas, et
+    // le site restait alors entièrement vide : aucun biais, aucun niveau,
+    // aucune explication. On refait donc ici une lecture d'AFFICHAGE sur la
+    // dernière bougie connue, sans machine à états et sans jamais produire de
+    // trade. Rien de ce qui suit ne peut modifier un signal.
+    var finB = clock[clock.length - 1], eFin = heure(finB.t);
+    var horsFenetre = eFin.dow < 1 || eFin.dow > 5 ||
+                      eFin.min < CFG.ghDeb || eFin.min >= CFG.ghFin;
+    if (etapes == null) {
+      var bAff = biaisA(prep, finB.t);
+      dir = bAff.dir;
+      etapes = { score: bAff.score, dir: bAff.dir, t: finB.t, ifvg: null,
+                 dol: bAff.dir === 0 ? null : dolNiveau(finB.t, bAff.dir, finB.c),
+                 key: null };
+      if (bAff.dir !== 0) {
+        var meilleur = null, iFin = clock.length - 1;
+        for (var nn = 0; nn < niveaux.length; nn++) {
+          var zA = niveaux[nn], idxA = ST.idxA(zA.cs, finB.t);
+          if (zA.ne == null || zA.ne > idxA || idxA - zA.ne > CFG.keyAge) continue;
+          if (zA.vu && zA.vu > finB.t) continue;
+          if (zA.casse != null && zA.casse <= idxA) continue;
+          if (zA.haussier !== (bAff.dir > 0)) continue;
+          var dA = bAff.dir > 0 ? finB.c - zA.haut : zA.bas - finB.c;
+          if (dA < 0) continue;
+          if (meilleur == null || dA < meilleur.d) meilleur = { z: zA, d: dA };
+        }
+        if (meilleur) etapes.key = { type: meilleur.z.type, tf: meilleur.z.tf,
+                                     bas: meilleur.z.bas, haut: meilleur.z.haut };
+      }
+    }
+
     // Pour l'affichage : ce que chaque unité offre comme niveaux clés valides
     // dans le sens du biais. C'est la matière du radar et de la liste.
     var fin = clock[clock.length - 1];
     var parTF = ['M5', 'M15', 'M30', 'H1', 'H4'].map(function (nom) {
-      var n = 0, proche = null, type = null;
+      var n = 0, proche = null, type = null, liste = [];
       if (dir !== 0) niveaux.forEach(function (z) {
         if (z.tf !== nom) return;
         var idx = ST.idxA(z.cs, fin.t);
@@ -199,9 +232,13 @@
         var d = dir > 0 ? fin.c - z.haut : z.bas - fin.c;
         if (d < 0) return;
         n++;
+        // Le radar a besoin des niveaux un par un, pas seulement de leur
+        // nombre : un point par niveau, placé à sa distance du prix.
+        liste.push({ type: z.type, d: d, bas: z.bas, haut: z.haut });
         if (proche == null || d < proche) { proche = d; type = z.type; }
       });
-      return { tf: nom, n: n, distance: proche, type: type };
+      liste.sort(function (a, b) { return a.d - b.d; });
+      return { tf: nom, n: n, distance: proche, type: type, liste: liste.slice(0, 14) };
     });
 
     return {
@@ -219,9 +256,28 @@
       parTF: parTF,
       trade: dernier && dernier.derniere ? dernier : null,
       dernierSignal: dernier,
+      hors: horsFenetre,
       cfg: CFG
     };
   }
 
-  root.Modele = { evaluer: evaluer, CFG: CFG, heure: heure };
+  // ── quand le modèle peut-il parler ? ───────────────────────────────────
+  // Le site n'émet de position que du lundi au vendredi entre 09 h 30 et
+  // 10 h 00 à New York. Le reste du temps il doit le DIRE, pas se taire.
+  function fenetre(now) {
+    now = now || Date.now();
+    var e = heure(now);
+    var ouverte = e.dow >= 1 && e.dow <= 5 && e.min >= CFG.ghDeb && e.min < CFG.ghFin;
+    if (ouverte) return { ouverte: true, ms: (CFG.ghFin - e.min) * 60000 };
+    var t = now, d = e, ecoule = 0;
+    for (var k = 0; k < 9; k++) {
+      if (d.dow >= 1 && d.dow <= 5 && d.min < CFG.ghDeb)
+        return { ouverte: false, ms: ecoule + (CFG.ghDeb - d.min) * 60000 };
+      var saut = (24 * 60 - d.min) * 60000;         // jusqu'à minuit à New York
+      ecoule += saut; t += saut; d = heure(t);
+    }
+    return { ouverte: false, ms: null };
+  }
+
+  root.Modele = { evaluer: evaluer, CFG: CFG, heure: heure, fenetre: fenetre };
 })(typeof window !== 'undefined' ? window : this);

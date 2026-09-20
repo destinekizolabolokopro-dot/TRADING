@@ -3,375 +3,398 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>MECH · NQ</title>
+<meta name="theme-color" content="#161826">
+<meta name="description" content="TRADEassist — signaux MECH sur le Nasdaq 100 future.">
+<title>TRADEassist</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23161826'/><circle cx='16' cy='16' r='5' fill='%239184d9'/></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-  /* Langage repris du tableau de bord Méridian : bleu nuit profond, panneaux
-     légèrement plus clairs, accent violet, libellés petits en majuscules,
-     densité forte. La typographie des chiffres reste Inter Tight. */
-  :root{
-    /* Noir véritable. Les panneaux ne sont pas bleutés mais neutres, à peine
-       détachés du fond ; c'est le filet qui les dessine, pas leur couleur. */
-    --bg:#000000; --panel:#0b0b0d; --panel-2:#121215; --raise:#1b1b1f;
-    --line:rgba(255,255,255,.09); --line-2:rgba(255,255,255,.18);
-    --ink:#f2f2f4; --muted:#9a9aa4; --faint:#63636d;
-    --accent:#E4007C; --accent-dim:rgba(228,0,124,.14);
-    --long:#3ddc97; --short:#ff5c7a; --wait:#ffb547;
-    --mono:'JetBrains Mono','IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
-    --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
-    --display:'Inter Tight','Inter',-apple-system,sans-serif;
-    --r:10px;
-  }
-  *{box-sizing:border-box}
-  html{-webkit-text-size-adjust:100%}
-  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.55 var(--sans);
-    letter-spacing:-.005em;-webkit-font-smoothing:antialiased;
-    background-image:radial-gradient(rgba(255,255,255,.045) 1px,transparent 1px);
-    background-size:24px 24px;background-attachment:fixed;
-    padding-bottom:env(safe-area-inset-bottom,0px)}
-  .wrap{max-width:1180px;margin:0 auto;padding:0 18px}
-  .mono{font-family:var(--display);font-variant-numeric:tabular-nums;font-feature-settings:'tnum' 1}
+/* ═══════════════════════════════════════════════════════════════════════
+   NOCTURNE — système de design fourni avec la maquette Méridien.
+   Fond sombre bleu-gris, JAMAIS de noir pur ni de blanc pur. Un seul accent,
+   utilisé en trait et en halo, jamais en aplat. L'élévation est une hairline
+   de 1 px, pas une pile d'ombres. Les titres ne dépassent jamais la graisse
+   500 : la hiérarchie se fait par la taille et l'espace.
 
-  /* ── barre flottante ───────────────────────────────────────────────── */
-  /* Une pastille détachée du bord, pas un bandeau collé en haut : c'est la
-     signature de la référence, et ça libère le fond. */
-  header{position:sticky;top:0;z-index:30;padding:18px 18px 0;
-    padding-top:calc(18px + env(safe-area-inset-top,0px));pointer-events:none}
-  .navpill{pointer-events:auto;max-width:1180px;margin:0 auto;height:62px;
-    display:flex;align-items:center;gap:22px;padding:0 10px 0 24px;
-    background:rgba(10,10,12,.72);backdrop-filter:blur(16px) saturate(1.5);
-    border:1px solid var(--line);border-radius:999px}
-  .brand{display:flex;align-items:baseline;gap:1px;font-family:var(--display);
-    font-weight:800;font-size:1.02rem;letter-spacing:-.03em}
-  .brand i{width:6px;height:6px;border-radius:50%;background:var(--accent);
-    display:inline-block;margin-left:3px;font-style:normal}
-  .navdots{display:flex;gap:5px;align-items:center}
-  .navdots i{width:4px;height:4px;border-radius:50%;background:var(--line-2);font-style:normal}
-  .navdots i.on{background:var(--accent)}
-  .navlinks{display:flex;gap:26px;margin-left:8px}
-  .navlinks a{font-family:var(--mono);font-size:.64rem;letter-spacing:.17em;text-transform:uppercase;
-    color:var(--faint);text-decoration:none;transition:color .15s}
-  .navlinks a:hover{color:var(--ink)}
-  .navact{margin-left:auto;display:flex;gap:7px}
-  .ico{width:38px;height:38px;display:grid;place-items:center;padding:0;
-    border:1px solid var(--line);border-radius:999px;background:transparent;
-    color:var(--muted);cursor:pointer;transition:border-color .15s,color .15s,background .15s}
-  .ico svg{width:16px;height:16px;display:block}
-  .ico:hover{border-color:var(--line-2);color:var(--ink);background:var(--panel)}
-  .ico.on{border-color:var(--accent);color:var(--accent);background:var(--accent-dim)}
-  @media(max-width:820px){.navlinks,.navdots{display:none}.navpill{padding-left:20px;gap:14px}}
+   Écart assumé n° 1 — vert/rouge. Nocturne est une palette mono et ne porte
+   aucune sémantique de gain/perte. La maquette ajoute #6cc0a0 et #dd7f8e, à
+   n'employer QUE sur des chiffres et des traits de 1 px, en aplat au plus à
+   16 % d'alpha.
 
-  /* ── scène d'ouverture ─────────────────────────────────────────────── */
-  .scene{position:relative;display:flex;flex-direction:column;align-items:center;
-    padding:34px 20px 46px;text-align:center}
-  .statepill{display:inline-flex;align-items:center;gap:9px;padding:7px 16px;border-radius:999px;
-    background:rgba(10,10,12,.7);border:1px solid var(--line);backdrop-filter:blur(8px);
-    font-family:var(--mono);font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;
-    color:var(--muted);margin-bottom:26px;white-space:nowrap;max-width:92vw;overflow:hidden;text-overflow:ellipsis}
-  .hero-radar{position:relative;width:100%;max-width:440px;margin-bottom:26px}
-  .hero-radar .rd-box{max-width:none}
-  .hero-px{display:flex;align-items:baseline;justify-content:center;gap:14px;flex-wrap:wrap}
-  .px{font-family:var(--display);font-size:clamp(3.1rem,10vw,5.6rem);font-weight:800;
-    letter-spacing:-.05em;line-height:.95;font-variant-numeric:tabular-nums}
-  .chg{font-family:var(--mono);font-size:.82rem;font-weight:500;letter-spacing:.04em;
-    padding:5px 12px;border-radius:999px;border:1px solid var(--line)}
-  .chg.up{color:var(--long)} .chg.dn{color:var(--short)}
-  .hero-sub{margin-top:16px;font-family:var(--mono);font-size:.64rem;letter-spacing:.18em;
-    text-transform:uppercase;color:var(--faint);display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
-  .hero-sub .sep{opacity:.4}
+   Écart assumé n° 2 — le responsive. Le handoff dit « non conçu, cadre fixe
+   1440 px, terminal de bureau ». Ce site se consulte sur iPad et sur
+   téléphone : les règles de repli ci-dessous sont les miennes, pas celles du
+   designer.
+   ═══════════════════════════════════════════════════════════════════════ */
+:root{
+  --bg:#161826; --surface:#232532; --panel:rgba(35,37,50,.70);
+  --ink:#e9e9ed; --acc:#9184d9;
+  --a200:#e7e5fe; --a300:#d2cefd; --a400:#b5abfc; --a700:#5d5294; --a800:#423a6a;
+  --n400:#b2b6ca; --n500:#9397ab; --n600:#75798c; --n800:#3f424d; --n900:#292b31;
+  --gain:#6cc0a0; --loss:#dd7f8e;
+  --muted:rgba(233,233,237,.55); --dim:rgba(233,233,237,.42); --faint:rgba(233,233,237,.30);
+  --rule:rgba(233,233,237,.06); --rule2:rgba(233,233,237,.09); --div:rgba(233,233,237,.16);
+  --hair:0 0 0 1px var(--n800);
+  --r4:4px; --r6:6px; --r8:8px; --r14:14px; --pill:40px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{
+  background:var(--bg); color:var(--ink);
+  font:400 13.5px/1.5 Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+  min-height:100vh; overflow-x:hidden;
+}
+/* Les prix ne doivent jamais trembler quand ils tickent. */
+.mono,.num,input,table{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
+h1,h2,h3{font-weight:500;letter-spacing:-.02em}
+a{color:inherit}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-radius:2px}
 
-  .dot{width:6px;height:6px;border-radius:50%;background:var(--faint);flex:none;font-style:normal}
-  .dot.on{background:var(--accent);box-shadow:0 0 0 4px rgba(228,0,124,.16)}
+/* ── barre d'en-tête ─────────────────────────────────────────────────── */
+.top{
+  display:flex;align-items:center;gap:18px;padding:15px 26px;
+  border-bottom:1px solid var(--rule2);background:rgba(22,24,38,.92);
+  backdrop-filter:blur(8px);position:sticky;top:0;z-index:40;
+}
+.brand{display:flex;align-items:center;gap:9px;flex:none}
+.logo{
+  width:20px;height:20px;border-radius:var(--r6);display:grid;place-items:center;
+  box-shadow:inset 0 0 0 1px var(--acc);flex:none;
+}
+.logo i{width:7px;height:7px;border-radius:50%;background:var(--acc);
+  box-shadow:0 0 10px rgba(145,132,217,.7);display:block}
+.wm{font-size:16px;font-weight:600;letter-spacing:-.01em;white-space:nowrap}
+.wm span{color:var(--dim);font-weight:400;margin-left:6px}
+.nav{display:flex;gap:2px;flex:none}
+.nav a{
+  padding:6px 11px;border-radius:var(--r6);font-size:13px;color:var(--muted);
+  text-decoration:none;white-space:nowrap;transition:background .12s,color .12s;
+}
+.nav a:hover{color:var(--ink)}
+.nav a.on{background:rgba(145,132,217,.14);color:var(--a300)}
+.sp{flex:1 1 auto;min-width:0}
+.stats{display:flex;align-items:center;gap:20px;flex:none}
+.st{display:flex;flex-direction:column;gap:1px;line-height:1.25}
+.st b{font-size:13.5px;font-weight:600;letter-spacing:-.01em}
+.st i{font-size:10.5px;font-style:normal;color:var(--dim);text-transform:uppercase;letter-spacing:.09em}
+.st b.pos{color:var(--gain)} .st b.neg{color:var(--loss)}
+.btn{
+  padding:7px 15px;border-radius:var(--pill);background:transparent;cursor:pointer;
+  box-shadow:inset 0 0 0 1px var(--acc);color:var(--a300);font-size:12.5px;
+  border:0;white-space:nowrap;transition:background .12s;
+}
+.btn:hover{background:rgba(145,132,217,.14)}
+.btn.q{box-shadow:inset 0 0 0 1px var(--div);color:var(--muted)}
+.btn.q:hover{background:rgba(233,233,237,.05);color:var(--ink)}
+.btn.on{background:rgba(145,132,217,.16);color:var(--a200)}
+.btn[disabled]{opacity:.4;cursor:not-allowed}
 
-  /* ── grille de tableau de bord ─────────────────────────────────────── */
-  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start;padding-bottom:20px}
-  @media(max-width:900px){.grid{grid-template-columns:1fr}}
-  #trade{margin-bottom:14px}
-  .pan.wide{grid-column:1/-1}
-  /* Radar et liste côte à côte : le panneau occupe toute la largeur, plus de
-     colonne vide à droite. */
-  .unites{display:grid;grid-template-columns:330px 1fr}
-  .unites .radar{border-bottom:0;border-right:1px solid var(--line)}
-  .unites #tfs{align-self:center}
-  @media(max-width:760px){
-    .unites{grid-template-columns:1fr}
-    .unites .radar{border-right:0;border-bottom:1px solid var(--line)}
-  }
+/* ── grille principale ───────────────────────────────────────────────── */
+.wrap{display:flex;align-items:stretch;min-height:calc(100vh - 53px)}
+.left{flex:1 1 auto;min-width:0;padding:22px 26px 28px;border-right:1px solid var(--rule2)}
+.right{flex:0 0 420px;width:420px;display:flex;flex-direction:column;gap:14px;padding:22px 22px 28px}
 
-  /* ── panneau ───────────────────────────────────────────────────────── */
-  .pan{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
-  .pan-h{display:flex;align-items:center;gap:8px;padding:11px 15px;border-bottom:1px solid var(--line);
-    background:var(--panel-2)}
-  .pan-h h2{margin:0;font-family:var(--mono);font-size:.62rem;font-weight:500;
-    letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
-  .pan-h .tag{margin-left:auto;font-family:var(--mono);font-size:.58rem;letter-spacing:.1em;
-    text-transform:uppercase;color:var(--faint);padding:2px 8px;border-radius:5px;background:var(--raise)}
+.lede{display:flex;align-items:flex-end;gap:20px;margin-bottom:18px;flex-wrap:wrap}
+.eyebrow{font-size:11px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;color:var(--a400)}
+.lede h1{font-size:27px;margin-top:6px;max-width:22ch}
+.lede p{font-size:13.5px;color:var(--muted);max-width:44ch;margin-top:7px;text-wrap:pretty}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto}
+.chip{
+  padding:5px 12px;border-radius:var(--pill);font-size:11.5px;cursor:pointer;border:0;
+  background:transparent;box-shadow:inset 0 0 0 1px var(--div);color:var(--muted);
+  transition:background .12s,color .12s,box-shadow .12s;white-space:nowrap;
+}
+.chip:hover{color:var(--ink)}
+.chip.on{background:rgba(145,132,217,.16);box-shadow:inset 0 0 0 1px var(--acc);color:var(--a300)}
 
-  /* ── chaîne du modèle ──────────────────────────────────────────────── */
-  /* C'est une SÉQUENCE : elle se lit comme un fil, pas comme une liste. Un
-     trait relie les étapes, plein tant qu'elles sont franchies, pointillé
-     dès que la chaîne casse — on voit d'un coup d'œil jusqu'où le modèle
-     est allé et où il bute. */
-  .chain{padding:4px 0}
-  .step{position:relative;display:flex;gap:12px;align-items:flex-start;
-    padding:12px 16px 12px 46px;min-height:52px}
-  /* la pastille */
-  .step::before{content:'';position:absolute;left:17px;top:17px;width:13px;height:13px;
-    border-radius:50%;border:2px solid var(--line-2);background:var(--panel);z-index:1;
-    transition:border-color .25s,background .25s,box-shadow .25s}
-  /* le trait qui descend vers l'étape suivante */
-  .step::after{content:'';position:absolute;left:23px;top:30px;bottom:-12px;width:1px;
-    background:var(--line-2)}
-  .step:last-child::after{display:none}
-  .step.ok::before{border-color:var(--long);background:var(--long);
-    box-shadow:0 0 0 3px rgba(61,220,151,.15)}
-  .step.ok::after{background:var(--long);opacity:.45}
-  .step.wait::before{border-color:var(--wait);background:transparent;
-    box-shadow:0 0 0 3px rgba(255,181,71,.13)}
-  .step.wait::after{background:linear-gradient(var(--line-2) 50%,transparent 0);
-    background-size:1px 6px}
-  .step.no::before{border-color:var(--short);background:var(--short);
-    box-shadow:0 0 0 3px rgba(255,92,122,.15)}
-  .step.no::after{background:linear-gradient(var(--line-2) 50%,transparent 0);background-size:1px 6px}
-  .step.todo::after{background:linear-gradient(var(--line-2) 50%,transparent 0);background-size:1px 6px}
+/* ── le radar ────────────────────────────────────────────────────────── */
+.scope{position:relative;display:grid;place-items:center;min-height:420px}
+.scope::before{
+  content:"";position:absolute;width:min(470px,86%);aspect-ratio:1;border-radius:50%;
+  background:radial-gradient(circle,rgba(145,132,217,.20),transparent 68%);
+  filter:blur(12px);pointer-events:none;
+}
+#radar{display:block;max-width:100%;height:auto;position:relative}
+.ov{position:absolute;bottom:2px;font-size:11.5px;pointer-events:none}
+.ov.l{left:0}
+.ov.r{right:0;text-align:right}
+.lg{display:flex;align-items:center;gap:7px;color:var(--dim);margin-top:5px}
+.lg s{width:8px;height:8px;border-radius:2px;display:block;flex:none}
+.ov.r .k{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--dim)}
+.ov.r .v{font-size:22px;font-weight:600;letter-spacing:-.02em;margin-top:2px}
+.ov.r .s{font-size:12.5px;color:var(--muted)}
 
-  .step-b{flex:1;min-width:0}
-  .step-t{display:block;font-family:var(--display);font-size:.95rem;font-weight:650;
-    letter-spacing:-.018em;margin-bottom:3px;color:var(--ink)}
-  .step.todo .step-t{color:var(--muted)}
-  .step-d{display:block;font-size:.815rem;color:var(--muted);line-height:1.5}
-  .step-s{flex:none;font-family:var(--mono);font-size:.55rem;font-weight:500;letter-spacing:.13em;
-    text-transform:uppercase;padding:3px 9px;border-radius:5px;background:var(--raise);
-    color:var(--faint);margin-top:1px}
-  .step.ok .step-s{background:rgba(61,220,151,.13);color:var(--long)}
-  .step.no .step-s{background:rgba(255,92,122,.13);color:var(--short)}
-  .step.wait .step-s{background:rgba(255,181,71,.13);color:var(--wait)}
+/* ── tuiles par unité de temps ───────────────────────────────────────── */
+.tiles{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-top:22px}
+.tile{
+  padding:12px 13px;border-radius:var(--r8);
+  box-shadow:inset 0 0 0 1px rgba(145,132,217,.25);background:rgba(145,132,217,.07);
+}
+.tile.off{box-shadow:inset 0 0 0 1px rgba(233,233,237,.12);background:transparent}
+.tile.ret{box-shadow:inset 0 0 0 1px var(--acc);background:rgba(145,132,217,.16)}
+.tile k{display:block;font-size:11.5px;color:var(--muted);font-weight:400}
+.tile v{display:block;font-size:19px;font-weight:600;letter-spacing:-.02em;margin:3px 0 1px}
+.tile s{display:block;font-size:12px;color:var(--dim);text-decoration:none}
+.tile.off v{color:var(--faint)}
 
-  /* jauge d'avancement dans l'en-tête du panneau */
-  .gauge{margin-left:auto;display:flex;align-items:center;gap:9px}
-  .gauge-bar{width:70px;height:4px;border-radius:2px;background:var(--raise);overflow:hidden;
-    box-shadow:inset 0 0 0 1px var(--line)}
-  .gauge-fill{height:100%;background:var(--accent);border-radius:2px;width:0;min-width:4px;
-    box-shadow:0 0 7px rgba(228,0,124,.7);
-    transition:width .5s cubic-bezier(.4,0,.2,1)}
-  .gauge-txt{font-family:var(--mono);font-size:.58rem;letter-spacing:.1em;color:var(--muted)}
+/* ── panneaux ────────────────────────────────────────────────────────── */
+.pan{background:var(--panel);border-radius:var(--r14);box-shadow:var(--hair);overflow:hidden}
+.pan-h{display:flex;align-items:center;gap:10px;padding:13px 16px 11px;border-bottom:1px solid var(--rule)}
+.pan-h h2{font-size:11px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.tag{margin-left:auto;font-size:11px;font-weight:600;color:var(--dim);white-space:nowrap}
+.pan-b{padding:14px 16px}
+.empty{padding:20px 16px;color:var(--dim);font-size:12.5px;line-height:1.6}
+.empty b{display:block;color:var(--muted);font-weight:500;font-size:13.5px;margin-bottom:3px}
+.empty .hint{display:block;margin-top:7px;color:var(--faint);font-size:11.5px}
 
-  /* ── position ──────────────────────────────────────────────────────── */
-  .trade{border-radius:var(--r);overflow:hidden;border:1px solid var(--accent);
-    background:var(--panel);box-shadow:0 0 0 3px var(--accent-dim),0 0 24px rgba(228,0,124,.14)}
-  .t-head{display:flex;align-items:center;gap:10px;padding:13px 16px;background:var(--panel-2)}
-  .t-dir{font-family:var(--display);font-size:1.45rem;font-weight:800;letter-spacing:-.04em}
-  .t-dir.long{color:var(--long)} .t-dir.short{color:var(--short)}
-  .t-tf{font-family:var(--mono);font-size:.6rem;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
-  .t-rr{margin-left:auto;font-family:var(--mono);font-size:.68rem;letter-spacing:.06em;
-    padding:4px 10px;border-radius:6px;background:var(--raise)}
-  .t-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line)}
-  @media(max-width:620px){.t-grid{grid-template-columns:repeat(2,1fr)}}
-  .t-cell{background:var(--panel);padding:13px 16px}
-  .t-k{font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.14em;
-    color:var(--faint);margin-bottom:5px}
-  .t-v{font-family:var(--display);font-size:1.3rem;font-weight:700;letter-spacing:-.035em;
-    font-variant-numeric:tabular-nums}
-  .t-v.sl{color:var(--short)} .t-v.tp{color:var(--long)}
-  .t-sub{font-family:var(--mono);font-size:.58rem;color:var(--faint);margin-top:3px}
-  .t-why{padding:12px 16px;font-size:.79rem;color:var(--muted);line-height:1.5;border-top:1px solid var(--line)}
+/* ── état de séance ──────────────────────────────────────────────────── */
+.sess{padding:15px 16px}
+.sess-t{display:flex;align-items:center;gap:9px}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--n600);flex:none}
+.dot.on{background:var(--acc);box-shadow:0 0 10px rgba(145,132,217,.75);animation:br 2.2s ease-in-out infinite}
+@keyframes br{0%,100%{opacity:1}50%{opacity:.35}}
+.sess-t b{font-size:11.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase}
+.sess-t .tag{font-size:11px}
+.px{font-size:34px;font-weight:600;letter-spacing:-.03em;margin:9px 0 2px;line-height:1}
+.sess-s{font-size:12.5px;color:var(--muted)}
+.sess-w{
+  margin-top:12px;padding-top:12px;border-top:1px solid var(--rule);
+  font-size:12.5px;color:var(--dim);line-height:1.6;
+}
+.sess-w b{color:var(--a300);font-weight:500}
+.cd{font-size:19px;font-weight:600;letter-spacing:-.02em;color:var(--ink);display:block;margin-top:4px}
 
-  .empty{padding:22px 20px;font-size:.82rem;color:var(--faint);text-align:center;line-height:1.6}
-  .empty b{display:block;font-family:var(--display);font-size:.98rem;font-weight:650;
-    letter-spacing:-.02em;color:var(--muted);margin-bottom:6px}
-  .empty .hint{display:block;margin-top:8px;font-family:var(--mono);font-size:.58rem;
-    letter-spacing:.11em;text-transform:uppercase;color:var(--line-2)}
+/* ── la chaîne ───────────────────────────────────────────────────────── */
+.gauge{height:2px;background:rgba(233,233,237,.08)}
+.gauge i{display:block;height:100%;width:0;background:var(--acc);transition:width .4s ease;
+  box-shadow:0 0 8px rgba(145,132,217,.8)}
+.step{display:flex;align-items:flex-start;gap:11px;padding:11px 16px;border-top:1px solid var(--rule)}
+.step:first-child{border-top:0}
+.step::before{
+  content:"";width:7px;height:7px;border-radius:50%;flex:none;margin-top:5px;
+  background:transparent;box-shadow:inset 0 0 0 1px var(--n600);
+}
+.step.ok::before{background:var(--acc);box-shadow:0 0 9px rgba(145,132,217,.7)}
+.step.wait::before{box-shadow:inset 0 0 0 1px var(--acc);animation:br 2.2s ease-in-out infinite}
+.step-b{flex:1;min-width:0}
+.step-t{display:block;font-size:13px;font-weight:500}
+.step-d{display:block;font-size:12px;color:var(--dim);margin-top:2px;text-wrap:pretty}
+.step.ok .step-d{color:var(--muted)}
+.step-s{font-size:10.5px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--dim);flex:none;margin-top:3px}
+.step.ok .step-s{color:var(--a400)}
 
-  /* ── radar de balayage ─────────────────────────────────────────────── */
-  /* Repris du « balayage de volatilité » de la référence, mais il montre de
-     vraies données : chaque axe est une unité de temps, et le rayon dit
-     jusqu'où le modèle est allé sur cette unité. Rien n'est décoratif. */
+/* ── la position ─────────────────────────────────────────────────────── */
+.trade{padding:15px 16px}
+.t-head{display:flex;align-items:center;gap:9px;margin-bottom:13px}
+.t-dir{font-size:11px;font-weight:600;letter-spacing:.1em;padding:3px 9px;border-radius:var(--pill)}
+.t-dir.long{color:var(--gain);background:rgba(108,192,160,.16)}
+.t-dir.short{color:var(--loss);background:rgba(221,127,142,.16)}
+.t-tf,.t-rr{font-size:11.5px;color:var(--dim)}
+.t-rr{margin-left:auto;font-weight:600;color:var(--muted)}
+.t-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--rule);
+  border-radius:var(--r8);overflow:hidden}
+.t-cell{background:var(--bg);padding:11px 13px}
+.t-k{font-size:10.5px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--dim)}
+.t-v{font-size:18px;font-weight:600;letter-spacing:-.02em;margin-top:3px}
+.t-v.sl{color:var(--loss)} .t-v.tp{color:var(--gain)}
+.t-sub{font-size:11px;color:var(--dim);margin-top:2px}
+.t-why{font-size:12px;color:var(--dim);margin-top:11px;line-height:1.6;text-wrap:pretty}
 
-  .rd-box{position:relative;width:100%;max-width:330px}
-  .radar svg{display:block;width:100%;height:auto;overflow:visible}
-  .rd-ring{fill:none;stroke:var(--line);stroke-width:1}
-  .rd-axis{stroke:var(--line);stroke-width:1}
-  .rd-poly{fill:rgba(228,0,124,.14);stroke:var(--accent);stroke-width:1.5;stroke-linejoin:round}
-  .rd-pt{fill:var(--accent)}
-  .rd-pt.ok{fill:var(--long)}
-  .rd-lab{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;fill:var(--faint)}
-  .rd-lab.ret{fill:var(--accent)}
-  /* Le faisceau qui tourne. Sa largeur — 78 % de la boîte — vaut exactement le
-     diamètre du cercle extérieur du SVG (2 × 92 sur 236), et son centre est
-     celui du viewBox : les deux se superposent au pixel près. */
-  .rd-sweep{position:absolute;top:50%;left:50%;width:78%;aspect-ratio:1;
-    border-radius:50%;pointer-events:none;
-    background:conic-gradient(from 0deg at 50% 50%,rgba(228,0,124,.30),rgba(139,123,255,0) 40%);
-    animation:rdspin 4.4s linear infinite}
-  @keyframes rdspin{from{transform:translate(-50%,-50%) rotate(0)}
-                    to{transform:translate(-50%,-50%) rotate(360deg)}}
-  @media (prefers-reduced-motion:reduce){.rd-sweep{animation:none;opacity:.22}}
+/* ── bilan + journal ─────────────────────────────────────────────────── */
+.bilan{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--rule)}
+.bilan>div{background:var(--panel);padding:11px 14px}
+.bk{font-size:10px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--dim)}
+.bv{font-size:17px;font-weight:600;letter-spacing:-.02em;margin-top:3px}
+.bv.pos{color:var(--gain)} .bv.neg{color:var(--loss)}
+.bsub{font-size:11px;font-weight:400;color:var(--dim)}
+.jr{display:grid;grid-template-columns:auto auto 1fr auto;gap:10px;align-items:center;
+  padding:10px 16px;border-top:1px solid var(--rule);font-size:12px}
+.jr-d{color:var(--faint);font-size:11px}
+.jr-s{font-size:10.5px;font-weight:600;letter-spacing:.08em}
+.jr-s.long{color:var(--gain)} .jr-s.short{color:var(--loss)}
+.jr-p{color:var(--dim);font-size:11.5px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.jr-r{text-align:right;line-height:1.3}
+.jv{display:block;font-size:11.5px;font-weight:500}
+.jn{display:block;font-size:11px;color:var(--dim)}
+.jr-r.pos .jv{color:var(--gain)} .jr-r.neg .jv{color:var(--loss)} .jr-r.open .jv{color:var(--a400)}
 
-  /* ── unités ────────────────────────────────────────────────────────── */
-  .tf{display:flex;align-items:center;gap:12px;padding:10px 15px;font-size:.8rem}
-  .tf+.tf{border-top:1px solid var(--line)}
-  .tf.ok{background:rgba(61,220,151,.05)}
-  .tf.ret{background:rgba(228,0,124,.12);box-shadow:inset 2px 0 0 var(--accent)}
-  .tf.off{color:var(--faint)}
-  .tf-id{font-family:var(--mono);font-size:.68rem;font-weight:600;letter-spacing:.08em;width:40px;flex:none}
-  .tf-st{color:var(--ink);opacity:.72;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .tf-rr{font-family:var(--mono);font-size:.68rem;flex:none;color:var(--faint)}
-  .tf.ok .tf-rr{color:var(--long)}
+/* ── réglages ────────────────────────────────────────────────────────── */
+#settings{display:none}
+#settings.open{display:block}
+.fld{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;
+  padding:10px 16px;border-top:1px solid var(--rule)}
+.fld label{font-size:12.5px;color:var(--muted)}
+.fld input,.fld select{
+  background:var(--bg);border:0;box-shadow:inset 0 0 0 1px var(--div);border-radius:var(--r6);
+  padding:6px 10px;font-size:12.5px;width:170px;max-width:46vw;
+}
+.fld input:focus,.fld select:focus{box-shadow:inset 0 0 0 1px var(--acc)}
+.acts{display:flex;gap:8px;flex-wrap:wrap;padding:13px 16px;border-top:1px solid var(--rule)}
+.msg{padding:0 16px 14px;font-size:11.5px;color:var(--dim);line-height:1.6}
+.msg b{color:var(--a300);font-weight:500}
+.foot{padding:14px 26px 26px;font-size:11.5px;color:var(--faint);
+  border-top:1px solid var(--rule2);line-height:1.7}
 
-  /* ── journal des signaux ───────────────────────────────────────────── */
-  .bilan{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);
-    border-bottom:1px solid var(--line)}
-  .bilan div{background:var(--panel-2);padding:12px 14px}
-  .bilan .bk{font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.14em;
-    color:var(--faint);margin-bottom:5px}
-  .bilan .bv{font-family:var(--display);font-size:1.12rem;font-weight:700;letter-spacing:-.03em;
-    font-variant-numeric:tabular-nums}
-  .bilan .bv.pos{color:var(--long)} .bilan .bv.neg{color:var(--short)}
-  @media(max-width:620px){.bilan{grid-template-columns:repeat(2,1fr)}}
-  .bilan .bsub{font-family:var(--mono);font-size:.58rem;font-weight:400;color:var(--faint);
-    letter-spacing:.04em}
-
-  .jr{display:flex;align-items:center;gap:11px;padding:10px 15px;font-size:.79rem}
-  .jr+.jr{border-top:1px solid var(--line)}
-  .jr-d{font-family:var(--mono);font-size:.64rem;color:var(--faint);width:76px;flex:none}
-  .jr-s{font-family:var(--display);font-weight:700;font-size:.8rem;width:48px;flex:none}
-  .jr-s.long{color:var(--long)} .jr-s.short{color:var(--short)}
-  .jr-p{font-family:var(--display);font-variant-numeric:tabular-nums;color:var(--muted);flex:1;min-width:0;
-    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .jr-r{flex:none;text-align:right;display:flex;flex-direction:column;gap:1px;min-width:104px}
-  .jr-r .jv{font-family:var(--mono);font-size:.56rem;font-weight:500;letter-spacing:.13em;
-    text-transform:uppercase}
-  .jr-r .jn{font-family:var(--display);font-weight:700;font-variant-numeric:tabular-nums;font-size:.85rem}
-  .jr-r.pos{color:var(--long)} .jr-r.neg{color:var(--short)} .jr-r.open{color:var(--wait);font-weight:500}
-
-  .fgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:11px}
-  .panelbox select{width:100%;padding:10px 12px;background:var(--bg);border:1px solid var(--line);
-    border-radius:7px;color:var(--ink);font:12.5px var(--sans)}
-  .panelbox select:focus{outline:0;border-color:var(--accent)}
-
-  /* ── réglages ──────────────────────────────────────────────────────── */
-  .panelbox{display:none;padding:15px}
-  .panelbox.open{display:block}
-  .panelbox p{margin:0 0 13px;font-size:.8rem;color:var(--muted);line-height:1.55}
-  .panelbox label{display:block;font-family:var(--mono);font-size:.56rem;text-transform:uppercase;
-    letter-spacing:.14em;color:var(--faint);margin-bottom:6px}
-  .panelbox input{width:100%;padding:10px 12px;background:var(--bg);border:1px solid var(--line);
-    border-radius:7px;color:var(--ink);font:12.5px var(--mono)}
-  .panelbox input:focus{outline:0;border-color:var(--accent)}
-  .row{display:flex;gap:7px;margin-top:11px;flex-wrap:wrap}
-  .btn{font-family:var(--mono);font-size:.62rem;font-weight:500;letter-spacing:.1em;text-transform:uppercase;
-    padding:9px 14px;border-radius:7px;border:1px solid var(--line);background:var(--panel-2);
-    color:var(--ink);cursor:pointer;transition:.15s}
-  .btn:hover{border-color:var(--line-2);background:var(--raise)}
-  .btn.p{background:var(--accent);border-color:var(--accent);color:#fff}
-  .btn.p:hover{filter:brightness(1.1)}
-  .msg{margin-top:12px;font-size:.78rem;color:var(--muted);line-height:1.55}
-
-  footer{padding:18px 0 34px;border-top:1px solid var(--line);
-    font-family:var(--mono);font-size:.6rem;letter-spacing:.06em;color:var(--faint);line-height:1.9}
+/* ── repli — écart assumé, voir l'en-tête ────────────────────────────── */
+@media (max-width:1180px){
+  .top{gap:12px}
+  .stats{gap:14px}
+  .wrap{flex-direction:column}
+  .left{border-right:0;border-bottom:1px solid var(--rule2)}
+  .right{flex:1 1 auto;width:auto;padding:18px 22px 26px}
+  .tiles{grid-template-columns:repeat(3,1fr)}
+}
+@media (max-width:720px){
+  .top{padding:12px 16px;gap:12px;flex-wrap:wrap}
+  .sp{display:none}
+  .nav{order:3;width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .stats{gap:14px;margin-left:auto}
+  .st i{display:none}
+  .left{padding:18px 16px 22px}
+  .right{padding:16px 16px 24px}
+  .lede h1{font-size:22px}
+  .chips{margin-left:0;width:100%}
+  .tiles{grid-template-columns:repeat(2,1fr)}
+  .scope{min-height:320px}
+  .px{font-size:28px}
+  .bilan{grid-template-columns:repeat(2,1fr)}
+  .jr{grid-template-columns:auto auto 1fr;row-gap:3px}
+  .jr-r{grid-column:1/-1;text-align:left;display:flex;gap:8px;align-items:baseline}
+  .foot{padding:14px 16px 24px}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.01ms!important;transition-duration:.01ms!important}
+}
 </style>
 </head>
 <body>
 
-<header>
-  <nav class="navpill">
-    <span class="brand"><b>MECH</b><i></i></span>
-    <span class="navdots"><i></i><i></i><i></i><i></i><i class="on"></i></span>
-    <span class="navlinks">
-      <a href="#pan-chaine">CHAÎNE</a>
-      <a href="#pan-unites">UNITÉS</a>
-      <a href="#pan-journal">JOURNAL</a>
-    </span>
-    <span class="navact">
-      <button class="ico" id="b-alert" title="Alertes" aria-label="Alertes">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
-          <path d="M18 8A6 6 0 1 0 6 8c0 7-3 8-3 8h18s-3-1-3-8"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></button>
-      <button class="ico" id="b-set" title="Réglages" aria-label="Réglages">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
-          <circle cx="12" cy="12" r="3"/>
-          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6h.09A1.65 1.65 0 0 0 10 3.09V3a2 2 0 1 1 4 0v.09A1.65 1.65 0 0 0 15 4.6a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9v.09a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
-    </span>
+<header class="top">
+  <div class="brand">
+    <span class="logo"><i></i></span>
+    <span class="wm">TRADEassist<span>MECH</span></span>
+  </div>
+  <nav class="nav">
+    <a href="#scope" class="on">Radar</a>
+    <a href="#pan-chain">Chaîne</a>
+    <a href="#pan-journal">Historique</a>
+    <a href="#settings" id="n-set">Réglages</a>
   </nav>
+  <span class="sp"></span>
+  <div class="stats">
+    <div class="st"><i>Nasdaq 100</i><b class="mono" id="px-top">—</b></div>
+    <div class="st"><i>Capital</i><b class="mono" id="cap-top">—</b></div>
+    <div class="st"><i>Cumulé</i><b class="mono" id="pnl-top">—</b></div>
+  </div>
+  <button class="btn" id="b-alert" title="Activer les alertes">Alertes</button>
 </header>
 
-<!-- Scène d'ouverture : le radar au centre, le prix en très grand dessous.
-     C'est la seule zone du site qui a le droit de respirer. -->
-<section class="scene">
-  <span class="statepill" id="sesswrap" title=""><i class="dot" id="sdot"></i><span id="stxt">Chargement…</span></span>
-
-  <div class="hero-radar">
-    <div class="rd-box"><div class="rd-sweep"></div><div id="radar"></div></div>
-  </div>
-
-  <div class="hero-px">
-    <span class="px mono" id="px">—</span>
-    <span class="chg mono" id="chg"></span>
-  </div>
-  <div class="hero-sub">
-    <span>E-MINI NASDAQ 100</span><span class="sep">·</span><span id="age">—</span>
-  </div>
-</section>
-
 <div class="wrap">
-  <div class="pan panelbox" id="settings">
-    <div class="fgrid">
-      <div><label>Capital</label><input type="number" id="c-capital" min="100" step="100"></div>
-      <div><label>Devise</label>
-        <select id="c-devise"><option value="EUR">EUR €</option><option value="USD">USD $</option></select></div>
-      <div><label>Risque par trade %</label><input type="number" id="c-risque" min="0.05" max="5" step="0.05"></div>
-      <div><label>Contrat</label>
-        <select id="c-contrat"><option value="MNQ">MNQ — micro (2 $/pt)</option><option value="NQ">NQ — plein (20 $/pt)</option></select></div>
-    </div>
-    <div class="msg" id="c-msg"></div>
-    <hr style="border:0;border-top:1px solid var(--line);margin:18px 0">
-    <p><b>Flux temps réel.</b> Par défaut le site lit Yahoo, à travers des relais gratuits
-       souvent saturés, et avec environ <b>10 minutes de retard</b>. Un compte démo OANDA
-       donne le NAS100 sans retard et <b>sans relais</b> — c'est la seule voie fiable.</p>
-    <label>Jeton OANDA — compte pratique</label>
-    <input type="password" id="tok" placeholder="xxxxxxxx-xxxxxxxxxxxxxxxx" autocomplete="off">
-    <div class="row">
-      <button class="btn p" id="b-save">Enregistrer</button>
-      <button class="btn" id="b-corr">Corrélation avec le NQ</button>
-      <button class="btn" id="b-clear">Retirer</button>
-      <button class="btn" id="b-reset">Vider le journal</button>
-    </div>
-    <div class="msg" id="setmsg"></div>
-  </div>
 
-  <!-- La position d'abord, pleine largeur : c'est la seule chose qui demande
-       d'agir. Le reste explique pourquoi elle est là ou pourquoi elle ne l'est
-       pas. -->
-  <div id="trade"></div>
-
-  <div class="grid">
-    <div class="pan" id="pan-chaine">
-      <div class="pan-h"><h2>Chaîne du modèle</h2>
-        <span class="gauge"><span class="gauge-bar"><span class="gauge-fill" id="gauge"></span></span>
-        <span class="gauge-txt" id="chain-tag">—</span></span></div>
-      <div class="chain" id="chain"></div>
+  <!-- ── colonne gauche : le balayage ──────────────────────────────── -->
+  <main class="left">
+    <div class="lede">
+      <div>
+        <div class="eyebrow" id="tf-tag">09 h 30 – 10 h 00 NY</div>
+        <h1>Où se forme le signal</h1>
+        <p>Chaque point est un niveau clé encore valide dans le sens du biais.
+           Le rayon est sa distance au prix : plus il est proche du centre,
+           plus le prix en est près.</p>
+      </div>
+      <div class="chips" id="chips"></div>
     </div>
 
-    <div class="pan" id="pan-journal">
-      <div class="pan-h"><h2>Journal des signaux</h2>
-        <span class="tag" id="j-tag">—</span></div>
+    <section class="scope" id="scope">
+      <canvas id="radar" width="620" height="560"
+              aria-label="Niveaux clés valides par unité de temps"></canvas>
+      <div class="ov l">
+        <div class="lg"><s style="background:#d2cefd"></s>Balayé à l’instant</div>
+        <div class="lg"><s style="background:rgba(145,132,217,.5)"></s>Rayon = distance au prix</div>
+        <div class="lg"><s style="background:rgba(233,233,237,.25)"></s>Angle = unité de temps</div>
+      </div>
+      <div class="ov r">
+        <div class="k">Le plus proche</div>
+        <div class="v mono" id="near-v">—</div>
+        <div class="s" id="near-s">en attente des bougies</div>
+      </div>
+    </section>
+
+    <div class="tiles" id="tfs"></div>
+  </main>
+
+  <!-- ── colonne droite : l’état, la position, le journal ──────────── -->
+  <aside class="right">
+
+    <section class="pan">
+      <div class="sess">
+        <div class="sess-t">
+          <span class="dot" id="sdot"></span>
+          <b id="stxt">Séance</b>
+          <span class="tag mono" id="age">—</span>
+        </div>
+        <div class="px mono" id="px">—</div>
+        <div class="sess-s" id="chg">Nasdaq 100 future · NQ</div>
+        <div class="sess-w" id="sess-why"></div>
+      </div>
+    </section>
+
+    <section class="pan" id="pan-trade">
+      <div id="trade"></div>
+    </section>
+
+    <section class="pan" id="pan-chain">
+      <div class="pan-h"><h2>La chaîne</h2><span class="tag" id="chain-tag">—</span></div>
+      <div class="gauge"><i id="gauge"></i></div>
+      <div id="chain"></div>
+    </section>
+
+    <section class="pan" id="pan-journal">
+      <div class="pan-h"><h2>Historique</h2><span class="tag" id="j-tag">—</span></div>
       <div id="bilan"></div>
       <div id="journal"></div>
-    </div>
+    </section>
 
-    <div class="pan wide" id="pan-unites">
-      <div class="pan-h"><h2>Balayage des unités</h2><span class="tag" id="tf-tag">NQ</span></div>
-      <div id="tfs"></div>
-    </div>
-  </div>
+    <section class="pan" id="settings">
+      <div class="pan-h"><h2>Réglages</h2></div>
+      <div class="fld"><label for="c-capital">Capital</label>
+        <input id="c-capital" type="number" min="100" step="100" class="mono"></div>
+      <div class="fld"><label for="c-devise">Devise</label>
+        <select id="c-devise"><option value="EUR">EUR</option><option value="USD">USD</option></select></div>
+      <div class="fld"><label for="c-risque">Risque par position (%)</label>
+        <input id="c-risque" type="number" min="0.05" max="5" step="0.05" class="mono"></div>
+      <div class="fld"><label for="c-contrat">Contrat</label>
+        <select id="c-contrat"><option value="MNQ">MNQ (micro)</option><option value="NQ">NQ (plein)</option></select></div>
+      <div class="msg" id="c-msg"></div>
+      <div class="fld"><label for="tok">Jeton OANDA (temps réel)</label>
+        <input id="tok" type="password" autocomplete="off" spellcheck="false"
+               placeholder="xxxxxxxx-xxxxxxxxxxxxxxxx"></div>
+      <div class="acts">
+        <button class="btn" id="b-save">Enregistrer</button>
+        <button class="btn q" id="b-clear">Retirer</button>
+        <button class="btn q" id="b-corr">Vérifier la corrélation</button>
+        <button class="btn q" id="b-reset">Vider le journal</button>
+      </div>
+      <div class="msg" id="setmsg">
+        Le jeton reste dans ce navigateur. Sans lui, les bougies viennent de
+        Yahoo avec environ dix minutes de retard.
+      </div>
+    </section>
 
-  <footer>
-    MECH Model de PB Blake, sur le NQ uniquement. Si une étape manque, il n'y a pas de position.<br>
-    Données Yahoo Finance ou OANDA. Pédagogique — pas un conseil financier.
-  </footer>
+  </aside>
 </div>
 
+<footer class="foot">
+  NQ seul · bougies 5 min · fenêtre 09 h 30 → 10 h 00 à New York.
+  Mesuré sur 60 jours : 55 signaux, 83,6 % de réussite, espérance +0,237 R, profit factor 2,45.
+  Le seuil d’équilibre est de 68 % — la marge n’est que de quinze points, et l’avantage ne se
+  retrouve ni sur l’ES ni sur une autre unité d’exécution. Aucun ordre n’est passé : ce site
+  signale, il n’exécute pas.
+</footer>
 <script src="js/session.js"></script>
 <script src="js/cfd.js"></script>
 <script src="js/nq.js"></script>
@@ -384,23 +407,71 @@
 'use strict';
 const $ = s => document.querySelector(s);
 const fmt = n => n == null ? '—' : Number(n).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2});
-let D = null;
+const fmt0 = n => n == null ? '—' : Math.round(n).toLocaleString('fr-FR');
+// Le handoff impose le vrai signe moins U+2212, pas un trait d'union.
+const sgn = (v,d=2) => (v>0?'+':v<0?'−':'') + Math.abs(v).toFixed(d);
+let D = null, FILTRE = 'Toutes';
 
-/* ── barre + séance ─────────────────────────────────────────────────── */
+const ACC='#9184d9', ACC3='#d2cefd', INK='#e9e9ed';
+const hexA=(h,a)=>{const n=parseInt(h.slice(1),16);
+  return 'rgba('+(n>>16&255)+','+(n>>8&255)+','+(n&255)+','+a+')';};
+
+const TFS = ['M5','M15','M30','H1','H4'];
+const hh = m => String(Math.floor(m/60)).padStart(2,'0') + ' h ' + String(m%60).padStart(2,'0');
+
+/* ── en-tête + état de séance ───────────────────────────────────────── */
+function duree(ms){
+  if(ms == null) return '—';
+  const m = Math.round(ms/60000), j = Math.floor(m/1440), h = Math.floor(m%1440/60), r = m%60;
+  if(j) return j + ' j ' + h + ' h';
+  if(h) return h + ' h ' + String(r).padStart(2,'0');
+  return r + ' min';
+}
+// « dans 1 j 0 h » ne dit rien à personne. On nomme le moment : « lundi
+// 15 h 30 », à l'heure de celui qui regarde l'écran.
+function moment(ms){
+  if(ms == null) return '—';
+  const d = new Date(Date.now() + ms);
+  const j = d.toLocaleDateString('fr-FR',{weekday:'long'});
+  const h = d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}).replace(':','\u00a0h\u00a0');
+  const auj = new Date();
+  const dem = ms < 36*3600000 && d.getDate() !== auj.getDate();
+  return (dem && (d - auj) < 36*3600000 && d.getDay() === (auj.getDay()+1)%7 ? 'demain' : j) + ' ' + h;
+}
 function paintTop(){
-  $('#px').textContent = D ? fmt(D.prix) : '—';
-  const e = $('#chg'); e.textContent = ''; e.className = 'chg mono';
+  const p = D ? fmt(D.prix) : '—';
+  $('#px').textContent = p; $('#px-top').textContent = p;
 
   const age = D && D.derniereBougie ? Math.round((Date.now() - D.derniereBougie)/60000) : null;
   const src = D && D.source === 'cfd' ? 'OANDA' : 'Yahoo';
-  $('#age').innerHTML = age == null ? '—' : '<b>' + src + '</b> · −' + age + ' min';
+  $('#age').textContent = age == null ? '—' : src + ' · −' + age + ' min';
 
-  const w = window.WINDOW ? WINDOW.state() : null;
-  if(w){
-    $('#sdot').className = 'dot' + (w.ouverte ? ' on' : '');
-    const m = /dans ([^—]+)$/.exec(w.texte);
-    $('#stxt').textContent = (w.ouverte ? 'Ouverte' : 'Fermée') + (m ? ' · ' + m[1].trim() : '');
-    const el = $('#sesswrap'); if(el) el.title = w.texte;
+  const f = window.Modele ? Modele.fenetre() : null;
+  const c = window.Modele ? Modele.CFG : null;
+  if(f){
+    $('#sdot').className = 'dot' + (f.ouverte ? ' on' : '');
+    $('#stxt').textContent = f.ouverte ? 'Fenêtre ouverte' : 'Hors fenêtre';
+    // La raison du silence est écrite noir sur blanc : c'est exactement ce
+    // qui manquait — le site se taisait sans dire pourquoi.
+    $('#sess-why').innerHTML = f.ouverte
+      ? 'Le modèle regarde le marché. Il reste <b>' + duree(f.ms) + '</b> avant la fermeture ' +
+        'de la fenêtre.<span class="cd">' + duree(f.ms) + ' de balayage</span>'
+      : 'Le modèle n’émet de position que du lundi au vendredi, entre <b>' +
+        hh(c.ghDeb) + '</b> et <b>' + hh(c.ghFin) + '</b> à New York — ' +
+        'soit 15 h 30 → 16 h 00 à Paris. En dehors, il ne se prononce pas.' +
+        '<span class="cd">Ouverture ' + moment(f.ms) + '</span>' +
+        '<span style="color:var(--faint);font-size:11.5px">dans ' + duree(f.ms) + '</span>';
+  }
+  if(window.Compte){
+    const r = Compte.lire();
+    $('#cap-top').textContent = fmt0(r.capital) + ' ' + Compte.sym(r.devise);
+  }
+  if(window.History){
+    const b = History.bilan('MECH'), uR = window.Compte ? Compte.uniteR() : 0;
+    const e = $('#pnl-top');
+    e.textContent = b.total ? sgn(b.rsum,1) + ' R' : '—';
+    e.className = 'mono' + (b.rsum > 0 ? ' pos' : b.rsum < 0 ? ' neg' : '');
+    e.title = b.total ? Math.round(b.rsum*uR) + ' ' + (window.Compte?Compte.sym(Compte.lire().devise):'') : '';
   }
 }
 
@@ -409,7 +480,6 @@ function paintChain(){
   const box = $('#chain');
   if(!D){ box.innerHTML = '<div class="empty"><b>Aucune donnée</b>Récupération des bougies NQ…</div>'; return; }
   const c = Modele.CFG;
-  const hh = m => String(Math.floor(m/60)).padStart(2,'0') + ' h ' + String(m%60).padStart(2,'0');
 
   const etapes = [
     { t:'Biais haute unité',
@@ -430,14 +500,14 @@ function paintChain(){
       ok: D.etat === 'ATTEND_IFVG',
       attente: D.etat === 'ATTEND_TOUCHE',
       d: D.etat === 'ATTEND_IFVG' ? 'Le prix est entré dans la zone.'
-         : D.etat === 'ATTEND_TOUCHE' ? 'Niveau repéré, le prix n\u2019y est pas encore.'
-         : 'Pas de niveau en attente.',
-      long:'On n\u2019entre pas parce que le niveau existe : il faut que le prix y vienne.' },
+         : D.etat === 'ATTEND_TOUCHE' ? 'Niveau repéré, le prix n’y est pas encore.'
+         : D.hors ? 'Suivie seulement pendant la fenêtre.' : 'Pas de niveau en attente.',
+      long:'On n’entre pas parce que le niveau existe : il faut que le prix y vienne.' },
     { t:'IFVG confirmé',
       ok: !!D.ifvg,
       attente: D.etat === 'ATTEND_IFVG' && !D.ifvg,
       d: D.ifvg ? 'Inversion ' + D.ifvg.tf + ' validée par clôture de corps.'
-                : 'Aucune inversion dans la jambe.',
+                : D.hors ? 'Cherchée seulement pendant la fenêtre.' : 'Aucune inversion dans la jambe.',
       long:'Plus haute unité disponible de 5 min vers 1 min. Le simple contact ne suffit pas.' }
   ];
 
@@ -452,101 +522,178 @@ function paintChain(){
   }).join('');
 
   const n = etapes.filter(e => e.ok).length;
-  const tag = $('#chain-tag'), g = $('#gauge');
-  if(tag) tag.textContent = n + '/' + etapes.length;
-  if(g) g.style.width = Math.round(n / etapes.length * 100) + '%';
-
-  // La fenêtre du modèle n'est pas celle du site : on l'affiche pour éviter
-  // toute confusion sur l'heure à laquelle un signal peut apparaître.
-  const tf = $('#tf-tag');
-  if(tf) tf.textContent = hh(c.ghDeb) + ' – ' + hh(c.ghFin) + ' NY';
+  $('#chain-tag').textContent = n + '/' + etapes.length;
+  $('#gauge').style.width = Math.round(n / etapes.length * 100) + '%';
+  $('#tf-tag').textContent = hh(c.ghDeb) + ' – ' + hh(c.ghFin) + ' NY';
 }
 
 /* ── la position ────────────────────────────────────────────────────── */
 function paintTrade(){
   const box = $('#trade');
-  const t = D && D.trade;
-  const vide = h => '<div class="pan"><div class="pan-h"><h2>Position</h2></div>' +
-                    '<div class="empty">' + h + '</div></div>';
-  if(!t){ box.innerHTML = vide('<b>Aucune position</b>En attente des données du marché.'); return; }
-  if(!t.possible){
-    box.innerHTML = vide('<b>Aucune position</b>' + (t.raison || 'Une étape de la chaîne n\u2019est pas franchie.') +
-      '<span class="hint">le modèle n\u2019entre que si tout est réuni</span>');
+  const t = D && (D.trade || D.dernierSignal);
+  const frais = D && D.trade && !D.hors;
+  const tete = '<div class="pan-h"><h2>Position</h2>' +
+               '<span class="tag">' + (frais ? 'à prendre' : t ? 'dernier signal' : '—') + '</span></div>';
+  const vide = h => tete + '<div class="empty">' + h + '</div>';
+
+  if(!D){ box.innerHTML = vide('<b>Aucune position</b>En attente des données du marché.'); return; }
+  if(!t){
+    const f = Modele.fenetre();
+    box.innerHTML = vide('<b>Aucune position</b>' +
+      (f.ouverte ? 'La chaîne n’est pas complète sur cette bougie.'
+                 : 'Hors fenêtre : le modèle ne se prononce pas.') +
+      '<span class="hint">prochaine ouverture ' + moment(f.ms) + '</span>');
     return;
   }
   const L = t.sens === 'LONG', dp = Math.abs(t.entree - t.sl), dt = Math.abs(t.tp - t.entree);
-  // Calibrage sur le capital réel : le modèle raisonne en R, on passe des ordres
-  // en contrats.
   const k = window.Compte ? Compte.calibrer(t.entree, t.sl, t.tp) : null;
   const dev = k ? Compte.sym(k.devise) : '';
-  box.innerHTML =
-    '<div class="trade ' + (L ? 'long' : 'short') + '">' +
+  const quand = t.t ? new Date(t.t).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
+  box.innerHTML = tete +
+    '<div class="trade">' +
       '<div class="t-head"><span class="t-dir ' + (L ? 'long' : 'short') + '">' + t.sens + '</span>' +
-        '<span class="t-tf">' + (D.tf_retenue || '') + '</span>' +
+        '<span class="t-tf">' + (t.niveau || '') + '</span>' +
         '<span class="t-rr">RR ' + Number(t.rr).toFixed(2) + '</span></div>' +
       '<div class="t-grid">' +
-        '<div class="t-cell"><div class="t-k">Entrée</div><div class="t-v">' + fmt(t.entree) + '</div></div>' +
-        '<div class="t-cell"><div class="t-k">Stop</div><div class="t-v sl">' + fmt(t.sl) + '</div><div class="t-sub">−' + dp.toFixed(1) + ' pts</div></div>' +
-        '<div class="t-cell"><div class="t-k">Objectif</div><div class="t-v tp">' + fmt(t.tp) + '</div><div class="t-sub">+' + dt.toFixed(1) + ' pts</div></div>' +
+        '<div class="t-cell"><div class="t-k">Entrée</div><div class="t-v mono">' + fmt(t.entree) + '</div></div>' +
+        '<div class="t-cell"><div class="t-k">Stop</div><div class="t-v sl mono">' + fmt(t.sl) + '</div><div class="t-sub">−' + dp.toFixed(1) + ' pts</div></div>' +
+        '<div class="t-cell"><div class="t-k">Objectif</div><div class="t-v tp mono">' + fmt(t.tp) + '</div><div class="t-sub">+' + dt.toFixed(1) + ' pts</div></div>' +
         '<div class="t-cell"><div class="t-k">Taille</div>' +
           (k && !k.tropPetit
-            ? '<div class="t-v">' + k.contrats + ' ' + Compte.lire().contrat + '</div>' +
+            ? '<div class="t-v mono">' + k.contrats + ' ' + Compte.lire().contrat + '</div>' +
               '<div class="t-sub">risque ' + k.risqueDev + dev + ' · gain ' + k.gainDev + dev + '</div>'
-            : '<div class="t-v" style="color:var(--wait)">—</div>' +
+            : '<div class="t-v" style="color:var(--dim)">—</div>' +
               '<div class="t-sub">stop trop large pour ce capital</div>') +
         '</div>' +
       '</div>' +
-      (t.motif ? '<div class="t-why">' + t.motif + '</div>' : '') +
+      '<div class="t-why">' +
+        (frais ? 'Signal armé sur la bougie en cours. Partiel à 0,5 R sur 90 % de la taille, le reste court jusqu’à 2,5 R.'
+               : 'Ce signal date du ' + quand + '. Il est affiché pour mémoire — ce n’est pas une position à prendre maintenant.') +
+      '</div>' +
     '</div>';
 }
 
-/* ── radar : ce que chaque unité offre comme niveaux clés ───────────── */
-function paintRadar(){
-  const box = $('#radar');
-  const vs = D && D.parTF;
-  if(!vs || !vs.length){ box.innerHTML = ''; return; }
-  const R = 92, cx = 118, cy = 104, n = vs.length;
-  const maxN = Math.max(4, ...vs.map(v => v.n));
-  const pt = (i, r) => { const a = -Math.PI/2 + i*2*Math.PI/n;
-    return [cx + Math.cos(a)*r, cy + Math.sin(a)*r]; };
-  let g = '';
-  for(let k=1;k<=4;k++) g += '<circle class="rd-ring" cx="'+cx+'" cy="'+cy+'" r="'+(R*k/4).toFixed(1)+'"/>';
-  vs.forEach((v,i) => {
-    const [x,y] = pt(i,R);
-    g += '<line class="rd-axis" x1="'+cx+'" y1="'+cy+'" x2="'+x.toFixed(1)+'" y2="'+y.toFixed(1)+'"/>';
-    const [lx,ly] = pt(i,R+15);
-    const actif = D.key && D.key.tf === v.tf;
-    g += '<text class="rd-lab'+(actif?' ret':'')+'" x="'+lx.toFixed(1)+'" y="'+(ly+3).toFixed(1)+
-         '" text-anchor="middle">'+v.tf+'</text>';
+/* ── le radar (canvas Nocturne) ─────────────────────────────────────── */
+let blips = [], rafId = null;
+function majBlips(){
+  blips = [];
+  const vs = D && D.parTF; if(!vs) return;
+  const maxD = Math.max(1, ...vs.flatMap(v => (v.liste||[]).map(x => x.d)));
+  vs.forEach((v, i) => {
+    if(FILTRE !== 'Toutes' && FILTRE !== v.tf) return;
+    const base = i / TFS.length * Math.PI * 2;
+    (v.liste || []).forEach((z, j) => {
+      const jitter = (((j * 37) % 23) / 23 - 0.5) * (42 * Math.PI / 180);
+      blips.push({ ang: base + jitter, rad: 0.22 + (z.d / maxD) * 0.70,
+                   sym: z.type, tf: v.tf, ret: D.key && D.key.tf === v.tf && D.key.type === z.type && j === 0 });
+    });
   });
-  const pts = vs.map((v,i) => pt(i, Math.max(3, R * v.n / maxN)));
-  g += '<polygon class="rd-poly" points="'+pts.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ')+'"/>';
-  pts.forEach((p,i) => { g += '<circle class="rd-pt'+(D.key&&D.key.tf===vs[i].tf?' ok':'')+
-    '" cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="2.6"/>'; });
-  box.innerHTML = '<svg viewBox="0 0 236 208" role="img" aria-label="Niveaux clés valides par unité de temps">'+g+'</svg>';
+}
+function drawRadar(t){
+  const c = $('#radar'); if(!c) return;
+  const ctx = c.getContext('2d'); if(!ctx) return;
+  const dpr = window.devicePixelRatio || 1;
+  const W = 620, H = 560;
+  if(c.width !== W * dpr){ c.width = W * dpr; c.height = H * dpr; c.style.width = W + 'px'; c.style.height = H + 'px'; }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const cx = W / 2, cy = H / 2 - 8, R = 218;
+  ctx.clearRect(0, 0, W, H);
+
+  for(let i = 1; i <= 4; i++){
+    ctx.strokeStyle = hexA(INK, i === 4 ? .12 : .07); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(cx, cy, R * i / 4, 0, Math.PI * 2); ctx.stroke();
+  }
+  for(let i = 0; i < 20; i++){
+    const a = i / 20 * Math.PI * 2;
+    ctx.strokeStyle = hexA(INK, i % 4 === 0 ? .1 : .05);
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(a) * R, cy + Math.sin(a) * R); ctx.stroke();
+  }
+
+  const sweep = (t * 0.00055) % (Math.PI * 2);
+  const span = 0.85;
+  for(let k = 0; k < 26; k++){
+    const a = sweep - k / 26 * span;
+    ctx.strokeStyle = hexA(ACC, .16 * (1 - k / 26)); ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(a) * R, cy + Math.sin(a) * R); ctx.stroke();
+  }
+  ctx.strokeStyle = hexA(ACC3, .75); ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(sweep) * R, cy + Math.sin(sweep) * R); ctx.stroke();
+
+  TFS.forEach((nom, i) => {
+    const a = i / TFS.length * Math.PI * 2 - Math.PI / 2;
+    ctx.fillStyle = hexA(INK, FILTRE === 'Toutes' || FILTRE === nom ? .38 : .14);
+    ctx.font = '11px Inter, sans-serif';
+    ctx.textAlign = Math.cos(a) > .2 ? 'left' : Math.cos(a) < -.2 ? 'right' : 'center';
+    ctx.fillText(nom, cx + Math.cos(a) * (R + 14), cy + Math.sin(a) * (R + 14) + 4);
+  });
+  ctx.textAlign = 'left';
+
+  blips.forEach(b => {
+    const a = b.ang - Math.PI / 2;
+    const x = cx + Math.cos(a) * b.rad * R, y = cy + Math.sin(a) * b.rad * R;
+    let d = sweep - a; while(d < 0) d += Math.PI * 2; while(d > Math.PI * 2) d -= Math.PI * 2;
+    const lit = d < 1.6 ? 1 - d / 1.6 : 0;
+    ctx.strokeStyle = hexA(ACC, .1 + lit * .55); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(x, y, 5 + lit * 13, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = hexA(ACC3, .35 + lit * .65);
+    if(lit > .4){ ctx.shadowColor = ACC; ctx.shadowBlur = 12 * lit; }
+    ctx.beginPath(); ctx.arc(x, y, b.ret ? 4.2 : 3.2, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowBlur = 0;
+    if(lit > .25 || b.ret){
+      ctx.fillStyle = hexA(INK, .32 + lit * .5);
+      ctx.font = (lit > .5 || b.ret ? '600 ' : '') + '11px Inter, sans-serif';
+      ctx.fillText(b.sym, x + 9, y + 3.5);
+    }
+  });
+
+  ctx.fillStyle = hexA(ACC, .9);
+  ctx.beginPath(); ctx.arc(cx, cy, 2.6, 0, Math.PI * 2); ctx.fill();
+}
+function boucle(t){ drawRadar(t); rafId = requestAnimationFrame(boucle); }
+
+function paintRadar(){
+  majBlips();
+  const n = $('#near-v'), s = $('#near-s');
+  const vs = D && D.parTF;
+  const tous = vs ? vs.filter(v => v.distance != null) : [];
+  if(!tous.length){
+    n.textContent = '—';
+    s.textContent = D && D.dir === 0 ? 'biais neutre, aucun niveau retenu' : 'aucun niveau du bon côté';
+    return;
+  }
+  const best = tous.reduce((a, b) => b.distance < a.distance ? b : a);
+  n.textContent = best.distance.toFixed(1) + ' pts';
+  s.textContent = best.type + ' ' + best.tf;
 }
 
-/* ── liste des unités ───────────────────────────────────────────────── */
+/* ── tuiles par unité ───────────────────────────────────────────────── */
 function paintTFs(){
   const box = $('#tfs');
   const vs = D && D.parTF;
-  if(!vs){ box.innerHTML = '<div class="empty">—</div>'; return; }
+  if(!vs){ box.innerHTML = ''; return; }
   box.innerHTML = vs.map(v => {
-    const actif = D.key && D.key.tf === v.tf;
-    return '<div class="tf ' + (actif ? 'ret' : v.n ? 'ok' : 'off') + '">' +
-      '<span class="tf-id">' + v.tf + '</span>' +
-      '<span class="tf-st">' + (v.n ? v.n + ' niveaux valides' + (v.type ? ' · plus proche ' + v.type : '')
-                                    : 'aucun niveau du bon côté') + '</span>' +
-      '<span class="tf-rr">' + (v.distance != null ? v.distance.toFixed(1) + ' pts' : '—') + '</span></div>';
+    const ret = D.key && D.key.tf === v.tf;
+    return '<div class="tile ' + (ret ? 'ret' : v.n ? '' : 'off') + '">' +
+      '<k>' + v.tf + '</k>' +
+      '<v class="mono">' + v.n + '</v>' +
+      '<s>' + (v.n ? (v.distance != null ? v.distance.toFixed(0) + ' pts · ' + v.type : 'niveaux valides')
+                   : 'aucun niveau') + '</s></div>';
   }).join('');
 }
+
+/* ── filtres ────────────────────────────────────────────────────────── */
+function paintChips(){
+  $('#chips').innerHTML = ['Toutes'].concat(TFS)
+    .map(k => '<button class="chip' + (k === FILTRE ? ' on' : '') + '" data-k="' + k + '">' + k + '</button>').join('');
+}
+$('#chips').addEventListener('click', e => {
+  const b = e.target.closest('.chip'); if(!b) return;
+  FILTRE = b.dataset.k; paintChips(); majBlips();
+});
 
 function paintAll(){ paintTop(); paintChain(); paintTrade(); paintJournal(); paintRadar(); paintTFs(); }
 
 /* ── cycle de rafraîchissement ──────────────────────────────────────── */
-// Les six séries dont le modèle a besoin. Plus d'ES : la configuration
-// mesurée n'utilise pas la divergence SMT, et six requêtes au lieu de onze
-// ménagent les relais.
 const SERIES = [['1m','8d'],['2m','60d'],['5m','60d'],['15m','60d'],['60m','3mo'],['1d','1y']];
 const CLES   = ['m1','m2','m5','m15','h1','d1'];
 
@@ -568,11 +715,9 @@ async function refresh(){
     if(D) D.source = (window.CFD && CFD.actif()) ? 'cfd' : 'yahoo';
   }catch(e){ D = null; }
   if(D && window.History){
-    // Un signal armé pendant un créneau de trading entre au journal ; les
-    // signaux déjà ouverts sont confrontés au prix courant.
     History.evaluate({ NQ: D.prix });
     const t = D.trade;
-    if(t && t.possible && (!window.WINDOW || WINDOW.isOpen()))
+    if(t && t.possible !== false && !D.hors)
       History.record([{ sym:'NQ', dir:t.sens, entry:t.entree, sl:t.sl, tp:t.tp, rr:t.rr,
         note:'IFVG ' + t.tf + ' sur ' + t.niveau, tf:t.tf, price:D.prix }], 'MECH');
   }
@@ -580,47 +725,45 @@ async function refresh(){
   if(D && window.Notif) Notif.verifier(D);
 }
 
-/* ── journal : ce que les signaux passés ont donné ──────────────────── */
+/* ── journal ────────────────────────────────────────────────────────── */
 function paintJournal(){
   const bx = $('#bilan'), jx = $('#journal'), tag = $('#j-tag');
-  if(!window.History){ return; }
+  if(!window.History) return;
   const h = History.load().filter(x => x.source === 'MECH');
   const b = History.bilan('MECH');
   const uR = window.Compte ? Compte.uniteR() : 0;
   const dev = window.Compte ? Compte.sym(Compte.lire().devise) : '';
-  const eur = Math.round(b.rsum * uR);
 
-  if(tag) tag.textContent = b.total + (b.open ? ' + ' + b.open + ' en cours' : '');
+  tag.textContent = b.total + (b.open ? ' + ' + b.open + ' en cours' : '');
 
-  // Deux RR à ne pas confondre : celui qu'on VISE au moment du signal, et
-  // celui qu'on ENCAISSE réellement. L'écart entre les deux est exactement ce
-  // qui distingue un modèle qui atteint ses cibles d'un modèle qui les rate.
+  // Deux RR à ne pas confondre : celui qu'on VISE au signal, et celui qu'on
+  // ENCAISSE. L'écart entre les deux dit si le modèle atteint ses cibles.
   const clos = h.filter(x => x.status === 'closed');
   const rrVise = h.length ? h.reduce((a, x) => a + (+x.rr || 0), 0) / h.length : null;
-  const rrGain = clos.filter(x => (x.r || 0) > 0);
-  const rrMoyGain = rrGain.length ? rrGain.reduce((a, x) => a + x.r, 0) / rrGain.length : null;
+  const gagn = clos.filter(x => (x.r || 0) > 0);
+  const rrMoyGain = gagn.length ? gagn.reduce((a, x) => a + x.r, 0) / gagn.length : null;
   const esp = clos.length ? b.rsum / clos.length : null;
-  const nR = v => (v == null ? '—' : (v > 0 ? '+' : '') + v.toFixed(2) + ' R');
+  const nR = v => v == null ? '—' : sgn(v) + ' R';
 
   bx.innerHTML =
     '<div class="bilan">' +
-      '<div><div class="bk">Signaux clos</div><div class="bv">' + b.total +
+      '<div><div class="bk">Signaux clos</div><div class="bv mono">' + b.total +
         (b.open ? '<span class="bsub"> +' + b.open + '</span>' : '') + '</div></div>' +
-      '<div><div class="bk">Réussite</div><div class="bv">' + (b.rate == null ? '—' : b.rate + ' %') + '</div></div>' +
-      '<div><div class="bk">RR moyen visé</div><div class="bv">' +
+      '<div><div class="bk">Réussite</div><div class="bv mono">' + (b.rate == null ? '—' : b.rate + ' %') + '</div></div>' +
+      '<div><div class="bk">RR moyen visé</div><div class="bv mono">' +
         (rrVise == null ? '—' : rrVise.toFixed(2)) + '</div></div>' +
-      '<div><div class="bk">Gain moyen</div><div class="bv ' + (rrMoyGain ? 'pos' : '') + '">' +
+      '<div><div class="bk">Gain moyen</div><div class="bv mono ' + (rrMoyGain ? 'pos' : '') + '">' +
         nR(rrMoyGain) + '</div></div>' +
-      '<div><div class="bk">Espérance</div><div class="bv ' + (esp > 0 ? 'pos' : esp < 0 ? 'neg' : '') + '">' +
-        nR(esp) + (esp != null ? '<span class="bsub"> / trade</span>' : '') + '</div></div>' +
-      '<div><div class="bk">Cumulé · 1 R = ' + uR + dev + '</div><div class="bv ' + (b.rsum > 0 ? 'pos' : b.rsum < 0 ? 'neg' : '') + '">' +
-        (b.rsum > 0 ? '+' : '') + b.rsum.toFixed(1) + ' R' +
-        '<span class="bsub"> ' + (eur > 0 ? '+' : '') + eur + dev + '</span></div></div>' +
+      '<div><div class="bk">Espérance</div><div class="bv mono ' + (esp > 0 ? 'pos' : esp < 0 ? 'neg' : '') + '">' +
+        nR(esp) + '</div></div>' +
+      '<div><div class="bk">Cumulé · 1 R = ' + uR + dev + '</div><div class="bv mono ' +
+        (b.rsum > 0 ? 'pos' : b.rsum < 0 ? 'neg' : '') + '">' + sgn(b.rsum,1) + ' R' +
+        '<span class="bsub"> ' + sgn(Math.round(b.rsum * uR),0) + dev + '</span></div></div>' +
     '</div>';
 
   if(!h.length){
-    jx.innerHTML = '<div class="empty"><b>Journal vide</b>Chaque signal armé pendant un créneau ' +
-                   'sera enregistré ici, puis suivi jusqu\u2019à son stop ou son objectif.</div>';
+    jx.innerHTML = '<div class="empty"><b>Journal vide</b>Chaque signal armé pendant la fenêtre ' +
+                   'sera enregistré ici, puis suivi jusqu’à son stop ou son objectif.</div>';
     return;
   }
   jx.innerHTML = h.slice().reverse().slice(0, 12).map(x => {
@@ -629,25 +772,27 @@ function paintJournal(){
                  ' ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
     const ouvert = x.status === 'open';
     const r = ouvert ? null : (x.r || 0);
-    // Le résultat est écrit en toutes lettres AVANT les chiffres : « perdu
-    // −1.00 R » se lit sans avoir à savoir ce qu'est un R.
+    // Le verdict est écrit en toutes lettres AVANT les chiffres.
     const verdict = ouvert ? 'en cours' : r > 0 ? 'gagné' : 'perdu';
-    return '<div class="jr" title="' + (x.motif || '').replace(/"/g,'&quot;') + '">' +
-      '<span class="jr-d">' + jour + '</span>' +
+    return '<div class="jr" title="' + (x.note || '').replace(/"/g,'&quot;') + '">' +
+      '<span class="jr-d mono">' + jour + '</span>' +
       '<span class="jr-s ' + (x.direction === 'LONG' ? 'long' : 'short') + '">' + x.direction + '</span>' +
-      '<span class="jr-p">entrée ' + fmt(x.entry) + ' · cible ' + fmt(x.tp) + ' · stop ' + fmt(x.sl) +
-        (x.tf ? ' · ' + x.tf : '') + '</span>' +
+      '<span class="jr-p mono">entrée ' + fmt(x.entry) + ' · cible ' + fmt(x.tp) + ' · stop ' + fmt(x.sl) + '</span>' +
       '<span class="jr-r ' + (ouvert ? 'open' : r > 0 ? 'pos' : 'neg') + '">' +
         '<span class="jv">' + verdict + '</span>' +
-        (ouvert ? '' : '<span class="jn">' + (r > 0 ? '+' : '') + r.toFixed(2) + ' R · ' +
-                        (r > 0 ? '+' : '') + Math.round(r * uR) + dev + '</span>') +
+        (ouvert ? '' : '<span class="jn mono">' + sgn(r) + ' R · ' + sgn(Math.round(r * uR),0) + dev + '</span>') +
       '</span></div>';
   }).join('');
 }
 
 /* ── réglages ───────────────────────────────────────────────────────── */
 function setMsg(t){ $('#setmsg').innerHTML = t; }
-$('#b-set').addEventListener('click', () => $('#settings').classList.toggle('open'));
+function ouvrirReglages(){
+  $('#settings').classList.toggle('open');
+  if($('#settings').classList.contains('open'))
+    $('#settings').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+$('#n-set').addEventListener('click', e => { e.preventDefault(); ouvrirReglages(); });
 $('#b-save').addEventListener('click', () => {
   const v = $('#tok').value.trim();
   if(v) CFD.setToken(v);
@@ -667,8 +812,8 @@ $('#b-clear').addEventListener('click', () => {
 $('#b-corr').addEventListener('click', () => {
   if(!CFD.actif()){ setMsg('Enregistre un jeton d’abord.'); return; }
   setMsg('Comparaison en cours…');
-  // On compare les VARIATIONS, pas les niveaux. C'est ce qui décide si le CFD
-  // est un substitut acceptable : QQQ donnait 0,924 et ce n'était pas assez.
+  // On compare les VARIATIONS, pas les niveaux : c'est ce qui décide si le
+  // CFD est un substitut acceptable. QQQ donnait 0,924 et ce n'était pas assez.
   Promise.all([CFD.candles('5m', 500), NQ.brut('NQ=F', '5m', '5d')]).then(([a, b]) => {
     const r = CFD.correlation(a, b && b.candles ? b.candles : b);
     if(!r || r.r == null){ setMsg('Pas assez de bougies communes.'); return; }
@@ -679,8 +824,11 @@ $('#b-corr').addEventListener('click', () => {
        : 'Insuffisant : QQQ faisait 0,924 et l’avantage y disparaissait.'));
   }).catch(() => setMsg('Comparaison impossible.'));
 });
+$('#b-reset').addEventListener('click', () => {
+  if(!window.History) return;
+  History.reset(); setMsg('Journal vidé.'); paintAll();
+});
 
-/* ── réglages du compte ─────────────────────────────────────────────── */
 function compteInit(){
   if(!window.Compte) return;
   const r = Compte.lire();
@@ -706,30 +854,26 @@ function compteInit(){
   Compte.majTaux().then(maj);
   maj();
 }
-$('#b-reset').addEventListener('click', () => {
-  if(!window.History) return;
-  History.reset();
-  setMsg('Journal vidé.');
-  paintAll();
-});
 
 /* ── alertes ────────────────────────────────────────────────────────── */
 function paintAlert(){
   const b = $('#b-alert');
-  if(!window.Notif || !Notif.supporte()){ b.disabled = true; b.title = 'Non supporté'; return; }
+  if(!window.Notif || !Notif.supporte()){ b.disabled = true; b.title = 'Non supporté par ce navigateur'; return; }
   const on = Notif.actif() && Notif.permis();
-  b.className = 'ico' + (on ? ' on' : '');
-  b.title = on ? 'Alertes activées' : 'Activer les alertes';
+  b.className = 'btn' + (on ? ' on' : '');
+  b.textContent = on ? 'Alertes activées' : 'Alertes';
 }
 $('#b-alert').addEventListener('click', () => {
-  if(Notif.actif()) { Notif.desactiver(); paintAlert(); }
+  if(Notif.actif()){ Notif.desactiver(); paintAlert(); }
   else Notif.activer().then(paintAlert);
 });
 
 /* ── démarrage ──────────────────────────────────────────────────────── */
-paintAll(); paintAlert(); compteInit();
-if(CFD.actif()) $('#tok').placeholder = 'jeton enregistré';
-setInterval(() => { paintTop(); }, 1000);
+paintChips(); paintAll(); paintAlert(); compteInit();
+if(window.CFD && CFD.actif()) $('#tok').placeholder = 'jeton enregistré';
+if(!window.matchMedia('(prefers-reduced-motion: reduce)').matches) boucle(performance.now());
+else drawRadar(0);
+setInterval(paintTop, 1000);
 refresh();
 setInterval(refresh, 300000);   // le modèle travaille en M5/M15 : 5 minutes suffisent
 </script>
