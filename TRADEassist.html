@@ -2704,6 +2704,12 @@ async function charger(){
 // reprend le calcul local : ce flux-là est joignable directement, et en
 // temps réel.
 async function etatDistant(){
+  // Servi par GitHub Pages à côté de la page : même origine, pas de CORS,
+  // pas de dépendance à un domaine tiers.
+  try{
+    const r = await fetch('data/etat.json?t=' + Date.now(), { cache:'no-store' });
+    if(r.ok){ const j = await r.json(); if(j && j.prix != null) return j; }
+  }catch(e){ /* page ouverte en local : on passe par le dépôt */ }
   for(const br of BRANCHES){
     try{
       const u = 'https://raw.githubusercontent.com/' + DEPOT + '/' +
@@ -2755,6 +2761,11 @@ const BRANCHES = ['claude/trading-ict-smc-site-h1n3i7', 'main'];
 let DISTANT = null, DISTANT_ETAT = 'chargement';
 
 async function chargerDistant(){
+  try{
+    const r = await fetch('data/signaux.json?t=' + Date.now(), { cache:'no-store' });
+    if(r.ok){ const j = await r.json();
+      if(j && Array.isArray(j.signaux)){ DISTANT = j; DISTANT_ETAT = 'ok'; return; } }
+  }catch(e){ /* page ouverte en local : on passe par le dépôt */ }
   for(const br of BRANCHES){
     try{
       const u = 'https://raw.githubusercontent.com/' + DEPOT + '/' +

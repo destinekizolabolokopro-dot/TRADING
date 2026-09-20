@@ -35,3 +35,17 @@ fs.mkdirSync(docs, { recursive: true });
 fs.writeFileSync(path.join(docs, 'index.html'), html);
 fs.writeFileSync(path.join(docs, '.nojekyll'), '');   // pas de traitement Jekyll
 console.log('✅ Écrit : docs/index.html (GitHub Pages)');
+
+// Les données relevées par la tâche automatique sont recopiées à côté de la
+// page : servies par Pages sur la MÊME origine, elles se lisent sans CORS et
+// sans dépendre de raw.githubusercontent.com.
+try {
+  const src = path.join(__dirname, '..', 'data');
+  const dst = path.join(__dirname, '..', 'docs', 'data');
+  if (fs.existsSync(src)) {
+    fs.mkdirSync(dst, { recursive: true });
+    for (const f of fs.readdirSync(src).filter(f => f.endsWith('.json')))
+      fs.copyFileSync(path.join(src, f), path.join(dst, f));
+    console.log('✅ Copié  : docs/data/  (' + fs.readdirSync(dst).join(', ') + ')');
+  }
+} catch (e) { console.error('Copie des données impossible : ' + e.message); }

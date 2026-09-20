@@ -46,15 +46,18 @@ jobs:
       - name: Relever les signaux
         run: node scripts/live_log.js ${{ inputs.force && '--force' || '' }}
 
+      - name: Republier la page avec les données fraîches
+        run: node scripts/build_single.js
+
       - name: Versionner le journal
         run: |
-          if git diff --quiet -- data/; then
+          if git diff --quiet -- data/ docs/; then
             echo "Rien de neuf à enregistrer."
             exit 0
           fi
           git config user.name  "journal-signaux"
           git config user.email "noreply@github.com"
-          git add data/
+          git add data/ docs/
           git commit -m "Journal : relevé du $(date -u '+%Y-%m-%d %H:%M UTC')"
           # Une autre exécution a pu pousser entre-temps : on rejoue par-dessus.
           for i in 1 2 3 4 5; do
