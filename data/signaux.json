@@ -31,6 +31,37 @@
    "closTs": "2026-09-18T13:55:00.000Z",
    "barres": 1,
    "part1": true
+  },
+  {
+   "ts": "2026-09-21T13:48:21.796Z",
+   "bougie": "2026-09-21T13:35:00.000Z",
+   "jour": "2026-09-21",
+   "heureNY": "09:35",
+   "prix": 30292.5,
+   "retardMin": 13,
+   "biais": "haussier",
+   "score": 4,
+   "dol": 30343,
+   "niveau": "ITL M5",
+   "etat": "CHERCHE",
+   "niveauxParUnite": "M5:113 M15:123 M30:101 H1:113 H4:93",
+   "cle": "1789997700000|LONG|30292.5",
+   "sens": "LONG",
+   "entree": 30292.5,
+   "sl": 30282.69,
+   "tp1": 30297.4,
+   "tp": 30317.02,
+   "rr": 0.7,
+   "uniteIFVG": "5m",
+   "niveauDeclencheur": "ITL M5",
+   "risquePts": 9.81,
+   "raisonnement": "Biais haussier (score 4/4). DOL à 30343. Niveau clé ITL M5. Le prix l'a touché, puis une inversion 5m a été confirmée par clôture de corps. Entrée 30292.5, stop au bord de l'IFVG à 30282.69 (9.8 pts), partiel 0,5 R à 30297.4 sur 90 % de la taille, le reste court jusqu'à 2,5 R à 30317.02.",
+   "statut": "ouvert",
+   "resultat": null,
+   "r": null,
+   "closTs": null,
+   "part1": false,
+   "slCourant": 30282.69
   }
  ],
  "passages": [
@@ -84,10 +115,10 @@
   }
  ],
  "bilan": {
-  "maj": "2026-09-20T16:20:59.363Z",
-  "total": 1,
+  "maj": "2026-09-21T13:48:21.796Z",
+  "total": 2,
   "clos": 1,
-  "ouverts": 0,
+  "ouverts": 1,
   "reussite": 100,
   "cumulR": 0.45,
   "passages": 3
