@@ -197,15 +197,27 @@ function blocage(d) {
   // L'identité d'un signal, c'est SA BOUGIE et son sens. Le modèle n'en
   // produit qu'un par bougie, et ses deux signaux quotidiens tombent
   // forcément sur des bougies différentes.
-  const t = d.trade || d.dernierSignal;
   const cleDe = x => `${x.t}|${x.sens}`;
-  const neuf = t && dansLaFenetre(t.t) &&
-    !db.signaux.some(s => s.cle === cleDe(t));
+  // On reprend TOUS les signaux de la passe tombés dans la fenêtre, pas
+  // seulement le dernier : le déclenchement automatique n'étant pas fiable,
+  // un seul relevé doit suffire à rattraper toute la séance.
+  // Borné au JOUR EN COURS — celui de la dernière bougie reçue. Sans cette
+  // borne, `tousSignaux` remonte les soixante jours de l'historique et
+  // déverse cinquante-cinq reconstitutions dans le journal en direct, qui
+  // ne doit contenir que ce que le robot a réellement observé. Les
+  // reconstitutions ont leur propre place, dans js/mesure.js, étiquetées
+  // comme telles.
+  const jourCourant = Modele.heure(d.derniereBougie).jour;
+  const candidats = (d.tousSignaux || [d.trade || d.dernierSignal])
+    .filter(x => x && dansLaFenetre(x.t))
+    .filter(x => Modele.heure(x.t).jour === jourCourant)
+    .filter(x => !db.signaux.some(s => s.cle === cleDe(x)));
+  const neuf = candidats.length > 0;
 
-  if (neuf) {
-    // Les champs de contexte doivent décrire la bougie DU SIGNAL, pas la
-    // dernière reçue : avec le retard de Yahoo, les deux diffèrent
-    // systématiquement, et un relevé qui mélange les deux est faux.
+  // Chaque candidat donne une ligne. Les champs de contexte décrivent la
+  // bougie DU SIGNAL, pas la dernière reçue : avec le retard de Yahoo les
+  // deux diffèrent toujours, et un relevé qui mélange les deux est faux.
+  candidats.forEach(t => {
     const eSig = Modele.heure(t.t);
     const hSig = String(Math.floor(eSig.min / 60)).padStart(2, '0') + ':' +
                  String(eSig.min % 60).padStart(2, '0');
@@ -226,7 +238,13 @@ function blocage(d) {
       statut: 'ouvert', resultat: null, r: null, closTs: null
     }));
     console.log(`✅ SIGNAL ${t.sens} · ${eSig.jour} ${hSig} NY · entrée ${t.entree} · stop ${t.sl} · ${t.niveau}`);
-  } else if (f.ouverte || FORCE) {
+  });
+  // Les signaux rattrapés sont triés : un relevé tardif peut en ramener
+  // plusieurs d'un coup, dans le désordre par rapport à l'existant.
+  if (neuf) db.signaux.sort((a, b) => Date.parse(a.bougie) - Date.parse(b.bougie));
+
+  if (neuf) { /* déjà journalisé ci-dessus */ }
+  else if (f.ouverte || FORCE) {
     const b = blocage(d);
     db.passages.push(Object.assign({}, commun, { etapeBloquee: b.etape, dit: b.dit }));
     console.log(`— ${commun.jour} ${hNY} NY · ${b.dit}`);

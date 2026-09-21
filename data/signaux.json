@@ -33,6 +33,37 @@
    "part1": true
   },
   {
+   "ts": "2026-09-21T14:14:27.553Z",
+   "bougie": "2026-09-21T13:30:00.000Z",
+   "jour": "2026-09-21",
+   "heureNY": "09:30",
+   "prix": 30252,
+   "retardMin": 44,
+   "biais": "haussier",
+   "score": 4,
+   "dol": 30599.75,
+   "niveau": "FVG M5",
+   "etat": "CHERCHE",
+   "niveauxParUnite": "M5:117 M15:124 M30:102 H1:113 H4:94",
+   "cle": "1789997400000|LONG",
+   "sens": "LONG",
+   "entree": 30252,
+   "sl": 30227.2,
+   "tp1": 30264.4,
+   "tp": 30314,
+   "rr": 0.7,
+   "uniteIFVG": "2m",
+   "niveauDeclencheur": "CISD M15",
+   "risquePts": 24.8,
+   "raisonnement": "Biais haussier (score 4/4). DOL à 30599.75. Niveau clé CISD M15. Le prix l'a touché, puis une inversion 2m a été confirmée par clôture de corps. Entrée 30252, stop au bord de l'IFVG à 30227.2 (24.8 pts), partiel 0,5 R à 30264.4 sur 90 % de la taille, le reste court jusqu'à 2,5 R à 30314.",
+   "statut": "clos",
+   "resultat": "gagné",
+   "r": 0.45,
+   "closTs": "2026-09-21T13:35:00.000Z",
+   "barres": 1,
+   "part1": true
+  },
+  {
    "ts": "2026-09-21T13:48:21.796Z",
    "bougie": "2026-09-21T13:35:00.000Z",
    "jour": "2026-09-21",
@@ -116,12 +147,12 @@
   }
  ],
  "bilan": {
-  "maj": "2026-09-21T14:00:01.190Z",
-  "total": 2,
-  "clos": 2,
+  "maj": "2026-09-21T14:14:27.553Z",
+  "total": 3,
+  "clos": 3,
   "ouverts": 0,
   "reussite": 100,
-  "cumulR": 1.15,
+  "cumulR": 1.6,
   "passages": 3
  }
 }

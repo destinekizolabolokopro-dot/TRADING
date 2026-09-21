@@ -114,7 +114,11 @@
 
     // ── machine à états, identique au backtest ─────────────────────────────
     var etat = 'CHERCHE', dir = 0, key = null, legDeb = 0, tTouche = 0;
-    var parJour = {}, dernier = null, etapes = null;
+    // `tous` garde TOUS les signaux de la passe, pas seulement le dernier.
+    // Le relevé automatique ne se déclenche pas de façon fiable : s'il ne
+    // tourne qu'une fois dans la séance, il doit quand même retrouver les
+    // deux signaux possibles de la journée, pas uniquement le plus récent.
+    var parJour = {}, dernier = null, etapes = null, tous = [];
 
     for (var i = 60; i < clock.length; i++) {
       var bar = clock[i], e = heure(bar.t), px = bar.c;
@@ -177,6 +181,7 @@
               rr: CFG.part * CFG.tp1 + (1 - CFG.part) * CFG.tp2,
               tf: choisi.tf, niveau: key.type + ' ' + key.tf, dol: dol,
               barre: i, derniere: i >= clock.length - 2 };
+            tous.push(dernier);
             parJour[e.jour]++; etat = 'CHERCHE'; key = null;
           }
         }
@@ -261,6 +266,7 @@
       parTF: parTF,
       trade: dernier && dernier.derniere ? dernier : null,
       dernierSignal: dernier,
+      tousSignaux: tous,
       hors: horsFenetre,
       cfg: CFG
     };
