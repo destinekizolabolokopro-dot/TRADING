@@ -124,6 +124,16 @@ function blocage(d) {
   const hNY = String(Math.floor(e.min / 60)).padStart(2, '0') + ':' + String(e.min % 60).padStart(2, '0');
   const db = charger();
 
+  // Rattrapage des doublons produits par l'ancienne clé : on garde le
+  // PREMIER relevé de chaque bougie, celui qui a été vu en direct.
+  const vues = new Set(), propre = [];
+  for (const s of db.signaux) {
+    const k = `${Date.parse(s.bougie)}|${s.sens}`;
+    if (vues.has(k)) { console.log(`Doublon retiré : ${s.jour} ${s.heureNY} ${s.sens} (${s.niveauDeclencheur})`); continue; }
+    vues.add(k); s.cle = k; propre.push(s);
+  }
+  db.signaux = propre;
+
   const commun = {
     ts: maintenant, bougie: new Date(d.derniereBougie).toISOString(),
     jour: e.jour, heureNY: hNY, prix: d.prix,
@@ -178,9 +188,19 @@ function blocage(d) {
     return e.dow >= 1 && e.dow <= 5 &&
            e.min >= Modele.CFG.ghDeb && e.min < Modele.CFG.ghFin;
   }
+  // ⚠️ La clé incluait le prix d'entrée. Or Yahoo révise ses bougies entre
+  // deux relevés : la MÊME bougie de 09 h 35 a rendu une entrée à 30292.5
+  // à 13 h 48, puis 30296.5 à 13 h 59, et le niveau retenu est passé de
+  // ITL M5 à ITL H4. Deux clés différentes, donc deux lignes au journal
+  // pour un seul événement de marché — un gain compté deux fois.
+  //
+  // L'identité d'un signal, c'est SA BOUGIE et son sens. Le modèle n'en
+  // produit qu'un par bougie, et ses deux signaux quotidiens tombent
+  // forcément sur des bougies différentes.
   const t = d.trade || d.dernierSignal;
+  const cleDe = x => `${x.t}|${x.sens}`;
   const neuf = t && dansLaFenetre(t.t) &&
-    !db.signaux.some(s => s.cle === `${t.t}|${t.sens}|${t.entree}`);
+    !db.signaux.some(s => s.cle === cleDe(t));
 
   if (neuf) {
     // Les champs de contexte doivent décrire la bougie DU SIGNAL, pas la
@@ -193,7 +213,7 @@ function blocage(d) {
       bougie: new Date(t.t).toISOString(), jour: eSig.jour, heureNY: hSig,
       prix: t.entree,
       retardMin: Math.round((Date.now() - t.t) / 60000),
-      cle: `${t.t}|${t.sens}|${t.entree}`,
+      cle: cleDe(t),
       sens: t.sens, entree: t.entree, sl: t.sl, tp1: t.tp1, tp: t.tp,
       rr: t.rr, uniteIFVG: t.tf, niveauDeclencheur: t.niveau,
       risquePts: +Math.abs(t.entree - t.sl).toFixed(2),

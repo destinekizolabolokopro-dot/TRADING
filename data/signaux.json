@@ -14,7 +14,7 @@
    "niveau": "FVG M5",
    "etat": "CHERCHE",
    "niveauxParUnite": "M5:11 M15:3 M30:1 H1:2 H4:15",
-   "cle": "1789739400000|SHORT|29782.75",
+   "cle": "1789739400000|SHORT",
    "sens": "SHORT",
    "entree": 29782.75,
    "sl": 29807.46,
@@ -45,7 +45,7 @@
    "niveau": "ITL M5",
    "etat": "CHERCHE",
    "niveauxParUnite": "M5:113 M15:123 M30:101 H1:113 H4:93",
-   "cle": "1789997700000|LONG|30292.5",
+   "cle": "1789997700000|LONG",
    "sens": "LONG",
    "entree": 30292.5,
    "sl": 30282.69,
@@ -63,37 +63,6 @@
    "part1": true,
    "slCourant": 30282.69,
    "barres": 1
-  },
-  {
-   "ts": "2026-09-21T13:59:01.948Z",
-   "bougie": "2026-09-21T13:35:00.000Z",
-   "jour": "2026-09-21",
-   "heureNY": "09:35",
-   "prix": 30296.5,
-   "retardMin": 24,
-   "biais": "haussier",
-   "score": 4,
-   "dol": 30599.75,
-   "niveau": "ITL H4",
-   "etat": "CHERCHE",
-   "niveauxParUnite": "M5:115 M15:124 M30:101 H1:113 H4:94",
-   "cle": "1789997700000|LONG|30296.5",
-   "sens": "LONG",
-   "entree": 30296.5,
-   "sl": 30282.69,
-   "tp1": 30303.4,
-   "tp": 30331.02,
-   "rr": 0.7,
-   "uniteIFVG": "5m",
-   "niveauDeclencheur": "ITL H4",
-   "risquePts": 13.81,
-   "raisonnement": "Biais haussier (score 4/4). DOL à 30599.75. Niveau clé ITL H4. Le prix l'a touché, puis une inversion 5m a été confirmée par clôture de corps. Entrée 30296.5, stop au bord de l'IFVG à 30282.69 (13.8 pts), partiel 0,5 R à 30303.4 sur 90 % de la taille, le reste court jusqu'à 2,5 R à 30331.02.",
-   "statut": "clos",
-   "resultat": "gagné",
-   "r": 0.7,
-   "closTs": "2026-09-21T13:40:00.000Z",
-   "barres": 1,
-   "part1": true
   }
  ],
  "passages": [
@@ -147,12 +116,12 @@
   }
  ],
  "bilan": {
-  "maj": "2026-09-21T13:59:01.948Z",
-  "total": 3,
-  "clos": 3,
+  "maj": "2026-09-21T14:00:01.190Z",
+  "total": 2,
+  "clos": 2,
   "ouverts": 0,
   "reussite": 100,
-  "cumulR": 1.85,
+  "cumulR": 1.15,
   "passages": 3
  }
 }
