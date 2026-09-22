@@ -243,11 +243,22 @@ function blocage(d) {
   // plusieurs d'un coup, dans le désordre par rapport à l'existant.
   if (neuf) db.signaux.sort((a, b) => Date.parse(a.bougie) - Date.parse(b.bougie));
 
+  // Un passage explicatif est consigné si la fenêtre est ouverte, MAIS AUSSI
+  // si la journée s'est déroulée sans qu'aucun passage ne l'ait décrite.
+  // Le planificateur de GitHub abandonne souvent les créneaux de la séance
+  // et ne déclenche que le soir : sans cette seconde condition, ces
+  // journées-là ne laissaient aucune trace de ce que le modèle avait vu,
+  // alors qu'expliquer son silence est la moitié de l'intérêt du relevé.
+  const jourDejaDecrit = db.passages.some(p => p.jour === jourCourant) ||
+                         db.signaux.some(x => x.jour === jourCourant);
   if (neuf) { /* déjà journalisé ci-dessus */ }
-  else if (f.ouverte || FORCE) {
+  else if (f.ouverte || FORCE || !jourDejaDecrit) {
     const b = blocage(d);
-    db.passages.push(Object.assign({}, commun, { etapeBloquee: b.etape, dit: b.dit }));
-    console.log(`— ${commun.jour} ${hNY} NY · ${b.dit}`);
+    db.passages.push(Object.assign({}, commun, {
+      jour: jourCourant, etapeBloquee: b.etape, dit: b.dit,
+      apresCoup: !f.ouverte && !FORCE
+    }));
+    console.log(`— ${jourCourant} ${hNY} NY · ${b.dit}`);
   } else {
     // Hors fenêtre on rafraîchit l'instantané et rien d'autre : consigner un
     // « passage » à 3 h du matin n'apprendrait rien à personne.

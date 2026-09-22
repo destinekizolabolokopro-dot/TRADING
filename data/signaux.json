@@ -144,15 +144,32 @@
    "niveauxParUnite": "M5:11 M15:3 M30:1 H1:2 H4:15",
    "etapeBloquee": "fenetre",
    "dit": "Hors fenêtre. Biais baissier, DOL à 29648, niveau le plus proche FVG M5 (29917.25 – 29958.25)."
+  },
+  {
+   "ts": "2026-09-22T14:46:16.942Z",
+   "bougie": "2026-09-22T14:36:17.000Z",
+   "jour": "2026-09-22",
+   "heureNY": "10:36",
+   "prix": 30958.75,
+   "retardMin": 10,
+   "biais": "haussier",
+   "score": 4,
+   "dol": null,
+   "niveau": "FVG H1",
+   "etat": "CHERCHE",
+   "niveauxParUnite": "M5:104 M15:127 M30:103 H1:121 H4:98",
+   "etapeBloquee": "dol",
+   "dit": "Biais haussier, mais plus aucune liquidité intacte dans ce sens.",
+   "apresCoup": true
   }
  ],
  "bilan": {
-  "maj": "2026-09-21T14:14:27.553Z",
+  "maj": "2026-09-22T14:46:16.942Z",
   "total": 3,
   "clos": 3,
   "ouverts": 0,
   "reussite": 100,
   "cumulR": 1.6,
-  "passages": 3
+  "passages": 4
  }
 }
