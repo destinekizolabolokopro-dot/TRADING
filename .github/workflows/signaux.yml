@@ -13,24 +13,28 @@ name: Journal des signaux
 
 on:
   schedule:
-    # ── POURQUOI SI PEU DE PASSAGES ──────────────────────────────────────
-    # Le planning était à '*/5 13-15 * * 1-5', soit trente-six passages par
-    # séance. Résultat mesuré : ZÉRO déclenchement en dix-neuf heures.
-    # GitHub traite les crons rapprochés « au mieux » et les abandonne sous
-    # charge — c'est documenté, et c'est exactement ce qui s'est produit.
+    # ── POURQUOI AUTANT DE CRÉNEAUX ──────────────────────────────────────
+    # Historique de ce planning :
+    #   '*/5 13-15'        36 passages demandés → 0 déclenchement
+    #   5 créneaux ciblés  → ceux du SOIR partent, ceux de la SÉANCE non
     #
-    # Depuis que le relevé rattrape toute la séance d'un coup, un seul
-    # passage suffit. On en demande donc peu, à des minutes décalées pour
-    # éviter les pics de charge, et on les DOUBLE pour que la perte d'un
-    # passage ne coûte pas la journée.
+    # GitHub honore mal les créneaux de l'après-midi — c'est son heure de
+    # pointe — et décale les autres de plusieurs dizaines de minutes. On
+    # cesse donc de viser juste : depuis que le relevé rattrape toute la
+    # séance en une fois, N'IMPORTE QUEL passage de la journée suffit à
+    # l'enregistrer. On en sème beaucoup, à des minutes décalées, du début
+    # d'après-midi jusqu'à la nuit.
     #
-    # New York bascule entre UTC−4 l'été et UTC−5 l'hiver : les deux jeux
-    # d'horaires couvrent les deux cas, le script tranche lui-même.
-    - cron: '45 13 * * 1-5'    # mi-séance, heure d'été
-    - cron: '20 14 * * 1-5'    # après la fenêtre, heure d'été
-    - cron: '45 14 * * 1-5'    # mi-séance, heure d'hiver
-    - cron: '20 15 * * 1-5'    # après la fenêtre, heure d'hiver
-    - cron: '10 21 * * 1-5'    # instantané du soir, pour le prix affiché
+    # Le coût est nul : un passage dure cinq secondes, et le script
+    # n'écrit rien quand rien n'a changé — donc pas de commit inutile.
+    - cron: '43 13 * * 1-5'    # pendant la séance, heure d'été
+    - cron: '43 14 * * 1-5'    # pendant la séance, heure d'hiver
+    - cron: '17 15 * * 1-5'
+    - cron: '37 16 * * 1-5'
+    - cron: '13 18 * * 1-5'
+    - cron: '47 19 * * 1-5'    # créneau du soir, éprouvé
+    - cron: '23 21 * * 1-5'
+    - cron: '53 23 * * 1-5'
   workflow_dispatch:
     inputs:
       force:

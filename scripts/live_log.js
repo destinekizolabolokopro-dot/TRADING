@@ -35,7 +35,37 @@ const ETAT    = path.join(__dirname, '..', 'data', 'etat.json');
 const YF = 'https://query1.finance.yahoo.com/v8/finance/chart/';
 const SERIES = [['1m','8d','m1'],['2m','60d','m2'],['5m','60d','m5'],
                 ['15m','60d','m15'],['60m','3mo','h1'],['1d','1y','d1']];
+const DUREE = { '1m': 6e4, '2m': 12e4, '5m': 3e5, '15m': 9e5, '60m': 36e5, '1d': 864e5 };
 const FORCE = process.argv.includes('--force');
+
+// ⚠️ Yahoo ajoute le PRIX EN DIRECT à la fin de la série, déguisé en
+// bougie : haut = bas = clôture, et un horodatage qui avance de quelques
+// secondes à chaque appel. Mesuré : deux appels à six secondes d'écart
+// rendent « 14:41:47 · 30907.75 » puis « 14:41:53 · 30905.25 ».
+//
+// Traitée comme une vraie bougie, elle fausse tout : elle ne peut former
+// ni FVG ni CISD puisqu'elle n'a pas de corps, elle n'est pas alignée sur
+// la grille des cinq minutes, et elle change en permanence — donc un
+// signal peut apparaître puis disparaître entre deux relevés.
+//
+// Le repère fiable est l'ESPACEMENT, pas le temps écoulé : les vraies
+// bougies sont posées sur la grille de leur intervalle, l'imposteur ne
+// l'est pas. Relevé sur une série 5 min :
+//
+//   14:20:00  écart 300 s   O 30950     H 30960.75  L 30934.25  C 30951.25
+//   14:40:00  écart 300 s   O 30943.75  H 30949.50  L 30896.25  C 30914.50
+//   14:43:05  écart 185 s   O 30898.5   H 30898.5   L 30898.5   C 30898.5
+//
+// On retire donc de la fin toute entrée trop rapprochée de la précédente.
+// Un simple « intervalle écoulé » ne suffisait pas : à 14 h 53, la fausse
+// bougie de 14 h 43 avait bien cinq minutes d'âge et passait le test.
+function nettoie(cs, interval) {
+  const d = DUREE[interval];
+  if (!d || cs.length < 2) return cs;
+  const out = cs.slice();
+  while (out.length >= 2 && out[out.length - 1].t - out[out.length - 2].t < d) out.pop();
+  return out;
+}
 
 async function serie(sym, interval, range) {
   const url = `${YF}${sym}?interval=${interval}&range=${range}`;
@@ -52,8 +82,11 @@ async function serie(sym, interval, range) {
         if (q.open[i] == null || q.close[i] == null) continue;
         out.push({ t: t[i] * 1000, o: q.open[i], h: q.high[i], l: q.low[i], c: q.close[i] });
       }
-      if (!out.length) throw new Error('aucune bougie');
-      return out;
+      const propre = nettoie(out, interval);
+      if (!propre.length) throw new Error('aucune bougie clôturée');
+      if (propre.length < out.length)
+        console.log(`  ${interval} : ${out.length - propre.length} entrée(s) non clôturée(s) écartée(s)`);
+      return propre;
     } catch (e) {
       if (essai === 3) throw e;
       await new Promise(r => setTimeout(r, 1000 * Math.pow(2, essai)));
