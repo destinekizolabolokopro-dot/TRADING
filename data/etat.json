@@ -1,10 +1,10 @@
 {
- "maj": "2026-09-22T21:10:30.290Z",
+ "maj": "2026-09-22T21:13:47.818Z",
  "source": "yahoo",
  "eurusd": 1.1465,
  "prix": 31004.25,
  "derniereBougie": 1790110500000,
- "retardMin": 16,
+ "retardMin": 19,
  "hors": true,
  "etat": "CHERCHE",
  "dir": 1,
@@ -492,7 +492,7 @@
   "tf": "2m",
   "niveau": "FVG M15",
   "dol": 30599.75,
-  "barre": 13229,
+  "barre": 13228,
   "derniere": false
  },
  "cfg": {
