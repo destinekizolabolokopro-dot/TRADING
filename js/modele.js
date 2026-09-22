@@ -20,15 +20,19 @@
 (function (root) {
 
   var CFG = {
-    // Fenêtre choisie par l'utilisateur : 09 h 30 → 11 h 00 New York, soit
-    // 15 h 30 → 17 h 00 à Paris. Elle couvre le balayage qui suit
-    // l'ouverture, qu'il voulait inclure.
+    // Fenêtre 09 h 00 → 10 h 00 New York, soit 15 h 00 → 16 h 00 à Paris.
+    // Retenue parce qu'elle est la meilleure sur les DEUX critères à la
+    // fois, sur un balayage des vingt-quatre heures :
     //
-    // Mesuré sur la même période, pour mémoire :
-    //   09h30 → 10h00   57 signaux · 78,9 % · +2 434 € · +0,171 R/signal
+    //   09h00 → 10h00   70 signaux · 80,0 % · +2 808 € · +0,160 R/signal
+    //   09h00 → 09h30   35 signaux · 85,7 % · +1 896 € · +0,217 R/signal
+    //   09h30 → 10h00   57 signaux · 77,2 % · +2 009 € · +0,141 R/signal
     //   09h30 → 11h00   80 signaux · 72,5 % · +1 215 € · +0,061 R/signal
-    // La fenêtre longue prend plus de trades, de moins bonne qualité.
-    ghDeb: 9 * 60 + 30, ghFin: 11 * 60,   // heure de New York
+    //
+    // La demi-heure 09h00-09h30, avant l'ouverture du NYSE, a le meilleur
+    // taux et la meilleure espérance par signal, mais deux fois moins de
+    // trades. L'heure entière garde 80 % tout en doublant l'échantillon.
+    ghDeb: 9 * 60, ghFin: 10 * 60,   // heure de New York
     seuil: 2, fvgn: 1,                    // biais : score minimum, FVG comptés par unité
     keyAge: 400, react: 12,               // âge d'un niveau, bougies entre touche et IFVG
     tp1: 0.5, tp2: 2.5, part: 0.9,        // partiel à 0,5 R, runner à 2,5 R

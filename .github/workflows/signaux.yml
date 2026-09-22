@@ -27,8 +27,10 @@ on:
     #
     # Le coût est nul : un passage dure cinq secondes, et le script
     # n'écrit rien quand rien n'a changé — donc pas de commit inutile.
-    - cron: '43 13 * * 1-5'    # pendant la séance, heure d'été
-    - cron: '43 14 * * 1-5'    # pendant la séance, heure d'hiver
+    - cron: '13 13 * * 1-5'    # pendant la séance, heure d'été
+    - cron: '43 13 * * 1-5'    # juste après, heure d'été
+    - cron: '13 14 * * 1-5'    # pendant la séance, heure d'hiver
+    - cron: '43 14 * * 1-5'    # juste après, heure d'hiver
     - cron: '17 15 * * 1-5'
     - cron: '37 16 * * 1-5'
     - cron: '13 18 * * 1-5'

@@ -400,11 +400,11 @@ button,input,select{font:inherit;color:inherit}
 </div>
 
 <footer class="foot">
-  NQ seul · bougies 5 min · fenêtre 09 h 30 → 11 h 00 à New York, soit 15 h 30 → 17 h 00 à Paris.
-  Mesuré du 13 juillet au 18 septembre : 80 signaux, 72,5 % de réussite, +0,061 R par signal
+  NQ seul · bougies 5 min · fenêtre 09 h 00 → 10 h 00 à New York, soit 15 h 00 → 16 h 00 à Paris.
+  Mesuré du 13 juillet au 18 septembre : 70 signaux, 80,0 % de réussite, +0,160 R par signal
   net de frais.
-  Le seuil d’équilibre est de 68 % — la marge n’est que de quatre points et demi, et l’avantage
-  ne se retrouve ni sur l’ES ni sur une autre unité d’exécution. Aucun ordre n’est passé : ce site
+  Le seuil d’équilibre est de 68 % — la marge n’est que de douze points, et l’avantage ne se
+  retrouve ni sur l’ES ni sur une autre unité d’exécution. Aucun ordre n’est passé : ce site
   signale, il n’exécute pas.
 </footer>
 <script src="js/cfd.js"></script>
@@ -440,7 +440,7 @@ function duree(ms){
   return r + ' min';
 }
 // « dans 1 j 0 h » ne dit rien à personne. On nomme le moment : « lundi
-// 15 h 30 », à l'heure de celui qui regarde l'écran.
+// 15 h 00 », à l'heure de celui qui regarde l'écran.
 function moment(ms){
   if(ms == null) return '—';
   const d = new Date(Date.now() + ms);
@@ -470,7 +470,7 @@ function paintTop(){
         'de la fenêtre.<span class="cd">' + duree(f.ms) + ' de balayage</span>'
       : 'Le modèle n’émet de position que du lundi au vendredi, entre <b>' +
         hh(c.ghDeb) + '</b> et <b>' + hh(c.ghFin) + '</b> à New York — ' +
-        'soit 15 h 30 → 16 h 00 à Paris. En dehors, il ne se prononce pas.' +
+        'soit 15 h 00 → 16 h 00 à Paris. En dehors, il ne se prononce pas.' +
         '<span class="cd">Ouverture ' + moment(f.ms) + '</span>' +
         '<span style="color:var(--faint);font-size:11.5px">dans ' + duree(f.ms) + '</span>';
   }
@@ -933,7 +933,7 @@ function paintJournal(){
          ? 'Journal distant injoignable. Il est tenu par une tâche automatique sur le dépôt ; ' +
            'vérifie que l\u2019action « Journal des signaux » est bien activée.'
        : 'Aucun signal relevé pour l\u2019instant. La tâche automatique passe toutes les cinq ' +
-         'minutes pendant la fenêtre, du lundi au vendredi de 15 h 30 à 17 h 00' +
+         'minutes pendant la fenêtre, du lundi au vendredi de 15 h 00 à 16 h 00' +
          (DISTANT && DISTANT.bilan ? ' — ' + DISTANT.bilan.passages + ' passages déjà consignés, ' +
            'aucun n\u2019a réuni les cinq conditions.' : '.')) + '</div>';
     return;
