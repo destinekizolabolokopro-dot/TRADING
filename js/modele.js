@@ -20,7 +20,15 @@
 (function (root) {
 
   var CFG = {
-    ghDeb: 9 * 60 + 30, ghFin: 10 * 60,   // fenêtre mesurée, heure de New York
+    // Fenêtre choisie par l'utilisateur : 09 h 30 → 11 h 00 New York, soit
+    // 15 h 30 → 17 h 00 à Paris. Elle couvre le balayage qui suit
+    // l'ouverture, qu'il voulait inclure.
+    //
+    // Mesuré sur la même période, pour mémoire :
+    //   09h30 → 10h00   57 signaux · 78,9 % · +2 434 € · +0,171 R/signal
+    //   09h30 → 11h00   80 signaux · 72,5 % · +1 215 € · +0,061 R/signal
+    // La fenêtre longue prend plus de trades, de moins bonne qualité.
+    ghDeb: 9 * 60 + 30, ghFin: 11 * 60,   // heure de New York
     seuil: 2, fvgn: 1,                    // biais : score minimum, FVG comptés par unité
     keyAge: 400, react: 12,               // âge d'un niveau, bougies entre touche et IFVG
     tp1: 0.5, tp2: 2.5, part: 0.9,        // partiel à 0,5 R, runner à 2,5 R
