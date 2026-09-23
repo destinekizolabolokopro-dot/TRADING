@@ -1,10 +1,10 @@
 {
- "maj": "2026-09-23T19:03:59.341Z",
+ "maj": "2026-09-23T19:47:12.034Z",
  "source": "yahoo",
- "eurusd": 1.1391,
- "prix": 30754.25,
- "derniereBougie": 1790189400000,
- "retardMin": 14,
+ "eurusd": 1.139,
+ "prix": 30764.25,
+ "derniereBougie": 1790192100000,
+ "retardMin": 12,
  "hors": true,
  "etat": "CHERCHE",
  "dir": 0,
@@ -64,7 +64,7 @@
   "dol": 30670,
   "biaisDir": -1,
   "biaisScore": -2,
-  "barre": 13503,
+  "barre": 13504,
   "derniere": false
  },
  "cfg": {
