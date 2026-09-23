@@ -1,9 +1,9 @@
 {
- "maj": "2026-09-23T14:52:09.389Z",
+ "maj": "2026-09-23T15:16:46.362Z",
  "source": "yahoo",
- "eurusd": 1.1393,
- "prix": 30701.25,
- "derniereBougie": 1790174400000,
+ "eurusd": 1.14,
+ "prix": 30795.25,
+ "derniereBougie": 1790175900000,
  "retardMin": 12,
  "hors": true,
  "etat": "CHERCHE",
@@ -62,7 +62,9 @@
   "tf": "5m",
   "niveau": "FVG M30",
   "dol": 30670,
-  "barre": 13504,
+  "biaisDir": -1,
+  "biaisScore": -2,
+  "barre": 13503,
   "derniere": false
  },
  "cfg": {

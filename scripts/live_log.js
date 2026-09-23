@@ -207,6 +207,27 @@ function blocage(d) {
     fs.writeFileSync(ETAT, JSON.stringify(instantane, null, 1) + '\n');
   }
 
+  // ── RÉPARATION DES ANCIENS ENREGISTREMENTS ──────────────────────────
+  // Les signaux consignés avant le correctif portent le contexte de la
+  // dernière bougie reçue au lieu du leur : l'un d'eux s'explique par
+  // « biais neutre 0/4, DOL à null », ce qu'aucun signal valide ne peut
+  // être. On les recolle sur le contexte que le modèle leur attribue.
+  (d.tousSignaux || []).forEach(sig => {
+    const k = `${sig.t}|${sig.sens}`;
+    const vieux = db.signaux.find(x => x.cle === k);
+    if (!vieux || vieux.biaisScore != null) return;
+    const sens = sig.biaisDir > 0 ? 'haussier' : 'baissier';
+    vieux.biais = sens; vieux.score = sig.biaisScore; vieux.dol = sig.dol;
+    vieux.biaisScore = sig.biaisScore;
+    vieux.raisonnement =
+      `Biais ${sens} (score ${Math.abs(sig.biaisScore)}/4). ` +
+      `DOL à ${sig.dol}. Niveau clé ${sig.niveau}. ` +
+      `Le prix l'a touché, puis une inversion ${sig.tf} a été confirmée par clôture de corps. ` +
+      `Entrée ${sig.entree}, stop au bord de l'IFVG à ${sig.sl} (${Math.abs(sig.entree - sig.sl).toFixed(1)} pts), ` +
+      `partiel 0,5 R à ${sig.tp1} sur 90 % de la taille, le reste court jusqu'à 2,5 R à ${sig.tp}.`;
+    console.log(`Raisonnement réparé : ${vieux.jour} ${vieux.heureNY} ${vieux.sens}`);
+  });
+
   // ── LE SIGNAL EST-IL RECEVABLE ? ────────────────────────────────────
   // ⚠️ Le test portait sur `d.hors`, qui décrit la DERNIÈRE bougie reçue,
   // pas celle qui a produit le signal. Or Yahoo livre avec une dizaine de
@@ -262,9 +283,14 @@ function blocage(d) {
       sens: t.sens, entree: t.entree, sl: t.sl, tp1: t.tp1, tp: t.tp,
       rr: t.rr, uniteIFVG: t.tf, niveauDeclencheur: t.niveau,
       risquePts: +Math.abs(t.entree - t.sl).toFixed(2),
+      // Contexte DU SIGNAL, figé par le modèle au moment où il l'a produit.
+      // On n'utilise plus d.dir / d.score / d.dol : ceux-là décrivent la
+      // dernière bougie reçue, qui peut dater d'heures plus tard.
+      biais: t.biaisDir > 0 ? 'haussier' : 'baissier',
+      score: t.biaisScore, biaisScore: t.biaisScore, dol: t.dol,
       raisonnement:
-        `Biais ${commun.biais} (score ${Math.abs(d.score)}/4). ` +
-        `DOL à ${d.dol}. Niveau clé ${t.niveau}. ` +
+        `Biais ${t.biaisDir > 0 ? 'haussier' : 'baissier'} (score ${Math.abs(t.biaisScore)}/4). ` +
+        `DOL à ${t.dol}. Niveau clé ${t.niveau}. ` +
         `Le prix l'a touché, puis une inversion ${t.tf} a été confirmée par clôture de corps. ` +
         `Entrée ${t.entree}, stop au bord de l'IFVG à ${t.sl} (${Math.abs(t.entree - t.sl).toFixed(1)} pts), ` +
         `partiel 0,5 R à ${t.tp1} sur 90 % de la taille, le reste court jusqu'à 2,5 R à ${t.tp}.`,

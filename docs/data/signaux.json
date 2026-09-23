@@ -55,13 +55,14 @@
    "uniteIFVG": "2m",
    "niveauDeclencheur": "CISD M15",
    "risquePts": 24.8,
-   "raisonnement": "Biais haussier (score 4/4). DOL à 30599.75. Niveau clé CISD M15. Le prix l'a touché, puis une inversion 2m a été confirmée par clôture de corps. Entrée 30252, stop au bord de l'IFVG à 30227.2 (24.8 pts), partiel 0,5 R à 30264.4 sur 90 % de la taille, le reste court jusqu'à 2,5 R à 30314.",
+   "raisonnement": "Biais haussier (score 4/4). DOL à 30599.75. Niveau clé FVG M15. Le prix l'a touché, puis une inversion 2m a été confirmée par clôture de corps. Entrée 30252, stop au bord de l'IFVG à 30227.2 (24.8 pts), partiel 0,5 R à 30264.4 sur 90 % de la taille, le reste court jusqu'à 2,5 R à 30314.",
    "statut": "clos",
    "resultat": "gagné",
    "r": 0.45,
    "closTs": "2026-09-21T13:35:00.000Z",
    "barres": 1,
-   "part1": true
+   "part1": true,
+   "biaisScore": 4
   },
   {
    "ts": "2026-09-21T13:48:21.796Z",
@@ -102,9 +103,9 @@
    "heureNY": "09:05",
    "prix": 30948.5,
    "retardMin": 107,
-   "biais": "neutre",
-   "score": 0,
-   "dol": null,
+   "biais": "baissier",
+   "score": -2,
+   "dol": 30670,
    "niveau": null,
    "etat": "CHERCHE",
    "niveauxParUnite": "M5:0 M15:0 M30:0 H1:0 H4:0",
@@ -118,13 +119,14 @@
    "uniteIFVG": "1m",
    "niveauDeclencheur": "CISD M30",
    "risquePts": 13.19,
-   "raisonnement": "Biais neutre (score 0/4). DOL à null. Niveau clé CISD M30. Le prix l'a touché, puis une inversion 1m a été confirmée par clôture de corps. Entrée 30948.5, stop au bord de l'IFVG à 30961.69 (13.2 pts), partiel 0,5 R à 30941.91 sur 90 % de la taille, le reste court jusqu'à 2,5 R à 30915.53.",
+   "raisonnement": "Biais baissier (score 2/4). DOL à 30670. Niveau clé CISD M30. Le prix l'a touché, puis une inversion 1m a été confirmée par clôture de corps. Entrée 30948.5, stop au bord de l'IFVG à 30961.69 (13.2 pts), partiel 0,5 R à 30941.91 sur 90 % de la taille, le reste court jusqu'à 2,5 R à 30915.53.",
    "statut": "clos",
    "resultat": "perdu",
    "r": -1,
    "closTs": "2026-09-23T13:10:00.000Z",
    "barres": 1,
-   "part1": false
+   "part1": false,
+   "biaisScore": -2
   },
   {
    "ts": "2026-09-23T14:52:09.389Z",
@@ -133,9 +135,9 @@
    "heureNY": "09:30",
    "prix": 30926.5,
    "retardMin": 82,
-   "biais": "neutre",
-   "score": 0,
-   "dol": null,
+   "biais": "baissier",
+   "score": -2,
+   "dol": 30670,
    "niveau": null,
    "etat": "CHERCHE",
    "niveauxParUnite": "M5:0 M15:0 M30:0 H1:0 H4:0",
@@ -149,13 +151,14 @@
    "uniteIFVG": "5m",
    "niveauDeclencheur": "FVG M30",
    "risquePts": 17.94,
-   "raisonnement": "Biais neutre (score 0/4). DOL à null. Niveau clé FVG M30. Le prix l'a touché, puis une inversion 5m a été confirmée par clôture de corps. Entrée 30926.5, stop au bord de l'IFVG à 30944.44 (17.9 pts), partiel 0,5 R à 30917.53 sur 90 % de la taille, le reste court jusqu'à 2,5 R à 30881.66.",
+   "raisonnement": "Biais baissier (score 2/4). DOL à 30670. Niveau clé FVG M30. Le prix l'a touché, puis une inversion 5m a été confirmée par clôture de corps. Entrée 30926.5, stop au bord de l'IFVG à 30944.44 (17.9 pts), partiel 0,5 R à 30917.53 sur 90 % de la taille, le reste court jusqu'à 2,5 R à 30881.66.",
    "statut": "clos",
    "resultat": "gagné",
    "r": 0.45,
    "closTs": "2026-09-23T13:35:00.000Z",
    "barres": 1,
-   "part1": true
+   "part1": true,
+   "biaisScore": -2
   }
  ],
  "passages": [
@@ -226,7 +229,7 @@
   }
  ],
  "bilan": {
-  "maj": "2026-09-23T14:52:09.389Z",
+  "maj": "2026-09-23T15:16:46.362Z",
   "total": 5,
   "clos": 5,
   "ouverts": 0,

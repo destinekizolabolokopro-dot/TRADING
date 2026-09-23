@@ -1775,6 +1775,13 @@ if (typeof window !== 'undefined') window.CFD = CFD;
               tp: +(L ? entree + risq * CFG.tp2 : entree - risq * CFG.tp2).toFixed(2),
               rr: CFG.part * CFG.tp1 + (1 - CFG.part) * CFG.tp2,
               tf: choisi.tf, niveau: key.type + ' ' + key.tf, dol: dol,
+              // Le contexte est figé ICI, au moment du signal. Sans ça, celui
+              // qui lit le journal voit le biais et le DOL de la DERNIÈRE
+              // bougie reçue — un autre instant, parfois des heures plus
+              // tard. Un signal du 23/09 s'est ainsi retrouvé expliqué par
+              // « biais neutre 0/4, DOL à null », alors que le modèle exige
+              // un biais d'au moins 2 et un DOL pour entrer.
+              biaisDir: etapeCourante.dir, biaisScore: etapeCourante.score,
               barre: i, derniere: i >= clock.length - 2 };
             tous.push(dernier);
             parJour[e.jour]++; etat = 'CHERCHE'; key = null;
