@@ -13,30 +13,29 @@ name: Journal des signaux
 
 on:
   schedule:
-    # ── POURQUOI AUTANT DE CRÉNEAUX ──────────────────────────────────────
-    # Historique de ce planning :
-    #   '*/5 13-15'        36 passages demandés → 0 déclenchement
-    #   5 créneaux ciblés  → ceux du SOIR partent, ceux de la SÉANCE non
+    # ── LE PLANNING SUIT CE QUE GITHUB HONORE RÉELLEMENT ─────────────────
+    # Mesuré sur dix-neuf déclenchements automatiques :
     #
-    # GitHub honore mal les créneaux de l'après-midi — c'est son heure de
-    # pointe — et décale les autres de plusieurs dizaines de minutes. On
-    # cesse donc de viser juste : depuis que le relevé rattrape toute la
-    # séance en une fois, N'IMPORTE QUEL passage de la journée suffit à
-    # l'enregistrer. On en sème beaucoup, à des minutes décalées, du début
-    # d'après-midi jusqu'à la nuit.
+    #   00 h █   01 h ██   17 h ██   18 h ███   19 h ████
+    #   20 h █   21 h ██   22 h ██   23 h ██
     #
-    # Le coût est nul : un passage dure cinq secondes, et le script
-    # n'écrit rien quand rien n'a changé — donc pas de commit inutile.
-    - cron: '13 13 * * 1-5'    # pendant la séance, heure d'été
-    - cron: '43 13 * * 1-5'    # juste après, heure d'été
-    - cron: '13 14 * * 1-5'    # pendant la séance, heure d'hiver
-    - cron: '43 14 * * 1-5'    # juste après, heure d'hiver
-    - cron: '17 15 * * 1-5'
-    - cron: '37 16 * * 1-5'
-    - cron: '13 18 * * 1-5'
-    - cron: '47 19 * * 1-5'    # créneau du soir, éprouvé
-    - cron: '23 21 * * 1-5'
-    - cron: '53 23 * * 1-5'
+    # ZÉRO entre 13 h et 16 h UTC, trois jours de suite, alors que quatre
+    # créneaux y étaient demandés. C'est l'après-midi américaine, l'heure de
+    # pointe des serveurs GitHub : les crons y sont abandonnés. Après 17 h,
+    # ils partent sans faute.
+    #
+    # Puisqu'un seul passage rattrape toute la séance, on cesse d'insister
+    # sur l'après-midi. Deux tentatives y restent au cas où GitHub
+    # s'améliore, et cinq passages du soir — éprouvés — garantissent que la
+    # journée soit enregistrée. Le relevé arrivera vers 19 h au lieu de
+    # 15 h 45, mais il arrivera.
+    - cron: '43 13 * * 1-5'    # tentative pendant la séance, heure d'été
+    - cron: '43 14 * * 1-5'    # tentative pendant la séance, heure d'hiver
+    - cron: '7 17 * * 1-5'     # à partir d'ici, GitHub répond
+    - cron: '23 18 * * 1-5'
+    - cron: '41 19 * * 1-5'
+    - cron: '19 21 * * 1-5'
+    - cron: '37 22 * * 1-5'
   workflow_dispatch:
     inputs:
       force:
