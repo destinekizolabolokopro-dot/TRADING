@@ -288,12 +288,21 @@ function blocage(d) {
       // dernière bougie reçue, qui peut dater d'heures plus tard.
       biais: t.biaisDir > 0 ? 'haussier' : 'baissier',
       score: t.biaisScore, biaisScore: t.biaisScore, dol: t.dol,
+      // Réglages sous lesquels ce signal a été produit. Sans eux, un
+      // changement de stop ou d'objectif rend tout l'historique incomparable
+      // sans qu'on puisse le savoir après coup.
+      slx: Modele.CFG.slx, cfgTp1: Modele.CFG.tp1, cfgTp2: Modele.CFG.tp2,
+      cfgSortieMin: Modele.CFG.sortieMin,
       raisonnement:
         `Biais ${t.biaisDir > 0 ? 'haussier' : 'baissier'} (score ${Math.abs(t.biaisScore)}/4). ` +
         `DOL à ${t.dol}. Niveau clé ${t.niveau}. ` +
         `Le prix l'a touché, puis une inversion ${t.tf} a été confirmée par clôture de corps. ` +
-        `Entrée ${t.entree}, stop au bord de l'IFVG à ${t.sl} (${Math.abs(t.entree - t.sl).toFixed(1)} pts), ` +
-        `partiel 0,5 R à ${t.tp1} sur 90 % de la taille, le reste court jusqu'à 2,5 R à ${t.tp}.`,
+        `Entrée ${t.entree}, stop à ${t.sl} — ${Math.abs(t.entree - t.sl).toFixed(1)} pts, soit ` +
+        `${Modele.CFG.slx} fois le bord de l'IFVG, pour ne pas être sorti par la respiration du prix. ` +
+        `Partiel ${String(Modele.CFG.tp1).replace('.', ',')} R à ${t.tp1} sur ${Math.round(Modele.CFG.part * 100)} % de la taille, ` +
+        `le reste court jusqu'à ${String(Modele.CFG.tp2).replace('.', ',')} R à ${t.tp}. ` +
+        `Solde au marché à ${String(Math.floor(Modele.CFG.sortieMin / 60)).padStart(2, '0')} h ` +
+        `${String(Modele.CFG.sortieMin % 60).padStart(2, '0')} New York si rien n'est touché avant.`,
       statut: 'ouvert', resultat: null, r: null, closTs: null
     }));
     console.log(`✅ SIGNAL ${t.sens} · ${eSig.jour} ${hSig} NY · entrée ${t.entree} · stop ${t.sl} · ${t.niveau}`);
@@ -348,7 +357,9 @@ function blocage(d) {
   //   2. quand il faut retomber sur le 5 minutes, tester le STOP D'ABORD.
   //      Le journal sous-estimera parfois un gain ; il ne racontera plus de
   //      victoires qui n'ont pas eu lieu.
-  const PART = 0.9, TP1R = 0.5, TP2R = 2.5;
+  // Tirés de CFG : écrits en dur, ils s'étaient déjà désynchronisés du modèle.
+  const PART = Modele.CFG.part, TP1R = Modele.CFG.tp1, TP2R = Modele.CFG.tp2;
+  const SORTIE = Modele.CFG.sortieMin;
   const m5 = brut.m5, m1 = brut.m1 || [];
 
   // Réparation : les positions closes par l'ANCIEN suivi (5 minutes, objectif
@@ -356,6 +367,19 @@ function blocage(d) {
   // être rejugées correctement. Une fois marquées `suiviUnite: '1m'`, elles ne
   // sont plus touchées. Cela rattrape l'historique déjà écrit sans le réécrire
   // à chaque passage.
+  // ── ARCHIVAGE DES ANCIENS RÉGLAGES ──────────────────────────────────
+  // Les signaux consignés avant l'élargissement du stop (slx) ont un stop
+  // quatre fois plus serré : ce ne sont pas les mêmes positions, et les
+  // mélanger au bilan rendrait le taux de réussite affiché faux. Ils sont
+  // déplacés dans `archive`, gardés mais sortis du décompte.
+  db.archive = db.archive || [];
+  const ancienne = db.signaux.filter(s => s.slx == null);
+  if (ancienne.length) {
+    db.archive = db.archive.concat(ancienne.map(s => Object.assign({ reglages: 'v1 · stop au bord de l\'IFVG' }, s)));
+    db.signaux = db.signaux.filter(s => s.slx != null);
+    console.log(`${ancienne.length} signal(aux) des anciens réglages déplacé(s) dans l'archive.`);
+  }
+
   let repares = 0;
   db.signaux.forEach(s => {
     if (s.statut !== 'clos' || s.suiviUnite === '1m') return;
@@ -391,6 +415,16 @@ function blocage(d) {
       } else if (part1 && touche(s.tp)) {
         s.statut = 'clos'; s.resultat = 'gagné';
         s.r = +(PART * TP1R + (1 - PART) * TP2R).toFixed(3);
+      } else if (SORTIE != null && (Modele.heure(c.t).jour !== s.jour || Modele.heure(c.t).min >= SORTIE)) {
+        // Sortie forcée AU MARCHÉ. Sans elle, une position sur douze passait
+        // la nuit — un risque de gap que la règle de drawdown d'un compte
+        // financé ne pardonne pas, et que le backtest ne sait pas chiffrer.
+        const brut = (L ? c.c - s.entree : s.entree - c.c) / s.risquePts;
+        s.statut = 'clos';
+        s.r = +(part1 ? PART * TP1R + (1 - PART) * Math.max(-1, Math.min(TP2R, brut))
+                      : Math.max(-1, Math.min(TP2R, brut))).toFixed(3);
+        s.resultat = s.r > 0 ? 'gagné' : 'perdu';
+        s.sortie = 'horaire';
       } else if (n > MAXBARRES) {
         const rBrut = (L ? c.c - s.entree : s.entree - c.c) / s.risquePts;
         s.statut = 'clos'; s.resultat = 'expiré';
