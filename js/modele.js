@@ -184,8 +184,16 @@
         if (choisi) {
           var L = dir > 0, entree = px, buf = entree * CFG.buf / 100;
           var sl = L ? choisi.z.bas - buf : choisi.z.haut + buf;   // stop au bord de l'IFVG
+          // ⚠️ L'entrée est la CLÔTURE de la bougie de confirmation, le stop
+          // est le bord de l'IFVG. Rien ne garantit que la clôture soit du bon
+          // côté de ce bord : quand elle le dépasse, le « stop » se retrouve
+          // DANS LE SENS DU GAIN, et l'ordre est impossible à passer. Mesuré
+          // sur les vraies bougies NQ : 4 à 9 % des signaux selon la fenêtre,
+          // et ils perdaient de l'argent. `Math.abs` ci-dessous effaçait le
+          // signe et rendait l'anomalie invisible.
+          var coherent = L ? sl < entree : sl > entree;
           var risq = Math.abs(entree - sl);
-          if (risq > 0 && atrC[i] && risq >= atrC[i] * CFG.atrMin) {
+          if (coherent && risq > 0 && atrC[i] && risq >= atrC[i] * CFG.atrMin) {
             dernier = { sens: L ? 'LONG' : 'SHORT', t: bar.t, entree: +entree.toFixed(2),
               sl: +sl.toFixed(2), risq: risq,
               tp1: +(L ? entree + risq * CFG.tp1 : entree - risq * CFG.tp1).toFixed(2),
