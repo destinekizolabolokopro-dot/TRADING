@@ -322,15 +322,32 @@
    "etapeBloquee": "dol",
    "dit": "Biais haussier, mais plus aucune liquidité intacte dans ce sens.",
    "apresCoup": true
+  },
+  {
+   "ts": "2026-09-25T18:04:16.615Z",
+   "bougie": "2026-09-25T17:50:00.000Z",
+   "jour": "2026-09-25",
+   "heureNY": "13:50",
+   "prix": 30900.25,
+   "retardMin": 14,
+   "biais": "haussier",
+   "score": 2,
+   "dol": 30999.5,
+   "niveau": "ITL M15",
+   "etat": "CHERCHE",
+   "niveauxParUnite": "M5:83 M15:67 M30:83 H1:113 H4:92",
+   "etapeBloquee": "fenetre",
+   "dit": "Hors fenêtre. Biais haussier, DOL à 30999.5, niveau le plus proche ITL M15 (30866.5 – 30895).",
+   "apresCoup": true
   }
  ],
  "bilan": {
-  "maj": "2026-09-24T17:57:07.338Z",
+  "maj": "2026-09-25T18:04:16.615Z",
   "total": 8,
   "clos": 8,
   "ouverts": 0,
   "reussite": 75,
   "cumulR": 1.2,
-  "passages": 4
+  "passages": 5
  }
 }
