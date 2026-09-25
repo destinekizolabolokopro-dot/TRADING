@@ -232,3 +232,82 @@ n'est pas un meilleur réglage, c'est **plus de données** (des années de 1
 minute, pas deux mois de 5 minutes glissants) et **un vrai passage d'ordre**
 (le robot consigne les signaux entre 13 minutes et deux jours après coup, donc
 il n'a jamais rien pris).
+
+---
+
+## 6. Les 80 %, en vrai cette fois — le stop
+
+Tout ce qui précède faisait bouger les objectifs. Un levier restait intouché :
+**où est le stop.** Il était toujours au bord de l'IFVG de confirmation, donc
+souvent à vingt ou trente points de l'entrée. `slx` l'éloigne d'un multiple de
+cette distance.
+
+Fenêtre 09h00–10h00, 64 signaux, comptage prudent, frais inclus :
+
+| stop | pts | partiel 0,2 R | 0,3 R | **0,4 R** | 0,5 R |
+|---|---|---|---|---|---|
+| × 1 (l'ancien) | 30 | 60,9 % · −4 266 € | 59,4 % · −3 644 € | 59,4 % · −2 789 € | 56,3 % · −2 659 € |
+| × 2 | 59 | 79,7 % · −403 € | 73,4 % · −463 € | 68,8 % · −301 € | 64,1 % · −398 € |
+| × 3 | 89 | 82,8 % · +86 € | 76,6 % · +134 € | 76,6 % · +1 299 € | 71,9 % · +1 626 € |
+| **× 4** | **118** | 82,8 % · +442 € | 82,8 % · +1 697 € | **81,3 % · +2 925 €** | 76,6 % · +3 070 € |
+| × 6 | 177 | 87,5 % · +1 246 € | 84,4 % · +2 558 € | 78,1 % · +2 476 € | 75,0 % · +2 876 € |
+
+Le stop serré était le problème depuis le début : à trente points de l'entrée
+sur le NQ, il est dans la respiration du prix. Le modèle lisait juste et se
+faisait sortir avant.
+
+### Les quatre épreuves
+
+Un chiffre flatteur ne vaut rien sans ça — c'est ce qui manquait aux 80 %
+précédents.
+
+| épreuve | stop × 4 · partiel 0,4 R |
+|---|---|
+| bougies ambiguës | **2 %** (contre 25 % avant) |
+| arbitrage 1 minute, 11 trades | 5 min +1,26 R → **vérité +1,01 R** |
+| 1re moitié de l'échantillon | 87,5 % · +2 405 € (32 trades) |
+| 2e moitié | **75,0 % · +519 €** (32 trades) |
+| pire série de pertes | **3** (contre 12 avant) |
+| pire creux | 839 € |
+| dérapage de 20 pts sur chaque stop | encore **+984 €** |
+
+### La sortie forcée
+
+Sans limite d'horaire, cinq positions sur soixante-quatre étaient tenues plus
+de six heures, jusqu'à seize — donc la nuit. Couper améliore le résultat :
+
+| sortie forcée | réussite | résultat | durée moyenne |
+|---|---|---|---|
+| 11h00 NY | 79,7 % | +3 102 € | 48 min |
+| **12h00 NY** | **81,3 %** | **+3 058 €** | **60 min** |
+| 16h00 NY | 81,3 % | +2 985 € | 86 min |
+| aucune | 81,3 % | +2 968 € | 119 min |
+
+### Le challenge Lucid
+
+| risque/trade | contrats MNQ | réussi | échec | séances si ça marche |
+|---|---|---|---|---|
+| 125 $ | 0,57 | 100,0 % | 0,0 % | 83 |
+| **250 $** | **1,14** | **98,2 %** | 1,8 % | **41** |
+| 375 $ | 1,71 | 92,5 % | 7,5 % | 26 |
+| 500 $ | 2,28 | 84,6 % | 15,4 % | 18 |
+
+Un stop de 118 points tient dans un contrat MNQ à 250 € de risque
+(118 × 2 $ = 236 $). C'est pour ça que `slx 4` est retenu et pas `slx 6` :
+177 points demandent 354 $, soit plus que le risque autorisé.
+
+### Ce qui reste fragile
+
+- **La deuxième moitié est quatre fois plus faible que la première** (+519 €
+  contre +2 405 €). L'avantage s'érode, ou la première moitié a eu de la
+  chance.
+- **`slx` et `tp1` sont deux réglages de plus, et j'ai retenu la meilleure
+  case sur quarante-deux.** Les épreuves ci-dessus limitent le risque, elles
+  ne l'annulent pas.
+- **64 trades.** Quatre-vingts pour cent de réussite sur 64 trades, l'écart
+  type vaut ±5 points.
+
+Ce qui change par rapport aux anciens 80 % : ceux-là venaient d'une hypothèse
+sur l'ordre des touches, et l'arbitrage en 1 minute les démentait. Ceux-ci
+sont confirmés par l'arbitrage, tiennent sur les deux moitiés de
+l'échantillon, et survivent à vingt points de dérapage.

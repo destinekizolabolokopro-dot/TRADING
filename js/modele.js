@@ -20,24 +20,54 @@
 (function (root) {
 
   var CFG = {
-    // Fenêtre 09 h 00 → 10 h 00 New York, soit 15 h 00 → 16 h 00 à Paris.
-    // Retenue parce qu'elle est la meilleure sur les DEUX critères à la
-    // fois, sur un balayage des vingt-quatre heures :
-    //
-    //   09h00 → 10h00   70 signaux · 80,0 % · +2 808 € · +0,160 R/signal
-    //   09h00 → 09h30   35 signaux · 85,7 % · +1 896 € · +0,217 R/signal
-    //   09h30 → 10h00   57 signaux · 77,2 % · +2 009 € · +0,141 R/signal
-    //   09h30 → 11h00   80 signaux · 72,5 % · +1 215 € · +0,061 R/signal
-    //
-    // La demi-heure 09h00-09h30, avant l'ouverture du NYSE, a le meilleur
-    // taux et la meilleure espérance par signal, mais deux fois moins de
-    // trades. L'heure entière garde 80 % tout en doublant l'échantillon.
-    ghDeb: 9 * 60, ghFin: 10 * 60,   // heure de New York
+    // ── FENÊTRE ──────────────────────────────────────────────────────────
+    // 09 h 00 → 10 h 00 New York, soit 15 h 00 → 16 h 00 à Paris.
+    ghDeb: 9 * 60, ghFin: 10 * 60,        // heure de New York
+
+    // ── BIAIS ET NIVEAUX ─────────────────────────────────────────────────
     seuil: 2, fvgn: 1,                    // biais : score minimum, FVG comptés par unité
     keyAge: 400, react: 12,               // âge d'un niveau, bougies entre touche et IFVG
-    tp1: 0.5, tp2: 2.5, part: 0.9,        // partiel à 0,5 R, runner à 2,5 R
     buf: 0.02, atrMin: 0.3,               // tampon du stop en %, stop minimum en fraction d'ATR
-    maxJour: 2
+    maxJour: 2,
+
+    // ── STOP : LARGEUR ──────────────────────────────────────── [MESURÉ]
+    // Le stop était au bord de l'IFVG de confirmation, et rien d'autre. Or ce
+    // bord est souvent à dix ou vingt points de l'entrée : le prix y revient
+    // pour respirer, sans que la lecture soit fausse. `slx` l'éloigne d'un
+    // multiple de cette distance.
+    //
+    //   Mesuré sur 64 signaux, fenêtre 09h00-10h00, comptage prudent :
+    //     slx 1  (l'ancien)  stop  30 pts   56,3 % de réussite   −2 659 €
+    //     slx 2              stop  59 pts   79,7 %               −  403 €
+    //     slx 3              stop  89 pts   76,6 %               +1 299 €
+    //     slx 4              stop 118 pts   81,3 %               +3 058 €
+    //     slx 6              stop 177 pts   84,4 %               +2 666 €
+    //
+    // slx 4 est retenu : 81,3 % de réussite pour un seuil d'équilibre à
+    // 65,8 %, soit quinze points de marge — et un stop de 118 points tient
+    // dans un contrat MNQ à 250 € de risque, ce que 177 points ne fait pas.
+    slx: 4,
+
+    // ── OBJECTIFS ────────────────────────────────────────────── [MESURÉ]
+    // Le partiel est à 0,4 R du stop ÉLARGI, donc ~47 points : assez loin
+    // pour qu'une bougie de 5 minutes ne puisse pas contenir l'aller et le
+    // retour (2 % de bougies ambiguës contre 25 % avec l'ancien 0,5 R sur
+    // stop serré), assez près pour être atteint quatre fois sur cinq.
+    tp1: 0.4, tp2: 2.5, part: 0.9,
+
+    // ── SORTIE FORCÉE ────────────────────────────────────────── [MESURÉ]
+    // Sans limite, cinq positions sur soixante-quatre étaient tenues plus de
+    // six heures, jusqu'à seize heures — donc la nuit, avec un risque de gap
+    // que ni le backtest ni la règle de drawdown d'un compte financé ne
+    // savent traiter. Couper à midi heure de New York ne coûte rien :
+    //
+    //   sortie 11h00   79,7 %   +3 102 €   durée moyenne  48 min
+    //   sortie 12h00   81,3 %   +3 058 €   durée moyenne  60 min
+    //   sortie 16h00   81,3 %   +2 985 €   durée moyenne  86 min
+    //   aucune         81,3 %   +2 968 €   durée moyenne 119 min
+    //
+    // La position est soldée AU MARCHÉ à cette heure, gain ou perte.
+    sortieMin: 12 * 60
   };
 
   var NY = 'America/New_York';
@@ -183,7 +213,10 @@
         etapeCourante.ifvg = choisi;
         if (choisi) {
           var L = dir > 0, entree = px, buf = entree * CFG.buf / 100;
-          var sl = L ? choisi.z.bas - buf : choisi.z.haut + buf;   // stop au bord de l'IFVG
+          // Bord de l'IFVG, puis éloigné de `slx` fois cette distance.
+          var bord = L ? choisi.z.bas - buf : choisi.z.haut + buf;
+          var d0 = Math.abs(entree - bord);
+          var sl = L ? entree - d0 * CFG.slx : entree + d0 * CFG.slx;
           // ⚠️ L'entrée est la CLÔTURE de la bougie de confirmation, le stop
           // est le bord de l'IFVG. Rien ne garantit que la clôture soit du bon
           // côté de ce bord : quand elle le dépasse, le « stop » se retrouve
@@ -191,9 +224,12 @@
           // sur les vraies bougies NQ : 4 à 9 % des signaux selon la fenêtre,
           // et ils perdaient de l'argent. `Math.abs` ci-dessous effaçait le
           // signe et rendait l'anomalie invisible.
-          var coherent = L ? sl < entree : sl > entree;
+          var coherent = L ? bord < entree : bord > entree;
           var risq = Math.abs(entree - sl);
-          if (coherent && risq > 0 && atrC[i] && risq >= atrC[i] * CFG.atrMin) {
+          // Le filtre d'ATR porte sur la distance STRUCTURELLE (le bord de
+          // l'IFVG), pas sur la distance élargie : sinon `slx` ferait passer
+          // n'importe quelle zone minuscule.
+          if (coherent && d0 > 0 && atrC[i] && d0 >= atrC[i] * CFG.atrMin) {
             dernier = { sens: L ? 'LONG' : 'SHORT', t: bar.t, entree: +entree.toFixed(2),
               sl: +sl.toFixed(2), risq: risq,
               tp1: +(L ? entree + risq * CFG.tp1 : entree - risq * CFG.tp1).toFixed(2),

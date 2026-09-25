@@ -402,6 +402,8 @@ button,input,select{font:inherit;color:inherit}
 <footer class="foot">
   NQ seul · bougies 5 min · fenêtre <span id="f-fen">—</span> à New York.
   <span id="f-mes">—</span>
+  Stop à <span id="f-slx">—</span> fois le bord de l’IFVG · solde au marché à
+  <span id="f-sortie">—</span> New York si rien n’est touché avant.
   <b>Comptage prudent :</b> quand une bougie de 5 minutes touche l’objectif et le stop, c’est le
   stop qui compte. L’ancienne version comptait l’objectif ; rejouée en bougies de 1 minute, cette
   hypothèse était fausse plus souvent que juste. Aucun ordre n’est passé : ce site signale, il
@@ -834,15 +836,26 @@ async function chargerDistant(){
 }
 
 // Les signaux du dépôt prennent la forme des lignes du journal.
-function distantEnLignes(){
-  if(!DISTANT) return [];
-  return DISTANT.signaux.map(s => ({
-    ts: Date.parse(s.bougie), source:'DIRECT', symbol:'NQ', direction:s.sens,
+function enLigne(s, source){
+  return {
+    ts: Date.parse(s.bougie), source: source, symbol:'NQ', direction:s.sens,
     entry:s.entree, sl:s.sl, tp:s.tp, rr:s.rr,
     r: s.r, status: s.statut === 'clos' ? 'closed' : 'open',
-    motif: s.raisonnement, heureNY: s.heureNY, jour: s.jour,
+    motif: (s.reglages ? '[' + s.reglages + '] ' : '') + s.raisonnement,
+    heureNY: s.heureNY, jour: s.jour,
     niveau: s.niveauDeclencheur, retard: s.retardMin
-  }));
+  };
+}
+function distantEnLignes(){
+  if(!DISTANT) return [];
+  return DISTANT.signaux.map(s => enLigne(s, 'DIRECT'));
+}
+// Les positions produites par des réglages qui ne tournent plus. Gardées, mais
+// JAMAIS mélangées au bilan : leur stop n'était pas au même endroit, donc leur
+// taux de réussite ne dit rien du modèle actuel.
+function archiveEnLignes(){
+  if(!DISTANT || !Array.isArray(DISTANT.archive)) return [];
+  return DISTANT.archive.map(s => enLigne(s, 'ARCHIVE'));
 }
 
 /* ── journal ────────────────────────────────────────────────────────── */
@@ -860,10 +873,12 @@ function jeuJournal(){
   const vus = new Set(dist.map(x => x.ts + '|' + x.entry));
   const live = dist.concat(local.filter(x => !vus.has(x.ts + '|' + x.entry)));
   const mes  = window.Mesure ? Mesure.liste() : [];
+  const arch = archiveEnLignes();
   const rows = JFILTRE === 'En direct' ? live
              : JFILTRE === 'Mesuré'    ? mes
-             : live.concat(mes);
-  return { rows: rows.slice().sort((a,b) => b.ts - a.ts), live, mes };
+             : JFILTRE === 'Archivé'   ? arch
+             : live.concat(mes);          // « Tout » n'inclut PAS l'archive
+  return { rows: rows.slice().sort((a,b) => b.ts - a.ts), live, mes, arch };
 }
 
 // Statistiques calculées sur la sélection courante, quelle qu'elle soit.
@@ -881,8 +896,10 @@ function stats(rows){
 
 function paintChipsJ(){
   const j = jeuJournal();
-  const lbl = { 'Tout': 'Tout', 'Mesuré': 'Mesuré ' + j.mes.length, 'En direct': 'En direct ' + j.live.length };
-  $('#jchips').innerHTML = ['Tout','Mesuré','En direct']
+  const lbl = { 'Tout': 'Tout', 'Mesuré': 'Mesuré ' + j.mes.length,
+                'En direct': 'En direct ' + j.live.length,
+                'Archivé': 'Archivé ' + j.arch.length };
+  $('#jchips').innerHTML = ['Tout','Mesuré','En direct'].concat(j.arch.length ? ['Archivé'] : [])
     .map(k => '<button class="chip' + (k === JFILTRE ? ' on' : '') + '" data-j="' + k + '">' + lbl[k] + '</button>').join('');
 }
 $('#jchips').addEventListener('click', e => {
@@ -960,11 +977,17 @@ function paintJournal(){
       '<span class="jr-p mono">entrée ' + fmt(x.entry) + ' · cible ' + fmt(x.tp) +
         ' · stop ' + fmt(x.sl) + '</span></div>';
   }).join('') +
-  (JFILTRE !== 'En direct'
-    ? '<div class="note"><b>Reconstitué</b> = ce que le modèle aurait produit sur les bougies ' +
-      'réelles du 13 juillet au 18 septembre. Ces signaux n\u2019ont jamais été envoyés : un bug ' +
-      'coupait la chaîne. Ils sont là pour que tu voies le modèle travailler, pas comme un relevé ' +
-      'de compte.</div>'
+  (JFILTRE === 'Archivé'
+    ? '<div class="note"><b>Archivé</b> = positions produites par des réglages qui ne tournent ' +
+      'plus (stop au bord de l\u2019IFVG, partiel à 0,5 R). Elles sont gardées pour mémoire et ' +
+      'ne comptent PAS dans le bilan : leur stop n\u2019était pas au même endroit, donc leur ' +
+      'taux de réussite ne dit rien du modèle actuel.</div>'
+  : JFILTRE !== 'En direct'
+    ? '<div class="note"><b>Reconstitué</b> = ce que le modèle produit sur les bougies réelles, ' +
+      'rejoué a posteriori. Ces signaux n\u2019ont jamais été envoyés : ils sont là pour que tu ' +
+      'voies le modèle travailler, pas comme un relevé de compte. Le suivi compte le stop avant ' +
+      'l\u2019objectif quand la bougie touche les deux, et se fait directement en 1 minute sur ' +
+      'les huit derniers jours.</div>'
     : '');
 }
 
@@ -1058,8 +1081,11 @@ $('#b-alert').addEventListener('click', () => {
 // que le fichier n'en disait plus rien. Ils sont désormais calculés.
 function paintFooter(){
   const hm = m => String(Math.floor(m/60)).padStart(2,'0') + ' h ' + String(m%60).padStart(2,'0');
-  if(window.Modele && Modele.CFG)
+  if(window.Modele && Modele.CFG){
     $('#f-fen').textContent = hm(Modele.CFG.ghDeb) + ' → ' + hm(Modele.CFG.ghFin);
+    $('#f-slx').textContent = String(Modele.CFG.slx);
+    $('#f-sortie').textContent = Modele.CFG.sortieMin != null ? hm(Modele.CFG.sortieMin) : 'aucune heure';
+  }
   if(!window.Mesure) return;
   const L = Mesure.liste(); if(!L.length) return;
   const R = L.reduce((a,x)=>a+x.r,0), g = L.filter(x=>x.r>0).length;
