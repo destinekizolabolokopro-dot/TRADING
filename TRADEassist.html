@@ -400,12 +400,12 @@ button,input,select{font:inherit;color:inherit}
 </div>
 
 <footer class="foot">
-  NQ seul · bougies 5 min · fenêtre 09 h 00 → 10 h 00 à New York, soit 15 h 00 → 16 h 00 à Paris.
-  Mesuré du 13 juillet au 18 septembre : 70 signaux, 80,0 % de réussite, +0,160 R par signal
-  net de frais.
-  Le seuil d’équilibre est de 68 % — la marge n’est que de douze points, et l’avantage ne se
-  retrouve ni sur l’ES ni sur une autre unité d’exécution. Aucun ordre n’est passé : ce site
-  signale, il n’exécute pas.
+  NQ seul · bougies 5 min · fenêtre <span id="f-fen">—</span> à New York.
+  <span id="f-mes">—</span>
+  <b>Comptage prudent :</b> quand une bougie de 5 minutes touche l’objectif et le stop, c’est le
+  stop qui compte. L’ancienne version comptait l’objectif ; rejouée en bougies de 1 minute, cette
+  hypothèse était fausse plus souvent que juste. Aucun ordre n’est passé : ce site signale, il
+  n’exécute pas.
 </footer>
 <script>
 'use strict';
@@ -1767,8 +1767,16 @@ if (typeof window !== 'undefined') window.CFD = CFD;
         if (choisi) {
           var L = dir > 0, entree = px, buf = entree * CFG.buf / 100;
           var sl = L ? choisi.z.bas - buf : choisi.z.haut + buf;   // stop au bord de l'IFVG
+          // ⚠️ L'entrée est la CLÔTURE de la bougie de confirmation, le stop
+          // est le bord de l'IFVG. Rien ne garantit que la clôture soit du bon
+          // côté de ce bord : quand elle le dépasse, le « stop » se retrouve
+          // DANS LE SENS DU GAIN, et l'ordre est impossible à passer. Mesuré
+          // sur les vraies bougies NQ : 4 à 9 % des signaux selon la fenêtre,
+          // et ils perdaient de l'argent. `Math.abs` ci-dessous effaçait le
+          // signe et rendait l'anomalie invisible.
+          var coherent = L ? sl < entree : sl > entree;
           var risq = Math.abs(entree - sl);
-          if (risq > 0 && atrC[i] && risq >= atrC[i] * CFG.atrMin) {
+          if (coherent && risq > 0 && atrC[i] && risq >= atrC[i] * CFG.atrMin) {
             dernier = { sens: L ? 'LONG' : 'SHORT', t: bar.t, entree: +entree.toFixed(2),
               sl: +sl.toFixed(2), risq: risq,
               tp1: +(L ? entree + risq * CFG.tp1 : entree - risq * CFG.tp1).toFixed(2),
@@ -2169,109 +2177,109 @@ if (typeof window !== 'undefined') window.Compte = Compte;
 <script>
 'use strict';
 /**
- * HISTORIQUE MESURÉ — les 70 signaux que le modèle produit sur les vraies
- * bougies NQ du 13 juillet au 18 septembre 2026.
+ * HISTORIQUE MESURÉ — les 64 signaux que le modèle produit sur les vraies
+ * bougies NQ du 2026-07-20 au 2026-09-24.
  *
- * Fenêtre : 09 h 00 → 10 h 00 New York (15 h 00 → 16 h 00 à Paris).
- * Retenue après un balayage des vingt-quatre heures : c'est l'heure qui a
- * à la fois le meilleur taux de réussite et le meilleur résultat, avec le
- * plus gros échantillon.
+ * Fenêtre : 09 h 00 → 10 h 00 New York.
  *
  * ⚠️ CE NE SONT PAS DES POSITIONS QUI ONT ÉTÉ ENVOYÉES. Ce sont des signaux
- * RECONSTITUÉS a posteriori, au prix de clôture exact de la bougie qui les
- * a déclenchés. Le R affiché est NET DE FRAIS : 0,25 point de slippage par
- * côté et 4,00 $ de commission, soit 0,7 point par trade.
+ * RECONSTITUÉS a posteriori, au prix de clôture exact de la bougie qui les a
+ * déclenchés. Le R affiché est net de frais : 0,25 point de slippage par côté
+ * et 4,00 $ de commission, soit 0,70 point par trade.
  *
- *   70 signaux · 80.0 % de réussite
- *   brut +13.45 R      net +11.23 R  (+2808 €)
+ * ⚠️ COMPTAGE PRUDENT. Une bougie de 5 minutes ne dit pas dans quel ordre son
+ * haut et son bas ont été atteints. Quand elle touche l'objectif ET le stop,
+ * ce fichier compte LE STOP. L'ancienne version comptait l'objectif, ce qui
+ * donnait 80 % de réussite et un résultat positif ; vérification faite en
+ * bougies de 1 minute, cette hypothèse était fausse plus souvent que juste.
+ * Les signaux des huit derniers jours sont suivis directement en 1 minute
+ * (colonne « tf »), là il n'y a plus d'hypothèse du tout.
  *
- * ⚠️ CES CHIFFRES NE SONT PAS REPRODUCTIBLES. La même commande relancée
- * deux heures plus tard a rendu 914 € d'écart sur une fenêtre voisine. La
- * profondeur des séries Yahoo est courte et glissante. Ce jeu est un
- * CLICHÉ, pas une vérité revérifiable.
+ *   64 signaux · 53.1 % de réussite
+ *   brut -11.95 R      net -14.03 R  (-3508 €)
  *
- * Colonnes : jour, minute NY, sens, niveau, unité, entrée, stop, objectif,
- *            RR visé, R net, R brut, sortie, horodatage, durée en minutes.
+ * ⚠️ CES CHIFFRES NE SONT PAS REPRODUCTIBLES À L'IDENTIQUE. La profondeur des
+ * séries Yahoo est courte et glissante : la même commande relancée deux heures
+ * plus tard ne rend pas exactement le même jeu. C'est un CLICHÉ.
+ *
+ * Régénéré par scripts/gen_mesure.js — ne pas éditer à la main.
+ *
+ * Colonnes : jour, minute NY, sens, niveau, unité de suivi, entrée, stop,
+ *            objectif, RR visé, R net, R brut, sortie, horodatage, durée (min).
  */
 var Mesure = (function () {
   var BRUT = [
-  ["2026-07-14",570,"SHORT","ITH H4","5m",29694.5,29800.44,29429.65,0.7,-1.007,-1,"perte",1784035800000,15],
-  ["2026-07-15",575,"SHORT","FVG M5","5m",29882.25,29938.48,29741.68,0.7,0.438,0.45,"gain partiel",1784122500000,5],
-  ["2026-07-15",585,"SHORT","ITH M5","5m",29784.75,29806.71,29729.85,0.7,0.418,0.45,"gain partiel",1784123100000,5],
-  ["2026-07-16",575,"SHORT","ITH H1","5m",29386,29426.63,29284.43,0.7,0.433,0.45,"gain partiel",1784208900000,5],
-  ["2026-07-20",570,"LONG","CISD H4","5m",29136.5,29019.92,29427.95,0.7,-1.006,-1,"perte",1784554200000,25],
-  ["2026-07-21",565,"LONG","CISD M5","5m",29221.5,29182.41,29319.23,0.7,0.432,0.45,"gain partiel",1784640300000,5],
-  ["2026-07-22",545,"LONG","CISD M5","5m",29059.75,29041.19,29106.15,0.7,0.412,0.45,"gain partiel",1784725500000,10],
-  ["2026-07-22",560,"LONG","CISD H1","5m",29089.25,29073.18,29129.43,0.7,0.406,0.45,"gain partiel",1784726400000,5],
-  ["2026-07-23",545,"SHORT","CISD M5","5m",28727.75,28776.75,28605.25,0.7,0.436,0.45,"gain partiel",1784811900000,10],
-  ["2026-07-23",555,"SHORT","CISD M15","5m",28716.5,28739.74,28658.4,0.7,0.42,0.45,"gain partiel",1784812500000,5],
-  ["2026-07-24",555,"SHORT","FVG M5","5m",28605,28591.72,28571.8,0.7,0.397,0.45,"gain partiel",1784898900000,5],
-  ["2026-07-24",565,"SHORT","FVG M5","5m",28540.25,28565.71,28476.6,0.7,0.423,0.45,"gain partiel",1784899500000,5],
-  ["2026-07-28",570,"SHORT","RB M5","5m",27877,27904.33,27808.68,0.7,0.674,0.7,"gain",1785245400000,5],
-  ["2026-07-29",540,"SHORT","RB M15","5m",27881.5,27911.08,27807.55,0.7,0.426,0.45,"gain partiel",1785330000000,15],
-  ["2026-07-29",590,"SHORT","CISD M15","5m",27753.5,27817.05,27594.63,0.7,0.439,0.45,"gain partiel",1785333000000,10],
-  ["2026-07-31",580,"SHORT","CISD M30","5m",28419,28468.93,28294.18,0.7,0.436,0.45,"gain partiel",1785505200000,5],
-  ["2026-07-31",585,"SHORT","FVG H1","5m",28360.5,28385.42,28298.2,0.7,0.672,0.7,"gain",1785505500000,5],
-  ["2026-08-03",565,"SHORT","CISD M30","5m",28418.5,28429.93,28389.93,0.7,0.639,0.7,"gain",1785763500000,5],
-  ["2026-08-03",570,"SHORT","CISD M5","5m",28380.75,28604.93,27820.3,0.7,-1.003,-1,"perte",1785763800000,25],
-  ["2026-08-04",540,"LONG","RB M5","5m",29218,29199.91,29263.23,0.7,0.411,0.45,"gain partiel",1785848400000,5],
-  ["2026-08-04",570,"LONG","CISD M15","5m",29382.75,29349.62,29465.58,0.7,0.429,0.45,"gain partiel",1785850200000,5],
-  ["2026-08-05",540,"LONG","CISD M15","5m",29937.5,29922.01,29976.23,0.7,0.405,0.45,"gain partiel",1785934800000,5],
-  ["2026-08-05",565,"LONG","CISD M15","5m",29974,29956.26,30018.35,0.7,0.411,0.45,"gain partiel",1785936300000,5],
-  ["2026-08-06",575,"LONG","RB H4","5m",29385.5,29363.12,29441.45,0.7,0.669,0.7,"gain",1786023300000,5],
-  ["2026-08-06",580,"LONG","CISD M5","5m",29458.75,29398.61,29609.1,0.7,0.438,0.45,"gain partiel",1786023600000,5],
+  ["2026-07-20",570,"LONG","CISD H4","5m",29136.5,29019.92,29427.94,0.7,-1.006,-1,"perte",1784554200000,25],
+  ["2026-07-22",545,"LONG","CISD M5","5m",29059.75,29041.19,29106.15,0.7,0.662,0.7,"gain",1784725500000,25],
+  ["2026-07-22",560,"LONG","CISD M15","5m",29089.25,29073.18,29129.42,0.7,0.656,0.7,"gain",1784726400000,10],
+  ["2026-07-23",545,"SHORT","CISD M5","5m",28727.75,28776.75,28605.26,0.7,0.436,0.45,"gain partiel",1784811900000,25],
+  ["2026-07-23",555,"SHORT","CISD M15","5m",28716.5,28739.74,28658.39,0.7,0.42,0.45,"gain partiel",1784812500000,10],
+  ["2026-07-24",565,"SHORT","FVG M5","5m",28540.25,28565.71,28476.6,0.7,-1.027,-1,"perte",1784899500000,5],
+  ["2026-07-24",580,"SHORT","CISD M5","5m",28485,28544.95,28335.13,0.7,0.438,0.45,"gain partiel",1784900400000,10],
+  ["2026-07-28",570,"SHORT","RB M5","5m",27877,27904.33,27808.69,0.7,-1.026,-1,"perte",1785245400000,5],
+  ["2026-07-29",540,"SHORT","CISD H4","5m",27881.5,27911.08,27807.56,0.7,0.426,0.45,"gain partiel",1785330000000,20],
+  ["2026-07-29",590,"SHORT","CISD M5","5m",27753.5,27817.05,27594.62,0.7,0.439,0.45,"gain partiel",1785333000000,10],
+  ["2026-07-31",580,"SHORT","CISD M30","5m",28419,28468.93,28294.17,0.7,-1.014,-1,"perte",1785505200000,5],
+  ["2026-07-31",585,"SHORT","FVG H1","5m",28360.5,28385.42,28298.19,0.7,-1.028,-1,"perte",1785505500000,5],
+  ["2026-08-04",540,"LONG","RB M5","5m",29218,29199.91,29263.23,0.7,0.661,0.7,"gain",1785848400000,20],
+  ["2026-08-04",570,"LONG","CISD M15","5m",29382.75,29281.87,29634.94,0.7,0.693,0.7,"gain",1785850200000,105],
+  ["2026-08-05",540,"LONG","CISD M15","5m",29937.5,29922.01,29976.22,0.7,0.405,0.45,"gain partiel",1785934800000,10],
+  ["2026-08-05",565,"LONG","CISD M15","5m",29974,29956.26,30018.36,0.7,-1.039,-1,"perte",1785936300000,5],
+  ["2026-08-06",575,"LONG","CISD H4","5m",29385.5,29363.12,29441.44,0.7,0.669,0.7,"gain",1786023300000,10],
+  ["2026-08-06",580,"LONG","CISD M5","5m",29458.75,29398.61,29609.1,0.7,0.688,0.7,"gain",1786023600000,30],
   ["2026-08-07",570,"LONG","FVG M5","5m",29806,29777.29,29877.78,0.7,-1.024,-1,"perte",1786109400000,5],
-  ["2026-08-11",570,"SHORT","RB M5","5m",29737.5,29777.45,29637.63,0.7,0.432,0.45,"gain partiel",1786455000000,5],
+  ["2026-08-10",570,"SHORT","ITH M15","5m",29740.75,29798.7,29595.88,0.7,-1.012,-1,"perte",1786368600000,5],
+  ["2026-08-11",570,"SHORT","RB M5","5m",29737.5,29777.45,29637.63,0.7,0.432,0.45,"gain partiel",1786455000000,10],
   ["2026-08-11",575,"SHORT","CISD M5","5m",29702.25,29734.19,29622.4,0.7,-1.022,-1,"perte",1786455300000,5],
-  ["2026-08-12",555,"LONG","ITL M5","5m",29961.5,29942.76,30008.35,0.7,0.413,0.45,"gain partiel",1786540500000,5],
-  ["2026-08-13",540,"LONG","RB M5","5m",29908.75,29885.77,29966.2,0.7,0.42,0.45,"gain partiel",1786626000000,5],
-  ["2026-08-17",555,"SHORT","CISD M5","5m",30211,30221.29,30185.28,0.7,0.382,0.45,"gain partiel",1786972500000,5],
-  ["2026-08-17",580,"SHORT","CISD M5","2m",30196.5,30227.79,30118.28,0.7,0.428,0.45,"gain partiel",1786974000000,5],
-  ["2026-08-18",545,"SHORT","CISD M5","5m",29693.5,29711.94,29647.4,0.7,0.412,0.45,"gain partiel",1787058300000,20],
-  ["2026-08-18",585,"SHORT","CISD M5","5m",29657.25,29681.18,29597.43,0.7,0.421,0.45,"gain partiel",1787060700000,5],
-  ["2026-08-19",550,"LONG","FVG M5","2m",29723.75,29706.06,29767.98,0.7,0.41,0.45,"gain partiel",1787145000000,10],
-  ["2026-08-19",560,"LONG","CISD H4","5m",29742.5,29711.55,29819.88,0.7,-1.023,-1,"perte",1787145600000,5],
-  ["2026-08-21",545,"SHORT","RB M15","5m",29487.75,29514.15,29421.75,0.7,0.423,0.45,"gain partiel",1787317500000,5],
-  ["2026-08-21",550,"SHORT","ITH M15","5m",29469,29510.14,29366.15,0.7,0.433,0.45,"gain partiel",1787317800000,15],
-  ["2026-08-24",570,"SHORT","RB H4","5m",29112.75,29131.57,29065.7,0.7,0.413,0.45,"gain partiel",1787578200000,5],
-  ["2026-08-24",575,"SHORT","CISD H4","5m",29080,29119.32,28981.7,0.7,0.682,0.7,"gain",1787578500000,5],
-  ["2026-08-25",540,"SHORT","RB M30","5m",29324.5,29338.61,29289.23,0.7,0.4,0.45,"gain partiel",1787662800000,5],
-  ["2026-08-25",560,"SHORT","RB M30","2m",29319.25,29337.11,29274.6,0.7,0.411,0.45,"gain partiel",1787664000000,5],
+  ["2026-08-12",555,"LONG","ITL M5","5m",29961.5,29942.76,30008.36,0.7,0.413,0.45,"gain partiel",1786540500000,10],
+  ["2026-08-13",540,"LONG","RB M5","5m",29908.75,29885.77,29966.2,0.7,0.42,0.45,"gain partiel",1786626000000,10],
+  ["2026-08-17",555,"SHORT","CISD M5","5m",30211,30221.29,30185.27,0.7,0.382,0.45,"gain partiel",1786972500000,10],
+  ["2026-08-18",545,"SHORT","CISD M5","5m",29693.5,29711.94,29647.4,0.7,0.412,0.45,"gain partiel",1787058300000,25],
+  ["2026-08-18",585,"SHORT","CISD M15","5m",29657.25,29681.18,29597.42,0.7,-1.029,-1,"perte",1787060700000,5],
+  ["2026-08-19",585,"SHORT","CISD M5","5m",29470.5,29497.14,29403.89,0.7,0.424,0.45,"gain partiel",1787147100000,10],
+  ["2026-08-20",585,"SHORT","FVG M15","5m",29384.25,29444.63,29233.31,0.7,0.438,0.45,"gain partiel",1787233500000,10],
+  ["2026-08-20",595,"SHORT","ITH M5","5m",29354,29377.87,29294.32,0.7,-1.029,-1,"perte",1787234100000,5],
+  ["2026-08-21",545,"SHORT","RB M15","5m",29487.75,29514.15,29421.76,0.7,0.673,0.7,"gain",1787317500000,20],
+  ["2026-08-21",550,"SHORT","ITH M15","5m",29469,29510.14,29366.14,0.7,0.433,0.45,"gain partiel",1787317800000,15],
+  ["2026-08-24",570,"SHORT","CISD M15","5m",29112.75,29131.57,29065.69,0.7,-1.037,-1,"perte",1787578200000,5],
+  ["2026-08-24",575,"SHORT","CISD H4","5m",29080,29119.32,28981.71,0.7,0.682,0.7,"gain",1787578500000,10],
+  ["2026-08-25",540,"SHORT","RB M30","5m",29324.5,29338.61,29289.21,0.7,0.4,0.45,"gain partiel",1787662800000,10],
+  ["2026-08-25",560,"SHORT","RB M30","5m",29319.25,29337.11,29274.59,0.7,-1.039,-1,"perte",1787664000000,5],
   ["2026-08-26",545,"SHORT","CISD M15","5m",29138.25,29157.58,29089.93,0.7,-1.036,-1,"perte",1787749500000,5],
-  ["2026-08-27",560,"SHORT","ITH M30","5m",29537.5,29546.16,29515.85,0.7,0.369,0.45,"gain partiel",1787836800000,5],
-  ["2026-08-27",590,"SHORT","ITH M5","5m",29543.25,29477.16,29378.03,0.7,0.439,0.45,"gain partiel",1787838600000,5],
-  ["2026-08-31",575,"SHORT","CISD H4","5m",29398.75,29420.88,29343.43,0.7,-1.032,-1,"perte",1788183300000,5],
-  ["2026-09-01",540,"SHORT","CISD H4","2m",29099.25,29127.82,29027.83,0.7,0.425,0.45,"gain partiel",1788267600000,15],
-  ["2026-09-01",570,"SHORT","CISD H4","2m",29099,29107.07,29078.83,0.7,0.613,0.7,"gain",1788269400000,5],
-  ["2026-09-03",550,"LONG","ITL H4","5m",29239.25,29218.4,29291.38,0.7,-1.034,-1,"perte",1788441000000,5],
-  ["2026-09-03",565,"LONG","CISD M5","2m",29249,29206.4,29355.5,0.7,0.434,0.45,"gain partiel",1788441900000,5],
-  ["2026-09-04",595,"LONG","ITL H1","5m",29691,29659.81,29768.98,0.7,-1.022,-1,"perte",1788530100000,5],
-  ["2026-09-08",570,"SHORT","RB H4","5m",29600.5,29627.42,29533.2,0.7,0.424,0.45,"gain partiel",1788874200000,5],
-  ["2026-09-08",575,"SHORT","RB M15","5m",29568,29596.91,29495.73,0.7,0.676,0.7,"gain",1788874500000,5],
-  ["2026-09-09",540,"LONG","RB M5","2m",29403.25,29394.62,29424.83,0.7,0.369,0.45,"gain partiel",1788958800000,10],
-  ["2026-09-09",555,"LONG","RB M5","5m",29414.5,29394.62,29464.2,0.7,0.665,0.7,"gain",1788959700000,15],
-  ["2026-09-10",560,"SHORT","FVG M30","2m",29056.5,29074.81,29010.73,0.7,0.412,0.45,"gain partiel",1789046400000,5],
-  ["2026-09-10",590,"SHORT","FVG M30","5m",29105.75,29138.82,29023.08,0.7,0.429,0.45,"gain partiel",1789048200000,5],
-  ["2026-09-11",545,"LONG","RB H4","2m",29452,29469.61,29496.03,0.7,-1.04,-1,"perte",1789131900000,5],
-  ["2026-09-11",580,"LONG","ITL M30","2m",29433.75,29409.11,29495.35,0.7,0.422,0.45,"gain partiel",1789134000000,5],
-  ["2026-09-15",570,"LONG","CISD M15","1m",29385.5,29415.62,29460.8,0.7,0.427,0.45,"gain partiel",1789479000000,35],
-  ["2026-09-16",585,"LONG","FVG M15","5m",29461.75,29438.86,29518.98,0.7,0.419,0.45,"gain partiel",1789566300000,5],
-  ["2026-09-16",595,"LONG","FVG M15","1m",29478.75,29453.35,29542.25,0.7,-1.028,-1,"perte",1789566900000,5],
-  ["2026-09-17",570,"SHORT","CISD H4","5m",29641.75,29687.93,29526.3,0.7,0.435,0.45,"gain partiel",1789651800000,5],
-  ["2026-09-17",575,"SHORT","ITH H1","5m",29620.5,29668.42,29500.7,0.7,-1.015,-1,"perte",1789652100000,10],
-  ["2026-09-18",565,"SHORT","RB M5","2m",29814.25,29774.21,29714.15,0.7,-1.017,-1,"perte",1789737900000,5],
-  ["2026-09-18",585,"SHORT","RB M5","1m",29795.25,29828.46,29712.23,0.7,0.679,0.7,"gain",1789739100000,20],
-  ["2026-09-21",545,"LONG","CISD M5","1m",30233.25,30223.95,30256.5,0.7,0.375,0.45,"gain partiel",1789995900000,5],
-  ["2026-09-21",570,"LONG","FVG M15","2m",30252,30227.2,30314,0.7,0.422,0.45,"gain partiel",1789997400000,5],
-  ["2026-09-22",540,"LONG","RB M5","1m",30767.5,30748.85,30814.13,0.7,0.412,0.45,"gain partiel",1790082000000,5],
-  ["2026-09-22",550,"LONG","ITL M15","1m",30769.75,30762.6,30787.63,0.7,0.352,0.45,"gain partiel",1790082600000,5]
+  ["2026-08-27",560,"SHORT","ITH M30","5m",29537.5,29546.16,29515.86,0.7,-1.081,-1,"perte",1787836800000,5],
+  ["2026-08-31",575,"SHORT","CISD M30","5m",29398.75,29420.88,29343.43,0.7,-1.032,-1,"perte",1788183300000,5],
+  ["2026-09-01",540,"SHORT","CISD M30","5m",29099.25,29127.82,29027.83,0.7,0.425,0.45,"gain partiel",1788267600000,20],
+  ["2026-09-01",550,"SHORT","FVG M5","5m",29093,29111.82,29045.95,0.7,-1.037,-1,"perte",1788268200000,10],
+  ["2026-09-03",550,"LONG","RB H4","5m",29239.25,29218.4,29291.37,0.7,-1.034,-1,"perte",1788441000000,5],
+  ["2026-09-03",565,"LONG","CISD M5","5m",29249,29206.4,29355.5,0.7,0.434,0.45,"gain partiel",1788441900000,10],
+  ["2026-09-04",595,"LONG","ITL H1","5m",29691,29659.81,29768.97,0.7,-1.022,-1,"perte",1788530100000,5],
+  ["2026-09-08",570,"SHORT","CISD M15","5m",29600.5,29627.42,29533.2,0.7,0.674,0.7,"gain",1788874200000,10],
+  ["2026-09-08",575,"SHORT","RB M15","5m",29568,29596.91,29495.72,0.7,0.676,0.7,"gain",1788874500000,10],
+  ["2026-09-09",540,"LONG","RB M5","5m",29403.25,29394.62,29424.83,0.7,-1.081,-1,"perte",1788958800000,10],
+  ["2026-09-09",555,"LONG","CISD H1","5m",29414.5,29394.62,29464.21,0.7,0.665,0.7,"gain",1788959700000,15],
+  ["2026-09-10",560,"SHORT","FVG M30","5m",29056.5,29074.81,29010.72,0.7,-1.038,-1,"perte",1789046400000,5],
+  ["2026-09-10",590,"SHORT","RB H4","5m",29105.75,29138.82,29023.07,0.7,0.429,0.45,"gain partiel",1789048200000,10],
+  ["2026-09-11",595,"LONG","FVG M5","5m",29472.75,29451.61,29525.61,0.7,-1.033,-1,"perte",1789134900000,5],
+  ["2026-09-15",575,"LONG","CISD M15","5m",29430.5,29419.61,29457.72,0.7,-1.064,-1,"perte",1789479300000,5],
+  ["2026-09-16",585,"LONG","FVG M15","5m",29461.75,29438.86,29518.98,0.7,0.419,0.45,"gain partiel",1789566300000,10],
+  ["2026-09-17",570,"SHORT","CISD H4","1m",29641.75,29687.93,29526.3,0.7,-1.015,-1,"perte",1789651800000,1],
+  ["2026-09-17",575,"SHORT","ITH H1","1m",29620.5,29668.42,29500.69,0.7,-1.015,-1,"perte",1789652100000,12],
+  ["2026-09-18",590,"SHORT","RB M5","1m",29782.75,29807.46,29720.98,0.7,0.422,0.45,"gain partiel",1789739400000,6],
+  ["2026-09-21",545,"LONG","CISD M5","1m",30233.25,30223.95,30256.49,0.7,0.375,0.45,"gain partiel",1789995900000,6],
+  ["2026-09-21",570,"LONG","FVG M15","1m",30252,30227.2,30314,0.7,-1.028,-1,"perte",1789997400000,3],
+  ["2026-09-22",540,"LONG","RB M5","1m",30767.5,30748.85,30814.13,0.7,0.412,0.45,"gain partiel",1790082000000,7],
+  ["2026-09-22",550,"LONG","ITL M15","1m",30769.75,30762.6,30787.63,0.7,-1.098,-1,"perte",1790082600000,2],
+  ["2026-09-23",545,"SHORT","CISD M30","1m",30948.5,30961.69,30915.53,0.7,-1.053,-1,"perte",1790168700000,8],
+  ["2026-09-23",570,"SHORT","FVG M30","1m",30926.5,30944.44,30881.66,0.7,-1.039,-1,"perte",1790170200000,1],
+  ["2026-09-24",540,"LONG","CISD M5","1m",30498.75,30476.4,30554.62,0.7,0.419,0.45,"gain partiel",1790254800000,3],
+  ["2026-09-24",570,"LONG","FVG M30","1m",30540,30525.14,30577.15,0.7,-1.047,-1,"perte",1790256600000,1]
   ];
   var CLES = ['jour','minNY','sens','niveau','tf','entry','sl','tp','rr','r','rBrut','sortie','ts','duree'];
   var LISTE = BRUT.map(function (l) {
     var o = {}; CLES.forEach(function (k, i) { o[k] = l[i]; });
     o.source = 'MESURE'; o.symbol = 'NQ'; o.direction = o.sens;
     o.status = 'closed'; o.result = o.r > 0 ? 'win' : 'loss';
-    o.motif = o.sortie + ' · IFVG ' + o.tf + ' sur ' + o.niveau +
+    o.motif = o.sortie + ' · suivi en ' + o.tf + ' · ' + o.niveau +
               ' · brut ' + (o.rBrut > 0 ? '+' : '') + o.rBrut + ' R';
     return o;
   });
@@ -3019,8 +3027,27 @@ $('#b-alert').addEventListener('click', () => {
   else Notif.activer().then(paintAlert);
 });
 
+/* ── pied de page : calculé, jamais écrit en dur ─────────────────────── */
+// Les chiffres du pied étaient recopiés à la main. Ils ont survécu à trois
+// régénérations de js/mesure.js et annonçaient encore 80 % de réussite alors
+// que le fichier n'en disait plus rien. Ils sont désormais calculés.
+function paintFooter(){
+  const hm = m => String(Math.floor(m/60)).padStart(2,'0') + ' h ' + String(m%60).padStart(2,'0');
+  if(window.Modele && Modele.CFG)
+    $('#f-fen').textContent = hm(Modele.CFG.ghDeb) + ' → ' + hm(Modele.CFG.ghFin);
+  if(!window.Mesure) return;
+  const L = Mesure.liste(); if(!L.length) return;
+  const R = L.reduce((a,x)=>a+x.r,0), g = L.filter(x=>x.r>0).length;
+  const j = L.map(x=>x.jour).sort();
+  $('#f-mes').textContent =
+    `Mesuré du ${j[0]} au ${j[j.length-1]} : ${L.length} signaux, ` +
+    `${(g/L.length*100).toFixed(1)} % de réussite, ` +
+    `${(R/L.length>=0?'+':'')}${(R/L.length).toFixed(3)} R par signal net de frais, ` +
+    `soit ${(R>=0?'+':'')}${Math.round(R*250)} € sur un risque de 250 € par trade.`;
+}
+
 /* ── démarrage ──────────────────────────────────────────────────────── */
-paintChips(); paintAll(); paintAlert();
+paintChips(); paintAll(); paintAlert(); paintFooter();
 // L'instantané porte le taux : on l'applique avant d'initialiser le compte.
 etatDistant().then(e => {
   if(e && e.eurusd && window.Compte) Compte.setTaux(e.eurusd);

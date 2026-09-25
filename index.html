@@ -400,12 +400,12 @@ button,input,select{font:inherit;color:inherit}
 </div>
 
 <footer class="foot">
-  NQ seul · bougies 5 min · fenêtre 09 h 00 → 10 h 00 à New York, soit 15 h 00 → 16 h 00 à Paris.
-  Mesuré du 13 juillet au 18 septembre : 70 signaux, 80,0 % de réussite, +0,160 R par signal
-  net de frais.
-  Le seuil d’équilibre est de 68 % — la marge n’est que de douze points, et l’avantage ne se
-  retrouve ni sur l’ES ni sur une autre unité d’exécution. Aucun ordre n’est passé : ce site
-  signale, il n’exécute pas.
+  NQ seul · bougies 5 min · fenêtre <span id="f-fen">—</span> à New York.
+  <span id="f-mes">—</span>
+  <b>Comptage prudent :</b> quand une bougie de 5 minutes touche l’objectif et le stop, c’est le
+  stop qui compte. L’ancienne version comptait l’objectif ; rejouée en bougies de 1 minute, cette
+  hypothèse était fausse plus souvent que juste. Aucun ordre n’est passé : ce site signale, il
+  n’exécute pas.
 </footer>
 <script src="js/cfd.js"></script>
 <script src="js/nq.js"></script>
@@ -1052,8 +1052,27 @@ $('#b-alert').addEventListener('click', () => {
   else Notif.activer().then(paintAlert);
 });
 
+/* ── pied de page : calculé, jamais écrit en dur ─────────────────────── */
+// Les chiffres du pied étaient recopiés à la main. Ils ont survécu à trois
+// régénérations de js/mesure.js et annonçaient encore 80 % de réussite alors
+// que le fichier n'en disait plus rien. Ils sont désormais calculés.
+function paintFooter(){
+  const hm = m => String(Math.floor(m/60)).padStart(2,'0') + ' h ' + String(m%60).padStart(2,'0');
+  if(window.Modele && Modele.CFG)
+    $('#f-fen').textContent = hm(Modele.CFG.ghDeb) + ' → ' + hm(Modele.CFG.ghFin);
+  if(!window.Mesure) return;
+  const L = Mesure.liste(); if(!L.length) return;
+  const R = L.reduce((a,x)=>a+x.r,0), g = L.filter(x=>x.r>0).length;
+  const j = L.map(x=>x.jour).sort();
+  $('#f-mes').textContent =
+    `Mesuré du ${j[0]} au ${j[j.length-1]} : ${L.length} signaux, ` +
+    `${(g/L.length*100).toFixed(1)} % de réussite, ` +
+    `${(R/L.length>=0?'+':'')}${(R/L.length).toFixed(3)} R par signal net de frais, ` +
+    `soit ${(R>=0?'+':'')}${Math.round(R*250)} € sur un risque de 250 € par trade.`;
+}
+
 /* ── démarrage ──────────────────────────────────────────────────────── */
-paintChips(); paintAll(); paintAlert();
+paintChips(); paintAll(); paintAlert(); paintFooter();
 // L'instantané porte le taux : on l'applique avant d'initialiser le compte.
 etatDistant().then(e => {
   if(e && e.eurusd && window.Compte) Compte.setTaux(e.eurusd);

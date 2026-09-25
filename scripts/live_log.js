@@ -325,30 +325,72 @@ function blocage(d) {
   }
 
   // ── SUIVI DES POSITIONS ─────────────────────────────────────────────
-  // Calqué bougie pour bougie sur scripts/mech.js (lignes 229-245). Toute
-  // divergence ici rendrait le relevé en direct incomparable au backtest,
-  // ce qui est précisément ce qu'on cherche à mesurer. L'ordre des tests
-  // compte : le partiel est examiné AVANT le stop, et il déplace le stop au
-  // seuil — sans quoi un stop touché après le partiel serait compté −1 R au
-  // lieu de +0,45 R.
-  const PART = 0.9, TP1R = 0.5, TP2R = 2.5, MAXBARRES = 200;
-  const m5 = brut.m5;
+  // ⚠️ CORRIGÉ. Le suivi se faisait en bougies de 5 minutes, et il testait
+  // l'OBJECTIF AVANT LE STOP. Or une bougie de 5 minutes ne dit pas dans
+  // quel ordre son haut et son bas ont été atteints : quand elle touche les
+  // deux, l'ancien code choisissait l'objectif. Avec un partiel à 0,5 R —
+  // souvent 5 à 10 points seulement — ce cas n'est pas rare, il est la
+  // règle. Vérification faite en rejouant les huit positions du journal sur
+  // les bougies de 1 MINUTE, où l'ordre est connu :
+  //
+  //     2026-09-21 09:30 LONG   annoncé +0,45  →  stop touché en 3 min
+  //     2026-09-21 09:35 LONG   annoncé +0,70  →  stop touché en 1 min
+  //     2026-09-23 09:30 SHORT  annoncé +0,45  →  stop touché en 1 min
+  //     2026-09-24 09:30 LONG   annoncé +0,70  →  stop touché en 1 min
+  //
+  //   le journal annonçait  +1,20 R  (+300 €)
+  //   la vérité en 1 minute  −5,10 R  (−1 275 €)
+  //
+  // Quatre positions sur huit étaient fausses. Deux corrections, donc :
+  //   1. suivre en 1 MINUTE dès que la série la couvre — Yahoo en sert 8
+  //      jours, et une position se dénoue en quelques minutes, donc c'est
+  //      presque toujours le cas ;
+  //   2. quand il faut retomber sur le 5 minutes, tester le STOP D'ABORD.
+  //      Le journal sous-estimera parfois un gain ; il ne racontera plus de
+  //      victoires qui n'ont pas eu lieu.
+  const PART = 0.9, TP1R = 0.5, TP2R = 2.5;
+  const m5 = brut.m5, m1 = brut.m1 || [];
+
+  // Réparation : les positions closes par l'ANCIEN suivi (5 minutes, objectif
+  // testé avant le stop) sont réouvertes dès que le 1 minute les couvre, pour
+  // être rejugées correctement. Une fois marquées `suiviUnite: '1m'`, elles ne
+  // sont plus touchées. Cela rattrape l'historique déjà écrit sans le réécrire
+  // à chaque passage.
+  let repares = 0;
+  db.signaux.forEach(s => {
+    if (s.statut !== 'clos' || s.suiviUnite === '1m') return;
+    const depuis = Date.parse(s.bougie);
+    if (!m1.length || m1[0].t > depuis) return;
+    s.statut = 'ouvert'; delete s.resultat; delete s.r; delete s.closTs;
+    delete s.barres; s.part1 = false; repares++;
+  });
+  if (repares) console.log(`${repares} position(s) rejugée(s) sur les bougies de 1 minute.`);
   db.signaux.filter(s => s.statut === 'ouvert').forEach(s => {
     const depuis = Date.parse(s.bougie);
-    const apres = m5.filter(c => c.t > depuis);
+    // le 1 minute est préféré, mais seulement s'il remonte jusqu'au signal
+    const fin1m = m1.length && m1[0].t <= depuis;
+    const cs = fin1m ? m1 : m5, unite = fin1m ? '1m' : '5m';
+    const MAXBARRES = fin1m ? 1000 : 200;
+    const apres = cs.filter(c => c.t > depuis);
     const L = s.sens === 'LONG';
-    let sl = s.sl, part1 = s.part1 === true, n = 0;
+    // Si la série couvre le signal, on rejoue depuis le début : l'état
+    // mémorisé au passage précédent a pu être établi sur l'autre unité.
+    let sl = s.sl, part1 = apres.length && cs[0].t <= depuis ? false : s.part1 === true;
+    if (part1) sl = s.entree;
+    let n = 0, ambigu = 0;
     for (const c of apres) {
       n++;
       const touche = niv => L ? c.h >= niv : c.l <= niv;
       const stoppe = () => L ? c.l <= sl : c.h >= sl;
-      if (!part1 && touche(s.tp1)) { part1 = true; sl = s.entree; }   // partiel + seuil
-      if (part1 && touche(s.tp)) {
-        s.statut = 'clos'; s.resultat = 'gagné';
-        s.r = +(PART * TP1R + (1 - PART) * TP2R).toFixed(3);
-      } else if (stoppe()) {
+      if (stoppe() && touche(part1 ? s.tp : s.tp1)) ambigu++;
+      if (stoppe()) {
         if (part1) { s.statut = 'clos'; s.resultat = 'gagné'; s.r = +(PART * TP1R).toFixed(3); }
         else       { s.statut = 'clos'; s.resultat = 'perdu'; s.r = -1; }
+      } else if (!part1 && touche(s.tp1)) {          // partiel encaissé, stop au seuil
+        part1 = true; sl = s.entree;
+      } else if (part1 && touche(s.tp)) {
+        s.statut = 'clos'; s.resultat = 'gagné';
+        s.r = +(PART * TP1R + (1 - PART) * TP2R).toFixed(3);
       } else if (n > MAXBARRES) {
         const rBrut = (L ? c.c - s.entree : s.entree - c.c) / s.risquePts;
         s.statut = 'clos'; s.resultat = 'expiré';
@@ -357,9 +399,9 @@ function blocage(d) {
       }
       if (s.statut === 'clos') { s.closTs = new Date(c.t).toISOString(); s.barres = n; break; }
     }
-    // Mémorisé pour le passage suivant : le partiel a pu tomber sur une
-    // bougie déjà dépassée, et la fenêtre de bougies recule à chaque relevé.
     s.part1 = part1;
+    s.suiviUnite = unite;
+    s.ambigu = ambigu;
     if (s.statut === 'ouvert') s.slCourant = sl;
   });
 

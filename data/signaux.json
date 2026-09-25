@@ -24,13 +24,16 @@
    "uniteIFVG": "5m",
    "niveauDeclencheur": "ITH H4",
    "risquePts": 24.71,
-   "raisonnement": "Biais baissier (score 2/4). DOL à 29648. Niveau clé ITH H4. Le prix l'a touché, puis une inversion 5m a été confirmée par clôture de corps. Entrée 29782.75, stop au bord de l'IFVG à 29807.46 (24.7 pts), partiel 0,5 R à 29770.4 sur 90 % de la taille, le reste court jusqu'à 2,5 R à 29720.98.",
+   "raisonnement": "Biais baissier (score 2/4). DOL à 29648. Niveau clé RB M5. Le prix l'a touché, puis une inversion 5m a été confirmée par clôture de corps. Entrée 29782.75, stop au bord de l'IFVG à 29807.46 (24.7 pts), partiel 0,5 R à 29770.4 sur 90 % de la taille, le reste court jusqu'à 2,5 R à 29720.98.",
    "statut": "clos",
+   "part1": true,
+   "biaisScore": -2,
    "resultat": "gagné",
    "r": 0.45,
-   "closTs": "2026-09-18T13:55:00.000Z",
-   "barres": 1,
-   "part1": true
+   "closTs": "2026-09-18T13:56:00.000Z",
+   "barres": 6,
+   "suiviUnite": "1m",
+   "ambigu": 0
   },
   {
    "ts": "2026-09-21T14:14:27.553Z",
@@ -57,12 +60,14 @@
    "risquePts": 24.8,
    "raisonnement": "Biais haussier (score 4/4). DOL à 30599.75. Niveau clé FVG M15. Le prix l'a touché, puis une inversion 2m a été confirmée par clôture de corps. Entrée 30252, stop au bord de l'IFVG à 30227.2 (24.8 pts), partiel 0,5 R à 30264.4 sur 90 % de la taille, le reste court jusqu'à 2,5 R à 30314.",
    "statut": "clos",
-   "resultat": "gagné",
-   "r": 0.45,
-   "closTs": "2026-09-21T13:35:00.000Z",
-   "barres": 1,
-   "part1": true,
-   "biaisScore": 4
+   "part1": false,
+   "biaisScore": 4,
+   "resultat": "perdu",
+   "r": -1,
+   "closTs": "2026-09-21T13:33:00.000Z",
+   "barres": 3,
+   "suiviUnite": "1m",
+   "ambigu": 0
   },
   {
    "ts": "2026-09-21T13:48:21.796Z",
@@ -89,12 +94,14 @@
    "risquePts": 9.81,
    "raisonnement": "Biais haussier (score 4/4). DOL à 30343. Niveau clé ITL M5. Le prix l'a touché, puis une inversion 5m a été confirmée par clôture de corps. Entrée 30292.5, stop au bord de l'IFVG à 30282.69 (9.8 pts), partiel 0,5 R à 30297.4 sur 90 % de la taille, le reste court jusqu'à 2,5 R à 30317.02.",
    "statut": "clos",
-   "resultat": "gagné",
-   "r": 0.7,
-   "closTs": "2026-09-21T13:40:00.000Z",
-   "part1": true,
+   "part1": false,
    "slCourant": 30282.69,
-   "barres": 1
+   "resultat": "perdu",
+   "r": -1,
+   "closTs": "2026-09-21T13:36:00.000Z",
+   "barres": 1,
+   "suiviUnite": "1m",
+   "ambigu": 0
   },
   {
    "ts": "2026-09-23T14:52:09.389Z",
@@ -121,12 +128,14 @@
    "risquePts": 13.19,
    "raisonnement": "Biais baissier (score 2/4). DOL à 30670. Niveau clé CISD M30. Le prix l'a touché, puis une inversion 1m a été confirmée par clôture de corps. Entrée 30948.5, stop au bord de l'IFVG à 30961.69 (13.2 pts), partiel 0,5 R à 30941.91 sur 90 % de la taille, le reste court jusqu'à 2,5 R à 30915.53.",
    "statut": "clos",
+   "part1": false,
+   "biaisScore": -2,
    "resultat": "perdu",
    "r": -1,
-   "closTs": "2026-09-23T13:10:00.000Z",
-   "barres": 1,
-   "part1": false,
-   "biaisScore": -2
+   "closTs": "2026-09-23T13:13:00.000Z",
+   "barres": 8,
+   "suiviUnite": "1m",
+   "ambigu": 0
   },
   {
    "ts": "2026-09-23T14:52:09.389Z",
@@ -153,12 +162,14 @@
    "risquePts": 17.94,
    "raisonnement": "Biais baissier (score 2/4). DOL à 30670. Niveau clé FVG M30. Le prix l'a touché, puis une inversion 5m a été confirmée par clôture de corps. Entrée 30926.5, stop au bord de l'IFVG à 30944.44 (17.9 pts), partiel 0,5 R à 30917.53 sur 90 % de la taille, le reste court jusqu'à 2,5 R à 30881.66.",
    "statut": "clos",
-   "resultat": "gagné",
-   "r": 0.45,
-   "closTs": "2026-09-23T13:35:00.000Z",
+   "part1": false,
+   "biaisScore": -2,
+   "resultat": "perdu",
+   "r": -1,
+   "closTs": "2026-09-23T13:31:00.000Z",
    "barres": 1,
-   "part1": true,
-   "biaisScore": -2
+   "suiviUnite": "1m",
+   "ambigu": 0
   },
   {
    "ts": "2026-09-24T17:57:07.338Z",
@@ -186,11 +197,13 @@
    "biaisScore": 2,
    "raisonnement": "Biais haussier (score 2/4). DOL à 30813. Niveau clé CISD M5. Le prix l'a touché, puis une inversion 5m a été confirmée par clôture de corps. Entrée 30498.75, stop au bord de l'IFVG à 30476.4 (22.3 pts), partiel 0,5 R à 30509.92 sur 90 % de la taille, le reste court jusqu'à 2,5 R à 30554.62.",
    "statut": "clos",
+   "part1": true,
    "resultat": "gagné",
    "r": 0.45,
-   "closTs": "2026-09-24T13:30:00.000Z",
-   "barres": 6,
-   "part1": true
+   "closTs": "2026-09-24T13:03:00.000Z",
+   "barres": 3,
+   "suiviUnite": "1m",
+   "ambigu": 0
   },
   {
    "ts": "2026-09-24T14:11:23.007Z",
@@ -218,11 +231,13 @@
    "biaisScore": 2,
    "raisonnement": "Biais haussier (score 2/4). DOL à 30813. Niveau clé RB M5. Le prix l'a touché, puis une inversion 5m a été confirmée par clôture de corps. Entrée 30540, stop au bord de l'IFVG à 30525.14 (14.9 pts), partiel 0,5 R à 30547.43 sur 90 % de la taille, le reste court jusqu'à 2,5 R à 30577.15.",
    "statut": "clos",
-   "resultat": "gagné",
-   "r": 0.7,
-   "closTs": "2026-09-24T13:35:00.000Z",
+   "part1": false,
+   "resultat": "perdu",
+   "r": -1,
+   "closTs": "2026-09-24T13:31:00.000Z",
    "barres": 1,
-   "part1": true
+   "suiviUnite": "1m",
+   "ambigu": 0
   },
   {
    "ts": "2026-09-24T14:11:23.007Z",
@@ -250,11 +265,13 @@
    "biaisScore": 2,
    "raisonnement": "Biais haussier (score 2/4). DOL à 30813. Niveau clé CISD M5. Le prix l'a touché, puis une inversion 5m a été confirmée par clôture de corps. Entrée 30595.5, stop au bord de l'IFVG à 30583.88 (11.6 pts), partiel 0,5 R à 30601.31 sur 90 % de la taille, le reste court jusqu'à 2,5 R à 30624.55.",
    "statut": "clos",
+   "part1": false,
    "resultat": "perdu",
    "r": -1,
-   "closTs": "2026-09-24T13:40:00.000Z",
+   "closTs": "2026-09-24T13:36:00.000Z",
    "barres": 1,
-   "part1": false
+   "suiviUnite": "1m",
+   "ambigu": 0
   }
  ],
  "passages": [
@@ -342,12 +359,12 @@
   }
  ],
  "bilan": {
-  "maj": "2026-09-25T18:04:16.615Z",
+  "maj": "2026-09-25T21:45:34.902Z",
   "total": 8,
   "clos": 8,
   "ouverts": 0,
-  "reussite": 75,
-  "cumulR": 1.2,
+  "reussite": 25,
+  "cumulR": -5.1,
   "passages": 5
  }
 }
