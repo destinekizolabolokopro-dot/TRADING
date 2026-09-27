@@ -420,3 +420,73 @@ frais sur le même échantillon, c'est une confirmation.
 
 La fenêtre appliquée reste 09h00–10h00 : changer la fenêtre est une décision de
 trading, pas une correction de bug.
+
+---
+
+## 8. Le plan source « 10AM OXXC » — ce qu'il confirme, contredit et manque
+
+Plan de trading systématique NQ / ES publié par la source (kinttnq). Confronté
+au modèle, il donne trois listes.
+
+### Ce qu'il CONFIRME
+
+| règle du plan | ce qu'on avait trouvé |
+|---|---|
+| « **SL : sous le dernier mouvement** » | le stop au bord de l'IFVG était le bug central ; l'élargir × 4 fait passer 56,3 % → 81,3 % |
+| « max **2 entrées / jour** sur ce setup » | `maxJour: 2` |
+| « 1 % max par trade en challenge, **0,5 %** funded » | calibrage à 0,5 % d'un compte de 50 000 € |
+| « **12h00 NY** = deadline secondaire ferme » | une limite horaire existe — mais chez lui c'est une limite d'ENTRÉE, chez nous une sortie forcée. Ce n'est pas la même chose. |
+
+**Le stop structurel pris au pied de la lettre ne marche pas** : en plaçant le
+stop à l'extrémité de la jambe depuis la touche du niveau,
+
+| stop | 09h00–10h00 | creux |
+|---|---|---|
+| « jambe » (lecture littérale) | 71,9 % · **+70 €** | 2 111 € |
+| × 4 (le multiplicateur mesuré) | 81,3 % · **+3 058 €** | 839 € |
+
+Donc « le dernier mouvement » de la source n'est PAS la jambe depuis la touche
+du niveau clé. C'est autre chose, et le plan ne le définit pas. Le
+multiplicateur reste une béquille en attendant.
+
+### Ce qu'il CONTREDIT
+
+**La fenêtre.** Le plan impose 10h → 11h NY (primaire), étendue à 12h00. Nous
+sommes sur 09h → 10h.
+
+| fenêtre NY | trades | réussite | espérance | résultat | 2e moitié |
+|---|---|---|---|---|---|
+| 09h00–10h00 (appliquée) | 64 | 81,3 % | +0,191 R | +3 058 € | 77,8 % / +1 157 € |
+| 10h00–11h00 (plan, primaire) | 51 | 74,5 % | +0,094 R | +1 198 € | **79,4 % / +1 282 €** |
+| 10h00–12h00 (plan, étendue) | 64 | 71,9 % | +0,060 R | +960 € | **79,5 % / +1 594 €** |
+| 09h30–12h00 | 80 | 77,5 % | +0,135 R | +2 702 € | **80,4 % / +1 857 €** |
+| 09h00–12h00 (l'union) | 84 | 81,0 % | +0,175 R | +3 683 € | 78,7 % / +1 458 € |
+
+La fenêtre du plan est **moins bonne sur l'ensemble et meilleure sur la
+deuxième moitié**. Sur 60 jours, ça ne tranche pas — mais c'est la seule des
+deux qui vienne d'une source plutôt que d'un balayage.
+
+### Ce qui MANQUE, par ordre d'importance
+
+1. **Confirmation conjointe NQ + ES.** Le plan l'exige partout : narrative
+   confirmée sur les deux, IFVG + CISD présents sur les deux. On ne regarde
+   que le NQ. C'est le filtre le plus lourd et le plus facile à ajouter — les
+   données ES sont déjà téléchargées.
+2. **IFVG ET CISD ensemble.** On prend l'un OU l'autre comme niveau clé. Le
+   plan les veut tous les deux, dans le sens du trade.
+3. **Objectif au haut/bas de session, PD High/Low, ou extrémité d'un CRT
+   H1/H4.** On vise un multiple de R fixe. C'est structurellement différent.
+4. **Passage au seuil (BE) sur structure** : quand une nouvelle jambe se forme
+   sous un OB suivi d'un déplacement, ou qu'un OB est suivi d'un FVG comblé.
+   On passe au seuil au partiel, mécaniquement.
+5. **Ré-entrées** : seuil atteint puis nouveau sweep → 1 % ; stop touché puis
+   nouveau sweep → 0,5 %, une seule tentative. Plafond 1,5 % cumulé par idée.
+6. **Sweep du low/high de séance ou de la bougie de 9h** précisément — on a un
+   balayage ITL/ITH générique.
+7. **Gestion des LR adverses près d'un open** (§ 8bis).
+8. **PD Array = FVG M15/M30/H1/H4 uniquement.** Testé : retirer le M5 coûte
+   0,018 R (81,3 % → 80,0 %). Marginal, donc non appliqué.
+9. Bonus explicitement NON requis : 2e plus bas/haut, Sharp Turn, SMT ES/NQ.
+
+Les options `slMode` et `unites` sont ajoutées à `js/modele.js` pour pouvoir
+mesurer ces variantes. Les valeurs appliquées ne changent pas.

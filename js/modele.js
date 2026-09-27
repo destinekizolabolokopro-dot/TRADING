@@ -46,7 +46,8 @@
     // slx 4 est retenu : 81,3 % de réussite pour un seuil d'équilibre à
     // 65,8 %, soit quinze points de marge — et un stop de 118 points tient
     // dans un contrat MNQ à 250 € de risque, ce que 177 points ne fait pas.
-    slx: 4,
+    slMode: 'multiple', slx: 4,
+    unites: 'M5,M15,M30,H1,H4',   // unités où chercher les niveaux clés
 
     // ── OBJECTIFS ────────────────────────────────────────────── [MESURÉ]
     // Le partiel est à 0,4 R du stop ÉLARGI, donc ~47 points : assez loin
@@ -117,8 +118,12 @@
     var hierH1 = ST.hierarchie(D.h1);
 
     // ── niveaux clés : quatre familles, cinq unités ────────────────── [COMM]
-    var UNITES = [{ cs: D.m5, n: 'M5' }, { cs: D.m15, n: 'M15' }, { cs: m30, n: 'M30' },
+    // Le plan de la source définit le PD Array comme un FVG M15 / M30 / H1 / H4.
+    // Le M5 n'y figure pas. `unites` permet de le retirer et de mesurer.
+    var TOUTES = [{ cs: D.m5, n: 'M5' }, { cs: D.m15, n: 'M15' }, { cs: m30, n: 'M30' },
                   { cs: D.h1, n: 'H1' }, { cs: h4, n: 'H4' }];
+    var voulues = CFG.unites || 'M5,M15,M30,H1,H4';
+    var UNITES = TOUTES.filter(function (u) { return voulues.indexOf(u.n) >= 0; });
     var niveaux = [];
     UNITES.forEach(function (u) {
       var push = function (zs, type) { zs.forEach(function (z) {
@@ -213,10 +218,26 @@
         etapeCourante.ifvg = choisi;
         if (choisi) {
           var L = dir > 0, entree = px, buf = entree * CFG.buf / 100;
-          // Bord de l'IFVG, puis éloigné de `slx` fois cette distance.
+          // ── OÙ SE POSE LE STOP ───────────────────────────────────────
+          //   'jambe'    sous (ou sur) l'extrémité de la jambe de
+          //              manipulation, depuis la touche du niveau clé
+          //              jusqu'à la bougie de confirmation. C'est la règle
+          //              de la source : « SL : sous le dernier mouvement ».
+          //              Aucun paramètre libre, donc rien à sur-ajuster.
+          //   'multiple' le bord de l'IFVG éloigné de `slx` fois sa distance.
+          //              Approximation numérique de la précédente, trouvée
+          //              en balayant avant d'avoir la règle.
           var bord = L ? choisi.z.bas - buf : choisi.z.haut + buf;
           var d0 = Math.abs(entree - bord);
-          var sl = L ? entree - d0 * CFG.slx : entree + d0 * CFG.slx;
+          var sl;
+          if (CFG.slMode === 'jambe') {
+            var seg = clock.slice(legDeb, i + 1), ext = L ? seg[0].l : seg[0].h;
+            for (var q2 = 1; q2 < seg.length; q2++)
+              ext = L ? Math.min(ext, seg[q2].l) : Math.max(ext, seg[q2].h);
+            sl = L ? ext - buf : ext + buf;
+          } else {
+            sl = L ? entree - d0 * CFG.slx : entree + d0 * CFG.slx;
+          }
           // ⚠️ L'entrée est la CLÔTURE de la bougie de confirmation, le stop
           // est le bord de l'IFVG. Rien ne garantit que la clôture soit du bon
           // côté de ce bord : quand elle le dépasse, le « stop » se retrouve
@@ -224,7 +245,7 @@
           // sur les vraies bougies NQ : 4 à 9 % des signaux selon la fenêtre,
           // et ils perdaient de l'argent. `Math.abs` ci-dessous effaçait le
           // signe et rendait l'anomalie invisible.
-          var coherent = L ? bord < entree : bord > entree;
+          var coherent = (L ? bord < entree : bord > entree) && (L ? sl < entree : sl > entree);
           var risq = Math.abs(entree - sl);
           // Le filtre d'ATR porte sur la distance STRUCTURELLE (le bord de
           // l'IFVG), pas sur la distance élargie : sinon `slx` ferait passer
