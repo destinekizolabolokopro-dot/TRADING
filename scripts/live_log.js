@@ -40,6 +40,13 @@ const SERIES = [['1m','8d','m1'],['2m','60d','m2'],['5m','60d','m5'],
 // ne peut pas appliquer la règle et le dit (`sansConfirmation`).
 const SERIES2 = [['5m','60d','m5'],['15m','60d','m15'],['60m','3mo','h1'],['1d','1y','d1']];
 const SYM2 = 'ES=F';
+
+// ── DES EUROS, PAS DES R ───────────────────────────────────────────────────
+// Le R est une unité de travail : « 1 R » = ce qu'on risque sur un trade.
+// Personne ne lit un journal en R. Tout ce qui est écrit pour un humain est
+// traduit ici, sur la base du risque réellement calibré.
+const RISQUE = +(process.env.RISQUE_EUR || 250);       // 0,5 % d'un compte de 50 000 €
+const euros = v => (v >= 0 ? '+' : '') + Math.round(v) + ' €';
 const DUREE = { '1m': 6e4, '2m': 12e4, '5m': 3e5, '15m': 9e5, '60m': 36e5, '1d': 864e5 };
 const FORCE = process.argv.includes('--force');
 
@@ -244,7 +251,8 @@ function blocage(d) {
       `DOL à ${sig.dol}. Niveau clé ${sig.niveau}. ` +
       `Le prix l'a touché, puis une inversion ${sig.tf} a été confirmée par clôture de corps. ` +
       `Entrée ${sig.entree}, stop au bord de l'IFVG à ${sig.sl} (${Math.abs(sig.entree - sig.sl).toFixed(1)} pts), ` +
-      `partiel 0,5 R à ${sig.tp1} sur 90 % de la taille, le reste court jusqu'à 2,5 R à ${sig.tp}.`;
+      `objectif partiel à ${sig.tp1} sur ${Math.round(Modele.CFG.part * 100)} % de la position ` +
+      `(${euros(Modele.CFG.tp1 * RISQUE)}), le reste court jusqu'à ${sig.tp} (${euros(Modele.CFG.tp2 * RISQUE)}).`;
     console.log(`Raisonnement réparé : ${vieux.jour} ${vieux.heureNY} ${vieux.sens}`);
   });
 
@@ -317,10 +325,16 @@ function blocage(d) {
         `Biais ${t.biaisDir > 0 ? 'haussier' : 'baissier'} (score ${Math.abs(t.biaisScore)}/4). ` +
         `DOL à ${t.dol}. Niveau clé ${t.niveau}. ` +
         `Le prix l'a touché, puis une inversion ${t.tf} a été confirmée par clôture de corps. ` +
-        `Entrée ${t.entree}, stop à ${t.sl} — ${Math.abs(t.entree - t.sl).toFixed(1)} pts, soit ` +
+        `Entrée ${t.entree}, stop à ${t.sl} — ${Math.abs(t.entree - t.sl).toFixed(0)} points, soit ` +
         `${Modele.CFG.slx} fois le bord de l'IFVG, pour ne pas être sorti par la respiration du prix. ` +
-        `Partiel ${String(Modele.CFG.tp1).replace('.', ',')} R à ${t.tp1} sur ${Math.round(Modele.CFG.part * 100)} % de la taille, ` +
-        `le reste court jusqu'à ${String(Modele.CFG.tp2).replace('.', ',')} R à ${t.tp}. ` +
+        // Le R est une unité de travail. Celui qui lit le journal veut des
+        // points et des euros : on traduit ici, une fois pour toutes.
+        `Objectif partiel à ${t.tp1}, soit ${(Math.abs(t.tp1 - t.entree)).toFixed(0)} points ` +
+        `(${euros(Modele.CFG.tp1 * RISQUE)}), sur ${Math.round(Modele.CFG.part * 100)} % de la position — ` +
+        `le stop remonte alors au prix d'entrée et la position ne peut plus perdre. ` +
+        `Les ${Math.round((1 - Modele.CFG.part) * 100)} % restants courent jusqu'à ${t.tp}, ` +
+        `soit ${(Math.abs(t.tp - t.entree)).toFixed(0)} points (${euros(Modele.CFG.tp2 * RISQUE)}). ` +
+        `Gain si tout est touché : ${euros(t.rr * RISQUE)} · perte si le stop part : ${euros(-RISQUE)}. ` +
         `Solde au marché à ${String(Math.floor(Modele.CFG.sortieMin / 60)).padStart(2, '0')} h ` +
         `${String(Modele.CFG.sortieMin % 60).padStart(2, '0')} New York si rien n'est touché avant.`,
       statut: 'ouvert', resultat: null, r: null, closTs: null

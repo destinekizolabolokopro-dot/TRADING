@@ -2575,7 +2575,10 @@ function paintTop(){
   if(window.History){
     const b = History.bilan('MECH'), uR = window.Compte ? Compte.uniteR() : 0;
     const e = $('#pnl-top');
-    e.textContent = b.total ? sgn(b.rsum,1) + ' R' : '—';
+    // En euros : le R ne veut rien dire pour qui regarde son compte.
+    const u = window.Compte ? Compte.uniteR() : 250;
+    const d = window.Compte ? Compte.sym(Compte.lire().devise) : ' €';
+    e.textContent = b.total ? sgn(Math.round(b.rsum * u), 0) + d : '—';
     e.className = 'mono' + (b.rsum > 0 ? ' pos' : b.rsum < 0 ? ' neg' : '');
     e.title = b.total ? Math.round(b.rsum*uR) + ' ' + (window.Compte?Compte.sym(Compte.lire().devise):'') : '';
   }
@@ -2687,7 +2690,7 @@ function paintTrade(){
         (!okSL || !okTP
           ? '<span style="color:var(--loss)">Ce signal est incohérent : stop et objectif doivent ' +
             'encadrer l\u2019entrée. Ne le prends pas.</span>'
-        : frais ? 'Signal armé sur la bougie en cours. Partiel à 0,5 R sur 90 % de la taille, le reste court jusqu’à 2,5 R.'
+        : frais ? 'Signal armé sur la bougie en cours. Une partie est encaissée au premier objectif, le stop remonte alors au prix d’entrée, et le reste court jusqu’à la cible.'
                : 'Ce signal date du ' + quand + '. Il est affiché pour mémoire — ce n’est pas une position à prendre maintenant.') +
       '</div>' +
     '</div>';
