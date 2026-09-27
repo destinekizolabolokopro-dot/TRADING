@@ -38,6 +38,36 @@ balises.forEach((rel) => {
 const reste = [...html.matchAll(/<script src="([^"]+)"><\/script>/g)].map(m => m[1]);
 if (reste.length) { console.error('⚠️ références non inlinées :', reste.join(', ')); process.exit(1); }
 
+// ── LE REPÈRE DE VERSION ───────────────────────────────────────────────────
+// « Est-ce que la mise à jour est passée ? » ne doit pas demander de lire du
+// code ni de m'écrire. Le pied de page porte la date du DERNIER CHANGEMENT DE
+// SOURCE — pas l'heure de construction : sinon le fichier changerait à chaque
+// passage du robot et déclencherait un commit inutile toutes les heures.
+let version = 'inconnue';
+try {
+  const git = (...a) => require('child_process')
+    .execFileSync('git', a, { cwd: ROOT, encoding: 'utf8' }).trim();
+  const src = ['index.html', 'js', 'scripts/build_single.js'];
+  // Le build tourne AVANT le commit : lire seulement le dernier commit ferait
+  // afficher la date de la version précédente. Quand les sources sont
+  // modifiées mais pas encore validées, on prend l'heure courante — elle est
+  // à quelques secondes du commit qui va suivre. Quand elles sont propres
+  // (cas du robot, qui ne touche qu'à data/), on prend la date du commit :
+  // le fichier ne bouge donc pas d'un passage à l'autre, et le robot ne
+  // produit pas de commit inutile toutes les heures.
+  const sale = git('status', '--porcelain', '--', ...src) !== '';
+  const d = sale ? new Date().toISOString() : git('log', '-1', '--format=%cI', '--', ...src);
+  if (d) {
+    const o = new Date(d);
+    version = String(o.getUTCDate()).padStart(2, '0') + '/' +
+              String(o.getUTCMonth() + 1).padStart(2, '0') + '/' + o.getUTCFullYear() +
+              ' à ' + String(o.getUTCHours()).padStart(2, '0') + ' h ' +
+              String(o.getUTCMinutes()).padStart(2, '0') + ' UTC';
+  }
+} catch (e) { /* hors dépôt git : le repère reste « inconnue » */ }
+html = html.replace('__VERSION__', version);
+console.log('Version inscrite :', version);
+
 fs.writeFileSync(out, html);
 console.log('✅ Écrit :', out, '(' + Math.round(html.length / 1024) + ' Ko)');
 
