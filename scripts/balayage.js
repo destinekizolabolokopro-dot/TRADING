@@ -193,12 +193,12 @@ function tableau(lignes, tri, top) {
   lignes.sort((a, b) => f(b) - f(a));
   const s = n => (n >= 0 ? '+' : '') + n.toFixed(3);
   const e = n => ((n >= 0 ? '+' : '') + Math.round(n)).padStart(6) + ' €';
-  console.log('  n │ OPTIMISTE  (objectif d\'abord) │ PRUDENT  (stop d\'abord)              │ bougies │ 2e moitié │ réglages');
-  console.log('    │ réuss.  espér.      total €  │ réuss.  espér.      total €   creux  │ ambiguës│  prudent  │');
+  console.log('  n  │ OPTIMISTE (objectif d\'abord) │ PRUDENT (stop d\'abord)                  │ bougies │ 2e moitié  │ réglages');
+  console.log('     │ gagnés   par trade   total   │ gagnés   par trade   total     creux    │ ambiguës│  par trade │');
   for (const x of lignes.slice(0, top || 15)) {
-    console.log(`${String(x.opt.n).padStart(3)} │ ${x.opt.wr.toFixed(1).padStart(5)}%  ${s(x.opt.esp)}  ${e(x.opt.euros)}  │` +
-      ` ${x.pru.wr.toFixed(1).padStart(5)}%  ${s(x.pru.esp)}  ${e(x.pru.euros)}  ${Math.round(x.pru.ddE).toString().padStart(5)}€ │` +
-      ` ${x.opt.flou.toFixed(0).padStart(6)}% │ ${x.pruB ? (s(x.pruB.esp) + ` (${x.pruB.n})`).padStart(9) : '      n/a'} │ ${lisible(x.cfg)}`);
+    console.log(`${String(x.opt.n).padStart(4)} │ ${x.opt.wr.toFixed(1).padStart(5)}%  ${e(x.opt.esp * RISQUE_E)}  ${e(x.opt.euros)} │` +
+      ` ${x.pru.wr.toFixed(1).padStart(5)}%  ${e(x.pru.esp * RISQUE_E)}  ${e(x.pru.euros)}  ${('-' + Math.round(x.pru.ddE)).padStart(6)} € │` +
+      ` ${x.opt.flou.toFixed(0).padStart(6)}% │ ${x.pruB ? e(x.pruB.esp * RISQUE_E).padStart(10) : '       n/a'} │ ${lisible(x.cfg)}`);
   }
 }
 
@@ -335,8 +335,15 @@ async function rapport() {
     if (!T.length) { console.log(`\n${sym} : aucun signal`); continue; }
     const C = M.CFG;
     const hm = m => String(Math.floor(m / 60)).padStart(2, '0') + ' h ' + String(m % 60).padStart(2, '0');
-    const g = (m, n) => m ? `${String(n).padEnd(14)} ${String(m.n).padStart(4)} tr · ${m.wr.toFixed(1).padStart(5)} % · ` +
-      `${(m.esp >= 0 ? '+' : '') + m.esp.toFixed(3)} R · ${((m.euros >= 0 ? '+' : '') + Math.round(m.euros)).padStart(7)} €` : '';
+    // ── TOUT EN EUROS ET EN POURCENTS ────────────────────────────────────
+    // Le R est une unité de travail : « 1 R » veut dire « ce qu'on risque sur
+    // un trade ». Utile pour comparer des marchés, illisible pour savoir ce
+    // qu'on gagne. Chaque ligne donne donc le gain MOYEN PAR TRADE en euros,
+    // et le R reste entre parenthèses pour qui veut comparer.
+    const eur = x => (x >= 0 ? '+' : '') + Math.round(x) + ' €';
+    const g = (m, n) => m ? `${String(n).padEnd(14)} ${String(m.n).padStart(4)} trades · ` +
+      `${m.wr.toFixed(1).padStart(5)} % gagnés · ${eur(m.esp * RISQUE_E).padStart(7)} par trade · ` +
+      `${eur(m.euros).padStart(8)} au total` : '';
     if (syms.length > 1 || sym !== 'NQ=F') console.log(`\n╔══ ${sym} ══╗`);
     const o = mesurer(T), p = mesurer(T, 'rpnet');
     if (sym === syms[0]) {
@@ -346,16 +353,23 @@ async function rapport() {
       console.log(`   biais seuil ${C.seuil}/4 · ${C.fvgn} FVG par unité · niveau ≤ ${C.keyAge} bougies · ${C.react} bougies entre touche et IFVG`);
       console.log(`   risque ${RISQUE_E} € par trade · frais 0,70 point (0,25 pt de slippage par côté + 4,00 $)\n`);
     }
+    const gagnants = Math.round(p.wr / 100 * p.n), perdants = p.n - gagnants;
     console.log('── ENSEMBLE ────────────────────────────────────────────────────────');
-    console.log(`   ${o.n} trades · stop moyen ${(T.reduce((a, x) => a + x.risq, 0) / T.length).toFixed(0)} pts · durée moyenne ${o.minutes.toFixed(0)} min`);
-    console.log(`   réussite      optimiste ${o.wr.toFixed(1)} %   prudent ${p.wr.toFixed(1)} %`);
-    console.log(`   espérance     optimiste ${(o.esp >= 0 ? '+' : '') + o.esp.toFixed(3)} R   prudent ${(p.esp >= 0 ? '+' : '') + p.esp.toFixed(3)} R`);
-    console.log(`   résultat      optimiste ${(o.euros >= 0 ? '+' : '') + Math.round(o.euros)} €   prudent ${(p.euros >= 0 ? '+' : '') + Math.round(p.euros)} €`);
-    console.log(`   seuil d'équilibre ${p.seuil.toFixed(1)} % → marge ${(p.marge >= 0 ? '+' : '') + p.marge.toFixed(1)} points`);
-    console.log(`   gain moyen +${p.gMoy.toFixed(2)} R · perte moyenne −${p.pMoy.toFixed(2)} R · profit factor ${p.pf === Infinity ? 'inf' : p.pf.toFixed(2)}`);
-    console.log(`   pire creux ${Math.round(p.ddE)} € · bougies ambiguës ${o.flou.toFixed(0)} %`);
-    console.log(`   intervalle de confiance à 95 % : ${(p.esp - 1.96 * p.se).toFixed(3)} … ${(p.esp + 1.96 * p.se).toFixed(3)} R  (t = ${p.t.toFixed(2)})`);
-    if (p.esp - 1.96 * p.se <= 0) console.log(`   ⚠️ l'intervalle contient zéro : l'avantage n'est PAS établi statistiquement`);
+    console.log(`   ${p.n} trades sur la période · stop moyen ${(T.reduce((a, x) => a + x.risq, 0) / T.length).toFixed(0)} pts · durée moyenne ${o.minutes.toFixed(0)} min`);
+    console.log(`   ${gagnants} gagnants, ${perdants} perdants  →  ${p.wr.toFixed(1)} % de réussite`);
+    console.log(`   il en faut ${p.seuil.toFixed(1)} % pour ne rien perdre  →  marge de ${(p.marge >= 0 ? '+' : '') + p.marge.toFixed(1)} points`);
+    console.log('');
+    console.log(`   un trade gagnant rapporte en moyenne   ${eur(p.gMoy * RISQUE_E).padStart(8)}`);
+    console.log(`   un trade perdant coûte en moyenne      ${eur(-p.pMoy * RISQUE_E).padStart(8)}`);
+    console.log(`   donc en moyenne, par trade             ${eur(p.esp * RISQUE_E).padStart(8)}`);
+    console.log(`   sur les ${String(p.n).padStart(3)} trades de la période        ${eur(p.euros).padStart(8)}`);
+    console.log('');
+    console.log(`   pire creux traversé                    ${eur(-p.ddE).padStart(8)}`);
+    console.log(`   pour 1 € perdu, ${p.pf === Infinity ? '∞' : p.pf.toFixed(2)} € gagnés (profit factor)`);
+    console.log(`   bougies ambiguës ${o.flou.toFixed(0)} % · comptage optimiste : ${o.wr.toFixed(1)} % et ${eur(o.euros)}`);
+    console.log(`   fourchette de confiance à 95 % : entre ${eur((p.esp - 1.96 * p.se) * RISQUE_E)} et ${eur((p.esp + 1.96 * p.se) * RISQUE_E)} par trade`);
+    if (p.esp - 1.96 * p.se <= 0) console.log(`   ⚠️ la fourchette passe par zéro : l'avantage n'est PAS prouvé, il peut être nul`);
+    else console.log(`   ✅ la fourchette ne passe pas par zéro : l'avantage tient sur cet échantillon`);
     for (const [titre, cle] of [['PAR MOIS', x => x.jour.slice(0, 7)], ['PAR SENS', x => x.sens],
                                 ['PAR UNITÉ DE L\'IFVG', x => x.tf || '?'], ['PAR FAMILLE DE NIVEAU', x => String(x.niveau).split(' ')[0]]]) {
       console.log(`\n── ${titre} ──────────────────────────────────────────────`);

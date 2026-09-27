@@ -916,34 +916,46 @@ function paintJournal(){
   const j = jeuJournal(), rows = j.rows, st = stats(rows);
   const uR = window.Compte ? Compte.uniteR() : 0;
   const dev = window.Compte ? Compte.sym(Compte.lire().devise) : '';
-  const nR = v => v == null ? '—' : sgn(v) + ' R';
+  // ── DES EUROS, PAS DES R ─────────────────────────────────────────────
+  // Le R est une unité de travail : « 1 R » = ce qu'on risque sur un trade.
+  // Pratique pour comparer deux marchés, illisible pour savoir ce qu'on gagne.
+  // Chaque case donne donc l'euro en gros et le R en petit.
+  const eu = v => v == null ? '—' : sgn(Math.round(v * uR), 0) + dev;
+  const pr = v => v == null ? '' : '<span class="bsub"> ' + sgn(v) + ' R</span>';
+  // Le seuil d'équilibre : le taux de réussite minimum sous lequel on perd.
+  // Sans lui, « 83 % de réussite » ne veut rien dire — il en faut parfois 69.
+  const seuil = (st.gainMoy && st.perteMoy)
+    ? Math.abs(st.perteMoy) / (st.gainMoy + Math.abs(st.perteMoy)) * 100 : null;
 
   $('#j-tag').textContent = st.n + ' clos' + (st.open ? ' + ' + st.open + ' en cours' : '');
   paintChipsJ();
 
-  // Deux RR à ne pas confondre : celui qu'on VISE au signal, et celui qu'on
-  // ENCAISSE. L'écart entre les deux dit si le modèle atteint ses cibles.
   bx.innerHTML =
     '<div class="bilan">' +
       '<div><div class="bk">Signaux clos</div><div class="bv mono">' + st.n +
         (st.open ? '<span class="bsub"> +' + st.open + '</span>' : '') + '</div></div>' +
       '<div><div class="bk">Réussite</div><div class="bv mono">' +
-        (st.rate == null ? '—' : st.rate.toFixed(1) + ' %') + '</div></div>' +
-      '<div><div class="bk">RR visé</div><div class="bv mono">' +
-        (st.rrVise == null ? '—' : st.rrVise.toFixed(2)) + '</div></div>' +
-      '<div><div class="bk">Gain moyen</div><div class="bv mono ' + (st.gainMoy ? 'pos' : '') + '">' +
-        nR(st.gainMoy) + '</div></div>' +
-      '<div><div class="bk">Perte moy.</div><div class="bv mono ' + (st.perteMoy ? 'neg' : '') + '">' +
-        nR(st.perteMoy) + '</div></div>' +
+        (st.rate == null ? '—' : st.rate.toFixed(1) + ' %') +
+        (seuil == null ? '' : '<span class="bsub"> il en faut ' + seuil.toFixed(0) + ' %</span>') + '</div></div>' +
+      '<div><div class="bk">Par trade</div><div class="bv mono ' +
+        (st.esp > 0 ? 'pos' : st.esp < 0 ? 'neg' : '') + '">' + eu(st.esp) + pr(st.esp) + '</div></div>' +
+      '<div><div class="bk">Un gain</div><div class="bv mono ' + (st.gainMoy ? 'pos' : '') + '">' +
+        eu(st.gainMoy) + pr(st.gainMoy) + '</div></div>' +
+      '<div><div class="bk">Une perte</div><div class="bv mono ' + (st.perteMoy ? 'neg' : '') + '">' +
+        eu(st.perteMoy) + pr(st.perteMoy) + '</div></div>' +
       '<div><div class="bk">Cumulé</div><div class="bv mono ' +
-        (st.rsum > 0 ? 'pos' : st.rsum < 0 ? 'neg' : '') + '">' + sgn(st.rsum,1) + ' R' +
-        '<span class="bsub"> ' + sgn(Math.round(st.rsum * uR),0) + dev + '</span></div></div>' +
+        (st.rsum > 0 ? 'pos' : st.rsum < 0 ? 'neg' : '') + '">' + eu(st.rsum) + pr(st.rsum) + '</div></div>' +
     '</div>';
 
   bx.insertAdjacentHTML('beforeend',
-    '<div class="note">1 R = <b>' + uR + dev + '</b> · ' +
+    '<div class="note">Calculé sur un risque de <b>' + uR + dev + '</b> par trade, soit ' +
     (window.Compte ? Compte.lire().risque : '—') + ' % de ' +
-    (window.Compte ? Number(Compte.lire().capital).toLocaleString('fr-FR') : '—') + dev + '</div>');
+    (window.Compte ? Number(Compte.lire().capital).toLocaleString('fr-FR') : '—') + dev + '. ' +
+    (seuil != null
+      ? 'Le <b>seuil d\u2019équilibre</b> est le taux de réussite en dessous duquel on perd de l\u2019argent : ' +
+        'ici ' + seuil.toFixed(1) + ' %, parce qu\u2019une perte coûte ' +
+        (st.gainMoy ? (Math.abs(st.perteMoy) / st.gainMoy).toFixed(1) : '—') + ' fois ce que rapporte un gain.'
+      : '') + '</div>');
 
   if(!rows.length){
     jx.innerHTML = '<div class="empty"><b>Aucun signal</b>' +
@@ -1101,11 +1113,13 @@ function paintFooter(){
   const L = Mesure.liste(); if(!L.length) return;
   const R = L.reduce((a,x)=>a+x.r,0), g = L.filter(x=>x.r>0).length;
   const j = L.map(x=>x.jour).sort();
+  const uR = window.Compte ? Compte.uniteR() : 250;
   $('#f-mes').textContent =
     `Mesuré du ${j[0]} au ${j[j.length-1]} : ${L.length} signaux, ` +
-    `${(g/L.length*100).toFixed(1)} % de réussite, ` +
-    `${(R/L.length>=0?'+':'')}${(R/L.length).toFixed(3)} R par signal net de frais, ` +
-    `soit ${(R>=0?'+':'')}${Math.round(R*250)} € sur un risque de 250 € par trade.`;
+    `${g} gagnants et ${L.length-g} perdants, soit ${(g/L.length*100).toFixed(1)} % de réussite. ` +
+    `${(R/L.length>=0?'+':'')}${Math.round(R/L.length*uR)} € par signal en moyenne, ` +
+    `${(R>=0?'+':'')}${Math.round(R*uR)} € au total, net de frais, ` +
+    `sur un risque de ${uR} € par trade.`;
 }
 
 /* ── démarrage ──────────────────────────────────────────────────────── */
