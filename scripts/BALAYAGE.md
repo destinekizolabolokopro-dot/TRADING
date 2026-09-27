@@ -311,3 +311,112 @@ Ce qui change par rapport aux anciens 80 % : ceux-là venaient d'une hypothèse
 sur l'ordre des touches, et l'arbitrage en 1 minute les démentait. Ceux-ci
 sont confirmés par l'arbitrage, tiennent sur les deux moitiés de
 l'échantillon, et survivent à vingt points de dérapage.
+
+---
+
+## 7. Le backtest complet du réglage appliqué
+
+`node scripts/balayage.js rapport` — le banc d'essai lit les réglages dans
+`js/modele.js`, il n'en garde plus de copie : il mesurait un partiel à 0,5 R
+pendant que le robot en passait un à 0,4 R.
+
+### NQ, le contrat sur lequel le réglage a été choisi
+
+```
+fenêtre 09 h 00 → 10 h 00 New York · stop × 4 · partiel 0,4 R sur 90 %
+runner 2,5 R · solde au marché à 12 h 00 · 2 trades/jour max
+
+64 trades · stop moyen 118 pts · durée moyenne 40 min
+réussite      optimiste 82,8 %   prudent 81,3 %
+espérance     optimiste +0,182 R   prudent +0,191 R
+résultat      optimiste +2 910 €   prudent +3 058 €
+seuil d'équilibre 65,8 % → marge +15,5 points
+gain moyen +0,42 R · perte moyenne −0,81 R · profit factor 2,26
+pire creux 839 € · bougies ambiguës 2 %
+intervalle de confiance à 95 % : +0,066 … +0,316 R   (t = 2,99)
+```
+
+L'intervalle exclut zéro. Mais le réglage a été choisi sur ces mêmes 64 trades,
+donc ce test est complaisant : il mesure l'ajustement autant que l'avantage.
+
+| par mois | trades | réussite | espérance | résultat |
+|---|---|---|---|---|
+| juillet 2026 | 12 | 91,7 % | +0,410 R | +1 229 € |
+| août 2026 | 27 | 85,2 % | +0,203 R | +1 369 € |
+| **septembre 2026** | 25 | **72,0 %** | **+0,074 R** | **+461 €** |
+
+**L'avantage décroît de mois en mois.** C'est le fait le plus dérangeant du
+rapport, et il n'a aucune explication rassurante.
+
+| par famille de niveau | trades | réussite | espérance |
+|---|---|---|---|
+| RB (rejection block) | 13 | 92,3 % | +0,349 R |
+| CISD | 32 | 84,4 % | +0,232 R |
+| FVG | 11 | 72,7 % | +0,031 R |
+| ITH | 5 | 60,0 % | +0,003 R |
+| ITL | 3 | 66,7 % | −0,023 R |
+
+Presque tout le résultat vient du CISD et du rejection block — les deux familles
+dont la définition est de moi, faute de source. C'est une faiblesse, pas une
+force : ce sont les deux briques les moins fondées qui portent le résultat.
+
+### Les quatre autres contrats — le seul vrai hors-échantillon
+
+Ils n'ont servi à **rien** dans le choix du réglage. Avec l'ancien stop serré,
+tous les quatre perdaient (ES −0,114 R, RTY −0,199 R, GC −0,071 R par signal).
+Avec le stop élargi :
+
+| contrat | trades | réussite | espérance | résultat |
+|---|---|---|---|---|
+| NQ | 64 | 81,3 % | +0,191 R | +3 058 € |
+| ES | 52 | 71,2 % | +0,004 R | +57 € |
+| YM | 61 | 75,4 % | +0,100 R | +1 530 € |
+| RTY | 60 | 75,0 % | +0,032 R | +477 € |
+| GC | 59 | 69,5 % | +0,018 R | +266 € |
+| **TOUT** | **296** | **74,7 %** | **+0,073 R** | **+5 388 €** |
+
+```
+seuil d'équilibre 68,5 % → marge +6,1 points
+intervalle de confiance à 95 % : +0,009 … +0,136 R   (t = 2,25)
+→ l'intervalle EXCLUT zéro
+```
+
+Cinq contrats positifs, dont quatre qui n'ont pas servi au réglage : c'est la
+meilleure preuve disponible que l'élargissement du stop n'est pas un
+ajustement au passé.
+
+**Mais le NQ rend +0,191 R et l'ensemble +0,073 R.** L'écart, presque trois
+fois, EST le biais de sélection. **+0,073 R est l'estimation honnête**, pas
++0,191.
+
+### Le challenge, avec le chiffre honnête
+
+| risque/trade | réussi | échec | séances si ça marche |
+|---|---|---|---|
+| 125 $ | 96,4 % | 0,7 % | 198 |
+| **250 $** | **88,2 %** | 11,8 % | **92** |
+| 375 $ | 76,0 % | 24,0 % | 52 |
+| 500 $ | 67,4 % | 32,6 % | 33 |
+
+Sur le NQ seul, le même calcul donnait 98,2 % en 41 séances. Avec la
+distribution non biaisée : **88,2 % en 92 séances**, soit quatre mois et demi.
+C'est ça qu'il faut retenir, pas les 98 %.
+
+### Les 24 heures rebalayées avec le stop élargi
+
+| fenêtre NY | trades | réussite | résultat | creux | 2e moitié |
+|---|---|---|---|---|---|
+| **01h00–02h30** | 57 | **93,0 %** | **+4 150 €** | **255 €** | +0,278 R |
+| 01h00–03h00 | 63 | 92,1 % | +4 334 € | 255 € | +0,280 R |
+| 01h00–02h00 | 47 | 93,6 % | +3 552 € | 255 € | +0,303 R |
+| 07h30–09h30 | 78 | 85,9 % | +4 172 € | 756 € | +0,159 R |
+| **09h00–10h00 (appliquée)** | 64 | 81,3 % | +3 058 € | 839 € | +0,191 R |
+
+01h00–02h30 New York (07h00–08h30 à Paris) est meilleure sur tous les critères
+à la fois : réussite, résultat, creux, et tenue sur la seconde moitié. Elle
+était **déjà** dans les trois premières du balayage fait AVANT le changement de
+stop, avec des objectifs complètement différents — donc ce n'est pas un choix
+frais sur le même échantillon, c'est une confirmation.
+
+La fenêtre appliquée reste 09h00–10h00 : changer la fenêtre est une décision de
+trading, pas une correction de bug.

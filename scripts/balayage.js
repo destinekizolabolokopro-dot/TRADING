@@ -92,8 +92,9 @@ function chargerModele() {
 const COUT_PTS = 0.25 * 2 + 4.00 / 20;
 const RISQUE_E = +(args.risque || 250);     // 0,5 % d'un compte de 50 000 €
 
-function suivre(s, apres, cfg, prudent, maxBarres) {
+function suivre(s, apres, cfg, prudent, maxBarres, heure, jourSignal) {
   const L = s.sens === 'LONG';
+  const plafond = cfg.part * cfg.tp1 + (1 - cfg.part) * cfg.tp2;
   let sl = s.sl, part1 = false, n = 0, r = null, o = null, flou = 0;
   for (const c of apres) {
     n++;
@@ -103,11 +104,22 @@ function suivre(s, apres, cfg, prudent, maxBarres) {
     if (prudent) {
       if (stoppe())                     { r = part1 ? cfg.part * cfg.tp1 : -1; o = part1 ? 'partiel' : 'perte'; }
       else if (!part1 && touche(s.tp1)) { part1 = true; sl = s.entree; }
-      else if (part1 && touche(s.tp))   { r = cfg.part * cfg.tp1 + (1 - cfg.part) * cfg.tp2; o = 'gain'; }
+      else if (part1 && touche(s.tp))   { r = plafond; o = 'gain'; }
     } else {
       if (!part1 && touche(s.tp1))      { part1 = true; sl = s.entree; }
-      if (part1 && touche(s.tp))        { r = cfg.part * cfg.tp1 + (1 - cfg.part) * cfg.tp2; o = 'gain'; }
+      if (part1 && touche(s.tp))        { r = plafond; o = 'gain'; }
       else if (stoppe())                { r = part1 ? cfg.part * cfg.tp1 : -1; o = part1 ? 'partiel' : 'perte'; }
+    }
+    // Sortie forcée AU MARCHÉ : le robot solde à cette heure, le banc d'essai
+    // doit faire pareil, ou il ne mesure pas ce qui tourne.
+    if (r === null && cfg.sortieMin != null && heure) {
+      const e = heure(c.t);
+      if (e.jour !== jourSignal || e.min >= cfg.sortieMin) {
+        const brut = (L ? c.c - s.entree : s.entree - c.c) / Math.abs(s.entree - s.sl);
+        r = part1 ? cfg.part * cfg.tp1 + (1 - cfg.part) * Math.max(-1, Math.min(cfg.tp2, brut))
+                  : Math.max(-1, Math.min(cfg.tp2, brut));
+        o = 'horaire';
+      }
     }
     if (r === null && n > maxBarres) { r = part1 ? cfg.part * cfg.tp1 : 0; o = part1 ? 'partiel' : 'ambigu'; }
     if (r !== null) break;
@@ -122,14 +134,15 @@ function passe(M, D, cfg) {
   const T = [];
   for (const s of (d.tousSignaux || [])) {
     const apres = D.m5.filter(c => c.t > s.t);
-    const opt = suivre(s, apres, M.CFG, false, 200);
-    const pru = suivre(s, apres, M.CFG, true, 200);
+    const jourSig = M.heure(s.t).jour;
+    const opt = suivre(s, apres, M.CFG, false, 200, M.heure, jourSig);
+    const pru = suivre(s, apres, M.CFG, true, 200, M.heure, jourSig);
     if (!opt || !pru) continue;                 // position non dénouée : écartée
     const cout = COUT_PTS / s.risq;
     T.push({ r: opt.r, rnet: opt.r - cout, o: opt.o,
              rp: pru.r, rpnet: pru.r - cout, op: pru.o, flou: opt.flou,
              risq: s.risq, t: s.t, sens: s.sens, niveau: s.niveau,
-             entree: s.entree, sl: s.sl, tp1: s.tp1, tp: s.tp,
+             entree: s.entree, sl: s.sl, tp1: s.tp1, tp: s.tp, tf: s.tf,
              jour: M.heure(s.t).jour, min: M.heure(s.t).min, barres: opt.barres,
              rr: cfg.part * cfg.tp1 + (1 - cfg.part) * cfg.tp2 });
   }
@@ -179,8 +192,10 @@ function tableau(lignes, tri, top) {
 }
 
 // ═════════════════════════════════════════════════════════════════ grilles ══
-const BASE = { ghDeb: 9 * 60, ghFin: 10 * 60, seuil: 2, fvgn: 1, keyAge: 400, react: 12,
-               tp1: 0.5, tp2: 2.5, part: 0.9, buf: 0.02, atrMin: 0.3, maxJour: 2 };
+// Les réglages de départ sont ceux de js/modele.js, pas une copie qui se
+// désynchronise. C'est déjà arrivé : le banc d'essai mesurait un partiel à
+// 0,5 R pendant que le robot en passait un à 0,4 R.
+const BASE = Object.assign({}, chargerModele().CFG);
 
 function grille(mode) {
   const g = [];
@@ -279,7 +294,7 @@ async function arbitre() {
     const T = passe(M, D, cfg).filter(x => x.t > T0);
     let so = 0, sp = 0, sv = 0, n = 0, amb = 0, jOpt = 0, jPru = 0;
     for (const x of T) {
-      const v = suivre(x, m1.filter(k => k.t > x.t), cfg, true, 1200);
+      const v = suivre(x, m1.filter(k => k.t > x.t), cfg, true, 1200, M.heure, M.heure(x.t).jour);
       if (!v) { amb++; continue; }
       const cout = COUT_PTS / x.risq;
       n++; so += x.rnet; sp += x.rpnet; sv += v.r - cout;
@@ -295,8 +310,53 @@ async function arbitre() {
   }
 }
 
+// ═════════════════════════════════════════════════════════════════ rapport ══
+// Le backtest complet du réglage EFFECTIVEMENT appliqué, découpé de toutes les
+// façons qui peuvent le contredire : par mois, par sens, par unité, par niveau,
+// et sur les autres contrats.
+async function rapport() {
+  const M = chargerModele();
+  const syms = (args.syms || 'NQ=F').split(',');
+  for (const sym of syms) {
+    let D; try { D = await charger(sym); } catch (e) { console.log(`\n${sym} : ${e.message}`); continue; }
+    const T = passe(M, D, {});
+    if (!T.length) { console.log(`\n${sym} : aucun signal`); continue; }
+    const C = M.CFG;
+    const hm = m => String(Math.floor(m / 60)).padStart(2, '0') + ' h ' + String(m % 60).padStart(2, '0');
+    const g = (m, n) => m ? `${String(n).padEnd(14)} ${String(m.n).padStart(4)} tr · ${m.wr.toFixed(1).padStart(5)} % · ` +
+      `${(m.esp >= 0 ? '+' : '') + m.esp.toFixed(3)} R · ${((m.euros >= 0 ? '+' : '') + Math.round(m.euros)).padStart(7)} €` : '';
+    if (syms.length > 1 || sym !== 'NQ=F') console.log(`\n╔══ ${sym} ══╗`);
+    const o = mesurer(T), p = mesurer(T, 'rpnet');
+    if (sym === syms[0]) {
+      console.log(`\nRéglages lus dans js/modele.js :`);
+      console.log(`   fenêtre ${hm(C.ghDeb)} → ${hm(C.ghFin)} New York · stop × ${C.slx} · partiel ${C.tp1} R sur ${Math.round(C.part * 100)} % · ` +
+                  `runner ${C.tp2} R · solde au marché à ${hm(C.sortieMin)} · ${C.maxJour} trades/jour max`);
+      console.log(`   biais seuil ${C.seuil}/4 · ${C.fvgn} FVG par unité · niveau ≤ ${C.keyAge} bougies · ${C.react} bougies entre touche et IFVG`);
+      console.log(`   risque ${RISQUE_E} € par trade · frais 0,70 point (0,25 pt de slippage par côté + 4,00 $)\n`);
+    }
+    console.log('── ENSEMBLE ────────────────────────────────────────────────────────');
+    console.log(`   ${o.n} trades · stop moyen ${(T.reduce((a, x) => a + x.risq, 0) / T.length).toFixed(0)} pts · durée moyenne ${o.minutes.toFixed(0)} min`);
+    console.log(`   réussite      optimiste ${o.wr.toFixed(1)} %   prudent ${p.wr.toFixed(1)} %`);
+    console.log(`   espérance     optimiste ${(o.esp >= 0 ? '+' : '') + o.esp.toFixed(3)} R   prudent ${(p.esp >= 0 ? '+' : '') + p.esp.toFixed(3)} R`);
+    console.log(`   résultat      optimiste ${(o.euros >= 0 ? '+' : '') + Math.round(o.euros)} €   prudent ${(p.euros >= 0 ? '+' : '') + Math.round(p.euros)} €`);
+    console.log(`   seuil d'équilibre ${p.seuil.toFixed(1)} % → marge ${(p.marge >= 0 ? '+' : '') + p.marge.toFixed(1)} points`);
+    console.log(`   gain moyen +${p.gMoy.toFixed(2)} R · perte moyenne −${p.pMoy.toFixed(2)} R · profit factor ${p.pf === Infinity ? 'inf' : p.pf.toFixed(2)}`);
+    console.log(`   pire creux ${Math.round(p.ddE)} € · bougies ambiguës ${o.flou.toFixed(0)} %`);
+    console.log(`   intervalle de confiance à 95 % : ${(p.esp - 1.96 * p.se).toFixed(3)} … ${(p.esp + 1.96 * p.se).toFixed(3)} R  (t = ${p.t.toFixed(2)})`);
+    if (p.esp - 1.96 * p.se <= 0) console.log(`   ⚠️ l'intervalle contient zéro : l'avantage n'est PAS établi statistiquement`);
+    for (const [titre, cle] of [['PAR MOIS', x => x.jour.slice(0, 7)], ['PAR SENS', x => x.sens],
+                                ['PAR UNITÉ DE L\'IFVG', x => x.tf || '?'], ['PAR FAMILLE DE NIVEAU', x => String(x.niveau).split(' ')[0]]]) {
+      console.log(`\n── ${titre} ──────────────────────────────────────────────`);
+      const gr = {}; T.forEach(x => { const k = cle(x); (gr[k] = gr[k] || []).push(x); });
+      Object.keys(gr).sort().forEach(k => console.log('   ' + g(mesurer(gr[k], 'rpnet'), k)));
+    }
+    console.log('');
+  }
+}
+
 (async () => {
   if (MODE === 'ouvrier') return ouvrier();
+  if (MODE === 'rapport') return rapport();
   if (MODE === 'arbitre') return arbitre();
   return chef();
 })().catch(e => { console.error('ERREUR :', e.message); process.exit(1); });
