@@ -20,24 +20,65 @@
 (function (root) {
 
   var CFG = {
-    // Fenêtre 09 h 00 → 10 h 00 New York, soit 15 h 00 → 16 h 00 à Paris.
-    // Retenue parce qu'elle est la meilleure sur les DEUX critères à la
-    // fois, sur un balayage des vingt-quatre heures :
-    //
-    //   09h00 → 10h00   70 signaux · 80,0 % · +2 808 € · +0,160 R/signal
-    //   09h00 → 09h30   35 signaux · 85,7 % · +1 896 € · +0,217 R/signal
-    //   09h30 → 10h00   57 signaux · 77,2 % · +2 009 € · +0,141 R/signal
-    //   09h30 → 11h00   80 signaux · 72,5 % · +1 215 € · +0,061 R/signal
-    //
-    // La demi-heure 09h00-09h30, avant l'ouverture du NYSE, a le meilleur
-    // taux et la meilleure espérance par signal, mais deux fois moins de
-    // trades. L'heure entière garde 80 % tout en doublant l'échantillon.
-    ghDeb: 9 * 60, ghFin: 10 * 60,   // heure de New York
+    // ── FENÊTRE ──────────────────────────────────────────────────────────
+    // 09 h 00 → 10 h 00 New York, soit 15 h 00 → 16 h 00 à Paris.
+    ghDeb: 9 * 60, ghFin: 10 * 60,        // heure de New York
+
+    // ── BIAIS ET NIVEAUX ─────────────────────────────────────────────────
     seuil: 2, fvgn: 1,                    // biais : score minimum, FVG comptés par unité
     keyAge: 400, react: 12,               // âge d'un niveau, bougies entre touche et IFVG
-    tp1: 0.5, tp2: 2.5, part: 0.9,        // partiel à 0,5 R, runner à 2,5 R
     buf: 0.02, atrMin: 0.3,               // tampon du stop en %, stop minimum en fraction d'ATR
-    maxJour: 2
+    maxJour: 2,
+
+    // ── STOP : LARGEUR ──────────────────────────────────────── [MESURÉ]
+    // Le stop était au bord de l'IFVG de confirmation, et rien d'autre. Or ce
+    // bord est souvent à dix ou vingt points de l'entrée : le prix y revient
+    // pour respirer, sans que la lecture soit fausse. `slx` l'éloigne d'un
+    // multiple de cette distance.
+    //
+    //   Mesuré sur 64 signaux, fenêtre 09h00-10h00, comptage prudent :
+    //     slx 1  (l'ancien)  stop  30 pts   56,3 % de réussite   −2 659 €
+    //     slx 2              stop  59 pts   79,7 %               −  403 €
+    //     slx 3              stop  89 pts   76,6 %               +1 299 €
+    //     slx 4              stop 118 pts   81,3 %               +3 058 €
+    //     slx 6              stop 177 pts   84,4 %               +2 666 €
+    //
+    // slx 4 est retenu : 81,3 % de réussite pour un seuil d'équilibre à
+    // 65,8 %, soit quinze points de marge — et un stop de 118 points tient
+    // dans un contrat MNQ à 250 € de risque, ce que 177 points ne fait pas.
+    slMode: 'multiple', slx: 4,
+    unites: 'M5,M15,M30,H1,H4',   // unités où chercher les niveaux clés
+
+    // ── LES RÈGLES DU PLAN SOURCE ────────────────────────── [PLAN SOURCE]
+    // Trois exigences du plan « 10AM OXXC » que le modèle ne tenait pas.
+    // Elles viennent d'un document, pas d'un balayage : les appliquer est
+    // beaucoup moins risqué que d'aller chercher la meilleure case d'une
+    // grille sur les mêmes soixante jours.
+    confirme2: true,       // « narrative confirmée sur NQ et ES ensemble »
+    confirme2Ifvg: false,  // « IFVG + CISD présents sur NQ ET ES »
+    exigeCISD: false,      // IFVG ET CISD, au lieu de l'un OU l'autre
+    tp2Mode: 'R',          // 'R' = multiple du risque · 'dol' = la liquidité visée
+
+    // ── OBJECTIFS ────────────────────────────────────────────── [MESURÉ]
+    // Le partiel est à 0,4 R du stop ÉLARGI, donc ~47 points : assez loin
+    // pour qu'une bougie de 5 minutes ne puisse pas contenir l'aller et le
+    // retour (2 % de bougies ambiguës contre 25 % avec l'ancien 0,5 R sur
+    // stop serré), assez près pour être atteint quatre fois sur cinq.
+    tp1: 0.4, tp2: 2.5, part: 0.9,
+
+    // ── SORTIE FORCÉE ────────────────────────────────────────── [MESURÉ]
+    // Sans limite, cinq positions sur soixante-quatre étaient tenues plus de
+    // six heures, jusqu'à seize heures — donc la nuit, avec un risque de gap
+    // que ni le backtest ni la règle de drawdown d'un compte financé ne
+    // savent traiter. Couper à midi heure de New York ne coûte rien :
+    //
+    //   sortie 11h00   79,7 %   +3 102 €   durée moyenne  48 min
+    //   sortie 12h00   81,3 %   +3 058 €   durée moyenne  60 min
+    //   sortie 16h00   81,3 %   +2 985 €   durée moyenne  86 min
+    //   aucune         81,3 %   +2 968 €   durée moyenne 119 min
+    //
+    // La position est soldée AU MARCHÉ à cette heure, gain ou perte.
+    sortieMin: 12 * 60
   };
 
   var NY = 'America/New_York';
@@ -79,16 +120,57 @@
    * Évalue le modèle sur les bougies fournies et rend l'état COURANT.
    * @param D { m1, m2, m5, m15, h1, d1 }
    */
-  function evaluer(D) {
+  function evaluer(D, D2) {
     if (!D || !D.m5 || D.m5.length < 80 || !D.h1 || !D.d1 || !D.m15) return null;
     var clock = D.m5;
     var m30 = ST.agreger(D.m15, 2), h4 = ST.agreger(D.h1, 4);
     var prep = prepareBiais([D.d1, h4, D.h1, D.m15]);
     var hierH1 = ST.hierarchie(D.h1);
 
+    // ── LE MARCHÉ DE CONFIRMATION ────────────────────────── [PLAN SOURCE]
+    // « Narrative journalière confirmée sur NQ et ES ENSEMBLE », et « IFVG +
+    // CISD présents sur NQ ET ES ». Le plan ne demande pas de regarder le
+    // second marché en option : il en fait une condition. Quand D2 est
+    // fourni et que CFG.confirme2 est vrai, un signal n'est retenu que si le
+    // biais du second marché va dans le même sens au même instant.
+    var prep2 = null, ifvg2 = null;
+    // Demandée mais indisponible : il faut le DIRE, pas filtrer en silence.
+    // Sans ce drapeau, le site afficherait des signaux que le robot écarte.
+    var sansConfirmation = CFG.confirme2 && !(D2 && D2.m5 && D2.m5.length > 80);
+    if (D2 && D2.m5 && D2.m5.length > 80 && CFG.confirme2) {
+      var h4b = ST.agreger(D2.h1, 4);
+      prep2 = prepareBiais([D2.d1, h4b, D2.h1, D2.m15]);
+      // Les IFVG du second marché sur son unité d'exécution, pour la variante
+      // stricte : le plan veut l'inversion présente des deux côtés.
+      ifvg2 = ST.fvgs(D2.m5).filter(function (z) { return z.tCasse != null; });
+    }
+    // Le second marché confirme-t-il à l'instant t, dans le sens `dir` ?
+    function confirme2(t, dir) {
+      if (!prep2) return true;                       // pas de second marché : neutre
+      if (biaisA(prep2, t).dir !== dir) return false;
+      if (!CFG.confirme2Ifvg) return true;
+      // variante stricte : une inversion récente du bon sens sur le second marché
+      var limite = t - (CFG.react || 12) * 5 * 60000;
+      for (var q = ifvg2.length - 1; q >= 0; q--) {
+        var z = ifvg2[q];
+        if (z.tCasse > t || z.tCasse < limite) continue;
+        if ((z.haussier ? -1 : 1) === dir) return true;
+      }
+      return false;
+    }
+
     // ── niveaux clés : quatre familles, cinq unités ────────────────── [COMM]
-    var UNITES = [{ cs: D.m5, n: 'M5' }, { cs: D.m15, n: 'M15' }, { cs: m30, n: 'M30' },
+    // Le plan de la source définit le PD Array comme un FVG M15 / M30 / H1 / H4.
+    // Le M5 n'y figure pas. `unites` permet de le retirer et de mesurer.
+    var TOUTES = [{ cs: D.m5, n: 'M5' }, { cs: D.m15, n: 'M15' }, { cs: m30, n: 'M30' },
                   { cs: D.h1, n: 'H1' }, { cs: h4, n: 'H4' }];
+    var voulues = CFG.unites || 'M5,M15,M30,H1,H4';
+    var UNITES = TOUTES.filter(function (u) { return voulues.indexOf(u.n) >= 0; });
+    // Les CISD de l'unité d'exécution, horodatés, pour l'exigence « IFVG + CISD ».
+    var cisdClock = ST.cisd(clock).map(function (z) {
+      return { t: clock[z.ne] ? clock[z.ne].t : 0, haussier: z.haussier };
+    }).filter(function (z) { return z.t > 0; });
+
     var niveaux = [];
     UNITES.forEach(function (u) {
       var push = function (zs, type) { zs.forEach(function (z) {
@@ -108,6 +190,15 @@
     var atrC = ST.atr(clock);
 
     // DOL : la liquidité intacte LA PLUS PROCHE dans le sens du biais.
+    function objectif(L, entree, risq, dol) {
+      var parR = L ? entree + risq * CFG.tp2 : entree - risq * CFG.tp2;
+      if (CFG.tp2Mode !== 'dol' || dol == null) return parR;
+      var bon = L ? dol > entree : dol < entree;
+      if (!bon) return parR;                       // DOL du mauvais côté : on garde le R
+      // le DOL, mais jamais plus loin que le plafond en R
+      return L ? Math.min(dol, parR) : Math.max(dol, parR);
+    }
+
     function dolNiveau(t, dir, px) {
       var idx = ST.idxA(D.h1, t); if (idx < 0) return null;
       var liste = dir > 0 ? hierH1.ith : hierH1.itl, best = null;
@@ -181,15 +272,69 @@
           }
         }
         etapeCourante.ifvg = choisi;
+
+        // ── LE SECOND MARCHÉ DOIT DIRE LA MÊME CHOSE ───────── [PLAN SOURCE]
+        if (choisi && !confirme2(bar.t, dir)) { etapes = etapeCourante; continue; }
+
+        // ── IFVG *ET* CISD ─────────────────────────────────── [PLAN SOURCE]
+        // Le plan liste les deux : « IFVG + CISD présents ». Le modèle se
+        // contentait de l'un OU de l'autre — l'IFVG servait de confirmation,
+        // le CISD n'était qu'une des quatre familles de niveaux possibles.
+        if (choisi && CFG.exigeCISD) {
+          var cisdOk = false, limCisd = bar.t - CFG.react * 5 * 60000;
+          for (var q3 = cisdClock.length - 1; q3 >= 0; q3--) {
+            var zc = cisdClock[q3];
+            if (zc.t > bar.t || zc.t < limCisd) continue;
+            if (zc.haussier === (dir > 0)) { cisdOk = true; break; }
+          }
+          if (!cisdOk) { etapes = etapeCourante; continue; }
+        }
+
         if (choisi) {
           var L = dir > 0, entree = px, buf = entree * CFG.buf / 100;
-          var sl = L ? choisi.z.bas - buf : choisi.z.haut + buf;   // stop au bord de l'IFVG
+          // ── OÙ SE POSE LE STOP ───────────────────────────────────────
+          //   'jambe'    sous (ou sur) l'extrémité de la jambe de
+          //              manipulation, depuis la touche du niveau clé
+          //              jusqu'à la bougie de confirmation. C'est la règle
+          //              de la source : « SL : sous le dernier mouvement ».
+          //              Aucun paramètre libre, donc rien à sur-ajuster.
+          //   'multiple' le bord de l'IFVG éloigné de `slx` fois sa distance.
+          //              Approximation numérique de la précédente, trouvée
+          //              en balayant avant d'avoir la règle.
+          var bord = L ? choisi.z.bas - buf : choisi.z.haut + buf;
+          var d0 = Math.abs(entree - bord);
+          var sl;
+          if (CFG.slMode === 'jambe') {
+            var seg = clock.slice(legDeb, i + 1), ext = L ? seg[0].l : seg[0].h;
+            for (var q2 = 1; q2 < seg.length; q2++)
+              ext = L ? Math.min(ext, seg[q2].l) : Math.max(ext, seg[q2].h);
+            sl = L ? ext - buf : ext + buf;
+          } else {
+            sl = L ? entree - d0 * CFG.slx : entree + d0 * CFG.slx;
+          }
+          // ⚠️ L'entrée est la CLÔTURE de la bougie de confirmation, le stop
+          // est le bord de l'IFVG. Rien ne garantit que la clôture soit du bon
+          // côté de ce bord : quand elle le dépasse, le « stop » se retrouve
+          // DANS LE SENS DU GAIN, et l'ordre est impossible à passer. Mesuré
+          // sur les vraies bougies NQ : 4 à 9 % des signaux selon la fenêtre,
+          // et ils perdaient de l'argent. `Math.abs` ci-dessous effaçait le
+          // signe et rendait l'anomalie invisible.
+          var coherent = (L ? bord < entree : bord > entree) && (L ? sl < entree : sl > entree);
           var risq = Math.abs(entree - sl);
-          if (risq > 0 && atrC[i] && risq >= atrC[i] * CFG.atrMin) {
+          // Le filtre d'ATR porte sur la distance STRUCTURELLE (le bord de
+          // l'IFVG), pas sur la distance élargie : sinon `slx` ferait passer
+          // n'importe quelle zone minuscule.
+          if (coherent && d0 > 0 && atrC[i] && d0 >= atrC[i] * CFG.atrMin) {
             dernier = { sens: L ? 'LONG' : 'SHORT', t: bar.t, entree: +entree.toFixed(2),
               sl: +sl.toFixed(2), risq: risq,
               tp1: +(L ? entree + risq * CFG.tp1 : entree - risq * CFG.tp1).toFixed(2),
-              tp: +(L ? entree + risq * CFG.tp2 : entree - risq * CFG.tp2).toFixed(2),
+              // ── OÙ SE POSE L'OBJECTIF ──────────────────── [PLAN SOURCE]
+              // « TP : haut/bas de session, PD High/Low, ou extrémité d'un
+              // CRT H1/H4 ». C'est un ENDROIT du graphique, pas une distance.
+              // Le DOL — la liquidité intacte la plus proche — est ce que le
+              // modèle sait calculer de plus proche de ça. Borné à tp2 R pour
+              // que le runner reste atteignable.
+              tp: +objectif(L, entree, risq, dol).toFixed(2),
               rr: CFG.part * CFG.tp1 + (1 - CFG.part) * CFG.tp2,
               tf: choisi.tf, niveau: key.type + ' ' + key.tf, dol: dol,
               // Le contexte est figé ICI, au moment du signal. Sans ça, celui
@@ -287,6 +432,7 @@
       dernierSignal: dernier,
       tousSignaux: tous,
       hors: horsFenetre,
+      sansConfirmation: sansConfirmation,
       cfg: CFG
     };
   }

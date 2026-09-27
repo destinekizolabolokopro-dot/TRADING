@@ -1,3 +1,4 @@
 
 # État runtime des bots (apprentissage)
 scripts/data/
+.cache/
