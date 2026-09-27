@@ -53,7 +53,12 @@ const COUT_PTS = 0.25 * 2 + 4.00 / 20;
   if (args.ghdeb) M.CFG.ghDeb = +args.ghdeb;
   if (args.ghfin) M.CFG.ghFin = +args.ghfin;
   const C = M.CFG;
-  const d = M.evaluer(D);
+  // Le second marché, exigé par le plan source pour confirmer la narrative.
+  const E = {
+    m5: await serie('ES=F', '5m', '60d'), m15: await serie('ES=F', '15m', '60d'),
+    h1: await serie('ES=F', '1h', '6mo'), d1: await serie('ES=F', '1d', '1y')
+  };
+  const d = M.evaluer(D, E);
   const m1Debut = D.m1.length ? D.m1[0].t : Infinity;
 
   const lignes = [];

@@ -490,3 +490,97 @@ deux qui vienne d'une source plutôt que d'un balayage.
 
 Les options `slMode` et `unites` sont ajoutées à `js/modele.js` pour pouvoir
 mesurer ces variantes. Les valeurs appliquées ne changent pas.
+
+---
+
+## 9. Les trois règles du plan, construites et mesurées
+
+Elles viennent d'un document, pas d'un balayage. C'est toute la différence :
+il n'y a pas de « meilleure case » à choisir, on applique ou on n'applique pas.
+
+| règle appliquée | trades | réussite | espérance | résultat | creux | 2e moitié |
+|---|---|---|---|---|---|---|
+| aucune (l'état d'avant) | 64 | 81,3 % | +0,191 R | +3 058 € | 839 € | 77,8 % / +1 157 € |
+| **+ confirmation ES (biais)** | **42** | **83,3 %** | **+0,194 R** | +2 036 € | **756 €** | **85,2 % / +1 424 €** |
+| + confirmation ES stricte | 38 | 78,9 % | +0,154 R | +1 467 € | 915 € | 78,3 % / +791 € |
+| + IFVG ET CISD | 56 | 80,4 % | +0,181 R | +2 540 € | 1 007 € | 70,0 % / +159 € |
+| + objectif au DOL | 64 | 81,3 % | +0,191 R | +3 050 € | 839 € | 77,8 % / +1 157 € |
+| les trois ensemble | 35 | 82,9 % | +0,192 R | +1 676 € | 756 € | 76,2 % / +425 € |
+
+Une seule des trois mérite d'être gardée.
+
+### Retenue : la confirmation sur le second marché
+
+> « Narrative journalière confirmée sur NQ et ES ensemble »
+
+Elle écarte un tiers des signaux et **l'espérance ne bouge pas** : les trades
+retirés valaient zéro. Le creux baisse, et la deuxième moitié de l'échantillon
+s'améliore nettement. La décroissance mensuelle, qui était le fait le plus
+inquiétant du rapport, s'aplatit :
+
+| | sans confirmation | avec confirmation |
+|---|---|---|
+| juillet | 91,7 % · +0,410 R | 100,0 % · +0,416 R |
+| août | 85,2 % · +0,203 R | 82,4 % · +0,179 R |
+| **septembre** | 72,0 % · **+0,074 R** | 78,9 % · **+0,137 R** |
+
+Le filtre retire surtout des trades qui échouaient récemment.
+
+#### La validation croisée, qui nuance
+
+Si « confirmer avec un second indice » était une règle universelle, elle
+devrait aider partout. Elle n'aide pas partout.
+
+| marché ← confirmé par | sans | avec |
+|---|---|---|
+| NQ ← ES | +0,191 R | +0,194 R |
+| NQ ← YM | +0,191 R | **+0,156 R** |
+| ES ← NQ | +0,004 R | **+0,101 R** |
+| YM ← ES | +0,100 R | **+0,057 R** |
+| RTY ← ES | +0,032 R | **+0,256 R** |
+| YM ← NQ | +0,100 R | +0,117 R |
+
+Quatre paires sur six s'améliorent, deux se dégradent. Et par fenêtre :
+
+| fenêtre NY | sans | avec |
+|---|---|---|
+| 09h00–10h00 | +0,191 R | +0,194 R |
+| **10h00–11h00 (fenêtre du plan)** | +0,094 R | **+0,214 R** |
+| **10h00–12h00 (plan étendu)** | +0,060 R | **+0,163 R** |
+| 01h00–02h30 | +0,291 R | +0,243 R |
+| 07h30–09h00 | +0,168 R | +0,118 R |
+
+**La confirmation aide surtout dans la fenêtre que le plan prescrit.** Ce n'est
+pas un filtre universel : c'est une pièce d'un ensemble cohérent. Le plan dit
+« 10h–12h ET confirmation sur les deux », et c'est là que ça marche.
+
+### Écartées
+
+**IFVG ET CISD ensemble** — 80,4 % contre 81,3 %, et la deuxième moitié
+s'effondre (70,0 % / +159 €). Ma définition du CISD est probablement trop
+lâche pour servir de second filtre.
+
+**Objectif au DOL** — aucun effet mesurable (+3 050 € contre +3 058 €). Le DOL
+est presque toujours plus loin que 2,5 R, donc le plafond mord et l'objectif ne
+bouge pas. Pour appliquer vraiment la règle du plan il faudrait le haut/bas de
+séance et les extrémités de CRT H1/H4, qui ne sont pas implémentés.
+
+### Le coût : la vitesse
+
+| configuration | trades | réussite | espérance | challenge à 250 $ |
+|---|---|---|---|---|
+| 09h–10h sans confirmation | 64 | 81,3 % | +0,191 R | 99,3 % en **50 séances** |
+| **09h–10h avec confirmation** | **42** | **83,3 %** | **+0,194 R** | 99,1 % en **76 séances** |
+| 10h–11h avec confirmation (plan) | 34 | 85,3 % | +0,214 R | 100,0 % en 84 séances |
+| 10h–12h avec confirmation (plan) | 43 | 79,1 % | +0,163 R | 99,8 % en 88 séances |
+
+Un tiers de signaux en moins, c'est vingt-six séances de plus pour atteindre
+les 3 000 $. C'est le prix, et il est payé volontairement : la vitesse est
+exactement ce qu'il ne faut pas optimiser.
+
+### Ce que le modèle fait quand le second marché manque
+
+Il ne filtre pas en silence. `evaluer()` rend `sansConfirmation: true`, le
+robot consigne `confirmePar` dans l'instantané, et le pied du site écrit
+« NQ seul — confirmation indisponible ». Sans ça, le site afficherait des
+signaux que le robot écarte, et personne ne pourrait le voir.

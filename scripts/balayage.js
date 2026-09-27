@@ -71,6 +71,17 @@ async function charger(sym) {
   for (const [i, r, k] of SERIES) D[k] = await serie(sym, i, r);
   return D;
 }
+// Le marché de confirmation exigé par le plan source. Chargé une seule fois.
+let _conf = null;
+async function confirmateur() {
+  if (_conf) return _conf;
+  const s = args.conf || 'ES=F';
+  _conf = {
+    m5: await serie(s, '5m', '60d'), m15: await serie(s, '15m', '60d'),
+    h1: await serie(s, '1h', '6mo'), d1: await serie(s, '1d', '1y')
+  };
+  return _conf;
+}
 
 // ═══════════════════════════════════════════════ le modèle, tel qu'embarqué ══
 // js/structure.js et js/modele.js sont écrits pour le navigateur : ils
@@ -127,9 +138,9 @@ function suivre(s, apres, cfg, prudent, maxBarres, heure, jourSignal) {
   return r === null ? null : { r, o, barres: n, flou };
 }
 
-function passe(M, D, cfg) {
+function passe(M, D, cfg, D2) {
   Object.assign(M.CFG, cfg);
-  const d = M.evaluer(D);
+  const d = M.evaluer(D, D2);
   if (!d) return [];
   const T = [];
   for (const s of (d.tousSignaux || [])) {
@@ -244,11 +255,12 @@ async function ouvrier() {
   const M = chargerModele();
   const D = await charger(args.sym || 'NQ=F');
   const g = JSON.parse(fs.readFileSync(args.grille, 'utf-8'));
+  const CONF = M.CFG.confirme2 ? await confirmateur() : null;
   const jours = [...new Set(D.m5.map(c => M.heure(c.t).jour))].sort();
   const COUPE = jours[Math.floor(jours.length / 2)];      // découpe hors-échantillon
   const out = [];
   for (let i = +args.de; i < +args.a && i < g.length; i++) {
-    let T; try { T = passe(M, D, g[i]); } catch (e) { continue; }
+    let T; try { T = passe(M, D, g[i], CONF); } catch (e) { continue; }
     const opt = mesurer(T); if (!opt) continue;
     out.push({ cfg: g[i], opt, pru: mesurer(T, 'rpnet'),
                optA: mesurer(T.filter(x => x.jour < COUPE)),
@@ -291,7 +303,7 @@ async function arbitre() {
   const cas = (args.cas ? JSON.parse(args.cas) : [{ ghDeb: 540, ghFin: 600 }, { ghDeb: 60, ghFin: 150 }]);
   for (const c of cas) {
     const cfg = Object.assign({}, BASE, c);
-    const T = passe(M, D, cfg).filter(x => x.t > T0);
+    const T = passe(M, D, cfg, M.CFG.confirme2 ? await confirmateur() : null).filter(x => x.t > T0);
     let so = 0, sp = 0, sv = 0, n = 0, amb = 0, jOpt = 0, jPru = 0;
     for (const x of T) {
       const v = suivre(x, m1.filter(k => k.t > x.t), cfg, true, 1200, M.heure, M.heure(x.t).jour);
@@ -319,7 +331,7 @@ async function rapport() {
   const syms = (args.syms || 'NQ=F').split(',');
   for (const sym of syms) {
     let D; try { D = await charger(sym); } catch (e) { console.log(`\n${sym} : ${e.message}`); continue; }
-    const T = passe(M, D, {});
+    const T = passe(M, D, {}, M.CFG.confirme2 ? await confirmateur() : null);
     if (!T.length) { console.log(`\n${sym} : aucun signal`); continue; }
     const C = M.CFG;
     const hm = m => String(Math.floor(m / 60)).padStart(2, '0') + ' h ' + String(m % 60).padStart(2, '0');

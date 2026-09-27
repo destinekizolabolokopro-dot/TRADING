@@ -403,7 +403,8 @@ button,input,select{font:inherit;color:inherit}
   NQ seul · bougies 5 min · fenêtre <span id="f-fen">—</span> à New York.
   <span id="f-mes">—</span>
   Stop à <span id="f-slx">—</span> fois le bord de l’IFVG · solde au marché à
-  <span id="f-sortie">—</span> New York si rien n’est touché avant.
+  <span id="f-sortie">—</span> New York si rien n’est touché avant ·
+  narrative confirmée sur <span id="f-conf">—</span>.
   <b>Comptage prudent :</b> quand une bougie de 5 minutes touche l’objectif et le stop, c’est le
   stop qui compte. L’ancienne version comptait l’objectif ; rejouée en bougies de 1 minute, cette
   hypothèse était fausse plus souvent que juste. Aucun ordre n’est passé : ce site signale, il
@@ -719,7 +720,7 @@ $('#chips').addEventListener('click', e => {
   FILTRE = b.dataset.k; paintChips(); majBlips();
 });
 
-function paintAll(){ paintTop(); paintChain(); paintTrade(); paintJournal(); paintRadar(); paintTFs(); }
+function paintAll(){ paintTop(); paintChain(); paintTrade(); paintJournal(); paintRadar(); paintTFs(); paintFooter(); }
 
 /* ── cycle de rafraîchissement ──────────────────────────────────────── */
 const SERIES = [['1m','8d'],['2m','60d'],['5m','60d'],['15m','60d'],['60m','3mo'],['1d','1y']];
@@ -782,6 +783,8 @@ async function refresh(){
   try{
     if(window.CFD && CFD.actif()){
       const brut = await charger();
+      // Le flux CFD ne sert que le NQ : la confirmation sur le second marché
+      // ne peut pas être appliquée ici, et le modèle le signale.
       D = brut ? Modele.evaluer(brut) : null;
       if(D) D.source = 'cfd';
     } else {
@@ -1085,6 +1088,14 @@ function paintFooter(){
     $('#f-fen').textContent = hm(Modele.CFG.ghDeb) + ' → ' + hm(Modele.CFG.ghFin);
     $('#f-slx').textContent = String(Modele.CFG.slx);
     $('#f-sortie').textContent = Modele.CFG.sortieMin != null ? hm(Modele.CFG.sortieMin) : 'aucune heure';
+    // Le plan source exige la narrative confirmée sur DEUX marchés. Si la
+    // confirmation n'est pas disponible, il faut le dire : un signal non
+    // confirmé n'est pas le même objet qu'un signal confirmé.
+    const c = window.D && D.confirmePar;
+    $('#f-conf').textContent = !Modele.CFG.confirme2 ? 'NQ seul'
+      : c ? 'NQ + ' + String(c).replace('=F', '')
+      : (window.D && D.sansConfirmation) ? 'NQ seul — confirmation indisponible'
+      : 'NQ + ES';
   }
   if(!window.Mesure) return;
   const L = Mesure.liste(); if(!L.length) return;

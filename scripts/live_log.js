@@ -35,6 +35,11 @@ const ETAT    = path.join(__dirname, '..', 'data', 'etat.json');
 const YF = 'https://query1.finance.yahoo.com/v8/finance/chart/';
 const SERIES = [['1m','8d','m1'],['2m','60d','m2'],['5m','60d','m5'],
                 ['15m','60d','m15'],['60m','3mo','h1'],['1d','1y','d1']];
+// Le plan source exige que la narrative soit confirmée sur NQ ET ES. Le
+// second marché est donc téléchargé comme le premier : sans lui, le modèle
+// ne peut pas appliquer la règle et le dit (`sansConfirmation`).
+const SERIES2 = [['5m','60d','m5'],['15m','60d','m15'],['60m','3mo','h1'],['1d','1y','d1']];
+const SYM2 = 'ES=F';
 const DUREE = { '1m': 6e4, '2m': 12e4, '5m': 3e5, '15m': 9e5, '60m': 36e5, '1d': 864e5 };
 const FORCE = process.argv.includes('--force');
 
@@ -143,6 +148,18 @@ function blocage(d) {
     process.exit(1);
   }
 
+  // Le second marché. S'il manque, le modèle ne filtre PAS en silence : il
+  // rend `sansConfirmation` et on le consigne, parce qu'un signal non
+  // confirmé n'est pas le même objet qu'un signal confirmé.
+  let brut2 = null;
+  try {
+    brut2 = {};
+    for (const [iv, rg, cle] of SERIES2) brut2[cle] = await serie(SYM2, iv, rg);
+  } catch (e) {
+    brut2 = null;
+    console.error(`${SYM2} indisponible : ${e.message} — confirmation impossible.`);
+  }
+
   // Le site affiche des euros : il lui faut EUR/USD. Il allait le chercher
   // lui-même via les relais CORS, qui sont morts. On le relève ici.
   let eurusd = null;
@@ -152,7 +169,7 @@ function blocage(d) {
     if (v > 0.5 && v < 2) eurusd = +v.toFixed(4);
   } catch (e) { console.error('EUR/USD indisponible : ' + e.message); }
 
-  const d = Modele.evaluer(brut);
+  const d = Modele.evaluer(brut, brut2);
   const e = Modele.heure(d.derniereBougie);
   const hNY = String(Math.floor(e.min / 60)).padStart(2, '0') + ':' + String(e.min % 60).padStart(2, '0');
   const db = charger();
@@ -187,6 +204,9 @@ function blocage(d) {
   // `access-control-allow-origin: *`.
   const instantane = {
     maj: maintenant, source: 'yahoo', eurusd: eurusd,
+    // Le second marché sert-il vraiment ? Sans ça, on ne saurait pas
+    // distinguer « aucun signal » de « signal écarté faute de confirmation ».
+    confirmePar: brut2 ? SYM2 : null, sansConfirmation: !!d.sansConfirmation,
     prix: d.prix, derniereBougie: d.derniereBougie,
     retardMin: Math.round((Date.now() - d.derniereBougie) / 60000),
     hors: d.hors, etat: d.etat, dir: d.dir, score: d.score,
