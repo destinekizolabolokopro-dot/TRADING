@@ -1,0 +1,92 @@
+# ── LE RELEVÉ PENDANT LA SÉANCE ────────────────────────────────────────────
+#
+# LE PROBLÈME, mesuré sur quarante-deux déclenchements : GitHub n'honore
+# PRESQUE JAMAIS les tâches planifiées entre 13 h et 16 h UTC. C'est l'heure
+# de pointe de ses serveurs. Or c'est exactement la fenêtre de trading
+# (09 h 00 → 10 h 00 New York = 13 h 00 → 14 h 00 UTC l'été). Le lundi
+# 28 septembre, les deux créneaux prévus dans la séance ne sont pas partis :
+# le premier relevé automatique n'arrivait qu'à 19 h, cinq heures après.
+#
+# LA SOLUTION : ne pas demander à GitHub de déclencher pendant le trou. On
+# démarre AVANT (11 h 47 UTC, hors zone morte), le travail ATTEND, puis relève
+# plusieurs fois pendant la séance. Un travail peut durer six heures ; il en
+# faut moins de quatre. Le dépôt est public, donc les minutes sont gratuites.
+#
+# Ce fichier ne remplace pas signaux.yml : celui-ci couvre la séance, l'autre
+# garde ses passages du soir comme filet.
+name: Relevé pendant la séance
+
+on:
+  schedule:
+    # 11 h 47 UTC — bien avant la zone morte, et ça part sans faute.
+    - cron: '47 11 * * 1-5'
+  workflow_dispatch:
+
+concurrency:
+  group: journal-signaux          # le même que signaux.yml : jamais deux à la fois
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  seance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Relever pendant toute la fenêtre
+        run: |
+          set -u
+          git config user.name  "journal-signaux"
+          git config user.email "noreply@github.com"
+
+          # La fenêtre 09 h 00 → 10 h 00 New York tombe à 13 h 00 UTC l'été et
+          # à 14 h 00 l'hiver. On couvre les deux, plus la marge du retard
+          # Yahoo (dix à quinze minutes), donc 13 h 15 → 15 h 45 UTC.
+          DEBUT=$(date -u -d 'today 13:15' +%s)
+          FIN=$(date -u -d 'today 15:45' +%s)
+          MAINTENANT=$(date -u +%s)
+
+          if [ "$MAINTENANT" -lt "$DEBUT" ]; then
+            ATTENTE=$((DEBUT - MAINTENANT))
+            echo "Attente de $((ATTENTE / 60)) minutes jusqu'à 13 h 15 UTC…"
+            sleep "$ATTENTE"
+          fi
+
+          PASSAGE=0
+          while [ "$(date -u +%s)" -le "$FIN" ]; do
+            PASSAGE=$((PASSAGE + 1))
+            echo "───────── passage $PASSAGE · $(date -u '+%H:%M UTC') ─────────"
+
+            node scripts/live_log.js || echo "relevé en échec, on continue"
+            node scripts/build_single.js || echo "construction en échec, on continue"
+
+            if node scripts/test.js; then
+              if git diff --quiet -- data/ docs/; then
+                echo "Rien de neuf."
+              else
+                git add data/ docs/
+                git commit -m "Journal : séance du $(date -u '+%Y-%m-%d %H:%M UTC')"
+                for i in 1 2 3 4 5; do
+                  git pull --rebase --autostash origin main && \
+                  git push origin HEAD:main && break
+                  sleep $((i * 3))
+                done
+              fi
+            else
+              # Les vérifications sont un veto : un chiffre faux ne doit pas
+              # atteindre le site, même si ça veut dire ne rien publier.
+              echo "::error::Les vérifications ont échoué — rien n'est publié."
+              git checkout -- data/ docs/ || true
+            fi
+
+            RESTE=$((FIN - $(date -u +%s)))
+            [ "$RESTE" -le 0 ] && break
+            sleep $(( RESTE < 1200 ? RESTE : 1200 ))     # un passage toutes les 20 min
+          done
+          echo "Séance couverte en $PASSAGE passage(s)."

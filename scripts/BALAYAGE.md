@@ -635,3 +635,28 @@ tout.
   le refus d'un courtier restent des hypothèses.
 - **Les données Yahoo au-delà de leur forme** : fausses mais bien formées,
   rien ne le verra.
+
+### Les trois trous qui restaient, et ce qui a été fait
+
+**Le robot ne tournait pas pendant la séance.** GitHub n'honore presque jamais
+les tâches planifiées entre 13 h et 16 h UTC — mesuré sur quarante-deux
+déclenchements, et confirmé le lundi 28 septembre où les deux créneaux prévus
+dans la fenêtre ne sont pas partis. `.github/workflows/seance.yml` contourne le
+problème au lieu d'espérer : le travail démarre à **11 h 47 UTC**, hors zone
+morte, **attend** jusqu'à 13 h 15, puis relève toutes les vingt minutes
+jusqu'à 15 h 45. Un travail GitHub peut durer six heures, il en faut moins de
+quatre, et le dépôt est public donc les minutes sont gratuites. Les passages du
+soir restent comme filet.
+
+Les vérifications y sont un **veto** : si elles échouent, rien n'est publié,
+même si cela veut dire ne rien montrer.
+
+**Le site en ligne n'était comparé à rien.** `node scripts/test.js --enligne`
+télécharge la page publiée et vérifie qu'elle porte le même nombre de signaux,
+la même date de mise à jour, et qu'elle ne parle pas en R. La question « est-ce
+que c'est à jour ? » a enfin une réponse mécanique.
+
+**Le rendu n'était pas vérifié.** `--navigateur` contrôle désormais que le
+radar dessine vraiment (il compte les pixels du canvas : un canvas vide laisse
+la page d'apparence normale et le cœur visuel mort), que rien ne déborde à la
+largeur d'un téléphone, et que les repères d'affichage existent.

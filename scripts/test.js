@@ -478,10 +478,27 @@ p.on('console', m => { if (m.type() === 'error' && !/ERR_CERT|file:|Failed to lo
 await p.route('**://query*.finance.yahoo.com/**', r => r.fulfill({ status: 500, body: '{}' }));
 await p.goto('file://${RACINE}/TRADEassist.html', { waitUntil: 'load' });
 await p.waitForTimeout(2500);
+// Le radar est un canvas : s'il ne dessine rien, la page a l'air correcte et
+// le cœur visuel du site est mort. On compte les pixels non transparents.
+const radar = await p.evaluate(() => {
+  const c = document.querySelector('canvas'); if (!c) return -1;
+  const g = c.getContext('2d'); if (!g) return -1;
+  const d = g.getImageData(0, 0, c.width, c.height).data;
+  let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i] > 8) n++;
+  return n;
+});
+// Débordement horizontal à la largeur d'un téléphone : le site est lu sur iPad
+// et sur téléphone, une barre de défilement latérale le rend inutilisable.
+await p.setViewportSize({ width: 390, height: 844 });
+await p.waitForTimeout(400);
+const deborde = await p.evaluate(() =>
+  document.documentElement.scrollWidth - document.documentElement.clientWidth);
+const panneaux = await p.evaluate(() =>
+  ['#f-mes', '#f-conf', '#jchips'].filter(s => !document.querySelector(s)));
 const out = {
   err, pied: (await p.textContent('#f-mes') || '').trim(),
   titre: /Où se forme le signal/.test(await p.textContent('body')),
-  vides: (await p.textContent('body') || '').split('—').length - 1
+  radar, deborde, panneaux
 };
 console.log(JSON.stringify(out)); await b.close();`;
   let res = null;
@@ -497,6 +514,54 @@ console.log(JSON.stringify(out)); await b.close();`;
     t('le pied de page est rempli, pas laissé à « — »', () => {
       if (!res.pied || res.pied === '—') throw new Error('pied vide');
       if (!/\d+ signaux/.test(res.pied)) throw new Error('pied : ' + res.pied.slice(0, 60));
+    });
+    t('le radar dessine vraiment quelque chose', () => {
+      if (res.radar < 0) throw new Error('aucun canvas trouvé');
+      if (res.radar < 500) throw new Error('canvas quasi vide : ' + res.radar + ' pixels');
+    });
+    t('la page ne déborde pas à la largeur d\'un téléphone', () => {
+      if (res.deborde > 2) throw new Error(res.deborde + ' px de débordement horizontal');
+    });
+    t('tous les repères d\'affichage sont présents dans la page', () => {
+      if (res.panneaux.length) throw new Error('absents : ' + res.panneaux.join(', '));
+    });
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Le site EN LIGNE comparé au dépôt. Sur demande, parce qu'il faut le réseau :
+//   node scripts/test.js --enligne
+// Rien ne garantissait jusqu'ici que ce qui est publié soit ce qui est ici :
+// la question « est-ce que c'est à jour ? » n'avait pas de réponse mécanique.
+if (process.argv.includes('--enligne')) {
+  console.log('\n── LE SITE EN LIGNE EST BIEN CELUI DU DÉPÔT ──────────────────');
+  const URL = 'https://destinekizolabolokopro-dot.github.io/TRADING/';
+  const { execFileSync } = require('child_process');
+  let enligne = null;
+  try {
+    enligne = execFileSync('curl', ['-sS', '-H', 'Cache-Control: no-cache',
+      URL + '?v=' + Date.now()], { encoding: 'utf-8', maxBuffer: 1 << 26 });
+  } catch (e) { console.log('  ⏭️  site injoignable — test sauté'); }
+  if (enligne) {
+    const local = fs.readFileSync(path.join(RACINE, 'docs/index.html'), 'utf-8');
+    const compte = h => { const m = h.match(/var BRUT = \[([\s\S]*?)\n  \];/);
+                          return m ? m[1].trim().split('\n').length : -1; };
+    const version = h => { const m = h.match(/Dernière mise à jour du site : ([^.<]+)/);
+                           return m ? m[1].trim() : null; };
+    t('le site en ligne porte le même nombre de signaux que le dépôt', () => {
+      const a = compte(local), b = compte(enligne);
+      if (a !== b) throw new Error('dépôt ' + a + ' · en ligne ' + b +
+        ' — la fusion n\'est pas faite, ou GitHub sert encore son cache');
+    });
+    t('le site en ligne porte la même date de mise à jour', () => {
+      const a = version(local), b = version(enligne);
+      if (!a) throw new Error('le dépôt ne porte pas de date — construire d\'abord');
+      if (a !== b) throw new Error('dépôt « ' + a + ' » · en ligne « ' + b + ' »');
+    });
+    t('le site en ligne ne parle pas en R', () => {
+      const visible = enligne.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+      const m = visible.match(/\d[,.]\d\s*R\b/g);
+      if (m) throw new Error('reste en ligne : ' + [...new Set(m)].join(', '));
     });
   }
 }
@@ -517,12 +582,12 @@ CE QUI N'EST PAS VÉRIFIÉ ICI — et où un bug peut donc encore passer :
     pas que ce qu'il dit soit rentable. 42 trades sur 60 jours ne prouvent rien.
   · Les DÉFINITIONS du CISD et du rejection block, qui portent l'essentiel du
     résultat et qui sont de moi, faute de source précise.
-  · Le SITE DANS UN NAVIGATEUR n'est vérifié qu'avec --navigateur, et
-    seulement qu'il s'ouvre : ni la mise en page, ni les couleurs, ni le radar.
-  · Le SITE EN LIGNE : rien ne compare ce dépôt à ce que GitHub Pages sert.
-    La date en pied de page est là pour ça, elle se vérifie à l'œil.
-  · Le DÉCLENCHEMENT du robot. GitHub n'honore pas les tâches planifiées entre
-    15 h et 18 h heure de Paris — mesuré, jamais corrigé.
+  · L'APPARENCE du site : --navigateur vérifie qu'il s'ouvre sans erreur, que
+    le radar dessine, que rien ne déborde sur téléphone — pas que c'est beau.
+  · Le SITE EN LIGNE n'est comparé au dépôt qu'avec --enligne (réseau requis).
+  · Le DÉCLENCHEMENT du robot est contourné, pas garanti : un travail démarre
+    à 11 h 47 UTC et attend la séance. Si CE déclenchement-là manque aussi,
+    seuls les passages du soir restent.
   · L'EXÉCUTION RÉELLE. Aucun ordre n'est passé : le dérapage, les frais réels
     et le refus d'un courtier ne sont que des hypothèses.
   · Les DONNÉES YAHOO au-delà de leur forme : si elles sont fausses mais bien
