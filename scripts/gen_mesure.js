@@ -36,15 +36,15 @@ async function serie(sym, interval, range) {
 
 function chargerModele() {
   const ctx = {};
-  for (const f of ['js/structure.js', 'js/modele.js'])
+  for (const f of ['js/structure.js', 'js/position.js', 'js/modele.js'])
     new Function('root', 'ST', fs.readFileSync(path.join(RACINE, f), 'utf-8')).call(ctx, ctx, ctx.ST);
-  return ctx.Modele;
+  return ctx;
 }
 
 const COUT_PTS = 0.25 * 2 + 4.00 / 20;
 
 (async () => {
-  const M = chargerModele();
+  const CTX = chargerModele(), M = CTX.Modele, Position = CTX.Position;
   const D = {
     m1: await serie('NQ=F', '1m', '8d'), m2: await serie('NQ=F', '2m', '60d'),
     m5: await serie('NQ=F', '5m', '60d'), m15: await serie('NQ=F', '15m', '60d'),
@@ -65,28 +65,18 @@ const COUT_PTS = 0.25 * 2 + 4.00 / 20;
   for (const s of d.tousSignaux) {
     const fin1m = m1Debut <= s.t;
     const cs = fin1m ? D.m1 : D.m5, maxB = fin1m ? 1000 : 200, pas = fin1m ? 1 : 5;
-    const L = s.sens === 'LONG';
-    const jourSignal = M.heure(s.t).jour;
-    let sl = s.sl, part1 = false, n = 0, r = null, o = null;
-    for (const c of cs) {
-      if (c.t <= s.t) continue;
-      n++;
-      const e = M.heure(c.t);
-      const touche = niv => L ? c.h >= niv : c.l <= niv;
-      const stoppe = () => L ? c.l <= sl : c.h >= sl;
-      if (stoppe())                     { r = part1 ? C.part * C.tp1 : -1; o = part1 ? 'gain partiel' : 'perte'; }
-      else if (!part1 && touche(s.tp1))  { part1 = true; sl = s.entree; }
-      else if (part1 && touche(s.tp))    { r = C.part * C.tp1 + (1 - C.part) * C.tp2; o = 'gain'; }
-      // Sortie forcée AU MARCHÉ : aucune position ne passe la nuit.
-      else if (C.sortieMin != null && (e.jour !== jourSignal || e.min >= C.sortieMin)) {
-        const brut = (L ? c.c - s.entree : s.entree - c.c) / s.risq;
-        r = part1 ? C.part * C.tp1 + (1 - C.part) * Math.max(-1, Math.min(C.tp2, brut))
-                  : Math.max(-1, Math.min(C.tp2, brut));
-        o = r > 0 ? 'sortie horaire +' : 'sortie horaire −';
-      }
-      else if (n > maxB)                 { r = part1 ? C.part * C.tp1 : 0; o = part1 ? 'gain partiel' : 'ambigu'; }
-      if (r !== null) break;
-    }
+    // Le suivi n'est PAS réécrit ici : une copie de plus finirait par
+    // diverger du robot, comme c'est déjà arrivé. js/position.js est le seul
+    // endroit qui dit ce que vaut une position.
+    const fin = Position.suivre(s, cs, C, {
+      prudent: true, maxBarres: maxB, depuis: s.t,
+      heure: M.heure, jourSignal: M.heure(s.t).jour
+    });
+    const r = fin.ouverte ? null : fin.r;
+    const o = fin.ouverte ? null : ({ stop: 'perte', seuil: 'gain partiel',
+      objectif: 'gain', horaire: fin.r > 0 ? 'sortie horaire +' : 'sortie horaire −',
+      'expiré': 'ambigu' })[fin.sortie];
+    const n = fin.barres;
     if (r === null) continue;
     const e = M.heure(s.t);
     lignes.push([e.jour, e.min, s.sens, s.niveau, fin1m ? '1m' : '5m',

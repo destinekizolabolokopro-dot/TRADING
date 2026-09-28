@@ -416,6 +416,7 @@ button,input,select{font:inherit;color:inherit}
 <script src="js/cfd.js"></script>
 <script src="js/nq.js"></script>
 <script src="js/structure.js"></script>
+<script src="js/position.js"></script>
 <script src="js/modele.js"></script>
 <script src="js/compte.js"></script>
 <script src="js/history.js"></script>
@@ -1000,7 +1001,8 @@ function paintJournal(){
   }).join('') +
   (JFILTRE === 'Archivé'
     ? '<div class="note"><b>Archivé</b> = positions produites par des réglages qui ne tournent ' +
-      'plus (stop au bord de l\u2019IFVG, partiel à 0,5 R). Elles sont gardées pour mémoire et ' +
+      'plus : le stop était collé au bord de l\u2019IFVG, à une trentaine de points, et ' +
+      'l\u2019objectif partiel beaucoup plus près. Elles sont gardées pour mémoire et ' +
       'ne comptent PAS dans le bilan : leur stop n\u2019était pas au même endroit, donc leur ' +
       'taux de réussite ne dit rien du modèle actuel.</div>'
   : JFILTRE !== 'En direct'

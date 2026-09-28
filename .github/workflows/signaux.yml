@@ -66,6 +66,12 @@ jobs:
       - name: Republier la page avec les données fraîches
         run: node scripts/build_single.js
 
+      # Les vérifications tournent APRÈS la construction et AVANT la poussée :
+      # c'est le seul ordre qui empêche un chiffre faux d'atteindre le site.
+      # Chaque test porte le nom du bug réel qu'il aurait arrêté.
+      - name: Vérifier que rien ne s'est désaccordé
+        run: node scripts/test.js
+
       - name: Versionner le journal
         run: |
           if git diff --quiet -- data/ docs/; then

@@ -28,6 +28,7 @@ const path = require('path');
 
 global.window = global;
 require(path.join(__dirname, '..', 'js', 'structure.js'));
+require(path.join(__dirname, '..', 'js', 'position.js'));
 require(path.join(__dirname, '..', 'js', 'modele.js'));
 
 const FICHIER = path.join(__dirname, '..', 'data', 'signaux.json');
@@ -430,47 +431,35 @@ function blocage(d) {
     const cs = fin1m ? m1 : m5, unite = fin1m ? '1m' : '5m';
     const MAXBARRES = fin1m ? 1000 : 200;
     const apres = cs.filter(c => c.t > depuis);
-    const L = s.sens === 'LONG';
     // Si la série couvre le signal, on rejoue depuis le début : l'état
     // mémorisé au passage précédent a pu être établi sur l'autre unité.
-    let sl = s.sl, part1 = apres.length && cs[0].t <= depuis ? false : s.part1 === true;
-    if (part1) sl = s.entree;
-    let n = 0, ambigu = 0;
-    for (const c of apres) {
-      n++;
-      const touche = niv => L ? c.h >= niv : c.l <= niv;
-      const stoppe = () => L ? c.l <= sl : c.h >= sl;
-      if (stoppe() && touche(part1 ? s.tp : s.tp1)) ambigu++;
-      if (stoppe()) {
-        if (part1) { s.statut = 'clos'; s.resultat = 'gagné'; s.r = +(PART * TP1R).toFixed(3); }
-        else       { s.statut = 'clos'; s.resultat = 'perdu'; s.r = -1; }
-      } else if (!part1 && touche(s.tp1)) {          // partiel encaissé, stop au seuil
-        part1 = true; sl = s.entree;
-      } else if (part1 && touche(s.tp)) {
-        s.statut = 'clos'; s.resultat = 'gagné';
-        s.r = +(PART * TP1R + (1 - PART) * TP2R).toFixed(3);
-      } else if (SORTIE != null && (Modele.heure(c.t).jour !== s.jour || Modele.heure(c.t).min >= SORTIE)) {
-        // Sortie forcée AU MARCHÉ. Sans elle, une position sur douze passait
-        // la nuit — un risque de gap que la règle de drawdown d'un compte
-        // financé ne pardonne pas, et que le backtest ne sait pas chiffrer.
-        const brut = (L ? c.c - s.entree : s.entree - c.c) / s.risquePts;
-        s.statut = 'clos';
-        s.r = +(part1 ? PART * TP1R + (1 - PART) * Math.max(-1, Math.min(TP2R, brut))
-                      : Math.max(-1, Math.min(TP2R, brut))).toFixed(3);
-        s.resultat = s.r > 0 ? 'gagné' : 'perdu';
-        s.sortie = 'horaire';
-      } else if (n > MAXBARRES) {
-        const rBrut = (L ? c.c - s.entree : s.entree - c.c) / s.risquePts;
-        s.statut = 'clos'; s.resultat = 'expiré';
-        s.r = +(part1 ? PART * TP1R + (1 - PART) * Math.max(0, Math.min(TP2R, rBrut))
-                      : Math.max(-1, Math.min(TP2R, rBrut))).toFixed(3);
-      }
-      if (s.statut === 'clos') { s.closTs = new Date(c.t).toISOString(); s.barres = n; break; }
+    const repart = apres.length && cs[0].t <= depuis ? false : s.part1 === true;
+
+    // ⚠️ LE SUIVI N'EST PAS ÉCRIT ICI. Il vit dans js/position.js, et lui
+    // seul. Cette boucle en était une copie ; c'est une copie qui a annoncé
+    // quatre positions gagnantes sur huit alors qu'elles étaient perdantes,
+    // parce qu'elle testait l'objectif avant le stop. scripts/test.js refuse
+    // désormais qu'une copie réapparaisse.
+    const fin = Position.suivre(s, apres, Modele.CFG, {
+      prudent: true, maxBarres: MAXBARRES, part1: repart,
+      heure: Modele.heure, jourSignal: s.jour
+    });
+    const part1 = fin.part1, ambigu = fin.ambigu;
+    if (!fin.ouverte) {
+      s.statut = 'clos';
+      s.r = +fin.r.toFixed(3);
+      s.resultat = fin.sortie === 'expiré' ? 'expiré' : (s.r > 0 ? 'gagné' : 'perdu');
+      if (fin.sortie === 'horaire') s.sortie = 'horaire';
+      s.closTs = new Date(fin.t).toISOString();
+      s.barres = fin.barres;
     }
     s.part1 = part1;
     s.suiviUnite = unite;
     s.ambigu = ambigu;
-    if (s.statut === 'ouvert') s.slCourant = sl;
+    // Le stop courant : au prix d'entrée une fois le partiel encaissé, sinon
+    // celui d'origine. Il est déduit de l'état, plus recopié d'une variable
+    // de boucle qui n'existe plus.
+    if (s.statut === 'ouvert') s.slCourant = part1 ? s.entree : s.sl;
   });
 
   const clos = db.signaux.filter(s => s.statut === 'clos');
