@@ -30,14 +30,16 @@
    "cfgTp2": 2.5,
    "cfgSortieMin": 720,
    "raisonnement": "Biais baissier (score 2/4). DOL à 30370. Niveau clé ITH M5. Le prix l'a touché, puis une inversion 1m a été confirmée par clôture de corps. Entrée 30677, stop à 30834.54 — 157.5 pts, soit 4 fois le bord de l'IFVG, pour ne pas être sorti par la respiration du prix. Partiel 0,4 R à 30613.98 sur 90 % de la taille, le reste court jusqu'à 2,5 R à 30283.15. Solde au marché à 12 h 00 New York si rien n'est touché avant.",
-   "statut": "ouvert",
-   "resultat": null,
-   "r": null,
-   "closTs": null,
+   "statut": "clos",
+   "resultat": "gagné",
+   "r": 0.465,
+   "closTs": "2026-09-28T16:00:00.000Z",
    "part1": true,
    "suiviUnite": "1m",
    "ambigu": 0,
-   "slCourant": 30677
+   "slCourant": 30677,
+   "sortie": "horaire",
+   "barres": 150
   },
   {
    "ts": "2026-09-28T15:03:19.343Z",
@@ -68,14 +70,16 @@
    "cfgTp2": 2.5,
    "cfgSortieMin": 720,
    "raisonnement": "Biais baissier (score 2/4). DOL à 30370. Niveau clé RB M5. Le prix l'a touché, puis une inversion 5m a été confirmée par clôture de corps. Entrée 30643, stop à 30809.51 — 166.5 pts, soit 4 fois le bord de l'IFVG, pour ne pas être sorti par la respiration du prix. Partiel 0,4 R à 30576.39 sur 90 % de la taille, le reste court jusqu'à 2,5 R à 30226.71. Solde au marché à 12 h 00 New York si rien n'est touché avant.",
-   "statut": "ouvert",
-   "resultat": null,
-   "r": null,
-   "closTs": null,
+   "statut": "clos",
+   "resultat": "gagné",
+   "r": 0.439,
+   "closTs": "2026-09-28T16:00:00.000Z",
    "part1": true,
    "suiviUnite": "1m",
    "ambigu": 0,
-   "slCourant": 30643
+   "slCourant": 30643,
+   "sortie": "horaire",
+   "barres": 145
   }
  ],
  "passages": [
@@ -163,12 +167,12 @@
   }
  ],
  "bilan": {
-  "maj": "2026-09-28T15:03:19.343Z",
+  "maj": "2026-09-28T17:04:10.943Z",
   "total": 2,
-  "clos": 0,
-  "ouverts": 2,
-  "reussite": null,
-  "cumulR": 0,
+  "clos": 2,
+  "ouverts": 0,
+  "reussite": 100,
+  "cumulR": 0.904,
   "passages": 5
  },
  "archive": [
