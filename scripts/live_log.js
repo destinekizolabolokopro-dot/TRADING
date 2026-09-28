@@ -322,22 +322,16 @@ function blocage(d) {
       // sans qu'on puisse le savoir après coup.
       slx: Modele.CFG.slx, cfgTp1: Modele.CFG.tp1, cfgTp2: Modele.CFG.tp2,
       cfgSortieMin: Modele.CFG.sortieMin,
-      raisonnement:
-        `Biais ${t.biaisDir > 0 ? 'haussier' : 'baissier'} (score ${Math.abs(t.biaisScore)}/4). ` +
-        `DOL à ${t.dol}. Niveau clé ${t.niveau}. ` +
-        `Le prix l'a touché, puis une inversion ${t.tf} a été confirmée par clôture de corps. ` +
-        `Entrée ${t.entree}, stop à ${t.sl} — ${Math.abs(t.entree - t.sl).toFixed(0)} points, soit ` +
-        `${Modele.CFG.slx} fois le bord de l'IFVG, pour ne pas être sorti par la respiration du prix. ` +
-        // Le R est une unité de travail. Celui qui lit le journal veut des
-        // points et des euros : on traduit ici, une fois pour toutes.
-        `Objectif partiel à ${t.tp1}, soit ${(Math.abs(t.tp1 - t.entree)).toFixed(0)} points ` +
-        `(${euros(Modele.CFG.tp1 * RISQUE)}), sur ${Math.round(Modele.CFG.part * 100)} % de la position — ` +
-        `le stop remonte alors au prix d'entrée et la position ne peut plus perdre. ` +
-        `Les ${Math.round((1 - Modele.CFG.part) * 100)} % restants courent jusqu'à ${t.tp}, ` +
-        `soit ${(Math.abs(t.tp - t.entree)).toFixed(0)} points (${euros(Modele.CFG.tp2 * RISQUE)}). ` +
-        `Gain si tout est touché : ${euros(t.rr * RISQUE)} · perte si le stop part : ${euros(-RISQUE)}. ` +
-        `Solde au marché à ${String(Math.floor(Modele.CFG.sortieMin / 60)).padStart(2, '0')} h ` +
-        `${String(Modele.CFG.sortieMin % 60).padStart(2, '0')} New York si rien n'est touché avant.`,
+      // La phrase n'est plus écrite ici : js/position.js la compose, et le
+      // site la RECOMPOSE à l'affichage. Sans ça elle reste figée dans le
+      // journal — deux positions du 28 septembre parlaient encore en R
+      // longtemps après qu'on eut décidé d'arrêter, sans moyen de les corriger.
+      raisonnement: Position.raisonnement({
+        sens: t.sens, entree: t.entree, sl: t.sl, tp1: t.tp1, tp: t.tp,
+        niveauDeclencheur: t.niveau, uniteIFVG: t.tf,
+        biais: t.biaisDir > 0 ? 'haussier' : 'baissier',
+        biaisScore: t.biaisScore, dol: t.dol
+      }, Modele.CFG, RISQUE),
       statut: 'ouvert', resultat: null, r: null, closTs: null
     }));
     console.log(`✅ SIGNAL ${t.sens} · ${eSig.jour} ${hSig} NY · entrée ${t.entree} · stop ${t.sl} · ${t.niveau}`);

@@ -584,3 +584,54 @@ Il ne filtre pas en silence. `evaluer()` rend `sansConfirmation: true`, le
 robot consigne `confirmePar` dans l'instantané, et le pied du site écrit
 « NQ seul — confirmation indisponible ». Sans ça, le site afficherait des
 signaux que le robot écarte, et personne ne pourrait le voir.
+
+---
+
+## 10. Comment vérifier, et où la vérification s'arrête
+
+```
+node scripts/test.js                 79 vérifications, quelques secondes
+node scripts/test.js --navigateur    + la page ouverte dans Chromium
+node scripts/reference.js            le modèle produit-il la même chose qu'hier ?
+node scripts/reference.js --ecrire   accepter un changement et le figer
+```
+
+Les deux premiers tournent dans le robot, **après la construction et avant la
+poussée** : c'est le seul ordre qui empêche un chiffre faux d'atteindre le site.
+
+### Les sept familles de vérifications
+
+| famille | ce qu'elle attrape | le bug réel qui l'a motivée |
+|---|---|---|
+| réglages cohérents | fenêtre inversée, objectif plus près que le partiel, sortie forcée avant la fin de la fenêtre | — |
+| valeur d'une position | la part déjà vendue ignorée | « +467 € » au lieu de +157 € |
+| suivi d'une position | l'ordre des tests inversé | 4 positions sur 8 annoncées gagnantes alors qu'elles perdaient |
+| sorties du modèle | stop du mauvais côté, signal hors fenêtre, plafond par jour | 4 à 9 % d'ordres impossibles à passer |
+| affiché = mesuré | l'en-tête, les deux pages et le site doivent porter les mêmes chiffres | « 80,0 % » affiché à travers trois régénérations |
+| données d'entrée | bougies désordonnées, haut < bas, cotation en cours prise pour une bougie, saut de prix absurde | la pseudo-bougie de Yahoo |
+| pas de copie du suivi | une sixième réimplémentation | **la cause de tout** |
+
+Plus la **référence** : l'empreinte exacte des 42 signaux. Tout écart fait
+échouer les tests. L'accepter demande `--ecrire`, donc un geste délibéré,
+visible dans un commit. Rien ne distinguait jusqu'ici « j'ai amélioré » de
+« j'ai cassé sans m'en rendre compte ».
+
+### Ce qui n'est PAS vérifié
+
+Les tests le disent eux-mêmes à la fin de chaque exécution. C'est volontaire :
+le pire défaut d'une batterie de tests est de laisser croire qu'elle couvre
+tout.
+
+- **La stratégie.** Les tests vérifient que le code fait ce qu'il dit, pas que
+  ce qu'il dit soit rentable. 42 trades sur 60 jours ne prouvent rien.
+- **Les définitions du CISD et du rejection block**, qui portent l'essentiel du
+  résultat et qui sont de moi, faute de source précise.
+- **La mise en page**, les couleurs, le radar — seulement que la page s'ouvre.
+- **Le site en ligne** : rien ne compare ce dépôt à ce que GitHub Pages sert.
+  La date en pied de page est là pour ça, elle se vérifie à l'œil.
+- **Le déclenchement du robot** : GitHub n'honore pas les tâches planifiées
+  entre 15 h et 18 h heure de Paris. Mesuré, jamais corrigé.
+- **L'exécution réelle** : aucun ordre n'est passé. Le dérapage, les frais et
+  le refus d'un courtier restent des hypothèses.
+- **Les données Yahoo au-delà de leur forme** : fausses mais bien formées,
+  rien ne le verra.

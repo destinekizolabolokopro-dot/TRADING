@@ -851,7 +851,19 @@ function enLigne(s, source){
     ts: Date.parse(s.bougie), source: source, symbol:'NQ', direction:s.sens,
     entry:s.entree, sl:s.sl, tp:s.tp, rr:s.rr,
     r: s.r, status: s.statut === 'clos' ? 'closed' : 'open',
-    motif: (s.reglages ? '[' + s.reglages + '] ' : '') + s.raisonnement,
+    // ⚠️ La phrase stockée dans le journal est FIGÉE à la date du signal.
+    // Deux positions du 28 septembre parlaient encore en R longtemps après
+    // qu'on eut décidé d'arrêter. On la RECOMPOSE donc à partir des faits, à
+    // chaque affichage : changer la formulation corrige tout l'historique.
+    motif: (s.reglages ? '[' + s.reglages + '] ' : '') +
+      (window.Position && s.entree != null
+        ? Position.raisonnement(s, s.cfgTp1 != null
+            ? Object.assign({}, Modele.CFG, { tp1: s.cfgTp1, tp2: s.cfgTp2, slx: s.slx,
+                                              sortieMin: s.cfgSortieMin })
+            : Modele.CFG,
+            window.Compte ? Compte.uniteR() : 250,
+            window.Compte ? Compte.sym(Compte.lire().devise) : ' €')
+        : s.raisonnement),
     heureNY: s.heureNY, jour: s.jour,
     niveau: s.niveauDeclencheur, retard: s.retardMin
   };

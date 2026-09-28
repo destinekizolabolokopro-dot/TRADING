@@ -133,6 +133,53 @@
     return (slip * 2 + comm / pointval) / risq;
   }
 
-  root.Position = { niveaux: niveaux, valeur: valeur, suivre: suivre, cout: cout };
+  /**
+   * La phrase qui explique un signal, composée À LA LECTURE.
+   *
+   * Elle était écrite une fois pour toutes au moment du signal, et figée dans
+   * le journal. Conséquence : deux positions du 28 septembre disaient encore
+   * « partiel 0,4 R » longtemps après qu'on eut décidé de ne plus parler en R,
+   * et rien n'aurait jamais pu les corriger. Le journal garde donc les FAITS
+   * (entrée, stop, objectifs), et la phrase se recompose à chaque affichage.
+   *
+   * @param s      { sens, entree, sl, tp1, tp, niveauDeclencheur, uniteIFVG,
+   *                 biais, biaisScore, dol }
+   * @param cfg    les réglages
+   * @param risque ce qu'un trade risque, dans la devise du compte
+   * @param dev    le symbole de la devise
+   */
+  function raisonnement(s, cfg, risque, dev) {
+    dev = dev || ' €';
+    risque = risque || 250;
+    var eur = function (v) { return (v >= 0 ? '+' : '') + Math.round(v) + dev; };
+    var pts = function (a, b) { return Math.abs(a - b).toFixed(0) + ' points'; };
+    var hm = function (m) {
+      return String(Math.floor(m / 60)).padStart(2, '0') + ' h ' +
+             String(m % 60).padStart(2, '0');
+    };
+    var t = [];
+    if (s.biais) t.push('Biais ' + s.biais + ' (' + Math.abs(s.biaisScore) + ' sur 4).');
+    if (s.dol != null) t.push('Liquidité visée à ' + s.dol + '.');
+    if (s.niveauDeclencheur) t.push('Niveau clé ' + s.niveauDeclencheur + '.');
+    t.push('Le prix l\'a touché, puis une inversion ' + (s.uniteIFVG || '') +
+           ' a été confirmée par clôture de corps.');
+    t.push('Entrée ' + s.entree + ', stop à ' + s.sl + ' — ' + pts(s.entree, s.sl) +
+           ', soit ' + cfg.slx + ' fois le bord de l\'IFVG, pour ne pas être sorti par' +
+           ' la respiration du prix.');
+    t.push('Objectif partiel à ' + s.tp1 + ', soit ' + pts(s.tp1, s.entree) +
+           ' (' + eur(cfg.tp1 * risque) + '), sur ' + Math.round(cfg.part * 100) +
+           ' % de la position — le stop remonte alors au prix d\'entrée et la position' +
+           ' ne peut plus perdre.');
+    t.push('Les ' + Math.round((1 - cfg.part) * 100) + ' % restants courent jusqu\'à ' +
+           s.tp + ', soit ' + pts(s.tp, s.entree) + ' (' + eur(cfg.tp2 * risque) + ').');
+    t.push('Gain si tout est touché : ' + eur((cfg.part * cfg.tp1 + (1 - cfg.part) * cfg.tp2) * risque) +
+           ' · perte si le stop part : ' + eur(-risque) + '.');
+    if (cfg.sortieMin != null)
+      t.push('Solde au marché à ' + hm(cfg.sortieMin) + ' New York si rien n\'est touché avant.');
+    return t.join(' ');
+  }
+
+  root.Position = { niveaux: niveaux, valeur: valeur, suivre: suivre, cout: cout,
+                    raisonnement: raisonnement };
 
 })(typeof window !== 'undefined' ? window : this);

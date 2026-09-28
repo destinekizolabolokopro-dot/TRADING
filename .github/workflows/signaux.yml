@@ -72,6 +72,14 @@ jobs:
       - name: Vérifier que rien ne s'est désaccordé
         run: node scripts/test.js
 
+      # La référence est à part : elle ne dit pas « le code est incohérent »
+      # mais « le modèle ne produit plus la même chose qu'hier ». Un écart ici
+      # est soit une amélioration voulue — et il faut alors régénérer la
+      # référence à la main — soit une régression silencieuse.
+      - name: Le modèle produit-il toujours la même chose ?
+        run: node scripts/reference.js
+        continue-on-error: true
+
       - name: Versionner le journal
         run: |
           if git diff --quiet -- data/ docs/; then

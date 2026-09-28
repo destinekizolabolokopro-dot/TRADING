@@ -331,7 +331,200 @@ t('js/position.js est bien le seul à porter la règle', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
+console.log('\n── LES DONNÉES D\'ENTRÉE SONT SAINES ──────────────────────────');
+// Le modèle ne vaut rien si on le nourrit de bougies fausses. Yahoo en sert :
+// il ajoute la cotation en cours comme une pseudo-bougie (ouverture = haut =
+// bas = clôture, horodatage hors grille), et il lui arrive de servir des
+// séries trouées ou désordonnées. Sans ces contrôles, le modèle les avale
+// sans rien dire.
+
+if (dispo) {
+  const lire = (s, i, r) => JSON.parse(fs.readFileSync(path.join(CACHE, `${s}_${i}_${r}.json`), 'utf-8'));
+  const SERIES = [['NQF','5m','60d',300000], ['NQF','15m','60d',900000],
+                  ['NQF','1m','8d',60000], ['ESF','5m','60d',300000]];
+  for (const [sym, iv, rg, pas] of SERIES) {
+    const f = path.join(CACHE, `${sym}_${iv}_${rg}.json`);
+    if (!fs.existsSync(f)) continue;
+    const cs = lire(sym, iv, rg);
+    t(`${sym} ${iv} : les bougies sont en ordre chronologique`, () => {
+      for (let i = 1; i < cs.length; i++)
+        if (cs[i].t <= cs[i - 1].t) throw new Error('désordre à l\'indice ' + i);
+    });
+    t(`${sym} ${iv} : haut ≥ bas sur chaque bougie`, () => {
+      const faux = cs.filter(c => c.h < c.l);
+      if (faux.length) throw new Error(faux.length + ' bougie(s)');
+    });
+    t(`${sym} ${iv} : l'ouverture et la clôture sont dans la mèche`, () => {
+      const faux = cs.filter(c => c.o > c.h || c.o < c.l || c.c > c.h || c.c < c.l);
+      if (faux.length) throw new Error(faux.length + ' bougie(s)');
+    });
+    t(`${sym} ${iv} : aucun prix nul ou négatif`, () => {
+      const faux = cs.filter(c => !(c.o > 0 && c.h > 0 && c.l > 0 && c.c > 0));
+      if (faux.length) throw new Error(faux.length + ' bougie(s)');
+    });
+    t(`${sym} ${iv} : la dernière bougie n'est pas la cotation en cours`, () => {
+      // La signature : espacement plus court que le pas de la série.
+      if (cs.length < 3) return;
+      const d = cs[cs.length - 1].t - cs[cs.length - 2].t;
+      // Tolérance : Yahoo décale parfois d'une seconde. La vraie signature
+      // d'une cotation en cours est un espacement franchement court — celle
+      // qui avait été mesurée valait 185 s pour un pas de 300 s.
+      if (d > 0 && d < pas * 0.9)
+        throw new Error('espacement ' + (d / 1000) + ' s pour un pas de ' + (pas / 1000) + ' s');
+    });
+    t(`${sym} ${iv} : pas de saut de prix absurde entre deux bougies`, () => {
+      // Un écart de plus de 10 % d'une bougie à l'autre sur un indice est une
+      // donnée corrompue, pas un mouvement de marché.
+      for (let i = 1; i < cs.length; i++) {
+        const v = Math.abs(cs[i].c - cs[i - 1].c) / cs[i - 1].c;
+        if (v > 0.10) throw new Error('saut de ' + (v * 100).toFixed(0) + ' % le ' +
+          new Date(cs[i].t).toISOString().slice(0, 10));
+      }
+    });
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+console.log('\n── LE MODÈLE PRODUIT TOUJOURS LA MÊME CHOSE ──────────────────');
+// Le trou que les contrôles de cohérence ne voient pas : une modification qui
+// change les résultats sans rien casser. 42 signaux devenus 30, c'est
+// parfaitement cohérent — et catastrophique si ce n'était pas voulu.
+
+t('les résultats sont conformes à data/reference.json', () => {
+  const { execFileSync } = require('child_process');
+  try {
+    execFileSync('node', [path.join(RACINE, 'scripts/reference.js')],
+      { encoding: 'utf-8', env: process.env, stdio: 'pipe' });
+  } catch (e) {
+    throw new Error((e.stderr || e.stdout || '').trim().split('\n')
+      .filter(l => l.trim()).slice(1).join(' · ') || 'écart détecté');
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+console.log('\n── LES FICHIERS DE DONNÉES ONT LA FORME ATTENDUE ─────────────');
+// Un champ renommé ou disparu casse le site en silence : la page affiche
+// « — » partout et personne ne sait pourquoi. C'est arrivé avec
+// `derniere_bougie` contre `derniereBougie`, et avec `tf_retenue`.
+
+const CHAMPS_ETAT = ['maj', 'prix', 'derniereBougie', 'hors', 'etat', 'parTF', 'cfg'];
+const CHAMPS_SIGNAL = ['bougie', 'jour', 'heureNY', 'sens', 'entree', 'sl', 'tp1', 'tp',
+                       'risquePts', 'statut', 'raisonnement', 'slx'];
+
+const ef = path.join(RACINE, 'data/etat.json');
+if (fs.existsSync(ef)) {
+  const E2 = JSON.parse(fs.readFileSync(ef, 'utf-8'));
+  t('data/etat.json porte tous les champs que le site lit', () => {
+    const manque = CHAMPS_ETAT.filter(k => !(k in E2));
+    if (manque.length) throw new Error('manque : ' + manque.join(', '));
+  });
+  t('le prix de l\'instantané est un nombre plausible', () => {
+    if (!(E2.prix > 0 && isFinite(E2.prix))) throw new Error('prix = ' + E2.prix);
+  });
+  t('les réglages de l\'instantané sont ceux du modèle', () => {
+    for (const k of ['slx', 'tp1', 'tp2', 'part', 'ghDeb', 'ghFin'])
+      if (E2.cfg[k] !== CFG[k]) throw new Error(k + ' : ' + E2.cfg[k] + ' ≠ ' + CFG[k]);
+  });
+}
+if (fs.existsSync(jf)) {
+  const J2 = JSON.parse(fs.readFileSync(jf, 'utf-8'));
+  t('chaque signal du journal porte tous ses champs', () => {
+    for (const s of J2.signaux) {
+      const manque = CHAMPS_SIGNAL.filter(k => !(k in s));
+      if (manque.length) throw new Error(s.jour + ' ' + s.heureNY + ' manque : ' + manque.join(', '));
+    }
+  });
+  t('la phrase RECOMPOSÉE de chaque signal parle en euros et en points', () => {
+    // On ne teste PAS la phrase stockée : elle est figée à la date du signal
+    // et ne peut pas être corrigée. On teste celle que le site recompose, qui
+    // est la seule que quelqu'un lit vraiment.
+    for (const s of J2.signaux) {
+      const p = ctx.Position.raisonnement(s, CFG, 250, ' €');
+      if (!/points/.test(p)) throw new Error(s.jour + ' : pas de points');
+      if (!/€/.test(p)) throw new Error(s.jour + ' : pas d\'euros');
+      if (/\d[,.]\d\s*R\b/.test(p)) throw new Error(s.jour + ' : parle encore en R');
+    }
+  });
+  t('le site recompose la phrase au lieu de lire celle du journal', () => {
+    const h = fs.readFileSync(path.join(RACINE, 'index.html'), 'utf-8');
+    if (!/Position\.raisonnement/.test(h))
+      throw new Error('le site affiche la phrase figée du journal');
+  });
+  t('les copies sous docs/ sont identiques aux originales', () => {
+    for (const n of ['etat.json', 'signaux.json']) {
+      const a = path.join(RACINE, 'data', n), c = path.join(RACINE, 'docs/data', n);
+      if (!fs.existsSync(c)) throw new Error('docs/data/' + n + ' absent');
+      if (fs.readFileSync(a, 'utf-8') !== fs.readFileSync(c, 'utf-8'))
+        throw new Error(n + ' : la copie publiée diffère de l\'originale');
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Le site dans un vrai navigateur. Lent (quelques secondes), donc sur demande :
+//   node scripts/test.js --navigateur
+// Une erreur JavaScript ne casse rien de visible : la page s'arrête de se
+// remplir et affiche « — » partout. C'est exactement ce qui s'était produit
+// quand `derniere_bougie` avait été renommé.
+if (process.argv.includes('--navigateur')) {
+  console.log('\n── LE SITE S\'OUVRE SANS ERREUR ───────────────────────────────');
+  const { execFileSync } = require('child_process');
+  const script = `
+import { chromium } from '/opt/node22/lib/node_modules/playwright/index.mjs';
+const b = await chromium.launch(); const p = await b.newPage();
+const err = [];
+p.on('pageerror', e => err.push('ERREUR JS : ' + e.message));
+p.on('console', m => { if (m.type() === 'error' && !/ERR_CERT|file:|Failed to load resource/.test(m.text())) err.push('CONSOLE : ' + m.text()); });
+await p.route('**://query*.finance.yahoo.com/**', r => r.fulfill({ status: 500, body: '{}' }));
+await p.goto('file://${RACINE}/TRADEassist.html', { waitUntil: 'load' });
+await p.waitForTimeout(2500);
+const out = {
+  err, pied: (await p.textContent('#f-mes') || '').trim(),
+  titre: /Où se forme le signal/.test(await p.textContent('body')),
+  vides: (await p.textContent('body') || '').split('—').length - 1
+};
+console.log(JSON.stringify(out)); await b.close();`;
+  let res = null;
+  try {
+    fs.writeFileSync('/tmp/_smoke.mjs', script);
+    res = JSON.parse(execFileSync('node', ['/tmp/_smoke.mjs'], { encoding: 'utf-8' }).trim());
+  } catch (e) { console.log('  ⏭️  Chromium indisponible — test sauté'); }
+  if (res) {
+    t('la page ne lève aucune erreur JavaScript', () => {
+      if (res.err.length) throw new Error(res.err.slice(0, 3).join(' | '));
+    });
+    t('la page affiche bien son titre', () => { if (!res.titre) throw new Error('titre absent'); });
+    t('le pied de page est rempli, pas laissé à « — »', () => {
+      if (!res.pied || res.pied === '—') throw new Error('pied vide');
+      if (!/\d+ signaux/.test(res.pied)) throw new Error('pied : ' + res.pied.slice(0, 60));
+    });
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 const total = ok + ko;
 console.log('\n' + '─'.repeat(62));
 console.log(`${ok}/${total} vérifications passées` + (ko ? ` · ${ko} ÉCHEC(S)` : ' · tout est bon'));
+
+// ── CE QUI N'EST PAS VÉRIFIÉ ──────────────────────────────────────────────
+// Le pire défaut d'une batterie de tests est de laisser croire qu'elle couvre
+// tout. Celle-ci dit donc où elle s'arrête. Chaque ligne est un endroit où un
+// bug peut encore passer.
+console.log(`
+CE QUI N'EST PAS VÉRIFIÉ ICI — et où un bug peut donc encore passer :
+
+  · La STRATÉGIE elle-même. Les tests vérifient que le code fait ce qu'il dit,
+    pas que ce qu'il dit soit rentable. 42 trades sur 60 jours ne prouvent rien.
+  · Les DÉFINITIONS du CISD et du rejection block, qui portent l'essentiel du
+    résultat et qui sont de moi, faute de source précise.
+  · Le SITE DANS UN NAVIGATEUR n'est vérifié qu'avec --navigateur, et
+    seulement qu'il s'ouvre : ni la mise en page, ni les couleurs, ni le radar.
+  · Le SITE EN LIGNE : rien ne compare ce dépôt à ce que GitHub Pages sert.
+    La date en pied de page est là pour ça, elle se vérifie à l'œil.
+  · Le DÉCLENCHEMENT du robot. GitHub n'honore pas les tâches planifiées entre
+    15 h et 18 h heure de Paris — mesuré, jamais corrigé.
+  · L'EXÉCUTION RÉELLE. Aucun ordre n'est passé : le dérapage, les frais réels
+    et le refus d'un courtier ne sont que des hypothèses.
+  · Les DONNÉES YAHOO au-delà de leur forme : si elles sont fausses mais bien
+    formées, rien ne le verra.`);
 if (ko) { console.log(''); echecs.forEach(e => console.log('  ✗ ' + e)); process.exit(1); }
