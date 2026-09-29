@@ -198,16 +198,33 @@
    "etapeBloquee": "ifvg",
    "dit": "Le prix a touché RB M5 (30619.5 – 30637), mais aucune inversion confirmée par clôture de corps.",
    "apresCoup": false
+  },
+  {
+   "ts": "2026-09-29T13:35:07.498Z",
+   "bougie": "2026-09-29T13:25:00.000Z",
+   "jour": "2026-09-29",
+   "heureNY": "09:25",
+   "prix": 30682.25,
+   "retardMin": 10,
+   "biais": "haussier",
+   "score": 2,
+   "dol": 30759.25,
+   "niveau": "RB M5",
+   "etat": "ATTEND_IFVG",
+   "niveauxParUnite": "M5:95 M15:45 M30:59 H1:100 H4:95",
+   "etapeBloquee": "stop",
+   "dit": "Inversion 2m confirmée sur RB M5 (30619.5 – 30637), mais le stop était trop serré face à l'ATR.",
+   "apresCoup": false
   }
  ],
  "bilan": {
-  "maj": "2026-09-29T13:15:00.243Z",
+  "maj": "2026-09-29T13:35:07.498Z",
   "total": 2,
   "clos": 2,
   "ouverts": 0,
   "reussite": 100,
   "cumulR": 0.904,
-  "passages": 7
+  "passages": 8
  },
  "archive": [
   {
