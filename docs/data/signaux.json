@@ -181,16 +181,33 @@
    "etapeBloquee": "fenetre",
    "dit": "Hors fenêtre. Biais haussier, DOL à 30759.25, niveau le plus proche RB M5 (30531 – 30543.75).",
    "apresCoup": true
+  },
+  {
+   "ts": "2026-09-29T13:15:00.243Z",
+   "bougie": "2026-09-29T13:00:00.000Z",
+   "jour": "2026-09-29",
+   "heureNY": "09:00",
+   "prix": 30637.25,
+   "retardMin": 15,
+   "biais": "haussier",
+   "score": 2,
+   "dol": 30759.25,
+   "niveau": "RB M5",
+   "etat": "ATTEND_IFVG",
+   "niveauxParUnite": "M5:77 M15:39 M30:57 H1:98 H4:95",
+   "etapeBloquee": "ifvg",
+   "dit": "Le prix a touché RB M5 (30619.5 – 30637), mais aucune inversion confirmée par clôture de corps.",
+   "apresCoup": false
   }
  ],
  "bilan": {
-  "maj": "2026-09-29T06:48:48.087Z",
+  "maj": "2026-09-29T13:15:00.243Z",
   "total": 2,
   "clos": 2,
   "ouverts": 0,
   "reussite": 100,
   "cumulR": 0.904,
-  "passages": 6
+  "passages": 7
  },
  "archive": [
   {
