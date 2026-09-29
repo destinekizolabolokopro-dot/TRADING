@@ -1,12 +1,12 @@
 {
- "maj": "2026-09-29T15:45:00.269Z",
+ "maj": "2026-09-29T21:21:17.925Z",
  "source": "yahoo",
- "eurusd": 1.1337,
+ "eurusd": 1.1373,
  "confirmePar": "ES=F",
  "sansConfirmation": false,
- "prix": 30598.75,
- "derniereBougie": 1790695800000,
- "retardMin": 15,
+ "prix": 30656.25,
+ "derniereBougie": 1790715300000,
+ "retardMin": 26,
  "hors": true,
  "etat": "ATTEND_IFVG",
  "dir": 0,
@@ -66,7 +66,7 @@
   "dol": 30370,
   "biaisDir": -1,
   "biaisScore": -2,
-  "barre": 13231,
+  "barre": 13232,
   "derniere": false
  },
  "cfg": {
