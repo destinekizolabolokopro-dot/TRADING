@@ -41,8 +41,9 @@ const { spawn } = require('child_process');
 const RACINE = path.resolve(__dirname, '..');
 const CACHE  = process.env.MECH_CACHE || path.join(RACINE, '.cache');
 const YF = 'https://query1.finance.yahoo.com/v8/finance/chart/';
-const SERIES = [['1m', '8d', 'm1'], ['2m', '60d', 'm2'], ['5m', '60d', 'm5'],
-                ['15m', '60d', 'm15'], ['1h', '6mo', 'h1'], ['1d', '1y', 'd1']];
+// Les séries sont déclarées dans js/modele.js : une copie ici avait déjà
+// divergé de celle du robot sans que personne le voie.
+let SERIES = null;   // rempli par chargerModele()
 
 const args = {};
 process.argv.slice(3).forEach((a, i, arr) => { if (a.startsWith('--')) args[a.slice(2)] = arr[i + 1]; });
@@ -67,6 +68,7 @@ async function serie(sym, interval, range) {
   return out;
 }
 async function charger(sym) {
+  if (!SERIES) chargerModele();
   const D = {};
   for (const [i, r, k] of SERIES) D[k] = await serie(sym, i, r);
   return D;
@@ -76,10 +78,9 @@ let _conf = null;
 async function confirmateur() {
   if (_conf) return _conf;
   const s = args.conf || 'ES=F';
-  _conf = {
-    m5: await serie(s, '5m', '60d'), m15: await serie(s, '15m', '60d'),
-    h1: await serie(s, '1h', '6mo'), d1: await serie(s, '1d', '1y')
-  };
+  const M = chargerModele();
+  _conf = {};
+  for (const x of M.SERIES2) _conf[x.cle] = await serie(s, x.interval, x.range);
   return _conf;
 }
 
@@ -89,11 +90,14 @@ async function confirmateur() {
 // donc dans un faux objet global, et on lui donne les noms qu'ils attendent.
 function chargerModele() {
   const ctx = {};
-  for (const f of ['js/structure.js', 'js/modele.js']) {
+  for (const f of ['js/structure.js', 'js/position.js', 'js/modele.js']) {
     const code = fs.readFileSync(path.join(RACINE, f), 'utf-8');
     new Function('root', 'ST', code).call(ctx, ctx, ctx.ST);
   }
   if (!ctx.Modele) throw new Error('js/modele.js n\'a pas exposé Modele');
+  if (!ctx.Position) throw new Error('js/position.js n\'a pas exposé Position');
+  POSITION = ctx.Position;
+  SERIES = ctx.Modele.SERIES.map(x => [x.interval, x.range, x.cle]);
   return ctx.Modele;
 }
 
@@ -102,40 +106,21 @@ function chargerModele() {
 // commission, soit 0,70 point, qui pèsent d'autant plus que le stop est serré.
 const COUT_PTS = 0.25 * 2 + 4.00 / 20;
 const RISQUE_E = +(args.risque || 250);     // 0,5 % d'un compte de 50 000 €
+let POSITION = null;                        // js/position.js, chargé avec le modèle
 
+// Le suivi vit dans js/position.js et NULLE PART AILLEURS. Ce banc d'essai en
+// gardait sa propre copie ; elle a divergé du robot — il mesurait un partiel à
+// 0,5 R pendant que le robot en passait un à 0,4 R, et personne ne l'a vu
+// avant de comparer les deux à la main. Ici on ne fait plus qu'adapter les
+// arguments et traduire les noms d'issue.
 function suivre(s, apres, cfg, prudent, maxBarres, heure, jourSignal) {
-  const L = s.sens === 'LONG';
-  const plafond = cfg.part * cfg.tp1 + (1 - cfg.part) * cfg.tp2;
-  let sl = s.sl, part1 = false, n = 0, r = null, o = null, flou = 0;
-  for (const c of apres) {
-    n++;
-    const touche = niv => L ? c.h >= niv : c.l <= niv;
-    const stoppe = () => L ? c.l <= sl : c.h >= sl;
-    if (stoppe() && touche(part1 ? s.tp : s.tp1)) flou++;
-    if (prudent) {
-      if (stoppe())                     { r = part1 ? cfg.part * cfg.tp1 : -1; o = part1 ? 'partiel' : 'perte'; }
-      else if (!part1 && touche(s.tp1)) { part1 = true; sl = s.entree; }
-      else if (part1 && touche(s.tp))   { r = plafond; o = 'gain'; }
-    } else {
-      if (!part1 && touche(s.tp1))      { part1 = true; sl = s.entree; }
-      if (part1 && touche(s.tp))        { r = plafond; o = 'gain'; }
-      else if (stoppe())                { r = part1 ? cfg.part * cfg.tp1 : -1; o = part1 ? 'partiel' : 'perte'; }
-    }
-    // Sortie forcée AU MARCHÉ : le robot solde à cette heure, le banc d'essai
-    // doit faire pareil, ou il ne mesure pas ce qui tourne.
-    if (r === null && cfg.sortieMin != null && heure) {
-      const e = heure(c.t);
-      if (e.jour !== jourSignal || e.min >= cfg.sortieMin) {
-        const brut = (L ? c.c - s.entree : s.entree - c.c) / Math.abs(s.entree - s.sl);
-        r = part1 ? cfg.part * cfg.tp1 + (1 - cfg.part) * Math.max(-1, Math.min(cfg.tp2, brut))
-                  : Math.max(-1, Math.min(cfg.tp2, brut));
-        o = 'horaire';
-      }
-    }
-    if (r === null && n > maxBarres) { r = part1 ? cfg.part * cfg.tp1 : 0; o = part1 ? 'partiel' : 'ambigu'; }
-    if (r !== null) break;
-  }
-  return r === null ? null : { r, o, barres: n, flou };
+  const r = POSITION.suivre(s, apres, cfg, {
+    prudent: prudent, maxBarres: maxBarres, heure: heure, jourSignal: jourSignal
+  });
+  if (r.ouverte) return null;
+  const o = { stop: 'perte', seuil: 'partiel', objectif: 'gain',
+              horaire: 'horaire', 'expiré': 'ambigu' }[r.sortie] || r.sortie;
+  return { r: r.r, o: o, barres: r.barres, flou: r.ambigu };
 }
 
 function passe(M, D, cfg, D2) {

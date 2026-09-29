@@ -584,3 +584,143 @@ Il ne filtre pas en silence. `evaluer()` rend `sansConfirmation: true`, le
 robot consigne `confirmePar` dans l'instantané, et le pied du site écrit
 « NQ seul — confirmation indisponible ». Sans ça, le site afficherait des
 signaux que le robot écarte, et personne ne pourrait le voir.
+
+---
+
+## 10. Comment vérifier, et où la vérification s'arrête
+
+```
+node scripts/test.js                 79 vérifications, quelques secondes
+node scripts/test.js --navigateur    + la page ouverte dans Chromium
+node scripts/reference.js            le modèle produit-il la même chose qu'hier ?
+node scripts/reference.js --ecrire   accepter un changement et le figer
+```
+
+Les deux premiers tournent dans le robot, **après la construction et avant la
+poussée** : c'est le seul ordre qui empêche un chiffre faux d'atteindre le site.
+
+### Les sept familles de vérifications
+
+| famille | ce qu'elle attrape | le bug réel qui l'a motivée |
+|---|---|---|
+| réglages cohérents | fenêtre inversée, objectif plus près que le partiel, sortie forcée avant la fin de la fenêtre | — |
+| valeur d'une position | la part déjà vendue ignorée | « +467 € » au lieu de +157 € |
+| suivi d'une position | l'ordre des tests inversé | 4 positions sur 8 annoncées gagnantes alors qu'elles perdaient |
+| sorties du modèle | stop du mauvais côté, signal hors fenêtre, plafond par jour | 4 à 9 % d'ordres impossibles à passer |
+| affiché = mesuré | l'en-tête, les deux pages et le site doivent porter les mêmes chiffres | « 80,0 % » affiché à travers trois régénérations |
+| données d'entrée | bougies désordonnées, haut < bas, cotation en cours prise pour une bougie, saut de prix absurde | la pseudo-bougie de Yahoo |
+| pas de copie du suivi | une sixième réimplémentation | **la cause de tout** |
+
+Plus la **référence** : l'empreinte exacte des 42 signaux. Tout écart fait
+échouer les tests. L'accepter demande `--ecrire`, donc un geste délibéré,
+visible dans un commit. Rien ne distinguait jusqu'ici « j'ai amélioré » de
+« j'ai cassé sans m'en rendre compte ».
+
+### Ce qui n'est PAS vérifié
+
+Les tests le disent eux-mêmes à la fin de chaque exécution. C'est volontaire :
+le pire défaut d'une batterie de tests est de laisser croire qu'elle couvre
+tout.
+
+- **La stratégie.** Les tests vérifient que le code fait ce qu'il dit, pas que
+  ce qu'il dit soit rentable. 42 trades sur 60 jours ne prouvent rien.
+- **Les définitions du CISD et du rejection block**, qui portent l'essentiel du
+  résultat et qui sont de moi, faute de source précise.
+- **La mise en page**, les couleurs, le radar — seulement que la page s'ouvre.
+- **Le site en ligne** : rien ne compare ce dépôt à ce que GitHub Pages sert.
+  La date en pied de page est là pour ça, elle se vérifie à l'œil.
+- **Le déclenchement du robot** : GitHub n'honore pas les tâches planifiées
+  entre 15 h et 18 h heure de Paris. Mesuré, jamais corrigé.
+- **L'exécution réelle** : aucun ordre n'est passé. Le dérapage, les frais et
+  le refus d'un courtier restent des hypothèses.
+- **Les données Yahoo au-delà de leur forme** : fausses mais bien formées,
+  rien ne le verra.
+
+### Les trois trous qui restaient, et ce qui a été fait
+
+**Le robot ne tournait pas pendant la séance.** GitHub n'honore presque jamais
+les tâches planifiées entre 13 h et 16 h UTC — mesuré sur quarante-deux
+déclenchements, et confirmé le lundi 28 septembre où les deux créneaux prévus
+dans la fenêtre ne sont pas partis. `.github/workflows/seance.yml` contourne le
+problème au lieu d'espérer : le travail démarre à **11 h 47 UTC**, hors zone
+morte, **attend** jusqu'à 13 h 15, puis relève toutes les vingt minutes
+jusqu'à 15 h 45. Un travail GitHub peut durer six heures, il en faut moins de
+quatre, et le dépôt est public donc les minutes sont gratuites. Les passages du
+soir restent comme filet.
+
+Les vérifications y sont un **veto** : si elles échouent, rien n'est publié,
+même si cela veut dire ne rien montrer.
+
+**Le site en ligne n'était comparé à rien.** `node scripts/test.js --enligne`
+télécharge la page publiée et vérifie qu'elle porte le même nombre de signaux,
+la même date de mise à jour, et qu'elle ne parle pas en R. La question « est-ce
+que c'est à jour ? » a enfin une réponse mécanique.
+
+**Le rendu n'était pas vérifié.** `--navigateur` contrôle désormais que le
+radar dessine vraiment (il compte les pixels du canvas : un canvas vide laisse
+la page d'apparence normale et le cœur visuel mort), que rien ne déborde à la
+largeur d'un téléphone, et que les repères d'affichage existent.
+
+---
+
+## 11. L'audit du mécanisme, avant la première séance automatique
+
+Le travail qui couvre la séance n'avait jamais tourné. Relu ligne par ligne en
+se demandant « qu'est-ce qui casse ? », six défauts sont sortis. Deux étaient
+graves.
+
+### Le backtest mesurait une autre stratégie que le robot
+
+Le plus sérieux, et le plus discret. Le robot chargeait **60 minutes sur
+3 mois** ; le banc d'essai, **1 heure sur 6 mois**. Le biais et les niveaux H4
+sont agrégés depuis cette série. Sur les mêmes bougies d'exécution :
+
+| | signaux |
+|---|---|
+| banc d'essai — 1h / 6 mois | **42** |
+| robot — 60m / 3 mois | **37** |
+
+Et pas les mêmes jours : le robot voyait deux achats du 22 juillet absents du
+backtest, le backtest deux ventes du 24 juillet absentes du robot. **Tout ce
+qui était mesuré décrivait donc autre chose que ce qui tournait.**
+
+La liste des séries est désormais déclarée dans `js/modele.js`, puisque c'est
+lui qui les consomme, et les quatre chargeurs la lisent là.
+
+### Le travail se serait fait tuer au milieu de la séance
+
+`timeout-minutes` valait 300. Départ au plus tôt à 10 h 17, attente jusqu'à
+13 h 15 (178 min), relevés jusqu'à 15 h 45 (150 min) : **328 minutes**. GitHub
+l'aurait arrêté à 15 h 17, en coupant la demi-heure où les positions sont
+soldées. Porté à 350 ; la limite dure est 360.
+
+### Les quatre autres
+
+| défaut | conséquence | correction |
+|---|---|---|
+| départ très en retard | la boucle ne tournait pas une fois et le travail se terminait **en ayant l'air d'avoir réussi** | un relevé de rattrapage est forcé |
+| deux workflows, deux groupes de concurrence | ils pouvaient pousser sur `main` en même temps | les créneaux de séance de `signaux.yml` sont retirés — ils n'avaient jamais rien déclenché |
+| pas de cache dans l'action GitHub | les contrôles sur les **données d'entrée** étaient sautés là où le robot tourne vraiment | `live_log.js` dépose les séries dans `MECH_CACHE`, les deux workflows le définissent |
+| `fixture.json` publié sur le site | 885 Ko de bougies imposés au visiteur | seuls `etat.json` et `signaux.json` sont publiés |
+
+### La référence criait au loup tous les matins
+
+Elle portait sur le cache vivant. Comme la fenêtre de Yahoo glisse, elle
+échouait chaque jour — et un test qui alerte tous les matins finit par être
+ignoré, c'est-à-dire par ne plus rien protéger.
+
+Les bougies sont donc **gelées** dans `data/fixture.json` (huit jours, la
+profondeur du 1 minute chez Yahoo). Un écart ne peut alors venir que du
+**code**. Vérifié dans les deux sens :
+
+```
+trois exécutions d'affilée      → conforme, conforme, conforme
+slx passé de 4 à 5              → réussite 85,7 % → 100 %, résultat +383 € → +779 €,
+                                  réglage slx : 4 → 5        ← détecté
+```
+
+```
+node scripts/fixture.js              regeler les bougies (geste délibéré)
+node scripts/reference.js            comparer
+node scripts/reference.js --ecrire   accepter un changement
+```

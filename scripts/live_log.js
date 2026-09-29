@@ -28,18 +28,34 @@ const path = require('path');
 
 global.window = global;
 require(path.join(__dirname, '..', 'js', 'structure.js'));
+require(path.join(__dirname, '..', 'js', 'position.js'));
 require(path.join(__dirname, '..', 'js', 'modele.js'));
 
 const FICHIER = path.join(__dirname, '..', 'data', 'signaux.json');
 const ETAT    = path.join(__dirname, '..', 'data', 'etat.json');
 const YF = 'https://query1.finance.yahoo.com/v8/finance/chart/';
-const SERIES = [['1m','8d','m1'],['2m','60d','m2'],['5m','60d','m5'],
-                ['15m','60d','m15'],['60m','3mo','h1'],['1d','1y','d1']];
+// Où déposer les séries téléchargées, pour que scripts/test.js puisse les
+// contrôler juste après. Vide = on ne dépose rien.
+const CACHE = process.env.MECH_CACHE || '';
+// ⚠️ LES SÉRIES NE SONT PLUS DÉCLARÉES ICI. Elles l'étaient, et elles avaient
+// divergé de celles du banc d'essai : le robot chargeait 60 minutes sur 3 mois
+// pendant que le backtest chargeait 1 heure sur 6 mois. Sur les mêmes bougies
+// d'exécution cela donnait 37 signaux contre 42, et pas les mêmes jours — le
+// backtest mesurait donc une AUTRE stratégie que celle qui tournait ici.
+// js/modele.js les déclare, puisque c'est lui qui les consomme.
+const SERIES  = Modele.SERIES.map(s => [s.interval, s.range, s.cle]);
 // Le plan source exige que la narrative soit confirmée sur NQ ET ES. Le
 // second marché est donc téléchargé comme le premier : sans lui, le modèle
 // ne peut pas appliquer la règle et le dit (`sansConfirmation`).
-const SERIES2 = [['5m','60d','m5'],['15m','60d','m15'],['60m','3mo','h1'],['1d','1y','d1']];
+const SERIES2 = Modele.SERIES2.map(s => [s.interval, s.range, s.cle]);
 const SYM2 = 'ES=F';
+
+// ── DES EUROS, PAS DES R ───────────────────────────────────────────────────
+// Le R est une unité de travail : « 1 R » = ce qu'on risque sur un trade.
+// Personne ne lit un journal en R. Tout ce qui est écrit pour un humain est
+// traduit ici, sur la base du risque réellement calibré.
+const RISQUE = +(process.env.RISQUE_EUR || 250);       // 0,5 % d'un compte de 50 000 €
+const euros = v => (v >= 0 ? '+' : '') + Math.round(v) + ' €';
 const DUREE = { '1m': 6e4, '2m': 12e4, '5m': 3e5, '15m': 9e5, '60m': 36e5, '1d': 864e5 };
 const FORCE = process.argv.includes('--force');
 
@@ -91,6 +107,16 @@ async function serie(sym, interval, range) {
       if (!propre.length) throw new Error('aucune bougie clôturée');
       if (propre.length < out.length)
         console.log(`  ${interval} : ${out.length - propre.length} entrée(s) non clôturée(s) écartée(s)`);
+      // Les séries sont déposées dans MECH_CACHE quand il est défini. Sans ça,
+      // les vérifications sur les DONNÉES D'ENTRÉE (bougies désordonnées, haut
+      // sous le bas, cotation en cours prise pour une bougie…) sont sautées
+      // dans l'action GitHub faute de cache — c'est-à-dire précisément là où
+      // elles serviraient, puisque c'est là que le robot tourne vraiment.
+      if (CACHE) try {
+        fs.mkdirSync(CACHE, { recursive: true });
+        fs.writeFileSync(path.join(CACHE, `${sym.replace(/\W/g, '')}_${interval}_${range}.json`),
+                         JSON.stringify(propre));
+      } catch (e) { /* le cache est un confort, jamais un obstacle */ }
       return propre;
     } catch (e) {
       if (essai === 3) throw e;
@@ -244,7 +270,8 @@ function blocage(d) {
       `DOL à ${sig.dol}. Niveau clé ${sig.niveau}. ` +
       `Le prix l'a touché, puis une inversion ${sig.tf} a été confirmée par clôture de corps. ` +
       `Entrée ${sig.entree}, stop au bord de l'IFVG à ${sig.sl} (${Math.abs(sig.entree - sig.sl).toFixed(1)} pts), ` +
-      `partiel 0,5 R à ${sig.tp1} sur 90 % de la taille, le reste court jusqu'à 2,5 R à ${sig.tp}.`;
+      `objectif partiel à ${sig.tp1} sur ${Math.round(Modele.CFG.part * 100)} % de la position ` +
+      `(${euros(Modele.CFG.tp1 * RISQUE)}), le reste court jusqu'à ${sig.tp} (${euros(Modele.CFG.tp2 * RISQUE)}).`;
     console.log(`Raisonnement réparé : ${vieux.jour} ${vieux.heureNY} ${vieux.sens}`);
   });
 
@@ -313,16 +340,16 @@ function blocage(d) {
       // sans qu'on puisse le savoir après coup.
       slx: Modele.CFG.slx, cfgTp1: Modele.CFG.tp1, cfgTp2: Modele.CFG.tp2,
       cfgSortieMin: Modele.CFG.sortieMin,
-      raisonnement:
-        `Biais ${t.biaisDir > 0 ? 'haussier' : 'baissier'} (score ${Math.abs(t.biaisScore)}/4). ` +
-        `DOL à ${t.dol}. Niveau clé ${t.niveau}. ` +
-        `Le prix l'a touché, puis une inversion ${t.tf} a été confirmée par clôture de corps. ` +
-        `Entrée ${t.entree}, stop à ${t.sl} — ${Math.abs(t.entree - t.sl).toFixed(1)} pts, soit ` +
-        `${Modele.CFG.slx} fois le bord de l'IFVG, pour ne pas être sorti par la respiration du prix. ` +
-        `Partiel ${String(Modele.CFG.tp1).replace('.', ',')} R à ${t.tp1} sur ${Math.round(Modele.CFG.part * 100)} % de la taille, ` +
-        `le reste court jusqu'à ${String(Modele.CFG.tp2).replace('.', ',')} R à ${t.tp}. ` +
-        `Solde au marché à ${String(Math.floor(Modele.CFG.sortieMin / 60)).padStart(2, '0')} h ` +
-        `${String(Modele.CFG.sortieMin % 60).padStart(2, '0')} New York si rien n'est touché avant.`,
+      // La phrase n'est plus écrite ici : js/position.js la compose, et le
+      // site la RECOMPOSE à l'affichage. Sans ça elle reste figée dans le
+      // journal — deux positions du 28 septembre parlaient encore en R
+      // longtemps après qu'on eut décidé d'arrêter, sans moyen de les corriger.
+      raisonnement: Position.raisonnement({
+        sens: t.sens, entree: t.entree, sl: t.sl, tp1: t.tp1, tp: t.tp,
+        niveauDeclencheur: t.niveau, uniteIFVG: t.tf,
+        biais: t.biaisDir > 0 ? 'haussier' : 'baissier',
+        biaisScore: t.biaisScore, dol: t.dol
+      }, Modele.CFG, RISQUE),
       statut: 'ouvert', resultat: null, r: null, closTs: null
     }));
     console.log(`✅ SIGNAL ${t.sens} · ${eSig.jour} ${hSig} NY · entrée ${t.entree} · stop ${t.sl} · ${t.niveau}`);
@@ -416,47 +443,35 @@ function blocage(d) {
     const cs = fin1m ? m1 : m5, unite = fin1m ? '1m' : '5m';
     const MAXBARRES = fin1m ? 1000 : 200;
     const apres = cs.filter(c => c.t > depuis);
-    const L = s.sens === 'LONG';
     // Si la série couvre le signal, on rejoue depuis le début : l'état
     // mémorisé au passage précédent a pu être établi sur l'autre unité.
-    let sl = s.sl, part1 = apres.length && cs[0].t <= depuis ? false : s.part1 === true;
-    if (part1) sl = s.entree;
-    let n = 0, ambigu = 0;
-    for (const c of apres) {
-      n++;
-      const touche = niv => L ? c.h >= niv : c.l <= niv;
-      const stoppe = () => L ? c.l <= sl : c.h >= sl;
-      if (stoppe() && touche(part1 ? s.tp : s.tp1)) ambigu++;
-      if (stoppe()) {
-        if (part1) { s.statut = 'clos'; s.resultat = 'gagné'; s.r = +(PART * TP1R).toFixed(3); }
-        else       { s.statut = 'clos'; s.resultat = 'perdu'; s.r = -1; }
-      } else if (!part1 && touche(s.tp1)) {          // partiel encaissé, stop au seuil
-        part1 = true; sl = s.entree;
-      } else if (part1 && touche(s.tp)) {
-        s.statut = 'clos'; s.resultat = 'gagné';
-        s.r = +(PART * TP1R + (1 - PART) * TP2R).toFixed(3);
-      } else if (SORTIE != null && (Modele.heure(c.t).jour !== s.jour || Modele.heure(c.t).min >= SORTIE)) {
-        // Sortie forcée AU MARCHÉ. Sans elle, une position sur douze passait
-        // la nuit — un risque de gap que la règle de drawdown d'un compte
-        // financé ne pardonne pas, et que le backtest ne sait pas chiffrer.
-        const brut = (L ? c.c - s.entree : s.entree - c.c) / s.risquePts;
-        s.statut = 'clos';
-        s.r = +(part1 ? PART * TP1R + (1 - PART) * Math.max(-1, Math.min(TP2R, brut))
-                      : Math.max(-1, Math.min(TP2R, brut))).toFixed(3);
-        s.resultat = s.r > 0 ? 'gagné' : 'perdu';
-        s.sortie = 'horaire';
-      } else if (n > MAXBARRES) {
-        const rBrut = (L ? c.c - s.entree : s.entree - c.c) / s.risquePts;
-        s.statut = 'clos'; s.resultat = 'expiré';
-        s.r = +(part1 ? PART * TP1R + (1 - PART) * Math.max(0, Math.min(TP2R, rBrut))
-                      : Math.max(-1, Math.min(TP2R, rBrut))).toFixed(3);
-      }
-      if (s.statut === 'clos') { s.closTs = new Date(c.t).toISOString(); s.barres = n; break; }
+    const repart = apres.length && cs[0].t <= depuis ? false : s.part1 === true;
+
+    // ⚠️ LE SUIVI N'EST PAS ÉCRIT ICI. Il vit dans js/position.js, et lui
+    // seul. Cette boucle en était une copie ; c'est une copie qui a annoncé
+    // quatre positions gagnantes sur huit alors qu'elles étaient perdantes,
+    // parce qu'elle testait l'objectif avant le stop. scripts/test.js refuse
+    // désormais qu'une copie réapparaisse.
+    const fin = Position.suivre(s, apres, Modele.CFG, {
+      prudent: true, maxBarres: MAXBARRES, part1: repart,
+      heure: Modele.heure, jourSignal: s.jour
+    });
+    const part1 = fin.part1, ambigu = fin.ambigu;
+    if (!fin.ouverte) {
+      s.statut = 'clos';
+      s.r = +fin.r.toFixed(3);
+      s.resultat = fin.sortie === 'expiré' ? 'expiré' : (s.r > 0 ? 'gagné' : 'perdu');
+      if (fin.sortie === 'horaire') s.sortie = 'horaire';
+      s.closTs = new Date(fin.t).toISOString();
+      s.barres = fin.barres;
     }
     s.part1 = part1;
     s.suiviUnite = unite;
     s.ambigu = ambigu;
-    if (s.statut === 'ouvert') s.slCourant = sl;
+    // Le stop courant : au prix d'entrée une fois le partiel encaissé, sinon
+    // celui d'origine. Il est déduit de l'état, plus recopié d'une variable
+    // de boucle qui n'existe plus.
+    if (s.statut === 'ouvert') s.slCourant = part1 ? s.entree : s.sl;
   });
 
   const clos = db.signaux.filter(s => s.statut === 'clos');

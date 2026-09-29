@@ -405,6 +405,9 @@ button,input,select{font:inherit;color:inherit}
   Stop à <span id="f-slx">—</span> fois le bord de l’IFVG · solde au marché à
   <span id="f-sortie">—</span> New York si rien n’est touché avant ·
   narrative confirmée sur <span id="f-conf">—</span>.
+  <br><b>Dernière mise à jour du site : __VERSION__.</b>
+  Si cette date ne correspond pas à ce qui t’a été annoncé, la page vient du cache :
+  tire-la vers le bas pour la recharger.
   <b>Comptage prudent :</b> quand une bougie de 5 minutes touche l’objectif et le stop, c’est le
   stop qui compte. L’ancienne version comptait l’objectif ; rejouée en bougies de 1 minute, cette
   hypothèse était fausse plus souvent que juste. Aucun ordre n’est passé : ce site signale, il
@@ -413,6 +416,7 @@ button,input,select{font:inherit;color:inherit}
 <script src="js/cfd.js"></script>
 <script src="js/nq.js"></script>
 <script src="js/structure.js"></script>
+<script src="js/position.js"></script>
 <script src="js/modele.js"></script>
 <script src="js/compte.js"></script>
 <script src="js/history.js"></script>
@@ -484,7 +488,10 @@ function paintTop(){
   if(window.History){
     const b = History.bilan('MECH'), uR = window.Compte ? Compte.uniteR() : 0;
     const e = $('#pnl-top');
-    e.textContent = b.total ? sgn(b.rsum,1) + ' R' : '—';
+    // En euros : le R ne veut rien dire pour qui regarde son compte.
+    const u = window.Compte ? Compte.uniteR() : 250;
+    const d = window.Compte ? Compte.sym(Compte.lire().devise) : ' €';
+    e.textContent = b.total ? sgn(Math.round(b.rsum * u), 0) + d : '—';
     e.className = 'mono' + (b.rsum > 0 ? ' pos' : b.rsum < 0 ? ' neg' : '');
     e.title = b.total ? Math.round(b.rsum*uR) + ' ' + (window.Compte?Compte.sym(Compte.lire().devise):'') : '';
   }
@@ -596,7 +603,7 @@ function paintTrade(){
         (!okSL || !okTP
           ? '<span style="color:var(--loss)">Ce signal est incohérent : stop et objectif doivent ' +
             'encadrer l\u2019entrée. Ne le prends pas.</span>'
-        : frais ? 'Signal armé sur la bougie en cours. Partiel à 0,5 R sur 90 % de la taille, le reste court jusqu’à 2,5 R.'
+        : frais ? 'Signal armé sur la bougie en cours. Une partie est encaissée au premier objectif, le stop remonte alors au prix d’entrée, et le reste court jusqu’à la cible.'
                : 'Ce signal date du ' + quand + '. Il est affiché pour mémoire — ce n’est pas une position à prendre maintenant.') +
       '</div>' +
     '</div>';
@@ -844,7 +851,19 @@ function enLigne(s, source){
     ts: Date.parse(s.bougie), source: source, symbol:'NQ', direction:s.sens,
     entry:s.entree, sl:s.sl, tp:s.tp, rr:s.rr,
     r: s.r, status: s.statut === 'clos' ? 'closed' : 'open',
-    motif: (s.reglages ? '[' + s.reglages + '] ' : '') + s.raisonnement,
+    // ⚠️ La phrase stockée dans le journal est FIGÉE à la date du signal.
+    // Deux positions du 28 septembre parlaient encore en R longtemps après
+    // qu'on eut décidé d'arrêter. On la RECOMPOSE donc à partir des faits, à
+    // chaque affichage : changer la formulation corrige tout l'historique.
+    motif: (s.reglages ? '[' + s.reglages + '] ' : '') +
+      (window.Position && s.entree != null
+        ? Position.raisonnement(s, s.cfgTp1 != null
+            ? Object.assign({}, Modele.CFG, { tp1: s.cfgTp1, tp2: s.cfgTp2, slx: s.slx,
+                                              sortieMin: s.cfgSortieMin })
+            : Modele.CFG,
+            window.Compte ? Compte.uniteR() : 250,
+            window.Compte ? Compte.sym(Compte.lire().devise) : ' €')
+        : s.raisonnement),
     heureNY: s.heureNY, jour: s.jour,
     niveau: s.niveauDeclencheur, retard: s.retardMin
   };
@@ -994,7 +1013,8 @@ function paintJournal(){
   }).join('') +
   (JFILTRE === 'Archivé'
     ? '<div class="note"><b>Archivé</b> = positions produites par des réglages qui ne tournent ' +
-      'plus (stop au bord de l\u2019IFVG, partiel à 0,5 R). Elles sont gardées pour mémoire et ' +
+      'plus : le stop était collé au bord de l\u2019IFVG, à une trentaine de points, et ' +
+      'l\u2019objectif partiel beaucoup plus près. Elles sont gardées pour mémoire et ' +
       'ne comptent PAS dans le bilan : leur stop n\u2019était pas au même endroit, donc leur ' +
       'taux de réussite ne dit rien du modèle actuel.</div>'
   : JFILTRE !== 'En direct'

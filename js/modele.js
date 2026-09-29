@@ -455,5 +455,29 @@
     return { ouverte: false, ms: null };
   }
 
-  root.Modele = { evaluer: evaluer, CFG: CFG, heure: heure, fenetre: fenetre };
+  // ── LES SÉRIES DONT LE MODÈLE A BESOIN ──────────────────────────────────
+  // Déclarées ICI, parce que c'est le modèle qui les consomme. Elles étaient
+  // recopiées dans chaque chargeur, et elles avaient divergé sans que personne
+  // le voie : le robot chargeait 60 minutes sur 3 mois, le banc d'essai
+  // 1 heure sur 6 mois. Mesuré sur les mêmes bougies d'exécution, cela donnait
+  // 42 signaux d'un côté et 37 de l'autre, et pas les mêmes jours. Autrement
+  // dit le backtest mesurait une AUTRE stratégie que celle qui tourne.
+  //
+  // Six mois d'horaire sont retenus : le biais et les niveaux H4 sont agrégés
+  // depuis cette série, et trois mois ne suffisent pas à couvrir un niveau
+  // vieux de keyAge bougies.
+  var SERIES = [
+    { interval: '1m',  range: '8d',  cle: 'm1'  },
+    { interval: '2m',  range: '60d', cle: 'm2'  },
+    { interval: '5m',  range: '60d', cle: 'm5'  },
+    { interval: '15m', range: '60d', cle: 'm15' },
+    { interval: '1h',  range: '6mo', cle: 'h1'  },
+    { interval: '1d',  range: '1y',  cle: 'd1'  }
+  ];
+  // Le marché de confirmation n'a pas besoin des unités fines : seul son biais
+  // est consulté, et le biais se lit sur 15m, 1h, 4h et le journalier.
+  var SERIES2 = SERIES.filter(function (s) { return ['m5', 'm15', 'h1', 'd1'].indexOf(s.cle) >= 0; });
+
+  root.Modele = { evaluer: evaluer, CFG: CFG, heure: heure, fenetre: fenetre,
+                  SERIES: SERIES, SERIES2: SERIES2 };
 })(typeof window !== 'undefined' ? window : this);
