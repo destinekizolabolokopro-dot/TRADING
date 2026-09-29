@@ -724,3 +724,108 @@ node scripts/fixture.js              regeler les bougies (geste délibéré)
 node scripts/reference.js            comparer
 node scripts/reference.js --ecrire   accepter un changement
 ```
+
+---
+
+## 12. KINTT — le plan source, suivi à la lettre
+
+Deuxième stratégie, **à côté** de `js/modele.js`, pas à sa place. Les deux
+tournent et se mesurent l'une contre l'autre.
+
+| | `js/modele.js` | `js/kintt.js` |
+|---|---|---|
+| origine | un balayage, puis des corrections | **le plan « 10AM OXXC »** |
+| fenêtre | 09h–10h | **10h–11h, étendue à 12h** |
+| zones | M5 · M15 · M30 · H1 · H4 | **M15 · M30 · H1 · H4** (pas de M5) |
+| zone | n'importe laquelle | **intacte** — jamais touchée |
+| déclencheur | IFVG **ou** CISD | **IFVG *et* CISD** |
+| stop | × 4 le bord de l'IFVG | **sous l'extrémité du balayage** |
+| objectif | 2,5 fois le risque | **une zone** : haut/bas de séance, veille, ou bout du H4 |
+| partiel | 90 % à 0,4 | **aucun** — tout court jusqu'à l'objectif |
+
+### Ce que le plan produit vraiment
+
+```
+  modele (09h-10h)     41 trades ·  87,8 % ·  +52 € /trade ·  +2 116 €
+  kintt  (10h-12h)      3 trades ·  33,3 % · +101 € /trade ·    +304 €
+```
+
+**Trois trades en soixante jours.** Environ un par mois. L'entonnoir dit
+pourquoi :
+
+| étape | bougies écartées |
+|---|---|
+| biais neutre | 423 |
+| ES en désaccord | 384 |
+| **aucune zone intacte** | **442** |
+| avant 10h | 67 |
+| pas de balayage | 164 |
+| pas de confirmation | 10 |
+| **entrées** | **3** |
+
+Desserrer les règles ne change presque rien — accepter les zones déjà
+touchées, allonger l'âge maximum, ajouter le M5, doubler la fenêtre de
+balayage : on reste à trois signaux. **C'est la rareté de la zone intacte qui
+commande**, et c'est voulu : un FVG H4 jamais retouché n'apparaît que quelques
+fois par trimestre. Le plan décrit un cas rare, pas une machine quotidienne.
+
+### Conséquence, et elle est dure
+
+**On ne peut pas juger kintt sur ces données.** +304 € sur trois trades ne veut
+rien dire : un seul trade différent renverse le signe. Pour le mesurer il
+faudrait des années, pas soixante jours.
+
+C'est une information en soi, et elle vaut pour les deux stratégies : celle
+qui produit quarante-et-un signaux est mesurable et probablement sur-ajustée ;
+celle qui suit la source est honnête et invérifiable. Il n'y a pas de troisième
+option avec deux mois de données.
+
+### Les choix qu'il a fallu faire
+
+Le plan se tait sur cinq points. Chacun est marqué `[CHOIX]` dans le code et
+reste réglable :
+
+| ce que le plan dit | ce que j'en ai fait |
+|---|---|
+| « SL : sous le dernier mouvement » | sous l'extrémité du **balayage** — le seul point que le plan rende identifiable |
+| « PD High/Low » | **Previous Day** : haut et bas de la veille |
+| « extrémité d'un CRT H1/H4 » | l'extrémité de la bougie H4 en cours |
+| « IFVG M1/M3 » | 1m et 2m — Yahoo ne sert pas le 3 minutes au-delà de huit jours |
+| âge maximum d'une zone | 400 bougies de son unité |
+
+```
+node scripts/kintt_test.js     mesure kintt et la compare au modèle
+```
+
+### Où kintt se voit, maintenant
+
+La stratégie ne vit plus seulement dans un script de mesure : elle est
+**branchée de bout en bout**.
+
+| maillon | ce qu'il fait |
+|---|---|
+| `scripts/live_log.js` | évalue kintt à **chaque passage du robot**, sur les mêmes bougies que le modèle |
+| `data/kintt.json` | son journal en direct, **séparé** de `data/signaux.json` |
+| `data/etat.json` | porte un bloc `kintt` : chaîne du moment, dernier signal, entonnoir, reconstitution |
+| le site | un panneau **KINTT** avec son propre lien de navigation et sa propre jauge |
+| `scripts/reference.js` | fige une **seconde empreinte** : modifier `js/kintt.js` sans le vouloir se voit |
+| `scripts/test.js` | vérifie que tout ça est réellement branché, et que le panneau se remplit |
+
+Deux règles tenues à la lettre :
+
+1. **Les journaux ne se mélangent jamais.** Un test échoue si un même signal
+   apparaît dans les deux. Trois trades à 10 h et quarante-et-un à 9 h ne se
+   moyennent pas : la moyenne ne décrirait ni l'une ni l'autre.
+2. **Les bougies ne voyagent pas dans l'instantané.** La zone d'un signal
+   porte la série entière ; recopiée telle quelle, `etat.json` pèserait
+   plusieurs mégaoctets, téléchargés à chaque ouverture de la page. Un test
+   mesure le poids du bloc et refuse au-delà de 50 Ko.
+
+Le panneau affiche deux chiffres qu'il ne faut pas confondre :
+
+- **« Relevé en direct »** — ce que le robot a réellement vu depuis qu'il tient
+  ce journal. Aujourd'hui : rien, et c'est normal, la fenêtre est étroite.
+- **« Reconstitution »** — le plan rejoué sur l'historique disponible, étiqueté
+  comme tel. Trois trades. Le panneau écrit lui-même que ça ne veut rien dire,
+  et pourquoi la perte moyenne de 4 € est un artefact du stop remonté au prix
+  d'entrée, pas une prouesse.

@@ -92,7 +92,7 @@ try {
     // 885 Ko de bougies figées et reference.json est une empreinte : ce sont
     // des outils de développement, les publier ferait payer au visiteur le
     // téléchargement de données qui ne lui servent à rien.
-    const PUBLIES = ['etat.json', 'signaux.json'];
+    const PUBLIES = ['etat.json', 'signaux.json', 'kintt.json'];
     for (const f of fs.readdirSync(src).filter(f => PUBLIES.indexOf(f) >= 0))
       fs.copyFileSync(path.join(src, f), path.join(dst, f));
     // et on retire ce qui aurait été publié par erreur auparavant

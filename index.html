@@ -292,6 +292,7 @@ button,input,select{font:inherit;color:inherit}
   <nav class="nav">
     <a href="#scope" class="on">Radar</a>
     <a href="#pan-chain">Chaîne</a>
+    <a href="#pan-kintt">KINTT</a>
     <a href="#pan-journal">Historique</a>
     <a href="#settings" id="n-set">Réglages</a>
   </nav>
@@ -363,6 +364,18 @@ button,input,select{font:inherit;color:inherit}
       <div id="chain"></div>
     </section>
 
+    <!-- ── KINTT ────────────────────────────────────────────────────────
+         La seconde stratégie : le plan source suivi à la lettre, fenêtre
+         10 h → 12 h New York. Elle tourne à côté du modèle, sur les mêmes
+         bougies, et ne le remplace pas. Les deux bilans restent séparés :
+         une moyenne des deux ne décrirait ni l'une ni l'autre.          -->
+    <section class="pan" id="pan-kintt">
+      <div class="pan-h"><h2>KINTT · le plan source</h2>
+        <span class="tag" id="k-tag">—</span></div>
+      <div class="gauge"><i id="k-gauge"></i></div>
+      <div id="kintt"></div>
+    </section>
+
     <section class="pan" id="pan-journal">
       <div class="pan-h"><h2>Historique</h2><span class="tag" id="j-tag">—</span></div>
       <div class="jfilters" id="jchips"></div>
@@ -405,6 +418,10 @@ button,input,select{font:inherit;color:inherit}
   Stop à <span id="f-slx">—</span> fois le bord de l’IFVG · solde au marché à
   <span id="f-sortie">—</span> New York si rien n’est touché avant ·
   narrative confirmée sur <span id="f-conf">—</span>.
+  <br><b>Deux stratégies tournent côte à côte</b> sur les mêmes bougies : le modèle ci-dessus,
+  et <b>KINTT</b> — le plan source appliqué à la lettre, fenêtre <span id="f-kfen">—</span>
+  à New York, objectif sur une zone. Leurs journaux et leurs bilans sont séparés ;
+  aucune moyenne n’est faite entre les deux.
   <br><b>Dernière mise à jour du site : __VERSION__.</b>
   Si cette date ne correspond pas à ce qui t’a été annoncé, la page vient du cache :
   tire-la vers le bas pour la recharger.
@@ -418,6 +435,7 @@ button,input,select{font:inherit;color:inherit}
 <script src="js/structure.js"></script>
 <script src="js/position.js"></script>
 <script src="js/modele.js"></script>
+<script src="js/kintt.js"></script>
 <script src="js/compte.js"></script>
 <script src="js/history.js"></script>
 <script src="js/mesure.js"></script>
@@ -547,6 +565,229 @@ function paintChain(){
   $('#chain-tag').textContent = n + '/' + etapes.length;
   $('#gauge').style.width = Math.round(n / etapes.length * 100) + '%';
   $('#tf-tag').textContent = hh(c.ghDeb) + ' – ' + hh(c.ghFin) + ' NY';
+}
+
+/* ── KINTT : le plan source, suivi à la lettre ───────────────────────── */
+// Deux stratégies, deux panneaux, deux bilans. Le mélange serait pire que
+// l'absence : trois trades à 10 h et quarante-et-un à 9 h ne se moyennent pas.
+let KDIST = null, KDIST_ETAT = 'chargement';
+
+async function chargerKintt(){
+  const lu = j => j && Array.isArray(j.signaux);
+  try{
+    const r = await fetch('data/kintt.json?t=' + Date.now(), { cache:'no-store' });
+    if(r.ok){ const j = await r.json(); if(lu(j)){ KDIST = j; KDIST_ETAT = 'ok'; return; } }
+  }catch(e){ /* page ouverte en local : on passe par le dépôt */ }
+  for(const br of BRANCHES){
+    try{
+      const u = 'https://raw.githubusercontent.com/' + DEPOT + '/' +
+                encodeURIComponent(br).replace(/%2F/g,'/') + '/data/kintt.json?t=' + Date.now();
+      const r = await fetch(u, { cache:'no-store' });
+      if(!r.ok) continue;
+      const j = await r.json();
+      if(lu(j)){ KDIST = j; KDIST_ETAT = 'ok'; return; }
+    }catch(e){ /* branche suivante */ }
+  }
+  KDIST_ETAT = 'indisponible';
+}
+
+function paintKintt(){
+  const box = $('#kintt');
+  if(!box) return;
+  const K = D && D.kintt;
+  const c = window.Kintt ? Kintt.CFG : null;
+  const dev = window.Compte ? Compte.sym(Compte.lire().devise) : ' €';
+  const uR  = window.Compte ? Compte.uniteR() : 250;
+  // Décimale à la française et vrai signe moins : « 33.3 % » et « -4 € »
+  // dans une page en français, c'est de l'anglais mal traduit.
+  const nb  = (v, d2) => Number(v).toFixed(d2 == null ? 1 : d2).replace('.', ',').replace('-', '−');
+  const eu  = v => (v >= 0 ? '+' : '−') + Math.round(Math.abs(v)) + dev;
+
+  if(!K || !c){
+    $('#k-tag').textContent = '—';
+    $('#k-gauge').style.width = '0%';
+    box.innerHTML = '<div class="empty"><b>Pas encore de relevé</b>' +
+      'Le robot n’a pas encore fait tourner KINTT sur une bougie. ' +
+      'Le panneau se remplit au premier passage.</div>';
+    return;
+  }
+
+  // La fenêtre de KINTT n'est pas celle du modèle : 10 h → 12 h, avec une
+  // observation qui commence à 09 h 30 sans droit d'entrer.
+  const nowNY = window.Kintt ? Kintt.heure(Date.now()) : null;
+  const min = nowNY ? nowNY.min : null;
+  const ouvre = nowNY && nowNY.dow >= 1 && nowNY.dow <= 5 &&
+                min >= c.deb && min < c.fin;
+  const observe = nowNY && nowNY.dow >= 1 && nowNY.dow <= 5 &&
+                  min >= c.obs && min < c.deb;
+
+  const e = K.etape;
+  const sens = e && e.dir > 0 ? 'haussier' : e && e.dir < 0 ? 'baissier' : null;
+  const etapes = [
+    { t:'Camp choisi, NQ et ES d’accord',
+      ok: !!sens && e.conf !== 'ES en désaccord',
+      d: !e ? 'Aucune bougie examinée dans la fenêtre.'
+        : e.conf === 'ES en désaccord' ? 'Le NQ dit ' + sens + ', l’ES dit le contraire — le plan exige les deux.'
+        : sens ? 'Biais ' + sens + ' (' + Math.abs(e.score) + ' sur 4), confirmé sur l’ES.'
+        : 'Neutre — ' + Math.abs(e.score) + ' sur 4, il en faut ' + c.seuil + '.',
+      long:'Le plan demande une narrative confirmée sur les deux marchés ensemble.' },
+    { t:'Zone intacte ' + c.unites.split(',').join(' / '),
+      ok: !!(e && e.zone),
+      d: e && e.zone
+        ? 'FVG ' + e.zone.tf + ' jamais touché, entre ' + fmt(e.zone.bas) + ' et ' + fmt(e.zone.haut) + '.'
+        : 'Aucune zone jamais touchée où le prix soit venu. C’est le filtre qui rejette le plus de bougies.',
+      long:'« PD Array unmitigated » : un déséquilibre laissé intact. Le M5 n’y figure pas.' },
+    { t:'Fenêtre 10 h → 12 h New York',
+      ok: !!ouvre,
+      attente: !!observe,
+      d: ouvre ? 'Ouverte — les entrées sont permises' + (min < c.primaire ? ' (fenêtre primaire).' : ' (heure de rab).')
+        : observe ? 'On observe depuis 09 h 30, sans droit d’entrer avant 10 h.'
+        : 'Fermée. Le plan est net : aucun setup avant 12 h 00 New York, aucun trade.',
+      long:'09 h 30 on regarde, 10 h → 11 h fenêtre primaire, 11 h → 12 h heure de rab, 12 h terminé.' },
+    { t:'Balayage des stops',
+      ok: !!(e && e.sweep),
+      d: e && e.sweep
+        ? 'Le prix est allé chercher ' + fmt(e.sweep.ext) + ', au-delà du repère de séance.'
+        : 'Le prix n’est pas encore allé au-delà du plus bas / plus haut de séance.',
+      long:'Le piège : on va chercher la liquidité sous le plus bas de séance ou sous la bougie de 9 h, puis on se retourne.' },
+    { t:'Confirmation : inversion et CISD',
+      ok: !!(e && e.conf === 'ok'),
+      attente: !!(e && e.sweep && e.conf !== 'ok'),
+      d: !e ? '—'
+        : e.conf === 'ok' ? 'Inversion et changement de direction validés dans les ' + c.reactMax * 5 + ' minutes.'
+        : e.sweep ? 'Le retournement n’est pas confirmé (' + e.conf + ').'
+        : 'Cherchée seulement après un balayage.',
+      long:'Inversion de FVG en 1 ou 2 min ET un CISD dans le sens du trade ; à défaut, clôture au-delà de la M15 précédente.' }
+  ];
+
+  const n = etapes.filter(x => x.ok).length;
+  $('#k-tag').textContent = n + '/' + etapes.length + (K.hors ? ' · hors fenêtre' : '');
+  $('#k-gauge').style.width = Math.round(n / etapes.length * 100) + '%';
+
+  let h = '<div class="t-why" style="margin:0 0 10px">' +
+    'Le plan source, appliqué sans arrangement : fenêtre <b>10 h → 12 h</b> New York, ' +
+    'stop sous le balayage, objectif sur une <b>zone</b> (haut ou bas de séance, de la veille, ' +
+    'ou extrémité de la bougie de 4 h) et non à une distance fixe. ' +
+    'Le modèle de la page, lui, travaille de 09 h 00 à 10 h 00. ' +
+    '<b>Les deux tournent côte à côte et ne se mélangent pas.</b></div>';
+
+  h += etapes.map(x => {
+    const cls = x.ok ? 'ok' : x.attente ? 'wait' : 'todo';
+    const lbl = x.ok ? 'validé' : x.attente ? 'en attente' : '';
+    const ti = x.long ? ' title="' + x.long.replace(/"/g,'&quot;') + '"' : '';
+    return '<div class="step ' + cls + '"' + ti + '>' +
+           '<span class="step-b"><span class="step-t">' + x.t + '</span>' +
+           '<span class="step-d">' + x.d + '</span></span>' +
+           (lbl ? '<span class="step-s">' + lbl + '</span>' : '') + '</div>';
+  }).join('');
+
+  // ── le signal, s'il y en a un ────────────────────────────────────────
+  const t = K.trade || K.dernierSignal;
+  if(t){
+    const L = t.sens === 'LONG';
+    const dp = L ? t.entree - t.sl : t.sl - t.entree;
+    const dt = L ? t.tp - t.entree : t.entree - t.tp;
+    const frais = !!K.trade && !K.hors;
+    const cal = window.Compte ? Compte.calibrer(t.entree, t.sl, t.tp) : null;
+    const quand = t.t ? new Date(t.t).toLocaleString('fr-FR',
+      {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
+    h += '<div class="trade" style="margin-top:12px">' +
+      '<div class="t-head"><span class="t-dir ' + (L ? 'long' : 'short') + '">' + t.sens + '</span>' +
+        '<span class="t-tf">' + (t.niveau || '') + '</span>' +
+        '<span class="t-rr">gain ' + nb(t.rr, 2) + '× le risque</span></div>' +
+      '<div class="t-grid">' +
+        '<div class="t-cell"><div class="t-k">Entrée</div><div class="t-v mono">' + fmt(t.entree) + '</div></div>' +
+        '<div class="t-cell"><div class="t-k">Stop (sous le balayage)</div>' +
+          '<div class="t-v sl mono">' + fmt(t.sl) + '</div>' +
+          '<div class="t-sub">' + (dp > 0 ? '−' + nb(dp) + ' pts'
+            : '<span style="color:var(--loss)">du mauvais côté</span>') + '</div></div>' +
+        '<div class="t-cell"><div class="t-k">Objectif (une zone)</div>' +
+          '<div class="t-v tp mono">' + fmt(t.tp) + '</div>' +
+          '<div class="t-sub">' + (dt > 0 ? '+' + nb(dt) + ' pts'
+            : '<span style="color:var(--loss)">du mauvais côté</span>') + '</div></div>' +
+        '<div class="t-cell"><div class="t-k">Taille</div>' +
+          (cal && !cal.tropPetit
+            ? '<div class="t-v mono">' + cal.contrats + ' ' + Compte.lire().contrat + '</div>' +
+              '<div class="t-sub">risque ' + cal.risqueDev + dev +
+                (cal.gainDev != null ? ' · gain ' + cal.gainDev + dev : '') + '</div>'
+            : '<div class="t-v" style="color:var(--dim)">—</div>' +
+              '<div class="t-sub">stop trop large pour ce capital</div>') +
+        '</div></div>' +
+      '<div class="t-why">' +
+        (frais ? 'Signal armé sur la bougie en cours, fenêtre ' + (t.fenetre || '') + '. ' +
+                 'Rien n’est vendu en route : le plan laisse courir jusqu’à la zone. '
+               : 'Signal du ' + quand + ', affiché pour mémoire — ce n’est pas une position à prendre maintenant. ') +
+        'Le balayage repère était à ' + fmt(t.sweepNiveau) + ', le prix est allé à ' + fmt(t.sweepExt) + '.' +
+      '</div></div>';
+  }
+
+  // ── ce que ça a donné, en argent ─────────────────────────────────────
+  const b = KDIST && KDIST.bilan;
+  if(b && b.clos){
+    const gains = eu(b.cumulR * uR);
+    h += '<div class="t-why" style="margin-top:12px">' +
+      '<b>Relevé en direct de KINTT :</b> ' + b.total + ' signal(aux), ' + b.clos + ' clos, ' +
+      (b.reussite != null ? nb(b.reussite) + ' % gagnés, ' : '') +
+      'cumul <b>' + gains + '</b> sur un risque de ' + Math.round(uR) + dev + ' par trade. ' +
+      (b.clos < 20
+        ? '<span style="color:var(--loss)">' + b.clos + ' trade(s) clos ne permettent de rien conclure.</span> ' +
+          'Il en faut plusieurs dizaines avant que ce chiffre veuille dire quelque chose.'
+        : '') +
+      '</div>';
+  } else {
+    h += '<div class="t-why" style="margin-top:12px">' +
+      '<b>Relevé en direct de KINTT :</b> ' +
+      (KDIST_ETAT === 'indisponible' ? 'journal non joignable pour l’instant.'
+       : KDIST && KDIST.signaux.length ? KDIST.signaux.length + ' signal(aux), aucun encore clos.'
+       : 'aucun signal relevé pour l’instant. La fenêtre 10 h → 12 h est étroite et le filtre « zone intacte » très sélectif.') +
+      '</div>';
+  }
+
+  // ── la reconstitution sur l'historique, étiquetée comme telle ────────
+  const M = K.mesure;
+  if(M && M.clos){
+    // Les chiffres sont relevés sur un risque de référence ; on les ramène au
+    // risque RÉEL du compte, sinon la page annonce l'argent de quelqu'un d'autre.
+    const ech = M.risqueParTrade ? uR / M.risqueParTrade : 1;
+    h += '<div class="t-why" style="margin-top:12px">' +
+      '<b>Reconstitution sur l’historique disponible</b> — ce ne sont pas des trades ' +
+      'qui ont été pris, c’est le plan rejoué sur les bougies réelles : ' +
+      '<b>' + M.clos + ' trade(s)</b>, ' + nb(M.reussite) + ' % gagnés, ' +
+      '<b>' + eu(M.euros * ech) + '</b> au total, soit ' + eu(M.parTrade * ech) + ' par trade. ' +
+      'Gain moyen ' + eu(M.gainMoyen * ech) + ', perte moyenne ' + eu(M.perteMoyenne * ech) +
+      (M.seuil != null ? ', il faudrait gagner ' + nb(M.seuil) + ' % des trades pour ne rien perdre' : '') +
+      '. Pire creux traversé : ' + eu(M.pireCreux * ech) + '. ' +
+      // Sans cette phrase, « perte moyenne −4 € » passe pour une prouesse alors
+      // que c'est la mécanique du stop remonté au prix d'entrée qui la produit.
+      (M.perteMoyenne > -0.3 * M.risqueParTrade
+        ? 'La perte moyenne est si faible parce que les trades perdants sont sortis au prix ' +
+          'd’entrée : le stop y remonte dès que le prix a parcouru la moitié du risque. ' +
+          'Le seuil affiché ci-dessus en découle, il ne dit rien de la qualité des signaux. '
+        : '') +
+      (M.clos < 20
+        ? '<span style="color:var(--loss)">' + M.clos + ' trade(s) : ces chiffres ne veulent ' +
+          'rien dire.</span> La fenêtre 10 h → 12 h et le filtre « zone jamais touchée » ' +
+          'laissent passer très peu de choses ; il faut des mois pour savoir.'
+        : '') +
+      '</div>';
+  }
+
+  // ── l'entonnoir : quelle règle filtre, et combien ────────────────────
+  const E = K.entonnoir;
+  if(E && E.barres){
+    const NOMS = { biaisNeutre:'biais neutre', esDesaccord:'ES en désaccord',
+      pasDeZone:'aucune zone intacte', avant10h:'avant 10 h', pasDeBalayage:'pas de balayage',
+      pasDeConfirmation:'retournement non confirmé', stopMauvaisCote:'stop du mauvais côté',
+      stopTropSerre:'stop trop serré', rrInsuffisant:'gain visé trop faible' };
+    const lignes = Object.keys(NOMS).filter(k2 => E[k2] > 0)
+      .sort((a2,b2) => E[b2] - E[a2])
+      .map(k2 => NOMS[k2] + ' ' + E[k2]);
+    h += '<div class="t-why" style="margin-top:8px;color:var(--faint)">' +
+      'Sur les ' + E.barres + ' bougies examinées de l’historique, ' + E.entrees +
+      ' ont donné une entrée. Écartées pour : ' + lignes.join(' · ') + '.</div>';
+  }
+
+  box.innerHTML = h;
 }
 
 /* ── la position ────────────────────────────────────────────────────── */
@@ -727,7 +968,7 @@ $('#chips').addEventListener('click', e => {
   FILTRE = b.dataset.k; paintChips(); majBlips();
 });
 
-function paintAll(){ paintTop(); paintChain(); paintTrade(); paintJournal(); paintRadar(); paintTFs(); paintFooter(); }
+function paintAll(){ paintTop(); paintChain(); paintKintt(); paintTrade(); paintJournal(); paintRadar(); paintTFs(); paintFooter(); }
 
 /* ── cycle de rafraîchissement ──────────────────────────────────────── */
 const SERIES = [['1m','8d'],['2m','60d'],['5m','60d'],['15m','60d'],['60m','3mo'],['1d','1y']];
@@ -793,6 +1034,10 @@ async function refresh(){
       // Le flux CFD ne sert que le NQ : la confirmation sur le second marché
       // ne peut pas être appliquée ici, et le modèle le signale.
       D = brut ? Modele.evaluer(brut) : null;
+      // KINTT tourne sur LES MÊMES bougies, ici aussi : sans cette ligne, le
+      // panneau serait vide dès qu'on branche le flux direct, c'est-à-dire
+      // exactement quand on regarde le marché.
+      if(D && window.Kintt){ try{ D.kintt = Kintt.evaluer(brut); }catch(e){ D.kintt = null; } }
       if(D) D.source = 'cfd';
     } else {
       D = await etatDistant();
@@ -814,6 +1059,7 @@ async function refresh(){
         note:'IFVG ' + t.tf + ' sur ' + t.niveau, tf:t.tf, price:D.prix }], 'MECH');
   }
   await chargerDistant();
+  await chargerKintt();
   paintAll();
   if(D && window.Notif) Notif.verifier(D);
 }
@@ -1129,6 +1375,8 @@ function paintFooter(){
       : (window.D && D.sansConfirmation) ? 'NQ seul — confirmation indisponible'
       : 'NQ + ES';
   }
+  if(window.Kintt && Kintt.CFG)
+    $('#f-kfen').textContent = hm(Kintt.CFG.deb) + ' → ' + hm(Kintt.CFG.fin);
   if(!window.Mesure) return;
   const L = Mesure.liste(); if(!L.length) return;
   const R = L.reduce((a,x)=>a+x.r,0), g = L.filter(x=>x.r>0).length;

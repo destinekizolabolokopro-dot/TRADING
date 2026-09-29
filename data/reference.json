@@ -1,5 +1,5 @@
 {
- "ecritLe": "2026-09-29 06:44 UTC",
+ "ecritLe": "2026-09-29 22:45 UTC",
  "note": "Régénéré à la main. Tout écart fait échouer scripts/test.js.",
  "fixtureFigee": "2026-09-29 06:44 UTC",
  "cfg": {
@@ -29,5 +29,38 @@
  "clos": 7,
  "gagnants": 6,
  "reussite": 85.7,
- "euros": 383
+ "euros": 383,
+ "kintt": {
+  "cfg": {
+   "obs": 570,
+   "deb": 600,
+   "primaire": 660,
+   "fin": 720,
+   "seuil": 2,
+   "fvgn": 1,
+   "confirmeES": true,
+   "unites": "M15,M30,H1,H4",
+   "intact": true,
+   "ageMax": 400,
+   "sweepMax": 24,
+   "exigeIFVG": true,
+   "exigeCISD": true,
+   "accepteM15": true,
+   "reactMax": 12,
+   "buf": 0.02,
+   "atrMin": 0.3,
+   "objectif": "zone",
+   "tpR": 2.5,
+   "rrMin": 1,
+   "part": 0,
+   "tp1": 0.5,
+   "maxJour": 2
+  },
+  "signaux": 0,
+  "hash": "e3b0c44298fc1c14",
+  "clos": 0,
+  "gagnants": 0,
+  "reussite": null,
+  "euros": 0
+ }
 }
