@@ -34,6 +34,9 @@ require(path.join(__dirname, '..', 'js', 'modele.js'));
 const FICHIER = path.join(__dirname, '..', 'data', 'signaux.json');
 const ETAT    = path.join(__dirname, '..', 'data', 'etat.json');
 const YF = 'https://query1.finance.yahoo.com/v8/finance/chart/';
+// Où déposer les séries téléchargées, pour que scripts/test.js puisse les
+// contrôler juste après. Vide = on ne dépose rien.
+const CACHE = process.env.MECH_CACHE || '';
 const SERIES = [['1m','8d','m1'],['2m','60d','m2'],['5m','60d','m5'],
                 ['15m','60d','m15'],['60m','3mo','h1'],['1d','1y','d1']];
 // Le plan source exige que la narrative soit confirmée sur NQ ET ES. Le
@@ -99,6 +102,16 @@ async function serie(sym, interval, range) {
       if (!propre.length) throw new Error('aucune bougie clôturée');
       if (propre.length < out.length)
         console.log(`  ${interval} : ${out.length - propre.length} entrée(s) non clôturée(s) écartée(s)`);
+      // Les séries sont déposées dans MECH_CACHE quand il est défini. Sans ça,
+      // les vérifications sur les DONNÉES D'ENTRÉE (bougies désordonnées, haut
+      // sous le bas, cotation en cours prise pour une bougie…) sont sautées
+      // dans l'action GitHub faute de cache — c'est-à-dire précisément là où
+      // elles serviraient, puisque c'est là que le robot tourne vraiment.
+      if (CACHE) try {
+        fs.mkdirSync(CACHE, { recursive: true });
+        fs.writeFileSync(path.join(CACHE, `${sym.replace(/\W/g, '')}_${interval}_${range}.json`),
+                         JSON.stringify(propre));
+      } catch (e) { /* le cache est un confort, jamais un obstacle */ }
       return propre;
     } catch (e) {
       if (essai === 3) throw e;

@@ -41,7 +41,17 @@ permissions:
 jobs:
   seance:
     runs-on: ubuntu-latest
-    timeout-minutes: 300
+    # ⚠️ CALCUL À NE PAS SE TROMPER : départ au plus tôt à 10 h 17, attente
+    # jusqu'à 13 h 15 (178 min), puis relevés jusqu'à 15 h 45 (150 min) = 328
+    # minutes. Le premier jet mettait 300 : le travail se serait fait tuer à
+    # 15 h 17, coupant la dernière demi-heure de séance. La limite dure de
+    # GitHub est de 360 minutes.
+    timeout-minutes: 350
+    env:
+      # Les séries téléchargées sont déposées ici, pour que les vérifications
+      # puissent contrôler les données d'entrée juste après. Sans cache, ces
+      # contrôles-là sont sautés.
+      MECH_CACHE: ${{ github.workspace }}/.cache
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -65,6 +75,14 @@ jobs:
             ATTENTE=$((DEBUT - MAINTENANT))
             echo "Attente de $((ATTENTE / 60)) minutes jusqu'à 13 h 15 UTC…"
             sleep "$ATTENTE"
+          elif [ "$MAINTENANT" -gt "$FIN" ]; then
+            # Départ très en retard — GitHub le fait. Sans ce garde-fou, la
+            # boucle ne tournerait pas une seule fois et le travail se
+            # terminerait sans RIEN faire, en ayant l'air d'avoir réussi. On
+            # relève au moins une fois : le rattrapage journalier retrouve
+            # de toute façon tous les signaux de la journée.
+            echo "Démarrage après la fin de la fenêtre — un seul relevé de rattrapage."
+            FIN=$((MAINTENANT + 1))
           fi
 
           PASSAGE=0
