@@ -164,8 +164,8 @@ const dispo = fs.existsSync(path.join(CACHE, 'NQF_5m_60d.json'));
 let SIGNAUX = [];
 if (dispo) {
   const lire = (s, i, r) => JSON.parse(fs.readFileSync(path.join(CACHE, `${s}_${i}_${r}.json`), 'utf-8'));
-  const D = { m1: lire('NQF','1m','8d'), m2: lire('NQF','2m','60d'), m5: lire('NQF','5m','60d'),
-              m15: lire('NQF','15m','60d'), h1: lire('NQF','1h','6mo'), d1: lire('NQF','1d','1y') };
+  const D = {};
+  for (const x of Modele.SERIES) D[x.cle] = lire('NQF', x.interval, x.range);
   const E = fs.existsSync(path.join(CACHE, 'ESF_5m_60d.json'))
     ? { m5: lire('ESF','5m','60d'), m15: lire('ESF','15m','60d'),
         h1: lire('ESF','1h','6mo'), d1: lire('ESF','1d','1y') } : null;

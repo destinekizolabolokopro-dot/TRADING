@@ -41,8 +41,9 @@ const { spawn } = require('child_process');
 const RACINE = path.resolve(__dirname, '..');
 const CACHE  = process.env.MECH_CACHE || path.join(RACINE, '.cache');
 const YF = 'https://query1.finance.yahoo.com/v8/finance/chart/';
-const SERIES = [['1m', '8d', 'm1'], ['2m', '60d', 'm2'], ['5m', '60d', 'm5'],
-                ['15m', '60d', 'm15'], ['1h', '6mo', 'h1'], ['1d', '1y', 'd1']];
+// Les séries sont déclarées dans js/modele.js : une copie ici avait déjà
+// divergé de celle du robot sans que personne le voie.
+let SERIES = null;   // rempli par chargerModele()
 
 const args = {};
 process.argv.slice(3).forEach((a, i, arr) => { if (a.startsWith('--')) args[a.slice(2)] = arr[i + 1]; });
@@ -67,6 +68,7 @@ async function serie(sym, interval, range) {
   return out;
 }
 async function charger(sym) {
+  if (!SERIES) chargerModele();
   const D = {};
   for (const [i, r, k] of SERIES) D[k] = await serie(sym, i, r);
   return D;
@@ -76,10 +78,9 @@ let _conf = null;
 async function confirmateur() {
   if (_conf) return _conf;
   const s = args.conf || 'ES=F';
-  _conf = {
-    m5: await serie(s, '5m', '60d'), m15: await serie(s, '15m', '60d'),
-    h1: await serie(s, '1h', '6mo'), d1: await serie(s, '1d', '1y')
-  };
+  const M = chargerModele();
+  _conf = {};
+  for (const x of M.SERIES2) _conf[x.cle] = await serie(s, x.interval, x.range);
   return _conf;
 }
 
@@ -96,6 +97,7 @@ function chargerModele() {
   if (!ctx.Modele) throw new Error('js/modele.js n\'a pas exposé Modele');
   if (!ctx.Position) throw new Error('js/position.js n\'a pas exposé Position');
   POSITION = ctx.Position;
+  SERIES = ctx.Modele.SERIES.map(x => [x.interval, x.range, x.cle]);
   return ctx.Modele;
 }
 

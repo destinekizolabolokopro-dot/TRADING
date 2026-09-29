@@ -660,3 +660,67 @@ que c'est à jour ? » a enfin une réponse mécanique.
 radar dessine vraiment (il compte les pixels du canvas : un canvas vide laisse
 la page d'apparence normale et le cœur visuel mort), que rien ne déborde à la
 largeur d'un téléphone, et que les repères d'affichage existent.
+
+---
+
+## 11. L'audit du mécanisme, avant la première séance automatique
+
+Le travail qui couvre la séance n'avait jamais tourné. Relu ligne par ligne en
+se demandant « qu'est-ce qui casse ? », six défauts sont sortis. Deux étaient
+graves.
+
+### Le backtest mesurait une autre stratégie que le robot
+
+Le plus sérieux, et le plus discret. Le robot chargeait **60 minutes sur
+3 mois** ; le banc d'essai, **1 heure sur 6 mois**. Le biais et les niveaux H4
+sont agrégés depuis cette série. Sur les mêmes bougies d'exécution :
+
+| | signaux |
+|---|---|
+| banc d'essai — 1h / 6 mois | **42** |
+| robot — 60m / 3 mois | **37** |
+
+Et pas les mêmes jours : le robot voyait deux achats du 22 juillet absents du
+backtest, le backtest deux ventes du 24 juillet absentes du robot. **Tout ce
+qui était mesuré décrivait donc autre chose que ce qui tournait.**
+
+La liste des séries est désormais déclarée dans `js/modele.js`, puisque c'est
+lui qui les consomme, et les quatre chargeurs la lisent là.
+
+### Le travail se serait fait tuer au milieu de la séance
+
+`timeout-minutes` valait 300. Départ au plus tôt à 10 h 17, attente jusqu'à
+13 h 15 (178 min), relevés jusqu'à 15 h 45 (150 min) : **328 minutes**. GitHub
+l'aurait arrêté à 15 h 17, en coupant la demi-heure où les positions sont
+soldées. Porté à 350 ; la limite dure est 360.
+
+### Les quatre autres
+
+| défaut | conséquence | correction |
+|---|---|---|
+| départ très en retard | la boucle ne tournait pas une fois et le travail se terminait **en ayant l'air d'avoir réussi** | un relevé de rattrapage est forcé |
+| deux workflows, deux groupes de concurrence | ils pouvaient pousser sur `main` en même temps | les créneaux de séance de `signaux.yml` sont retirés — ils n'avaient jamais rien déclenché |
+| pas de cache dans l'action GitHub | les contrôles sur les **données d'entrée** étaient sautés là où le robot tourne vraiment | `live_log.js` dépose les séries dans `MECH_CACHE`, les deux workflows le définissent |
+| `fixture.json` publié sur le site | 885 Ko de bougies imposés au visiteur | seuls `etat.json` et `signaux.json` sont publiés |
+
+### La référence criait au loup tous les matins
+
+Elle portait sur le cache vivant. Comme la fenêtre de Yahoo glisse, elle
+échouait chaque jour — et un test qui alerte tous les matins finit par être
+ignoré, c'est-à-dire par ne plus rien protéger.
+
+Les bougies sont donc **gelées** dans `data/fixture.json` (huit jours, la
+profondeur du 1 minute chez Yahoo). Un écart ne peut alors venir que du
+**code**. Vérifié dans les deux sens :
+
+```
+trois exécutions d'affilée      → conforme, conforme, conforme
+slx passé de 4 à 5              → réussite 85,7 % → 100 %, résultat +383 € → +779 €,
+                                  réglage slx : 4 → 5        ← détecté
+```
+
+```
+node scripts/fixture.js              regeler les bougies (geste délibéré)
+node scripts/reference.js            comparer
+node scripts/reference.js --ecrire   accepter un changement
+```

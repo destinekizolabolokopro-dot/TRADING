@@ -45,19 +45,16 @@ const COUT_PTS = 0.25 * 2 + 4.00 / 20;
 
 (async () => {
   const CTX = chargerModele(), M = CTX.Modele, Position = CTX.Position;
-  const D = {
-    m1: await serie('NQ=F', '1m', '8d'), m2: await serie('NQ=F', '2m', '60d'),
-    m5: await serie('NQ=F', '5m', '60d'), m15: await serie('NQ=F', '15m', '60d'),
-    h1: await serie('NQ=F', '1h', '6mo'), d1: await serie('NQ=F', '1d', '1y')
-  };
+  // Les séries sont celles que le MODÈLE déclare : une liste recopiée ici
+  // finirait par diverger de celle du robot, comme cela s'est déjà produit.
+  const D = {};
+  for (const x of M.SERIES) D[x.cle] = await serie('NQ=F', x.interval, x.range);
   if (args.ghdeb) M.CFG.ghDeb = +args.ghdeb;
   if (args.ghfin) M.CFG.ghFin = +args.ghfin;
   const C = M.CFG;
   // Le second marché, exigé par le plan source pour confirmer la narrative.
-  const E = {
-    m5: await serie('ES=F', '5m', '60d'), m15: await serie('ES=F', '15m', '60d'),
-    h1: await serie('ES=F', '1h', '6mo'), d1: await serie('ES=F', '1d', '1y')
-  };
+  const E = {};
+  for (const x of M.SERIES2) E[x.cle] = await serie('ES=F', x.interval, x.range);
   const d = M.evaluer(D, E);
   const m1Debut = D.m1.length ? D.m1[0].t : Infinity;
 

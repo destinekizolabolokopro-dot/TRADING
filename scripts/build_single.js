@@ -88,8 +88,16 @@ try {
   const dst = path.join(__dirname, '..', 'docs', 'data');
   if (fs.existsSync(src)) {
     fs.mkdirSync(dst, { recursive: true });
-    for (const f of fs.readdirSync(src).filter(f => f.endsWith('.json')))
+    // Seuls les fichiers que LA PAGE lit sont publiés. fixture.json pèse
+    // 885 Ko de bougies figées et reference.json est une empreinte : ce sont
+    // des outils de développement, les publier ferait payer au visiteur le
+    // téléchargement de données qui ne lui servent à rien.
+    const PUBLIES = ['etat.json', 'signaux.json'];
+    for (const f of fs.readdirSync(src).filter(f => PUBLIES.indexOf(f) >= 0))
       fs.copyFileSync(path.join(src, f), path.join(dst, f));
+    // et on retire ce qui aurait été publié par erreur auparavant
+    for (const f of fs.readdirSync(dst).filter(f => PUBLIES.indexOf(f) < 0 && f.endsWith('.json')))
+      fs.unlinkSync(path.join(dst, f));
     console.log('✅ Copié  : docs/data/  (' + fs.readdirSync(dst).join(', ') + ')');
   }
 } catch (e) { console.error('Copie des données impossible : ' + e.message); }

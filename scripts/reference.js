@@ -32,15 +32,19 @@ function charger() {
 }
 
 function empreinte() {
-  const lire = (s, i, r) => {
-    const f = path.join(CACHE, `${s}_${i}_${r}.json`);
-    return fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf-8')) : null;
-  };
-  const D = { m1: lire('NQF','1m','8d'), m2: lire('NQF','2m','60d'), m5: lire('NQF','5m','60d'),
-              m15: lire('NQF','15m','60d'), h1: lire('NQF','1h','6mo'), d1: lire('NQF','1d','1y') };
-  if (!D.m5) return null;                        // pas de cache : rien à comparer
-  const E = lire('ESF','5m','60d') ? { m5: lire('ESF','5m','60d'), m15: lire('ESF','15m','60d'),
-                                       h1: lire('ESF','1h','6mo'), d1: lire('ESF','1d','1y') } : null;
+  // ⚠️ SUR DES BOUGIES FIGÉES, PAS SUR LE CACHE VIVANT.
+  // La première version lisait le cache. Elle échouait donc chaque jour, parce
+  // que la fenêtre de Yahoo glisse — et un test qui crie au loup tous les
+  // matins finit par être ignoré, c'est-à-dire par ne plus rien protéger. Sur
+  // des bougies gelées, un écart ne peut venir que du CODE.
+  const FIX = path.join(RACINE, 'data', 'fixture.json');
+  if (!fs.existsSync(FIX)) return null;
+  const f = JSON.parse(fs.readFileSync(FIX, 'utf-8'));
+  const conv = a => a.map(c => ({ t: c[0] * 1000, o: c[1], h: c[2], l: c[3], c: c[4] }));
+  const D = {}, E = {};
+  for (const k of Object.keys(f.NQ)) D[k] = conv(f.NQ[k]);
+  for (const k of Object.keys(f.ES)) E[k] = conv(f.ES[k]);
+  if (!D.m5) return null;
   const { Modele, Position } = charger();
   const C = Modele.CFG;
   const d = Modele.evaluer(D, E);
@@ -63,7 +67,7 @@ function empreinte() {
     somme += fin.r - Position.cout(s.risq);
   }
   return {
-    cfg: C, signaux: sigs.length, hash: hash,
+    fixtureFigee: f.fige, cfg: C, signaux: sigs.length, hash: hash,
     clos: total, gagnants: gagnants,
     reussite: total ? +(gagnants / total * 100).toFixed(1) : null,
     euros: Math.round(somme * 250)
@@ -71,7 +75,10 @@ function empreinte() {
 }
 
 const e = empreinte();
-if (!e) { console.log('Cache absent — impossible de calculer la référence.'); process.exit(0); }
+if (!e) {
+  console.log('data/fixture.json absent — lancer : node scripts/fixture.js');
+  process.exit(0);
+}
 
 if (process.argv.includes('--ecrire')) {
   fs.writeFileSync(REF, JSON.stringify(Object.assign({

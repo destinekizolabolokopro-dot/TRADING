@@ -37,12 +37,17 @@ const YF = 'https://query1.finance.yahoo.com/v8/finance/chart/';
 // Où déposer les séries téléchargées, pour que scripts/test.js puisse les
 // contrôler juste après. Vide = on ne dépose rien.
 const CACHE = process.env.MECH_CACHE || '';
-const SERIES = [['1m','8d','m1'],['2m','60d','m2'],['5m','60d','m5'],
-                ['15m','60d','m15'],['60m','3mo','h1'],['1d','1y','d1']];
+// ⚠️ LES SÉRIES NE SONT PLUS DÉCLARÉES ICI. Elles l'étaient, et elles avaient
+// divergé de celles du banc d'essai : le robot chargeait 60 minutes sur 3 mois
+// pendant que le backtest chargeait 1 heure sur 6 mois. Sur les mêmes bougies
+// d'exécution cela donnait 37 signaux contre 42, et pas les mêmes jours — le
+// backtest mesurait donc une AUTRE stratégie que celle qui tournait ici.
+// js/modele.js les déclare, puisque c'est lui qui les consomme.
+const SERIES  = Modele.SERIES.map(s => [s.interval, s.range, s.cle]);
 // Le plan source exige que la narrative soit confirmée sur NQ ET ES. Le
 // second marché est donc téléchargé comme le premier : sans lui, le modèle
 // ne peut pas appliquer la règle et le dit (`sansConfirmation`).
-const SERIES2 = [['5m','60d','m5'],['15m','60d','m15'],['60m','3mo','h1'],['1d','1y','d1']];
+const SERIES2 = Modele.SERIES2.map(s => [s.interval, s.range, s.cle]);
 const SYM2 = 'ES=F';
 
 // ── DES EUROS, PAS DES R ───────────────────────────────────────────────────
