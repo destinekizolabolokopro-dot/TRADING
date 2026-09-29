@@ -26,7 +26,7 @@ const REF = path.join(RACINE, 'data', 'reference.json');
 
 function charger() {
   const ctx = {};
-  for (const f of ['js/structure.js', 'js/position.js', 'js/modele.js'])
+  for (const f of ['js/structure.js', 'js/position.js', 'js/modele.js', 'js/kintt.js'])
     new Function('root', 'ST', fs.readFileSync(path.join(RACINE, f), 'utf-8')).call(ctx, ctx, ctx.ST);
   return ctx;
 }
@@ -45,7 +45,7 @@ function empreinte() {
   for (const k of Object.keys(f.NQ)) D[k] = conv(f.NQ[k]);
   for (const k of Object.keys(f.ES)) E[k] = conv(f.ES[k]);
   if (!D.m5) return null;
-  const { Modele, Position } = charger();
+  const { Modele, Position, Kintt } = charger();
   const C = Modele.CFG;
   const d = Modele.evaluer(D, E);
   const sigs = (d && d.tousSignaux) || [];
@@ -66,11 +66,40 @@ function empreinte() {
     total++; if (fin.r > 0) gagnants++;
     somme += fin.r - Position.cout(s.risq);
   }
+  // ── LA SECONDE STRATÉGIE A SA PROPRE EMPREINTE ──────────────────────
+  // Sans elle, on pourrait modifier js/kintt.js et ne s'apercevoir de rien :
+  // les vérifications internes resteraient vertes et le nombre de signaux
+  // passerait de trois à zéro en silence. Les deux empreintes sont SÉPARÉES,
+  // pour que le message dise laquelle des deux stratégies a bougé.
+  const dk = Kintt.evaluer(D, E);
+  const sk = (dk && dk.tousSignaux) || [];
+  const lk = sk.map(x => [x.t, x.sens, +x.entree.toFixed(2), +x.sl.toFixed(2),
+                          +x.tp.toFixed(2), +x.rr.toFixed(2), x.niveau].join('|'));
+  const hk = crypto.createHash('sha256').update(lk.join('\n')).digest('hex').slice(0, 16);
+  let tk = 0, gk = 0, rk = 0;
+  for (const x of sk) {
+    // kintt vise un PRIX : son plafond est propre à chaque signal.
+    const cfgK = Object.assign({}, Kintt.CFG, { tp2: x.rr });
+    let fin;
+    try {
+      fin = Position.suivre(x, D.m5, cfgK, { prudent: true, maxBarres: 200, depuis: x.t,
+        heure: Kintt.heure, jourSignal: Kintt.heure(x.t).jour });
+    } catch (e2) { continue; }
+    if (fin.ouverte) continue;
+    tk++; if (fin.r > 0) gk++;
+    rk += fin.r - Position.cout(x.risq);
+  }
+
   return {
     fixtureFigee: f.fige, cfg: C, signaux: sigs.length, hash: hash,
     clos: total, gagnants: gagnants,
     reussite: total ? +(gagnants / total * 100).toFixed(1) : null,
-    euros: Math.round(somme * 250)
+    euros: Math.round(somme * 250),
+    kintt: {
+      cfg: Kintt.CFG, signaux: sk.length, hash: hk, clos: tk, gagnants: gk,
+      reussite: tk ? +(gk / tk * 100).toFixed(1) : null,
+      euros: Math.round(rk * 250)
+    }
   };
 }
 
@@ -86,6 +115,7 @@ if (process.argv.includes('--ecrire')) {
     note: 'Régénéré à la main. Tout écart fait échouer scripts/test.js.'
   }, e), null, 1) + '\n');
   console.log(`Référence figée : ${e.signaux} signaux · ${e.reussite} % · ${e.euros >= 0 ? '+' : ''}${e.euros} € · empreinte ${e.hash}`);
+  console.log(`         kintt : ${e.kintt.signaux} signaux · ${e.kintt.reussite} % · ${e.kintt.euros >= 0 ? '+' : ''}${e.kintt.euros} € · empreinte ${e.kintt.hash}`);
 } else {
   if (!fs.existsSync(REF)) { console.log('Aucune référence. Lancer : node scripts/reference.js --ecrire'); process.exit(1); }
   const r = JSON.parse(fs.readFileSync(REF, 'utf-8'));
@@ -96,8 +126,19 @@ if (process.argv.includes('--ecrire')) {
   if (r.euros !== e.euros) ecarts.push(`résultat : ${r.euros} € → ${e.euros} €`);
   for (const k of Object.keys(r.cfg)) if (JSON.stringify(r.cfg[k]) !== JSON.stringify(e.cfg[k]))
     ecarts.push(`réglage ${k} : ${JSON.stringify(r.cfg[k])} → ${JSON.stringify(e.cfg[k])}`);
-  if (!ecarts.length) { console.log(`Conforme à la référence du ${r.ecritLe} · ${e.signaux} signaux · ${e.reussite} %`); process.exit(0); }
-  console.error('\n⚠️  LE MODÈLE NE PRODUIT PLUS LA MÊME CHOSE\n');
+  // La même comparaison pour kintt, annoncée séparément. Une référence écrite
+  // avant que kintt existe n'a pas ce bloc : on ne crie pas au loup pour ça.
+  if (r.kintt) {
+    const a = r.kintt, b = e.kintt;
+    if (a.hash !== b.hash) ecarts.push(`kintt · empreinte : ${a.hash} → ${b.hash}`);
+    if (a.signaux !== b.signaux) ecarts.push(`kintt · nombre de signaux : ${a.signaux} → ${b.signaux}`);
+    if (a.reussite !== b.reussite) ecarts.push(`kintt · réussite : ${a.reussite} % → ${b.reussite} %`);
+    if (a.euros !== b.euros) ecarts.push(`kintt · résultat : ${a.euros} € → ${b.euros} €`);
+    for (const k of Object.keys(a.cfg)) if (JSON.stringify(a.cfg[k]) !== JSON.stringify(b.cfg[k]))
+      ecarts.push(`kintt · réglage ${k} : ${JSON.stringify(a.cfg[k])} → ${JSON.stringify(b.cfg[k])}`);
+  }
+  if (!ecarts.length) { console.log(`Conforme à la référence du ${r.ecritLe} · modèle ${e.signaux} signaux (${e.reussite} %) · kintt ${e.kintt.signaux} signaux`); process.exit(0); }
+  console.error('\n⚠️  UNE DES DEUX STRATÉGIES NE PRODUIT PLUS LA MÊME CHOSE\n');
   ecarts.forEach(x => console.error('   ' + x));
   console.error('\nSi le changement est voulu : node scripts/reference.js --ecrire\n');
   process.exit(1);

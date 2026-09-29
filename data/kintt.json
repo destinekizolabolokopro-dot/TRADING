@@ -1,0 +1,24 @@
+{
+ "version": 1,
+ "strategie": "kintt",
+ "signaux": [],
+ "passages": [
+  {
+   "ts": "2026-09-29T22:40:34.228Z",
+   "jour": "2026-09-29",
+   "prix": 30671.25,
+   "etapeBloquee": "biais",
+   "dit": "Biais neutre (score 0 sur 4, il en faut 2) — le plan interdit d'entrer."
+  }
+ ],
+ "bilan": {
+  "maj": "2026-09-29T22:40:34.228Z",
+  "total": 0,
+  "clos": 0,
+  "ouverts": 0,
+  "reussite": null,
+  "cumulR": 0,
+  "euros": 0,
+  "passages": 1
+ }
+}

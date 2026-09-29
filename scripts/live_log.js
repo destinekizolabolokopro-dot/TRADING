@@ -30,9 +30,18 @@ global.window = global;
 require(path.join(__dirname, '..', 'js', 'structure.js'));
 require(path.join(__dirname, '..', 'js', 'position.js'));
 require(path.join(__dirname, '..', 'js', 'modele.js'));
+// La seconde stratégie tourne DANS LE MÊME relevé, sur les MÊMES bougies.
+// C'est la seule façon de les comparer sans qu'un écart de données explique
+// l'écart de résultats — l'erreur déjà commise entre le robot et le banc d'essai.
+require(path.join(__dirname, '..', 'js', 'kintt.js'));
 
 const FICHIER = path.join(__dirname, '..', 'data', 'signaux.json');
 const ETAT    = path.join(__dirname, '..', 'data', 'etat.json');
+// Journal SÉPARÉ pour kintt. Mélanger les deux stratégies dans signaux.json
+// rendrait tout bilan affiché faux : trois trades à 10 h n'ont rien à voir
+// avec quarante-et-un trades à 9 h, et la moyenne des deux ne décrit ni l'une
+// ni l'autre.
+const KINTT   = path.join(__dirname, '..', 'data', 'kintt.json');
 const YF = 'https://query1.finance.yahoo.com/v8/finance/chart/';
 // Où déposer les séries téléchargées, pour que scripts/test.js puisse les
 // contrôler juste après. Vide = on ne dépose rien.
@@ -161,6 +170,200 @@ function blocage(d) {
   return { etape: 'stop', dit: `Inversion ${d.ifvg.tf} confirmée sur ${k}, mais le stop était trop serré face à l'ATR.` };
 }
 
+
+// ╔═══════════════════════════════════════════════════════════════════════╗
+// ║  KINTT — la seconde stratégie, relevée dans le même passage.          ║
+// ╚═══════════════════════════════════════════════════════════════════════╝
+// Elle a son propre journal et son propre bilan. Rien n'est mutualisé sauf
+// LES BOUGIES et LE SUIVI DE POSITION (js/position.js) : le reste doit rester
+// séparé, sinon on ne compare plus deux stratégies mais une moyenne des deux.
+
+// L'instantané envoyé au site. `etape.zone` porte la SÉRIE DE BOUGIES
+// entière (`cs`) : la recopier telle quelle ferait un etat.json de plusieurs
+// mégaoctets, téléchargé à chaque ouverture de la page. On ne garde que les
+// bornes.
+function instantaneKintt(k, m5, m1) {
+  if (!k) return null;
+  const e = k.etape;
+  const leger = e ? {
+    t: e.t, score: e.score, dir: e.dir, conf: e.conf,
+    zone: e.zone ? { tf: e.zone.tf, bas: e.zone.bas, haut: e.zone.haut,
+                     haussier: e.zone.haussier } : null,
+    sweep: e.sweep ? { t: e.sweep.t, ext: e.sweep.ext } : null
+  } : null;
+  return {
+    hors: k.hors, prix: k.prix, derniereBougie: k.derniereBougie,
+    etape: leger, trade: k.trade, dernierSignal: k.dernierSignal,
+    entonnoir: k.entonnoir, cfg: k.cfg,
+    // rejouée à chaque passage, pour ne jamais être en retard sur le code
+    mesure: mesureKintt(k, m5 || [], m1 || [])
+  };
+}
+
+// Où la chaîne s'est arrêtée, en français, pour la même raison que `blocage`
+// pour l'autre modèle : expliquer le silence est la moitié de l'intérêt.
+function blocageKintt(k) {
+  if (!k) return { etape: 'données', dit: 'Bougies insuffisantes.' };
+  const e = k.etape;
+  if (!e) return { etape: 'fenetre', dit: 'Hors de la fenêtre 09 h 30 → 12 h 00 New York.' };
+  const sens = e.dir > 0 ? 'haussier' : e.dir < 0 ? 'baissier' : null;
+  if (!sens) return { etape: 'biais', dit: `Biais neutre (score ${e.score} sur 4, il en faut ${k.cfg.seuil}) — le plan interdit d'entrer.` };
+  if (e.conf === 'ES en désaccord') return { etape: 'es', dit: `Le NQ est ${sens}, l'ES dit le contraire — le plan exige les deux ensemble.` };
+  if (!e.zone) return { etape: 'zone', dit: `Biais ${sens}, mais aucune zone intacte (M15 → H4) où le prix soit venu.` };
+  const z = `FVG ${e.zone.tf} (${e.zone.bas} – ${e.zone.haut})`;
+  if (!e.sweep) return { etape: 'balayage', dit: `Prix dans ${z}, mais aucun balayage du plus bas ou du plus haut de séance.` };
+  if (e.conf !== 'ok') return { etape: 'confirmation', dit: `Balayage à ${e.sweep.ext} sur ${z}, mais la confirmation manque (${e.conf}).` };
+  return { etape: 'risque', dit: `Tout est là sur ${z}, mais le stop ou le rapport gain/risque a été refusé.` };
+}
+
+// ── LA RECONSTITUTION, ÉTIQUETÉE COMME TELLE ──────────────────────────────
+// Le journal en direct de kintt ne contient que ce que le robot a vu depuis
+// qu'il le relève, c'est-à-dire presque rien. Or la question « est-ce que ça
+// marche ? » a besoin des soixante jours d'historique. On les rejoue donc,
+// avec LE MÊME suivi (js/position.js), et on écrit noir sur blanc qu'il
+// s'agit d'une reconstitution : ce ne sont pas des trades qui ont été pris.
+function mesureKintt(k, m5, m1) {
+  if (!k || !Array.isArray(k.tousSignaux) || !k.tousSignaux.length) return null;
+  const T = [];
+  for (const sg of k.tousSignaux) {
+    const fin1m = m1.length && m1[0].t <= sg.t;
+    const cs = fin1m ? m1 : m5;
+    const cfg = Object.assign({}, k.cfg, { tp2: sg.rr != null ? sg.rr : k.cfg.tpR });
+    let fin;
+    try {
+      fin = Position.suivre(sg, cs.filter(c => c.t > sg.t), cfg, {
+        prudent: true, maxBarres: fin1m ? 1000 : 200,
+        heure: Kintt.heure, jourSignal: Kintt.heure(sg.t).jour });
+    } catch (e) { continue; }
+    if (fin.ouverte) continue;
+    // Le coût aller-retour est retiré : un stop serré coûte plus cher en
+    // proportion, et l'ignorer flatte toujours la stratégie.
+    T.push(fin.r - Position.cout(sg.risq));
+  }
+  if (!T.length) return null;
+  const R = T.reduce((a, x) => a + x, 0), g = T.filter(x => x > 0);
+  const pos = g.length ? g.reduce((a, x) => a + x, 0) / g.length : 0;
+  const neg = T.filter(x => x < 0);
+  const per = neg.length ? Math.abs(neg.reduce((a, x) => a + x, 0)) / neg.length : 0;
+  let pic = 0, cum = 0, dd = 0;
+  for (const x of T) { cum += x; if (cum > pic) pic = cum; if (pic - cum > dd) dd = pic - cum; }
+  return {
+    reconstitution: true,
+    clos: T.length, gagnes: g.length,
+    reussite: +(g.length / T.length * 100).toFixed(1),
+    euros: Math.round(R * RISQUE),
+    parTrade: Math.round(R / T.length * RISQUE),
+    gainMoyen: Math.round(pos * RISQUE), perteMoyenne: -Math.round(per * RISQUE),
+    // Le taux de réussite à partir duquel la stratégie cesse de perdre de
+    // l'argent. Sans lui, « 33 % gagnés » ne dit pas si c'est bon ou mauvais.
+    seuil: (pos + per) > 0 ? +(per / (pos + per) * 100).toFixed(1) : null,
+    pireCreux: -Math.round(dd * RISQUE),
+    risqueParTrade: RISQUE
+  };
+}
+
+function chargerKintt() {
+  try { return JSON.parse(fs.readFileSync(KINTT, 'utf8')); }
+  catch (e) { return { version: 1, strategie: 'kintt', signaux: [], passages: [] }; }
+}
+
+// Le journal de kintt, tenu comme celui de l'autre modèle : on n'inscrit que
+// ce qui a été VU pendant la journée en cours, jamais la reconstitution des
+// soixante jours d'historique.
+function journalKintt(k, m5, m1, maintenant) {
+  const db = chargerKintt();
+  db.signaux = db.signaux || []; db.passages = db.passages || [];
+  if (!k) return db;
+  const eD = Kintt.heure(k.derniereBougie);
+  const cle = x => `${x.t}|${x.sens}`;
+  const neufs = (k.tousSignaux || [])
+    .filter(x => x && Kintt.heure(x.t).jour === eD.jour)
+    .filter(x => !db.signaux.some(s => s.cle === cle(x)));
+
+  neufs.forEach(t => {
+    const e = Kintt.heure(t.t);
+    const hNY = String(Math.floor(e.min / 60)).padStart(2, '0') + ':' +
+                String(e.min % 60).padStart(2, '0');
+    db.signaux.push({
+      ts: maintenant, cle: cle(t), bougie: new Date(t.t).toISOString(),
+      jour: e.jour, heureNY: hNY, fenetre: t.fenetre,
+      retardMin: Math.round((Date.now() - t.t) / 60000),
+      sens: t.sens, entree: t.entree, sl: t.sl, tp1: t.tp1, tp: t.tp, rr: t.rr,
+      risq: t.risq, risquePts: +Math.abs(t.entree - t.sl).toFixed(2),
+      niveau: t.niveau, uniteIFVG: t.tf,
+      balayage: t.sweepNiveau, balayageExt: t.sweepExt,
+      biais: t.biaisDir > 0 ? 'haussier' : 'baissier', score: t.biaisScore,
+      // Le rapport gain/risque de kintt n'est PAS un réglage : il dépend de
+      // la zone visée, donc il change d'un trade à l'autre. Il est consigné
+      // avec le signal, sans quoi le suivi ne saurait pas où s'arrête le gain.
+      cfgPart: k.cfg.part, cfgTp1: k.cfg.tp1,
+      statut: 'ouvert', resultat: null, r: null, closTs: null
+    });
+    console.log(`✅ KINTT ${t.sens} · ${e.jour} ${hNY} NY · entrée ${t.entree} · stop ${t.sl} · objectif ${t.tp} (${t.rr}) · ${t.niveau}`);
+  });
+  if (neufs.length) db.signaux.sort((a, b) => Date.parse(a.bougie) - Date.parse(b.bougie));
+
+  // Un passage par jour, même sans signal : sinon les journées muettes ne
+  // laissent aucune trace et on ne sait pas si la stratégie a regardé.
+  const decrit = db.passages.some(p => p.jour === eD.jour) ||
+                 db.signaux.some(x => x.jour === eD.jour);
+  if (!neufs.length && !decrit) {
+    const b = blocageKintt(k);
+    db.passages.push({ ts: maintenant, jour: eD.jour, prix: k.prix,
+                       etapeBloquee: b.etape, dit: b.dit });
+    console.log(`— KINTT ${eD.jour} · ${b.dit}`);
+  }
+
+  // ── SUIVI : LE MÊME CODE QUE L'AUTRE MODÈLE ─────────────────────────
+  // Position.suivre, et rien d'autre. Une copie de cette boucle a déjà
+  // annoncé quatre positions gagnantes sur huit alors qu'elles étaient
+  // perdantes ; scripts/test.js refuse qu'une seconde copie réapparaisse.
+  db.signaux.filter(s => s.statut === 'ouvert').forEach(s => {
+    const depuis = Date.parse(s.bougie);
+    const fin1m = m1.length && m1[0].t <= depuis;
+    const cs = fin1m ? m1 : m5;
+    // kintt vise un PRIX, pas un multiple du risque : le plafond du suivi est
+    // donc propre à CE signal. Sans cette ligne, `plafond` vaut NaN et le
+    // garde-fou de Position.suivre lève à chaque passage.
+    const cfg = Object.assign({}, k.cfg, { tp2: s.rr != null ? s.rr : k.cfg.tpR });
+    const fin = Position.suivre(s, cs.filter(c => c.t > depuis), cfg, {
+      prudent: true, maxBarres: fin1m ? 1000 : 200,
+      heure: Kintt.heure, jourSignal: s.jour
+    });
+    if (!fin.ouverte) {
+      s.statut = 'clos'; s.r = +fin.r.toFixed(3);
+      s.resultat = fin.sortie === 'expiré' ? 'expiré' : (s.r > 0 ? 'gagné' : s.r < 0 ? 'perdu' : 'seuil');
+      s.closTs = new Date(fin.t).toISOString(); s.barres = fin.barres;
+    }
+    s.suiviUnite = fin1m ? '1m' : '5m';
+    s.ambigu = fin.ambigu;
+    if (s.statut === 'ouvert') s.slCourant = fin.part1 ? s.entree : s.sl;
+  });
+
+  const clos = db.signaux.filter(s => s.statut === 'clos');
+  const g = clos.filter(s => s.r > 0);
+  db.bilan = {
+    maj: maintenant, total: db.signaux.length, clos: clos.length,
+    ouverts: db.signaux.length - clos.length,
+    reussite: clos.length ? +(g.length / clos.length * 100).toFixed(1) : null,
+    cumulR: +clos.reduce((a, s) => a + (s.r || 0), 0).toFixed(3),
+    euros: Math.round(clos.reduce((a, s) => a + (s.r || 0), 0) * RISQUE),
+    passages: db.passages.length
+  };
+  db.passages = db.passages.slice(-3000);
+  return db;
+}
+
+function ecrireKintt(db) {
+  const utile = o => JSON.stringify({ signaux: o.signaux, passages: o.passages });
+  let ancien = null;
+  try { ancien = JSON.parse(fs.readFileSync(KINTT, 'utf8')); } catch (e) {}
+  if (ancien && utile(ancien) === utile(db)) return false;
+  fs.mkdirSync(path.dirname(KINTT), { recursive: true });
+  fs.writeFileSync(KINTT, JSON.stringify(db, null, 1) + '\n');
+  return true;
+}
+
 (async () => {
   const f = Modele.fenetre();
   const maintenant = new Date().toISOString();
@@ -196,6 +399,12 @@ function blocage(d) {
   } catch (e) { console.error('EUR/USD indisponible : ' + e.message); }
 
   const d = Modele.evaluer(brut, brut2);
+  // La seconde stratégie, sur les MÊMES bougies, dans le même passage.
+  // Une panne de kintt ne doit pas faire tomber le relevé du modèle en
+  // place : c'est lui qui est en test à blanc depuis trois semaines.
+  let k = null;
+  try { k = Kintt.evaluer(brut, brut2); }
+  catch (e) { console.error('KINTT en échec : ' + e.message); }
   const e = Modele.heure(d.derniereBougie);
   const hNY = String(Math.floor(e.min / 60)).padStart(2, '0') + ':' + String(e.min % 60).padStart(2, '0');
   const db = charger();
@@ -237,7 +446,11 @@ function blocage(d) {
     retardMin: Math.round((Date.now() - d.derniereBougie) / 60000),
     hors: d.hors, etat: d.etat, dir: d.dir, score: d.score,
     dol: d.dol, key: d.key, ifvg: d.ifvg, parTF: d.parTF,
-    trade: d.trade, dernierSignal: d.dernierSignal, cfg: d.cfg
+    trade: d.trade, dernierSignal: d.dernierSignal, cfg: d.cfg,
+    // La seconde stratégie voyage dans le même fichier : le site n'a qu'un
+    // seul instantané à charger, et les deux décrivent forcément la même
+    // bougie — impossible d'afficher deux prix différents côte à côte.
+    kintt: instantaneKintt(k, brut.m5, brut.m1 || [])
   };
   // Marché fermé, rien n'a bougé : n'écrire que l'horodatage produirait un
   // commit toutes les cinq minutes pour rien — une trentaine par jour, qui
@@ -483,6 +696,15 @@ function blocage(d) {
     cumulR: +clos.reduce((a, s) => a + (s.r || 0), 0).toFixed(3),
     passages: db.passages.length
   };
+  // ── LE JOURNAL DE KINTT ─────────────────────────────────────────────
+  try {
+    const dbK = journalKintt(k, brut.m5, brut.m1 || [], maintenant);
+    const ecritK = ecrireKintt(dbK);
+    console.log(`Kintt  : ${dbK.bilan ? dbK.bilan.total : 0} signaux ` +
+      `(${dbK.bilan ? dbK.bilan.clos : 0} clos) · ${dbK.passages.length} passages` +
+      (ecritK ? '' : ' — inchangé, non réécrit'));
+  } catch (e) { console.error('Journal kintt en échec : ' + e.message); }
+
   const ecrit = ecrire(db);
   console.log(`Journal : ${db.bilan.total} signaux (${db.bilan.clos} clos, ${db.bilan.ouverts} ouverts) · ` +
     `${db.bilan.passages} passages consignés` + (ecrit ? '' : ' — inchangé, non réécrit'));

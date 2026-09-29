@@ -27,9 +27,9 @@ function pres(a, b, tol, quoi) {
 
 // ── chargement des modules du navigateur ───────────────────────────────────
 const ctx = {};
-for (const f of ['js/structure.js', 'js/position.js', 'js/modele.js'])
+for (const f of ['js/structure.js', 'js/position.js', 'js/modele.js', 'js/kintt.js'])
   new Function('root', 'ST', fs.readFileSync(path.join(RACINE, f), 'utf-8')).call(ctx, ctx, ctx.ST);
-const { Position, Modele } = ctx;
+const { Position, Modele, Kintt } = ctx;
 const CFG = Modele.CFG;
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -297,6 +297,194 @@ if (fs.existsSync(jf)) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+console.log('\n── LA STRATÉGIE KINTT ────────────────────────────────────────');
+// Deuxième stratégie, suivant le plan source « 10AM OXXC ». Elle tourne à
+// côté de js/modele.js, elle ne le remplace pas. Les mêmes invariants lui
+// sont appliqués : c'est le minimum pour qu'elle soit comparable.
+
+t('kintt : la fenêtre d\'entrée est cohérente', () => {
+  const K = Kintt.CFG;
+  if (!(K.obs <= K.deb && K.deb < K.primaire && K.primaire <= K.fin))
+    throw new Error(`${K.obs} → ${K.deb} → ${K.primaire} → ${K.fin}`);
+});
+t('kintt : la fenêtre du plan est bien 10h → 12h New York', () => {
+  eq(Kintt.CFG.deb, 600, 'première entrée');
+  eq(Kintt.CFG.fin, 720, 'deadline ferme');
+});
+t('kintt : le M5 ne fait PAS partie des zones, comme dans le plan', () => {
+  if (Kintt.CFG.unites.indexOf('M5') >= 0)
+    throw new Error('le plan liste M15 / M30 / H1 / H4, pas le M5');
+});
+t('kintt : les deux confirmations sont exigées, comme dans le plan', () => {
+  if (!Kintt.CFG.exigeIFVG || !Kintt.CFG.exigeCISD)
+    throw new Error('le plan veut IFVG ET CISD, pas l\'un ou l\'autre');
+});
+t('kintt : le plafond de deux entrées par jour est en place', () => {
+  eq(Kintt.CFG.maxJour, 2, 'entrées par jour');
+});
+
+if (dispo) {
+  const lireK = (s2, i, r) => {
+    const f = path.join(CACHE, `${s2}_${i}_${r}.json`);
+    return fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf-8')) : null;
+  };
+  const DK = {}, EK = {};
+  for (const x of Modele.SERIES) DK[x.cle] = lireK('NQF', x.interval, x.range);
+  for (const x of Modele.SERIES2) EK[x.cle] = lireK('ESF', x.interval, x.range);
+  const dk = DK.m5 ? Kintt.evaluer(DK, EK.m5 ? EK : null) : null;
+  const SK = (dk && dk.tousSignaux) || [];
+
+  t('kintt : aucun signal n\'a son stop du mauvais côté', () => {
+    const faux = SK.filter(x => x.sens === 'LONG' ? !(x.sl < x.entree) : !(x.sl > x.entree));
+    if (faux.length) throw new Error(faux.length + ' sur ' + SK.length);
+  });
+  t('kintt : aucun signal n\'a son objectif du mauvais côté', () => {
+    const faux = SK.filter(x => x.sens === 'LONG' ? !(x.tp > x.entree) : !(x.tp < x.entree));
+    if (faux.length) throw new Error(faux.length + ' sur ' + SK.length);
+  });
+  t('kintt : tous les signaux tombent entre 10h et 12h New York', () => {
+    const dehors = SK.filter(x => {
+      const e2 = Kintt.heure(x.t);
+      return e2.min < Kintt.CFG.deb || e2.min >= Kintt.CFG.fin;
+    });
+    if (dehors.length) throw new Error(dehors.length + ' hors fenêtre');
+  });
+  t('kintt : le plafond par jour est respecté', () => {
+    const pj = {};
+    SK.forEach(x => { const j = Kintt.heure(x.t).jour; pj[j] = (pj[j] || 0) + 1; });
+    const trop = Object.keys(pj).filter(j => pj[j] > Kintt.CFG.maxJour);
+    if (trop.length) throw new Error('jours dépassant : ' + trop.join(', '));
+  });
+  t('kintt : chaque signal vise au moins le risque pris', () => {
+    const faux = SK.filter(x => x.rr < Kintt.CFG.rrMin - 1e-9);
+    if (faux.length) throw new Error(faux.length + ' signal(aux) sous le seuil');
+  });
+  t('kintt : l\'entonnoir additionne bien toutes les bougies', () => {
+    if (!dk || !dk.entonnoir) throw new Error('pas d\'entonnoir');
+    const E3 = dk.entonnoir;
+    const somme = Object.keys(E3).filter(k => k !== 'barres')
+      .reduce((a, k) => a + E3[k], 0);
+    if (somme !== E3.barres)
+      throw new Error(`${somme} comptées pour ${E3.barres} bougies — une branche ne compte pas`);
+  });
+}
+
+// ── KINTT EST-IL VRAIMENT BRANCHÉ ? ───────────────────────────────────────
+// Une stratégie qui n'atteint ni le relevé ni la page n'existe pas. Ces
+// vérifications-là ne regardent pas ce que kintt CALCULE, mais si quelqu'un
+// le lui demande et si le résultat arrive à l'écran.
+
+t('kintt lit EXACTEMENT les mêmes séries que le modèle', () => {
+  // Le relevé ne télécharge qu'une fois, avec Modele.SERIES, et donne les
+  // mêmes bougies aux deux stratégies. Si les listes divergeaient, kintt
+  // recevrait des séries qu'il n'a pas demandées — c'est l'erreur qui avait
+  // fait mesurer 37 signaux au robot contre 42 au banc d'essai.
+  const a = JSON.stringify(Modele.SERIES), b = JSON.stringify(Kintt.SERIES);
+  if (a !== b) throw new Error('modèle ' + a + ' · kintt ' + b);
+});
+
+t('scripts/live_log.js fait tourner kintt à chaque passage', () => {
+  const src = fs.readFileSync(path.join(RACINE, 'scripts/live_log.js'), 'utf-8');
+  if (!/js', 'kintt\.js'/.test(src)) throw new Error('le module n\'est pas chargé');
+  if (!/Kintt\.evaluer\(/.test(src)) throw new Error('la stratégie n\'est jamais évaluée');
+  if (!/data', 'kintt\.json'/.test(src)) throw new Error('aucun journal n\'est tenu');
+});
+
+t('scripts/live_log.js ne recopie pas les bougies dans l\'instantané', () => {
+  // `etape.zone` porte la SÉRIE ENTIÈRE dans le champ `cs`. Recopiée telle
+  // quelle, elle ferait un etat.json de plusieurs mégaoctets, téléchargé à
+  // chaque ouverture de la page. L'instantané ne doit garder que les bornes.
+  const src = fs.readFileSync(path.join(RACINE, 'scripts/live_log.js'), 'utf-8');
+  const m = src.match(/function instantaneKintt\([\s\S]*?\n\}/);
+  if (!m) throw new Error('instantaneKintt introuvable');
+  if (/Object\.assign\(\{\}, e\.zone\)|zone: e\.zone\s*[,}]/.test(m[0]))
+    throw new Error('la zone est recopiée entière, avec ses bougies');
+  // Et la preuve sur le fichier réellement produit : pas de bougies dedans,
+  // et un poids que le téléphone du visiteur peut se permettre.
+  const ef = path.join(RACINE, 'data/etat.json');
+  if (fs.existsSync(ef)) {
+    const E4 = JSON.parse(fs.readFileSync(ef, 'utf-8'));
+    if (E4.kintt) {
+      const poids = JSON.stringify(E4.kintt).length;
+      if (poids > 50000) throw new Error('l\'instantané de kintt pèse ' + poids + ' octets');
+      const z = E4.kintt.etape && E4.kintt.etape.zone;
+      if (z && ('cs' in z)) throw new Error('la série de bougies voyage dans l\'instantané');
+    }
+  }
+});
+
+t('scripts/build_single.js publie le journal de kintt', () => {
+  const src = fs.readFileSync(path.join(RACINE, 'scripts/build_single.js'), 'utf-8');
+  const m = src.match(/const PUBLIES = \[([^\]]*)\]/);
+  if (!m) throw new Error('liste des fichiers publiés introuvable');
+  if (!/kintt\.json/.test(m[1])) throw new Error('kintt.json n\'est pas publié : ' + m[1]);
+});
+
+t('le site charge js/kintt.js et affiche son panneau', () => {
+  const h = fs.readFileSync(path.join(RACINE, 'index.html'), 'utf-8');
+  if (!/<script src="js\/kintt\.js"><\/script>/.test(h))
+    throw new Error('le module n\'est pas chargé par la page');
+  for (const id of ['pan-kintt', 'k-tag', 'k-gauge', 'kintt'])
+    if (h.indexOf('id="' + id + '"') < 0) throw new Error('repère absent : ' + id);
+  if (!/href="#pan-kintt"/.test(h)) throw new Error('aucun lien de navigation vers le panneau');
+  if (!/function paintKintt\(/.test(h)) throw new Error('le panneau n\'est jamais dessiné');
+  if (!/paintKintt\(\);[\s\S]{0,400}paintFooter\(\)/.test(h.replace(/\n/g, ' ')))
+    throw new Error('paintKintt n\'est pas appelé dans le cycle d\'affichage');
+});
+
+t('le site calcule aussi kintt quand le flux direct est branché', () => {
+  // Sans cette ligne, le panneau se vide dès qu'on branche OANDA — c'est-à-dire
+  // exactement au moment où on regarde le marché.
+  const h = fs.readFileSync(path.join(RACINE, 'index.html'), 'utf-8');
+  if (!/Kintt\.evaluer\(brut\)/.test(h))
+    throw new Error('le mode direct n\'évalue pas kintt');
+});
+
+// ── LE JOURNAL DE KINTT SE TIENT ──────────────────────────────────────────
+const kf = path.join(RACINE, 'data/kintt.json');
+if (fs.existsSync(kf)) {
+  const K2 = JSON.parse(fs.readFileSync(kf, 'utf-8'));
+  t('kintt : le bilan compte le même nombre de signaux que la liste', () => {
+    eq(K2.bilan.total, K2.signaux.length, 'total');
+    eq(K2.bilan.clos, K2.signaux.filter(s => s.statut === 'clos').length, 'clos');
+  });
+  t('kintt : aucun résultat ne sort des bornes de SON objectif', () => {
+    // Le plafond de kintt change à chaque trade, puisqu'il vise une ZONE :
+    // c'est `rr`, consigné avec le signal. Un résultat au-delà voudrait dire
+    // que le suivi a utilisé le plafond d'un autre trade.
+    for (const s of K2.signaux.filter(x => x.statut === 'clos')) {
+      const haut = s.rr != null ? s.rr : Kintt.CFG.tpR;
+      if (s.r < -1 - 1e-6 || s.r > haut + 1e-6)
+        throw new Error(`${s.jour} ${s.heureNY} : ${s.r} hors de [−1 ; ${haut}]`);
+    }
+  });
+  t('kintt : tous les signaux du journal tombent entre 10h et 12h', () => {
+    for (const s of K2.signaux) {
+      const m = +s.heureNY.slice(0, 2) * 60 + +s.heureNY.slice(3);
+      if (m < Kintt.CFG.deb || m >= Kintt.CFG.fin)
+        throw new Error(`${s.jour} ${s.heureNY} hors de la fenêtre du plan`);
+    }
+  });
+  t('kintt : le stop et l\'objectif encadrent l\'entrée', () => {
+    for (const s of K2.signaux) {
+      const L = s.sens === 'LONG';
+      if (L ? !(s.sl < s.entree && s.tp > s.entree) : !(s.sl > s.entree && s.tp < s.entree))
+        throw new Error(`${s.jour} ${s.heureNY} ${s.sens} : ${s.sl} / ${s.entree} / ${s.tp}`);
+    }
+  });
+  t('kintt : le journal n\'est JAMAIS mélangé à celui du modèle', () => {
+    // Le mélange serait pire que l'absence : trois trades à 10 h et
+    // quarante-et-un à 9 h ne se moyennent pas.
+    const jf2 = path.join(RACINE, 'data/signaux.json');
+    if (!fs.existsSync(jf2)) return;
+    const J3 = JSON.parse(fs.readFileSync(jf2, 'utf-8'));
+    const cles = new Set(J3.signaux.map(s => s.cle));
+    const communs = K2.signaux.filter(s => cles.has(s.cle));
+    if (communs.length) throw new Error(communs.length + ' signal(aux) dans les deux journaux');
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 console.log('\n── PERSONNE NE GARDE SA PROPRE COPIE DU SUIVI ────────────────');
 // LA CAUSE DE TOUT : le calcul de ce que vaut une position était écrit à cinq
 // endroits. Chaque copie a fini par diverger, et chaque divergence a envoyé un
@@ -451,7 +639,8 @@ if (fs.existsSync(jf)) {
       throw new Error('le site affiche la phrase figée du journal');
   });
   t('les copies sous docs/ sont identiques aux originales', () => {
-    for (const n of ['etat.json', 'signaux.json']) {
+    for (const n of ['etat.json', 'signaux.json', 'kintt.json']) {
+      if (!fs.existsSync(path.join(RACINE, 'data', n))) continue;
       const a = path.join(RACINE, 'data', n), c = path.join(RACINE, 'docs/data', n);
       if (!fs.existsSync(c)) throw new Error('docs/data/' + n + ' absent');
       if (fs.readFileSync(a, 'utf-8') !== fs.readFileSync(c, 'utf-8'))
@@ -494,11 +683,45 @@ await p.waitForTimeout(400);
 const deborde = await p.evaluate(() =>
   document.documentElement.scrollWidth - document.documentElement.clientWidth);
 const panneaux = await p.evaluate(() =>
-  ['#f-mes', '#f-conf', '#jchips'].filter(s => !document.querySelector(s)));
+  ['#f-mes', '#f-conf', '#jchips', '#pan-kintt', '#kintt', '#f-kfen']
+    .filter(s => !document.querySelector(s)));
+// ── LA PAGE SERVIE, AVEC SES DONNÉES ────────────────────────────────────
+// Ouverte en file://, la page ne peut pas lire data/etat.json : tous les
+// panneaux nourris par le relevé restent à « — » et le test ne les voit
+// jamais. On sert donc docs/ sur une vraie adresse, comme GitHub Pages, et
+// on vérifie que le panneau KINTT SE REMPLIT — pas seulement qu'il existe.
+import http from 'node:http';
+import fsp from 'node:fs';
+const TYPES = { '.html':'text/html', '.json':'application/json', '.js':'text/javascript' };
+const srv = http.createServer((q, r) => {
+  const rel = (q.url.split('?')[0] === '/' ? '/index.html' : q.url.split('?')[0]);
+  const f = '${RACINE}/docs' + rel;
+  if (!fsp.existsSync(f)) { r.writeHead(404); r.end(); return; }
+  r.writeHead(200, { 'content-type': TYPES[rel.slice(rel.lastIndexOf('.'))] || 'text/plain' });
+  r.end(fsp.readFileSync(f));
+});
+await new Promise(res => srv.listen(0, '127.0.0.1', res));
+const port = srv.address().port;
+await p.setViewportSize({ width: 1280, height: 900 });
+const err2 = [];
+p.removeAllListeners('pageerror'); p.on('pageerror', e => err2.push('ERREUR JS : ' + e.message));
+await p.goto('http://127.0.0.1:' + port + '/index.html', { waitUntil: 'load' });
+await p.waitForTimeout(3000);
+const kintt = {
+  err: err2,
+  tag: (await p.textContent('#k-tag') || '').trim(),
+  texte: (await p.textContent('#kintt') || '').trim(),
+  jauge: await p.evaluate(() => document.querySelector('#k-gauge').style.width),
+  fen: (await p.textContent('#f-kfen') || '').trim(),
+  // Le panneau du modèle doit rester rempli lui aussi : brancher une seconde
+  // stratégie ne doit pas casser la première.
+  chaine: (await p.textContent('#chain') || '').trim().length
+};
+srv.close();
 const out = {
   err, pied: (await p.textContent('#f-mes') || '').trim(),
   titre: /Où se forme le signal/.test(await p.textContent('body')),
-  radar, deborde, panneaux
+  radar, deborde, panneaux, kintt
 };
 console.log(JSON.stringify(out)); await b.close();`;
   let res = null;
@@ -524,6 +747,31 @@ console.log(JSON.stringify(out)); await b.close();`;
     });
     t('tous les repères d\'affichage sont présents dans la page', () => {
       if (res.panneaux.length) throw new Error('absents : ' + res.panneaux.join(', '));
+    });
+    // ── LE PANNEAU KINTT SE REMPLIT VRAIMENT ──────────────────────────────
+    const K3 = res.kintt || {};
+    t('la page servie avec ses données ne lève aucune erreur', () => {
+      if ((K3.err || []).length) throw new Error(K3.err.slice(0, 3).join(' | '));
+    });
+    t('le panneau KINTT se remplit au lieu de rester vide', () => {
+      if (!K3.texte) throw new Error('panneau vide');
+      if (/Pas encore de relevé/.test(K3.texte))
+        throw new Error('le panneau ne reçoit pas l\'instantané — data/etat.json ne porte pas kintt');
+      if (K3.texte.length < 300) throw new Error('panneau trop court : ' + K3.texte.length + ' caractères');
+    });
+    t('le compteur et la jauge de KINTT sont renseignés', () => {
+      if (!/^\d\/\d/.test(K3.tag)) throw new Error('compteur : « ' + K3.tag + ' »');
+      if (!/%$/.test(K3.jauge || '')) throw new Error('jauge : « ' + K3.jauge + ' »');
+    });
+    t('le pied de page annonce la fenêtre propre à KINTT', () => {
+      if (!/^\d\d h \d\d → \d\d h \d\d$/.test(K3.fen)) throw new Error('« ' + K3.fen + ' »');
+    });
+    t('brancher KINTT n\'a pas vidé le panneau du modèle', () => {
+      if (!(K3.chaine > 200)) throw new Error('la chaîne du modèle ne fait plus que ' + K3.chaine + ' caractères');
+    });
+    t('KINTT dit combien de trades portent son chiffre', () => {
+      // « +304 € » sans « 3 trades » est un mensonge par omission.
+      if (!/trade/.test(K3.texte)) throw new Error('aucun décompte de trades affiché');
     });
   }
 }
@@ -585,6 +833,9 @@ CE QUI N'EST PAS VÉRIFIÉ ICI — et où un bug peut donc encore passer :
   · L'APPARENCE du site : --navigateur vérifie qu'il s'ouvre sans erreur, que
     le radar dessine, que rien ne déborde sur téléphone — pas que c'est beau.
   · Le SITE EN LIGNE n'est comparé au dépôt qu'avec --enligne (réseau requis).
+  · KINTT n'a que quelques trades relevés : son panneau est vérifié comme
+    MÉCANISME (branché, affiché, journal cohérent), jamais comme résultat.
+    Tant que le nombre de trades clos est sous vingt, son bilan ne dit rien.
   · Le DÉCLENCHEMENT du robot est contourné, pas garanti : un travail démarre
     à 11 h 47 UTC et attend la séance. Si CE déclenchement-là manque aussi,
     seuls les passages du soir restent.
