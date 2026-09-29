@@ -8,9 +8,9 @@
 # le premier relevé automatique n'arrivait qu'à 19 h, cinq heures après.
 #
 # LA SOLUTION : ne pas demander à GitHub de déclencher pendant le trou. On
-# démarre AVANT (11 h 47 UTC, hors zone morte), le travail ATTEND, puis relève
-# plusieurs fois pendant la séance. Un travail peut durer six heures ; il en
-# faut moins de quatre. Le dépôt est public, donc les minutes sont gratuites.
+# démarre AVANT, hors zone morte, le travail ATTEND, puis relève plusieurs
+# fois pendant la séance. Un travail peut durer six heures ; il en faut moins
+# de quatre. Le dépôt est public, donc les minutes sont gratuites.
 #
 # Ce fichier ne remplace pas signaux.yml : celui-ci couvre la séance, l'autre
 # garde ses passages du soir comme filet.
@@ -18,13 +18,22 @@ name: Relevé pendant la séance
 
 on:
   schedule:
-    # 11 h 47 UTC — bien avant la zone morte, et ça part sans faute.
+    # TROIS départs avant la zone morte, pas un seul. Le planning de GitHub
+    # rate des déclenchements même hors des heures de pointe : parier sur un
+    # unique créneau reproduirait le problème qu'on essaie de corriger. Il
+    # suffit que l'un des trois parte.
+    - cron: '17 10 * * 1-5'
     - cron: '47 11 * * 1-5'
+    - cron: '37 12 * * 1-5'
   workflow_dispatch:
 
 concurrency:
-  group: journal-signaux          # le même que signaux.yml : jamais deux à la fois
-  cancel-in-progress: false
+  # Groupe PROPRE à ce travail, et on annule le précédent. Si deux départs
+  # tombent, le second remplace le premier au lieu de s'empiler derrière :
+  # avec `cancel-in-progress: false`, le second aurait attendu la fin du
+  # premier — c'est-à-dire la fin de la séance — et n'aurait servi à rien.
+  group: seance
+  cancel-in-progress: true
 
 permissions:
   contents: write
