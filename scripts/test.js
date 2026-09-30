@@ -298,6 +298,142 @@ if (fs.existsSync(jf)) {
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
+console.log('\n── LA STRATÉGIE NE DOIT PAS CONNAÎTRE L\'AVENIR ───────────────');
+// LE PIRE BUG DU PROJET, et aucun test ne le voyait.
+//
+// ST.agreger regroupe les bougies 1 h par quatre. ST.idxA rend la bougie QUI
+// CONTIENT l'instant demandé — donc, sur une unité supérieure, une bougie NON
+// TERMINÉE. Son plus haut, son plus bas et sa clôture n'existent pas encore.
+// Mesuré sur une bougie H4 réelle : ouverture 01 h 00, plus haut 31058 ; le
+// code interrogeait ce plus haut dès 01 h 10, alors qu'il ne serait définitif
+// qu'à 05 h 00. Et le biais datait la résolution d'un FVG à l'OUVERTURE de la
+// bougie qui tranche — jusqu'à vingt-quatre heures trop tôt sur le journalier.
+//
+// Ce que ça coûtait, une fois retiré :
+//     modèle   41 trades · 87,8 % · +2 622 €   →   25 trades · 76,0 % · +606 €
+//     kintt     3 trades · 33,3 % ·   +304 €   →    2 trades ·  0,0 % · −256 €
+//
+// LA VÉRIFICATION, elle, ne regarde pas le code : elle coupe les bougies juste
+// après un signal et exige que la stratégie produise EXACTEMENT le même signal.
+// Une stratégie qui lit l'avenir ne peut pas passer.
+
+if (dispo) {
+  const lireA = (s2, i, r) => {
+    const f = path.join(CACHE, `${s2}_${i}_${r}.json`);
+    return fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf-8')) : null;
+  };
+  const DA = {}, EA = {};
+  for (const x of Modele.SERIES) DA[x.cle] = lireA('NQF', x.interval, x.range);
+  for (const x of Modele.SERIES2) EA[x.cle] = lireA('ESF', x.interval, x.range);
+
+  // Le marché tel qu'il était connu à l'instant t : on jette tout ce qui
+  // vient après, exactement comme le robot le voit en direct.
+  const couper = (S, t) => {
+    const out = {};
+    for (const k of Object.keys(S)) out[k] = S[k] ? S[k].filter(c => c.t < t) : S[k];
+    return out;
+  };
+
+  for (const [nom, strat] of [['le modèle', Modele], ['kintt', Kintt]]) {
+    t(nom + ' produit les mêmes signaux quand on lui retire l\'avenir', () => {
+      const plein = strat.evaluer(DA, EA.m5 ? EA : null);
+      const sigs = (plein && plein.tousSignaux) || [];
+      // Les bougies 1 minute ne remontent qu'à huit jours. Au-delà, tronquer
+      // efface une série que le robot AVAIT à l'époque : le signal
+      // disparaîtrait faute de données, pas faute d'honnêteté. On ne juge donc
+      // que la période réellement rejouable.
+      const t0 = DA.m1 && DA.m1.length ? DA.m1[0].t : 0;
+      const jugeables = sigs.filter(x => x.t > t0 + 2 * 24 * 3600 * 1000);
+      if (!jugeables.length) { console.log('     (periode rejouable sans signal)'); return; }
+
+      // Plusieurs dates de coupe : a chacune, TOUS les signaux anterieurs
+      // doivent reapparaitre a l'identique. Un signal qui ne tient que parce
+      // que la suite est connue se trahit ici.
+      const ecarts = [];
+      let compares = 0;
+      const coupes = [...new Set(jugeables.map(x => x.t + 5 * 60000))].slice(-5);
+      for (const tc of coupes) {
+        const T2 = couper(DA, tc), E2 = EA.m5 ? couper(EA, tc) : null;
+        if (!T2.m5 || T2.m5.length < 200 || !T2.m1 || T2.m1.length < 500) continue;
+        const r = strat.evaluer(T2, E2);
+        const vus = (r && r.tousSignaux) || [];
+        for (const sig of jugeables.filter(x => x.t < tc)) {
+          compares++;
+          const q = new Date(sig.t).toISOString().slice(0, 16).replace('T', ' ');
+          const vu = vus.filter(x => x.t === sig.t)[0];
+          if (!vu) { ecarts.push(q + ' disparait'); continue; }
+          for (const champ of ['sens', 'entree', 'sl', 'tp'])
+            if (String(vu[champ]) !== String(sig[champ]))
+              ecarts.push(`${q} · ${champ} ${sig[champ]} -> ${vu[champ]}`);
+        }
+      }
+      if (ecarts.length) throw new Error([...new Set(ecarts)].slice(0, 4).join(' | ') +
+        ` (${compares} comparaisons)`);
+      if (!compares) throw new Error('aucune comparaison possible : la verification ne prouve rien');
+      console.log(`     (${compares} comparaisons sur ${coupes.length} dates de coupe)`);
+    });
+  }
+
+  // La vérification ci-dessus ne couvre que six jours, faute de bougies
+  // 1 minute au-delà. Celle-ci couvre les SOIXANTE jours en retirant le
+  // 1 minute DES DEUX CÔTÉS : la comparaison redevient loyale, et c'est de
+  // toute façon sur les unités SUPÉRIEURES que le regard en avant se logeait.
+  for (const [nom, strat] of [['le modèle', Modele], ['kintt', Kintt]]) {
+    t(nom + ' ne dépend pas de l\'avenir des unités supérieures', () => {
+      const sansFin = S => { const o = Object.assign({}, S); o.m1 = []; return o; };
+      const base = sansFin(DA), baseE = EA.m5 ? sansFin(EA) : null;
+      const plein = strat.evaluer(base, baseE);
+      const sigs = (plein && plein.tousSignaux) || [];
+      if (sigs.length < 3) { console.log('     (trop peu de signaux sans le 1 min)'); return; }
+      const ecarts = []; let compares = 0;
+      // dix dates de coupe réparties sur tout l'historique
+      const pas = Math.max(1, Math.floor(sigs.length / 10));
+      for (let k = pas; k < sigs.length; k += pas) {
+        const tc = sigs[k].t + 5 * 60000;
+        const T2 = couper(base, tc), E2 = baseE ? couper(baseE, tc) : null;
+        if (!T2.m5 || T2.m5.length < 200) continue;
+        const vus = (strat.evaluer(T2, E2) || {}).tousSignaux || [];
+        for (const sig of sigs.filter(x => x.t < tc)) {
+          compares++;
+          const q = new Date(sig.t).toISOString().slice(0, 16).replace('T', ' ');
+          const vu = vus.filter(x => x.t === sig.t)[0];
+          if (!vu) { ecarts.push(q + ' disparait'); continue; }
+          for (const champ of ['sens', 'entree', 'sl', 'tp'])
+            if (String(vu[champ]) !== String(sig[champ]))
+              ecarts.push(`${q} · ${champ} ${sig[champ]} -> ${vu[champ]}`);
+        }
+      }
+      if (ecarts.length) throw new Error([...new Set(ecarts)].slice(0, 4).join(' | ') +
+        ` (${compares} comparaisons)`);
+      if (!compares) throw new Error('aucune comparaison possible');
+      console.log(`     (${compares} comparaisons sur tout l'historique)`);
+    });
+  }
+
+  t('aucune unité supérieure n\'est lue en cours de formation', () => {
+    // Le garde-fou de code, en plus du garde-fou de comportement : sur une
+    // série agrégée, c'est idxClos qu'il faut, jamais idxA.
+    for (const f of ['js/modele.js', 'js/kintt.js']) {
+      const src = fs.readFileSync(path.join(RACINE, f), 'utf-8')
+        .replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+      const restes = [...src.matchAll(/ST\.idxA\(([^,]+),/g)].map(m => m[1].trim());
+      if (restes.length)
+        throw new Error(f + ' interroge encore une bougie en cours : ' + restes.join(', '));
+    }
+  });
+
+  t('le biais date ce qu\'il apprend de la CLÔTURE, pas de l\'ouverture', () => {
+    for (const f of ['js/modele.js', 'js/kintt.js']) {
+      const src = fs.readFileSync(path.join(RACINE, f), 'utf-8');
+      if (/out\.push\(\{\s*t:\s*cs\[iRes\]\.t/.test(src))
+        throw new Error(f + ' : un événement est daté à l\'ouverture de sa bougie');
+      if (!/ST\.pasDe\(cs\)/.test(src))
+        throw new Error(f + ' : le décalage à la clôture est absent');
+    }
+  });
+}
+
 console.log('\n── UN CHIFFRE PORTE LE NOM DE CE QU\'IL EST ───────────────────');
 // BUG RÉEL, trouvé parce que quelqu'un a demandé « 33 % de réussite, mais
 // combien de RR ? ». Le champ s'appelait `rr` et valait 0,61. Ce n'était pas

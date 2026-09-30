@@ -79,6 +79,14 @@
     // le seul point que le plan rend identifiable. [CHOIX]
     buf: 0.02,               // tampon, en % du prix
     atrMin: 0.3,             // [CHOIX] stop minimum, en fraction d'ATR
+    // « le dernier mouvement » se lit de deux façons, et l'écart est énorme :
+    //   'balayage' — sous l'extrémité du balayage. Prudent, mais le balayage
+    //                peut dater de vingt bougies : le stop devient très large.
+    //   'recent'   — sous le plus bas des `stopBarres` dernières bougies,
+    //                c'est-à-dire sous LE RETOURNEMENT lui-même. C'est la
+    //                lecture serrée, et c'est elle qui fait les grands RR.
+    stopMode: 'balayage',    // 'balayage' | 'recent'
+    stopBarres: 3,           // [CHOIX] ne sert qu'en mode 'recent'
 
     // ── L'OBJECTIF ─────────────────────────────────────────── [PLAN §8]
     // « haut/bas de session, PD High/Low, ou extrémité d'un CRT H1/H4 ».
@@ -86,6 +94,10 @@
     // le haut et le bas de la veille. On vise le plus proche des trois qui
     // soit devant nous. [CHOIX] sur le choix du plus proche.
     objectif: 'zone',        // 'zone' | 'R'
+    // Le plan liste TROIS endroits possibles et ne dit pas lequel choisir.
+    // Viser le plus proche sécurise le trade et écrase le RR ; viser le plus
+    // loin fait l'inverse. C'est LE choix qui décide de tout.
+    cible: 'proche',         // 'proche' | 'loin'
     tpR: 2.5,                // utilisé seulement si objectif === 'R'
     rrMin: 1.0,              // [CHOIX] en dessous, le trade ne vaut pas le risque
 
@@ -116,7 +128,17 @@
       ST.fvgs(cs).forEach(function (z) {
         var iRes = z.casse != null ? z.casse : z.touche;
         if (iRes == null) return;
-        out.push({ t: cs[iRes].t, c: (z.haussier ? 1 : -1) * (z.casse == null ? 1 : -1) });
+        // Daté à la CLÔTURE de la bougie qui tranche, pas à son ouverture :
+        // sinon le biais connaît l'issue d'une bougie H4 quatre heures trop tôt.
+        // ⚠️ DATÉ À LA CLÔTURE DE LA BOUGIE QUI TRANCHE, calculée par sa
+        // DURÉE et non par l'arrivée de la bougie suivante. Passer par
+        // `cs[iRes + 1]` rendait l'événement invisible tant que la bougie
+        // d'après n'était pas livrée : la stratégie ne disait alors pas la
+        // même chose selon qu'on lui donnait ou non des bougies postérieures
+        // à sa décision. C'est ce que la vérification « sans l'avenir » a
+        // attrapé, après un premier correctif incomplet.
+        var tRes = cs[iRes].t + ST.pasDe(cs);
+        out.push({ t: tRes, c: (z.haussier ? 1 : -1) * (z.casse == null ? 1 : -1) });
       });
       return out.sort(function (a, b) { return a.t - b.t; });
     });
@@ -184,19 +206,26 @@
       if (e.min < CFG.obs || e.min >= CFG.fin) continue;
       if (parJour[e.jour] >= CFG.maxJour) continue;
 
-      var b = biais(prep, bar.t);
+      // L'INSTANT DE LA DÉCISION est la CLÔTURE de cette bougie de 5 minutes,
+      // pas son ouverture : le modèle lit `bar.c`. Tout ce qui s'est terminé à
+      // cet instant-là est connu, y compris la bougie de 5 minutes elle-même.
+      // Dater la décision à l'ouverture reculerait tout d'une bougie et ferait
+      // rater les signaux d'un cran — une sur-correction aussi fausse que le
+      // regard en avant qu'on vient de retirer.
+      var tD = clock[i + 1] ? clock[i + 1].t : bar.t + 300000;
+      var b = biais(prep, tD);
       var etape = { t: bar.t, score: b.score, dir: b.dir, zone: null, sweep: null, conf: null };
       E0.barres++;
       if (b.dir === 0) { E0.biaisNeutre++; etapes = etape; continue; }
       // « Narrative confirmée sur NQ et ES ENSEMBLE »
-      if (prepE && biais(prepE, bar.t).dir !== b.dir) { E0.esDesaccord++; etape.conf = 'ES en désaccord'; etapes = etape; continue; }
+      if (prepE && biais(prepE, tD).dir !== b.dir) { E0.esDesaccord++; etape.conf = 'ES en désaccord'; etapes = etape; continue; }
 
       // ── LA ZONE : intacte, du bon sens, et le prix arrive dedans ────────
       var idxJ = null, zone = null;
       for (var z2 = 0; z2 < zones.length; z2++) {
         var Z = zones[z2];
         if (Z.haussier !== (b.dir > 0)) continue;
-        var idx = ST.idxA(Z.cs, bar.t);
+        var idx = ST.idxClos(Z.cs, tD);
         if (Z.ne == null || Z.ne > idx || idx - Z.ne > CFG.ageMax) continue;
         if (Z.casse != null && Z.casse <= idx) continue;
         // « unmitigated » : jamais touchée AVANT la séance du jour
@@ -251,7 +280,7 @@
       // variante du plan : « clôture au-dessus/en-dessous de la M15 précédente »
       var aM15 = false;
       if (CFG.accepteM15) {
-        var i15 = ST.idxA(D.m15, bar.t);
+        var i15 = ST.idxClos(D.m15, tD);
         var prec = D.m15[i15 - 1];
         if (prec) aM15 = b.dir > 0 ? px > prec.h : px < prec.l;
       }
@@ -262,7 +291,16 @@
 
       // ── LE STOP : sous le dernier mouvement, c'est-à-dire le balayage ───
       var L = b.dir > 0, entree = px, buf = entree * CFG.buf / 100;
-      var sl = L ? sweep.ext - buf : sweep.ext + buf;
+      var ancre = sweep.ext;
+      if (CFG.stopMode === 'recent') {
+        // sous le retournement, pas sous le balayage : on prend l'extrémité
+        // des dernières bougies, bornée au balayage lui-même.
+        var d0 = Math.max(sweep.i, i - CFG.stopBarres + 1);
+        ancre = L ? Infinity : -Infinity;
+        for (var r0 = d0; r0 <= i; r0++)
+          ancre = L ? Math.min(ancre, clock[r0].l) : Math.max(ancre, clock[r0].h);
+      }
+      var sl = L ? ancre - buf : ancre + buf;
       if (L ? sl >= entree : sl <= entree) { E0.stopMauvaisCote++; etapes = etape; continue; }
       var risq = Math.abs(entree - sl);
       if (!atrC[i] || risq < atrC[i] * CFG.atrMin) { E0.stopTropSerre++; etapes = etape; continue; }
@@ -276,14 +314,19 @@
         for (var k2 = deb; k2 <= i; k2++) { hS = Math.max(hS, clock[k2].h); bS = Math.min(bS, clock[k2].l); }
         cands.push(L ? hS : bS);
         // haut / bas de la VEILLE — « PD » lu Previous Day
-        var iD = ST.idxA(D.d1, bar.t), veille = D.d1[iD - 1];
+        var iD = ST.idxClos(D.d1, tD), veille = D.d1[iD];
         if (veille) cands.push(L ? veille.h : veille.l);
-        // extrémité de la bougie H4 en cours — le « CRT H1/H4 » du plan
-        var iH4 = ST.idxA(h4, bar.t);
+        // ⚠️ « extrémité d'un CRT H1/H4 » — mais la bougie H4 EN COURS n'a pas
+        // encore d'extrémité. Le code lisait son plus haut avant qu'il existe,
+        // et visait donc un niveau que le prix était déjà connu pour atteindre.
+        // On prend la dernière bougie H4 TERMINÉE.
+        var iH4 = ST.idxClos(h4, tD);
         if (h4[iH4]) cands.push(L ? h4[iH4].h : h4[iH4].l);
         // le plus proche qui soit DEVANT nous
         var devant = cands.filter(function (v) { return v != null && isFinite(v) && (L ? v > entree : v < entree); });
-        if (devant.length) tp = L ? Math.min.apply(null, devant) : Math.max.apply(null, devant);
+        if (devant.length) tp = CFG.cible === 'loin'
+          ? (L ? Math.max.apply(null, devant) : Math.min.apply(null, devant))
+          : (L ? Math.min.apply(null, devant) : Math.max.apply(null, devant));
       }
       if (tp == null) tp = L ? entree + risq * CFG.tpR : entree - risq * CFG.tpR;
       var rr = Math.abs(tp - entree) / risq;

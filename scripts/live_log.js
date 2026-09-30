@@ -553,6 +553,11 @@ function ecrireKintt(db) {
       // sans qu'on puisse le savoir après coup.
       slx: Modele.CFG.slx, cfgTp1: Modele.CFG.tp1, cfgTp2: Modele.CFG.tp2,
       cfgSortieMin: Modele.CFG.sortieMin,
+      // Quel MOTEUR a produit ce signal. Les signaux d'avant le 30 septembre
+      // viennent d'un modèle qui lisait des bougies non terminées : leur taux
+      // de réussite ne dit rien de celui-ci, et les mélanger fausserait le
+      // bilan affiché. Ce marqueur est ce qui permet de les sortir du compte.
+      moteur: 'bougies-closes',
       // La phrase n'est plus écrite ici : js/position.js la compose, et le
       // site la RECOMPOSE à l'affichage. Sans ça elle reste figée dans le
       // journal — deux positions du 28 septembre parlaient encore en R
@@ -638,6 +643,21 @@ function ecrireKintt(db) {
     db.archive = db.archive.concat(ancienne.map(s => Object.assign({ reglages: 'v1 · stop au bord de l\'IFVG' }, s)));
     db.signaux = db.signaux.filter(s => s.slx != null);
     console.log(`${ancienne.length} signal(aux) des anciens réglages déplacé(s) dans l'archive.`);
+  }
+  // ── ET CEUX PRODUITS PAR UN MOTEUR QUI LISAIT L'AVENIR ──────────────
+  // Jusqu'au 30 septembre, le modèle interrogeait des bougies H4, H1 et M15
+  // NON TERMINÉES, et datait ce qu'il apprenait de l'OUVERTURE de la bougie
+  // qui tranche au lieu de sa clôture. Il voyait donc, à 09 h 35, des choses
+  // qui ne seraient vraies qu'à midi. Retirer ce regard en avant fait passer
+  // la mesure sur soixante jours de 41 trades à +2 622 € à 25 trades à
+  // +606 €. Les signaux émis avant le correctif ne viennent pas du même
+  // modèle : ils sont gardés, et sortis du bilan.
+  const regardAvant = db.signaux.filter(s => s.moteur == null);
+  if (regardAvant.length) {
+    db.archive = db.archive.concat(regardAvant.map(s =>
+      Object.assign({ reglages: 'v2 · moteur qui lisait des bougies non terminées' }, s)));
+    db.signaux = db.signaux.filter(s => s.moteur != null);
+    console.log(`${regardAvant.length} signal(aux) de l'ancien moteur déplacé(s) dans l'archive.`);
   }
 
   let repares = 0;

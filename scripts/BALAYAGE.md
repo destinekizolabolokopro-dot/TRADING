@@ -836,3 +836,82 @@ Le panneau affiche deux chiffres qu'il ne faut pas confondre :
   comme tel. Trois trades. Le panneau écrit lui-même que ça ne veut rien dire,
   et pourquoi la perte moyenne de 4 € est un artefact du stop remonté au prix
   d'entrée, pas une prouesse.
+
+
+---
+
+## 13. LE REGARD EN AVANT — et tout ce qu'il faut réécrire
+
+Trouvé le 30 septembre, en cherchant pourquoi le rapport gain/risque du plan
+restait bas. **C'est le pire défaut du projet, et aucune vérification ne le
+voyait.**
+
+### Ce qui se passait
+
+`ST.agreger` fabrique les bougies de 4 h en groupant les bougies d'1 h.
+`ST.idxA` rend **la bougie qui CONTIENT l'instant demandé** — donc, sur une
+unité supérieure, une bougie **non terminée**. Son plus haut, son plus bas et
+sa clôture n'existent pas encore.
+
+```
+une bougie H4 réelle
+  ouverture 01 h 00 · plus haut 31058, atteint dans la première heure
+  le code interrogeait ce plus haut dès 01 h 10
+  il ne serait définitif qu'à 05 h 00
+```
+
+Même faute dans le biais : la résolution d'un FVG était datée à
+l'**ouverture** de la bougie qui tranche. Sur le journalier, **vingt-quatre
+heures trop tôt**.
+
+Et une troisième, plus sournoise : `agreger` groupait le tableau **par paquets
+de quatre à partir de l'indice 0**. Yahoo sert une fenêtre glissante, donc le
+tableau ne commence pas au même endroit d'un jour à l'autre — la « bougie H4 »
+contenant 11 h 00 changeait de bornes selon le jour où on posait la question.
+Deux exécutions du même modèle, sur les mêmes données, ne voyaient pas le même
+graphique.
+
+### Ce que ça coûte
+
+| | avant | après |
+|---|---|---|
+| modèle 09h-10h | 41 trades · 87,8 % · **+2 622 €** | 25 trades · 76,0 % · **+676 €** |
+| kintt 10h-12h | 3 trades · 33,3 % · **+304 €** | 2 trades · 0 % · **−256 €** |
+
+**Les trois quarts du résultat du modèle étaient du regard en avant.** La
+totalité de celui de kintt.
+
+Sont donc faux, et remplacés : tous les chiffres de ce document antérieurs à
+cette section, ceux des demandes de fusion #4 et #5, `js/mesure.js`, la
+référence, et les quatre signaux du journal en direct — déplacés dans
+l'archive, gardés, sortis du bilan.
+
+### Les trois correctifs
+
+| | |
+|---|---|
+| `ST.idxClos` | la dernière bougie **terminée** : `t ≥ ouverture + durée`. La durée est déduite de la série, pas de l'arrivée de la bougie suivante — sinon le résultat dépend de ce qui a été livré après la décision. |
+| datation du biais | `cs[iRes].t + ST.pasDe(cs)` : l'instant où on l'**apprend**. |
+| `ST.agreger` | découpage **ancré sur l'horloge** : une bougie de 4 h commence à 00 h, 04 h, 08 h… quel que soit le contenu du tableau. |
+
+Et l'instant de décision est la **clôture** de la bougie de 5 minutes, pas son
+ouverture : le modèle lit `bar.c`. Dater la décision à l'ouverture aurait été
+une sur-correction, aussi fausse que le regard en avant.
+
+### La vérification qui manquait
+
+Elle ne lit pas le code. **Elle coupe les bougies juste après un signal et
+exige que la stratégie produise exactement le même signal.** Une stratégie qui
+lit l'avenir ne peut pas passer.
+
+```
+143 comparaisons sur tout l'historique, à dix dates de coupe
+```
+
+Vérifiée dans les deux sens : en remettant la datation à l'ouverture, elle
+rattrape aussitôt `2026-08-20 13:55 disparait (275 comparaisons)`.
+
+**La leçon, et elle vaut pour tout le reste :** une vérification qui relit le
+code ne voit que les fautes qu'on a pensé à chercher. Une vérification qui
+retire l'information et exige le même résultat voit celles qu'on n'a pas
+imaginées.
