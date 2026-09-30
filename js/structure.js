@@ -72,18 +72,25 @@
    * l'inversion (IFVG).
    */
   function fvgs(cs) {
+    // ⚠️ CHAQUE HORODATAGE EST CELUI OÙ ON L'APPREND, PAS CELUI OÙ ÇA COMMENCE.
+    // `cs[k].t` est l'OUVERTURE de la bougie ; une cassure se juge sur sa
+    // CLÔTURE, donc elle n'est connue qu'une durée de bougie plus tard. Sur le
+    // 15 minutes, lire l'ouverture avance le signal d'un quart d'heure ; sur le
+    // 4 heures, de quatre heures. C'est la même faute qui a gonflé les trois
+    // quarts du résultat, à un autre endroit.
+    const pas = pasDe(cs);
     const z = [];
     for (let i = 2; i < cs.length; i++) {
       if (cs[i].l > cs[i - 2].h)
-        z.push({ bas: cs[i - 2].h, haut: cs[i].l, haussier: true, ne: i, t: cs[i].t });
+        z.push({ bas: cs[i - 2].h, haut: cs[i].l, haussier: true, ne: i, t: cs[i].t + pas });
       else if (cs[i].h < cs[i - 2].l)
-        z.push({ bas: cs[i].h, haut: cs[i - 2].l, haussier: false, ne: i, t: cs[i].t });
+        z.push({ bas: cs[i].h, haut: cs[i - 2].l, haussier: false, ne: i, t: cs[i].t + pas });
     }
     z.forEach(x => {
       x.casse = null; x.tCasse = null; x.touche = null; x.tTouche = null;
       for (let k = x.ne + 1; k < cs.length; k++) {
-        if (x.touche == null && cs[k].l <= x.haut && cs[k].h >= x.bas) { x.touche = k; x.tTouche = cs[k].t; }
-        if (x.haussier ? cs[k].c < x.bas : cs[k].c > x.haut) { x.casse = k; x.tCasse = cs[k].t; break; }
+        if (x.touche == null && cs[k].l <= x.haut && cs[k].h >= x.bas) { x.touche = k; x.tTouche = cs[k].t + pas; }
+        if (x.haussier ? cs[k].c < x.bas : cs[k].c > x.haut) { x.casse = k; x.tCasse = cs[k].t + pas; break; }
       }
     });
     return z;
@@ -122,11 +129,15 @@
    * l'avenir.
    */
   function niveau1(cs, bas) {                       // STL / STH
+    const pas = pasDe(cs);
     const out = [];
     for (let i = 1; i < cs.length - 1; i++) {
       const a = cs[i - 1], m = cs[i], b = cs[i + 1];
       if (bas ? (a.l > m.l && b.l > m.l) : (a.h < m.h && b.h < m.h))
-        out.push({ prix: bas ? m.l : m.h, i, t: m.t, vu: b.t });
+        // `vu` = quand le niveau devient connaissable. La bougie de droite le
+        // confirme par sa CLÔTURE, pas par son ouverture : sur le 1 heure,
+        // lire `b.t` rendait le niveau lisible une heure trop tôt.
+        out.push({ prix: bas ? m.l : m.h, i, t: m.t, vu: b.t + pas });
     }
     return out;
   }
@@ -157,6 +168,7 @@
    * UNCONFIRMED ASSUMPTION : la source cite « CISD » sans le définir.
    */
   function cisd(cs) {
+    const pas = pasDe(cs);
     const out = [];
     for (let i = 2; i < cs.length; i++) {
       for (const haussier of [true, false]) {
@@ -169,8 +181,10 @@
         if (deb > i - 1) continue;                       // pas de série
         const ouv = cs[deb].o;
         if (haussier ? cs[i].c > ouv : cs[i].c < ouv) {
+          // Le CISD est décidé par la CLÔTURE de la bougie i : c'est donc à
+          // ce moment-là qu'il existe, pas à son ouverture.
           out.push({ bas: haussier ? ext : ouv, haut: haussier ? ouv : ext,
-            haussier, ne: i, t: cs[i].t, type: 'CISD' });
+            haussier, ne: i, t: cs[i].t + pas, type: 'CISD' });
         }
       }
     }
@@ -186,15 +200,21 @@
    * Le seuil « la mèche fait au moins la moitié du range » est de nous.
    */
   function rejectionBlocks(cs, ratio) {
+    // ⚠️ LE MOTIF EXIGE LA BOUGIE SUIVANTE : « creux local » veut dire que
+    // celle d'après ne descend pas plus bas. Le bloc était pourtant daté de la
+    // bougie du MILIEU et son index de formation `ne` valait i — il devenait
+    // donc utilisable une bougie avant d'être reconnaissable. Sur le 4 heures,
+    // quatre heures d'avance sur le marché.
+    const pas = pasDe(cs);
     const r = ratio == null ? 0.5 : ratio, out = [];
     for (let i = 1; i < cs.length - 1; i++) {
       const c = cs[i], rng = c.h - c.l; if (rng <= 0) continue;
       const corpsH = Math.max(c.o, c.c), corpsB = Math.min(c.o, c.c);
       // mèche basse longue + creux local → bloc haussier
       if ((corpsB - c.l) / rng >= r && cs[i - 1].l > c.l && cs[i + 1].l > c.l)
-        out.push({ bas: c.l, haut: corpsB, haussier: true, ne: i, t: c.t, type: 'RB' });
+        out.push({ bas: c.l, haut: corpsB, haussier: true, ne: i + 1, t: cs[i + 1].t + pas, type: 'RB' });
       if ((c.h - corpsH) / rng >= r && cs[i - 1].h < c.h && cs[i + 1].h < c.h)
-        out.push({ bas: corpsH, haut: c.h, haussier: false, ne: i, t: c.t, type: 'RB' });
+        out.push({ bas: corpsH, haut: c.h, haussier: false, ne: i + 1, t: cs[i + 1].t + pas, type: 'RB' });
     }
     return out;
   }

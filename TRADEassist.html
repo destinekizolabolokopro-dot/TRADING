@@ -422,7 +422,7 @@ button,input,select{font:inherit;color:inherit}
   et <b>KINTT</b> — le plan source appliqué à la lettre, fenêtre <span id="f-kfen">—</span>
   à New York, objectif sur une zone. Leurs journaux et leurs bilans sont séparés ;
   aucune moyenne n’est faite entre les deux.
-  <br><b>Dernière mise à jour du site : 30/09/2026 à 17 h 52 UTC.</b>
+  <br><b>Dernière mise à jour du site : 30/09/2026 à 18 h 02 UTC.</b>
   Si cette date ne correspond pas à ce qui t’a été annoncé, la page vient du cache :
   tire-la vers le bas pour la recharger.
   <b>Comptage prudent :</b> quand une bougie de 5 minutes touche l’objectif et le stop, c’est le
@@ -1484,18 +1484,25 @@ if (typeof window !== 'undefined') window.CFD = CFD;
    * l'inversion (IFVG).
    */
   function fvgs(cs) {
+    // ⚠️ CHAQUE HORODATAGE EST CELUI OÙ ON L'APPREND, PAS CELUI OÙ ÇA COMMENCE.
+    // `cs[k].t` est l'OUVERTURE de la bougie ; une cassure se juge sur sa
+    // CLÔTURE, donc elle n'est connue qu'une durée de bougie plus tard. Sur le
+    // 15 minutes, lire l'ouverture avance le signal d'un quart d'heure ; sur le
+    // 4 heures, de quatre heures. C'est la même faute qui a gonflé les trois
+    // quarts du résultat, à un autre endroit.
+    const pas = pasDe(cs);
     const z = [];
     for (let i = 2; i < cs.length; i++) {
       if (cs[i].l > cs[i - 2].h)
-        z.push({ bas: cs[i - 2].h, haut: cs[i].l, haussier: true, ne: i, t: cs[i].t });
+        z.push({ bas: cs[i - 2].h, haut: cs[i].l, haussier: true, ne: i, t: cs[i].t + pas });
       else if (cs[i].h < cs[i - 2].l)
-        z.push({ bas: cs[i].h, haut: cs[i - 2].l, haussier: false, ne: i, t: cs[i].t });
+        z.push({ bas: cs[i].h, haut: cs[i - 2].l, haussier: false, ne: i, t: cs[i].t + pas });
     }
     z.forEach(x => {
       x.casse = null; x.tCasse = null; x.touche = null; x.tTouche = null;
       for (let k = x.ne + 1; k < cs.length; k++) {
-        if (x.touche == null && cs[k].l <= x.haut && cs[k].h >= x.bas) { x.touche = k; x.tTouche = cs[k].t; }
-        if (x.haussier ? cs[k].c < x.bas : cs[k].c > x.haut) { x.casse = k; x.tCasse = cs[k].t; break; }
+        if (x.touche == null && cs[k].l <= x.haut && cs[k].h >= x.bas) { x.touche = k; x.tTouche = cs[k].t + pas; }
+        if (x.haussier ? cs[k].c < x.bas : cs[k].c > x.haut) { x.casse = k; x.tCasse = cs[k].t + pas; break; }
       }
     });
     return z;
@@ -1534,11 +1541,15 @@ if (typeof window !== 'undefined') window.CFD = CFD;
    * l'avenir.
    */
   function niveau1(cs, bas) {                       // STL / STH
+    const pas = pasDe(cs);
     const out = [];
     for (let i = 1; i < cs.length - 1; i++) {
       const a = cs[i - 1], m = cs[i], b = cs[i + 1];
       if (bas ? (a.l > m.l && b.l > m.l) : (a.h < m.h && b.h < m.h))
-        out.push({ prix: bas ? m.l : m.h, i, t: m.t, vu: b.t });
+        // `vu` = quand le niveau devient connaissable. La bougie de droite le
+        // confirme par sa CLÔTURE, pas par son ouverture : sur le 1 heure,
+        // lire `b.t` rendait le niveau lisible une heure trop tôt.
+        out.push({ prix: bas ? m.l : m.h, i, t: m.t, vu: b.t + pas });
     }
     return out;
   }
@@ -1569,6 +1580,7 @@ if (typeof window !== 'undefined') window.CFD = CFD;
    * UNCONFIRMED ASSUMPTION : la source cite « CISD » sans le définir.
    */
   function cisd(cs) {
+    const pas = pasDe(cs);
     const out = [];
     for (let i = 2; i < cs.length; i++) {
       for (const haussier of [true, false]) {
@@ -1581,8 +1593,10 @@ if (typeof window !== 'undefined') window.CFD = CFD;
         if (deb > i - 1) continue;                       // pas de série
         const ouv = cs[deb].o;
         if (haussier ? cs[i].c > ouv : cs[i].c < ouv) {
+          // Le CISD est décidé par la CLÔTURE de la bougie i : c'est donc à
+          // ce moment-là qu'il existe, pas à son ouverture.
           out.push({ bas: haussier ? ext : ouv, haut: haussier ? ouv : ext,
-            haussier, ne: i, t: cs[i].t, type: 'CISD' });
+            haussier, ne: i, t: cs[i].t + pas, type: 'CISD' });
         }
       }
     }
@@ -1598,15 +1612,21 @@ if (typeof window !== 'undefined') window.CFD = CFD;
    * Le seuil « la mèche fait au moins la moitié du range » est de nous.
    */
   function rejectionBlocks(cs, ratio) {
+    // ⚠️ LE MOTIF EXIGE LA BOUGIE SUIVANTE : « creux local » veut dire que
+    // celle d'après ne descend pas plus bas. Le bloc était pourtant daté de la
+    // bougie du MILIEU et son index de formation `ne` valait i — il devenait
+    // donc utilisable une bougie avant d'être reconnaissable. Sur le 4 heures,
+    // quatre heures d'avance sur le marché.
+    const pas = pasDe(cs);
     const r = ratio == null ? 0.5 : ratio, out = [];
     for (let i = 1; i < cs.length - 1; i++) {
       const c = cs[i], rng = c.h - c.l; if (rng <= 0) continue;
       const corpsH = Math.max(c.o, c.c), corpsB = Math.min(c.o, c.c);
       // mèche basse longue + creux local → bloc haussier
       if ((corpsB - c.l) / rng >= r && cs[i - 1].l > c.l && cs[i + 1].l > c.l)
-        out.push({ bas: c.l, haut: corpsB, haussier: true, ne: i, t: c.t, type: 'RB' });
+        out.push({ bas: c.l, haut: corpsB, haussier: true, ne: i + 1, t: cs[i + 1].t + pas, type: 'RB' });
       if ((c.h - corpsH) / rng >= r && cs[i - 1].h < c.h && cs[i + 1].h < c.h)
-        out.push({ bas: corpsH, haut: c.h, haussier: false, ne: i, t: c.t, type: 'RB' });
+        out.push({ bas: corpsH, haut: c.h, haussier: false, ne: i + 1, t: cs[i + 1].t + pas, type: 'RB' });
     }
     return out;
   }
@@ -2145,7 +2165,7 @@ if (typeof window !== 'undefined') window.CFD = CFD;
         for (var n = 0; n < niveaux.length; n++) {
           var z = niveaux[n], idx = ST.idxClos(z.cs, tD);
           if (z.ne == null || z.ne > idx || idx - z.ne > CFG.keyAge) continue;
-          if (z.vu && z.vu > bar.t) continue;
+          if (z.vu && z.vu > tD) continue;
           if (z.casse != null && z.casse <= idx) continue;
           if (z.haussier !== (dir > 0)) continue;
           var d = dir > 0 ? px - z.haut : z.bas - px;
@@ -2168,7 +2188,11 @@ if (typeof window !== 'undefined') window.CFD = CFD;
           var zs = zIF[ordre[o]];
           for (var q = 0; q < zs.length; q++) {
             var zz = zs[q];
-            if (zz.tCasse == null || zz.tCasse < tTouche || zz.tCasse > bar.t) continue;
+        // Les éléments de structure portent désormais l'instant où ils sont
+        // CONNUS. On les compare donc à l'instant de la DÉCISION — la
+        // clôture de la bougie de 5 minutes — et non à son ouverture, qui
+        // écartait tout ce qui se confirmait pendant la bougie en cours.
+            if (zz.tCasse == null || zz.tCasse < tTouche || zz.tCasse > tD) continue;
             if ((zz.haussier ? -1 : 1) !== dir) continue;
             choisi = { z: zz, tf: ordre[o] }; break;
           }
@@ -2186,7 +2210,7 @@ if (typeof window !== 'undefined') window.CFD = CFD;
           var cisdOk = false, limCisd = bar.t - CFG.react * 5 * 60000;
           for (var q3 = cisdClock.length - 1; q3 >= 0; q3--) {
             var zc = cisdClock[q3];
-            if (zc.t > bar.t || zc.t < limCisd) continue;
+            if (zc.t > tD || zc.t < limCisd) continue;
             if (zc.haussier === (dir > 0)) { cisdOk = true; break; }
           }
           if (!cisdOk) { etapes = etapeCourante; etapeParJour[e.jour] = etapeCourante; continue; }
@@ -2672,14 +2696,16 @@ if (typeof window !== 'undefined') window.CFD = CFD;
       var aIFVG = false, tfIFVG = null;
       for (var q = ifvgFin.length - 1; q >= 0; q--) {
         var f = ifvgFin[q];
-        if (f.t > bar.t || f.t < Math.max(limite, sweep.t)) continue;
+        // comparé à l'instant de la décision (clôture de la bougie), puisque
+        // les éléments de structure portent maintenant leur instant de CONNAISSANCE
+        if (f.t > tD || f.t < Math.max(limite, sweep.t)) continue;
         // un FVG cassé donne l'inversion OPPOSÉE à son sens
         if ((f.haussier ? -1 : 1) === b.dir) { aIFVG = true; tfIFVG = f.tf; break; }
       }
       var aCISD = false;
       for (var q2 = cisdClock.length - 1; q2 >= 0; q2--) {
         var c2 = cisdClock[q2];
-        if (c2.t > bar.t || c2.t < Math.max(limite, sweep.t)) continue;
+        if (c2.t > tD || c2.t < Math.max(limite, sweep.t)) continue;
         if (c2.haussier === (b.dir > 0)) { aCISD = true; break; }
       }
       // variante du plan : « clôture au-dessus/en-dessous de la M15 précédente »
@@ -3069,7 +3095,7 @@ if (typeof window !== 'undefined') window.Compte = Compte;
 <script>
 'use strict';
 /**
- * HISTORIQUE MESURÉ — les 25 signaux que le modèle produit sur les vraies
+ * HISTORIQUE MESURÉ — les 30 signaux que le modèle produit sur les vraies
  * bougies NQ du 2026-07-24 au 2026-09-28.
  *
  * Fenêtre : 09 h 00 → 10 h 00 New York.
@@ -3087,8 +3113,8 @@ if (typeof window !== 'undefined') window.Compte = Compte;
  * Les signaux des huit derniers jours sont suivis directement en 1 minute
  * (colonne « tf »), là il n'y a plus d'hypothèse du tout.
  *
- *   25 signaux · 76.0 % de réussite
- *   avant frais +723 €      net +676 €  (risque 250 € par trade)
+ *   30 signaux · 76.7 % de réussite
+ *   avant frais +861 €      net +798 €  (risque 250 € par trade)
  *
  * ⚠️ CES CHIFFRES NE SONT PAS REPRODUCTIBLES À L'IDENTIQUE. La profondeur des
  * séries Yahoo est courte et glissante : la même commande relancée deux heures
@@ -3103,28 +3129,33 @@ if (typeof window !== 'undefined') window.Compte = Compte;
 var Mesure = (function () {
   var BRUT = [
   ["2026-07-24",595,"SHORT","RB M5","5m",28322.25,29212.91,26095.61,2.5,0.61,-0.302,-0.3011818905083408,"sortie horaire −",1784901300000,125],
-  ["2026-07-28",570,"SHORT","RB M5","5m",27877,27986.3,27603.75,2.5,0.61,0.604,0.61,"gain",1785245400000,45],
+  ["2026-07-28",540,"SHORT","RB M5","5m",27980,28087.38,27711.54,2.5,0.61,0.603,0.61,"gain",1785243600000,45],
+  ["2026-07-28",570,"SHORT","ITH M15","5m",27877,27986.3,27603.75,2.5,0.61,0.604,0.61,"gain",1785245400000,45],
   ["2026-07-29",540,"SHORT","RB M15","5m",27881.5,27999.81,27585.74,2.5,0.61,0.604,0.61,"gain",1785330000000,85],
-  ["2026-07-29",590,"SHORT","CISD M5","5m",27753.5,28007.7,27117.99,2.5,0.61,0.473,0.47575403575413056,"sortie horaire +",1785333000000,130],
+  ["2026-07-29",545,"SHORT","CISD M5","5m",27893.75,27963.07,27720.46,2.5,0.61,0.35,0.36000000000000004,"gain partiel",1785330300000,15],
   ["2026-07-31",580,"SHORT","CISD M30","5m",28419,28618.74,27919.66,2.5,0.61,0.421,0.4243351797780276,"sortie horaire +",1785505200000,140],
   ["2026-07-31",585,"SHORT","FVG H1","5m",28360.5,28460.19,28111.28,2.5,0.61,0.353,0.36000000000000004,"gain partiel",1785505500000,10],
   ["2026-08-04",540,"LONG","RB M5","5m",29218,29145.63,29398.94,2.5,0.61,0.35,0.36000000000000004,"gain partiel",1785848400000,30],
-  ["2026-08-04",570,"LONG","FVG M5","5m",29382.75,28979.24,30391.52,2.5,0.61,0.434,0.43552548139285036,"sortie horaire +",1785850200000,150],
+  ["2026-08-04",545,"LONG","FVG M5","5m",29227.75,29116.37,29506.21,2.5,0.61,0.354,0.36000000000000004,"gain partiel",1785848700000,20],
   ["2026-08-18",545,"SHORT","CISD M5","5m",29693.5,29767.25,29509.11,2.5,0.61,0.351,0.36000000000000004,"gain partiel",1787058300000,30],
-  ["2026-08-18",585,"SHORT","CISD M15","5m",29657.25,29752.98,29417.94,2.5,0.61,0.353,0.36000000000000004,"gain partiel",1787060700000,15],
+  ["2026-08-18",550,"SHORT","CISD M15","5m",29696.25,29759.01,29539.36,2.5,0.61,0.349,0.36000000000000004,"gain partiel",1787058600000,25],
   ["2026-08-21",595,"SHORT","FVG H4","5m",29303.5,29369.94,29137.39,2.5,0.61,0.349,0.36000000000000004,"gain partiel",1787320500000,10],
   ["2026-08-24",580,"SHORT","CISD M15","5m",28978.75,29110.93,28648.29,2.5,0.61,-1.005,-1,"perte",1787578800000,105],
+  ["2026-08-24",585,"SHORT","FVG M5","5m",28990.75,29074.94,28780.27,2.5,0.61,0.352,0.36000000000000004,"gain partiel",1787579100000,10],
+  ["2026-08-25",595,"SHORT","ITH M30","5m",29312.75,29384.2,29134.12,2.5,0.61,0.404,0.4142335780725547,"sortie horaire +",1787666100000,125],
   ["2026-08-27",560,"SHORT","ITH M30","5m",29537.5,29572.13,29450.92,2.5,0.61,0.34,0.36000000000000004,"gain partiel",1787836800000,10],
-  ["2026-08-27",570,"SHORT","ITH M5","5m",29463.5,29518.07,29327.07,2.5,0.61,-1.013,-1,"perte",1787837400000,10],
+  ["2026-08-27",565,"SHORT","ITH M5","5m",29524.75,29610.37,29310.7,2.5,0.61,0.352,0.36000000000000004,"gain partiel",1787837100000,15],
   ["2026-08-31",575,"SHORT","CISD H4","5m",29398.75,29487.27,29177.45,2.5,0.61,0.352,0.36000000000000004,"gain partiel",1788183300000,60],
+  ["2026-08-31",580,"SHORT","CISD M5","5m",29407.25,29461.78,29270.94,2.5,0.61,-1.013,-1,"perte",1788183600000,5],
   ["2026-09-01",540,"SHORT","CISD M30","5m",29099.25,29213.53,28813.55,2.5,0.61,0.354,0.36000000000000004,"gain partiel",1788267600000,45],
   ["2026-09-01",550,"SHORT","FVG M5","5m",29093,29168.27,28904.81,2.5,0.61,0.351,0.36000000000000004,"gain partiel",1788268200000,25],
   ["2026-09-10",590,"SHORT","ITH H1","5m",29105.75,29238.03,28775.04,2.5,0.61,-1.005,-1,"perte",1789048200000,30],
-  ["2026-09-14",545,"SHORT","ITH M5","5m",28837.25,28926.32,28614.58,2.5,0.61,-1.008,-1,"perte",1789391100000,25],
-  ["2026-09-14",575,"SHORT","RB M5","5m",28889,28979.11,28663.72,2.5,0.61,-1.008,-1,"perte",1789392900000,10],
-  ["2026-09-21",570,"LONG","CISD M5","5m",30252,30152.8,30500,2.5,0.61,0.603,0.61,"gain",1789997400000,50],
-  ["2026-09-21",575,"LONG","ITL H4","5m",30296.5,30241.26,30434.59,2.5,0.61,0.597,0.61,"gain",1789997700000,25],
-  ["2026-09-22",580,"LONG","ITL M5","1m",30902.25,30835.53,31069.05,2.5,0.61,0.35,0.36000000000000004,"gain partiel",1790084400000,16],
+  ["2026-09-10",595,"SHORT","ITH H1","5m",29099.75,29256.03,28709.05,2.5,0.61,-1.004,-1,"perte",1789048500000,25],
+  ["2026-09-14",540,"SHORT","ITH M5","5m",28842.25,28911.32,28669.57,2.5,0.61,-1.01,-1,"perte",1789390800000,20],
+  ["2026-09-14",545,"SHORT","ITH M5","5m",28837.25,28908.32,28659.58,2.5,0.61,-1.01,-1,"perte",1789391100000,15],
+  ["2026-09-21",565,"LONG","CISD M5","5m",30221.5,30189.32,30301.94,2.5,0.61,0.588,0.61,"gain",1789997100000,10],
+  ["2026-09-21",570,"LONG","CISD M15","5m",30252,30152.8,30500,2.5,0.61,0.603,0.61,"gain",1789997400000,50],
+  ["2026-09-22",580,"LONG","ITL M5","1m",30902.25,30803.53,31149.05,2.5,0.61,0.353,0.36000000000000004,"gain partiel",1790084400000,16],
   ["2026-09-22",590,"LONG","ITL M5","1m",30941.25,30805.5,31280.63,2.5,0.61,0.355,0.36000000000000004,"gain partiel",1790085000000,48],
   ["2026-09-28",580,"SHORT","RB M5","1m",30611.5,30714.99,30352.78,2.5,0.61,0.45,0.45662844045562584,"sortie horaire +",1790602800000,140]
   ];

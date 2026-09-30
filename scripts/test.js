@@ -29,7 +29,7 @@ function pres(a, b, tol, quoi) {
 const ctx = {};
 for (const f of ['js/structure.js', 'js/position.js', 'js/modele.js', 'js/kintt.js'])
   new Function('root', 'ST', fs.readFileSync(path.join(RACINE, f), 'utf-8')).call(ctx, ctx, ctx.ST);
-const { Position, Modele, Kintt } = ctx;
+const { Position, Modele, Kintt, ST } = ctx;
 const CFG = Modele.CFG;
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -489,6 +489,57 @@ if (dispo) {
       if (!compares) throw new Error('aucune comparaison possible');
       console.log(`     (${compares} comparaisons sur tout l'historique)`);
     });
+  }
+
+  // ── L'INVARIANT DIRECT, SUR LES BRIQUES ELLES-MÊMES ──────────────────────
+  // La vérification par troncature de signaux ne voit pas un décalage d'UNE
+  // bougie : vérifiée, elle rattrape bien une cassure de FVG datée trop tôt,
+  // mais laisse passer un rejection block et un STL décalés d'un cran. Il faut
+  // donc contrôler les briques, et pas seulement ce qu'on en fait.
+  //
+  // LA RÈGLE, en une phrase : un élément de structure ne peut pas être connu
+  // avant que la dernière bougie dont il dépend soit CLOSE. On le vérifie en
+  // coupant la série à l'instant que l'élément s'attribue et en exigeant qu'il
+  // apparaisse quand même. Trois défauts réels ont été trouvés comme ça :
+  //   · un rejection block réclame la bougie SUIVANTE (« creux local ») et se
+  //     datait de celle du milieu — une bougie d'avance, quatre heures en H4 ;
+  //   · un STL se disait connu à l'OUVERTURE de la bougie qui le confirme ;
+  //   · un CISD, décidé par une clôture, se datait de l'ouverture.
+  {
+    const series = [['5 min', DA.m5], ['15 min', DA.m15], ['1 h', DA.h1]];
+    const briques = [
+      ['FVG', cs => ST.fvgs(cs).map(z => ({ q: z.t, c: [z.bas, z.haut, z.haussier].join('|') }))],
+      ['FVG cassé', cs => ST.fvgs(cs).filter(z => z.tCasse != null)
+        .map(z => ({ q: z.tCasse, c: [z.bas, z.haut, z.haussier, 'K'].join('|') }))],
+      ['CISD', cs => ST.cisd(cs).map(z => ({ q: z.t, c: [z.bas, z.haut, z.haussier].join('|') }))],
+      ['rejection block', cs => ST.rejectionBlocks(cs).map(z => ({ q: z.t, c: [z.bas, z.haut, z.haussier].join('|') }))],
+      ['STL', cs => ST.hierarchie(cs).stl.map(z => ({ q: z.vu, c: String(z.prix) }))],
+      ['ITL', cs => ST.hierarchie(cs).itl.map(z => ({ q: z.vu, c: String(z.prix) }))]
+    ];
+    for (const [nomS, cs] of series) {
+      if (!cs || cs.length < 500) continue;
+      const pas = ST.pasDe(cs);
+      for (const [nomB, extrait] of briques) {
+        t(`${nomB} ${nomS} : connu seulement quand sa dernière bougie est close`, () => {
+          const tout = extrait(cs);
+          if (!tout.length) return;
+          // on éprouve quelques éléments répartis dans l'historique
+          const pasEch = Math.max(1, Math.floor(tout.length / 12));
+          const fautifs = [];
+          for (let k = pasEch; k < tout.length; k += pasEch) {
+            const e = tout[k];
+            if (!(e.q > 0)) { fautifs.push('horodatage absent'); continue; }
+            // la série telle qu'elle est connue à l'instant que l'élément s'attribue
+            const vue = cs.filter(b => b.t + pas <= e.q);
+            if (vue.length < 5) continue;
+            if (!extrait(vue).some(x => x.c === e.c && x.q === e.q))
+              fautifs.push(new Date(e.q).toISOString().slice(0, 16) + ' (' + e.c + ')');
+          }
+          if (fautifs.length) throw new Error(fautifs.length +
+            ' élément(s) se disent connus trop tôt, ex. ' + fautifs[0]);
+        });
+      }
+    }
   }
 
   t('aucune unité supérieure n\'est lue en cours de formation', () => {
@@ -1174,9 +1225,20 @@ CE QUI N'EST PAS VÉRIFIÉ ICI — et où un bug peut donc encore passer :
   · KINTT n'a que quelques trades relevés : son panneau est vérifié comme
     MÉCANISME (branché, affiché, journal cohérent), jamais comme résultat.
     Tant que le nombre de trades clos est sous vingt, son bilan ne dit rien.
-  · Le DÉCLENCHEMENT du robot est contourné, pas garanti : un travail démarre
-    à 11 h 47 UTC et attend la séance. Si CE déclenchement-là manque aussi,
-    seuls les passages du soir restent.
+  · Le DÉCLENCHEMENT du robot est contourné, pas garanti. Cinq créneaux
+    démarrent avant la séance et attendent, et l'arithmétique de chacun est
+    vérifiée — mais si GitHub les abandonne TOUS, comme le 30 septembre où les
+    trois d'alors ont été perdus, il ne reste que le rattrapage du soir.
+  · Le REGARD EN AVANT est désormais attaqué de deux côtés : on coupe les
+    bougies après un signal et on exige le même signal, et on coupe la série à
+    l'instant que chaque brique s'attribue et on exige qu'elle apparaisse
+    quand même. La seconde a trouvé trois défauts que la première ne voyait
+    pas — un décalage d'UNE bougie lui échappe. Il peut en rester ailleurs :
+    ces deux filets ne couvrent que js/structure.js et les deux stratégies.
+  · LA PROFONDEUR DES DONNÉES est un plafond dur, mesuré : Yahoo refuse toute
+    bougie de 5 minutes au-delà de 60 jours (quatre fenêtres demandées, quatre
+    refus). Aucune des deux stratégies ne peut donc être jugée sur autre chose
+    que deux mois — et kintt produit environ un trade par mois.
   · L'EXÉCUTION RÉELLE. Aucun ordre n'est passé : le dérapage, les frais réels
     et le refus d'un courtier ne sont que des hypothèses.
   · Les DONNÉES YAHOO au-delà de leur forme : si elles sont fausses mais bien

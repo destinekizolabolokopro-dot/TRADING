@@ -271,7 +271,7 @@
         for (var n = 0; n < niveaux.length; n++) {
           var z = niveaux[n], idx = ST.idxClos(z.cs, tD);
           if (z.ne == null || z.ne > idx || idx - z.ne > CFG.keyAge) continue;
-          if (z.vu && z.vu > bar.t) continue;
+          if (z.vu && z.vu > tD) continue;
           if (z.casse != null && z.casse <= idx) continue;
           if (z.haussier !== (dir > 0)) continue;
           var d = dir > 0 ? px - z.haut : z.bas - px;
@@ -294,7 +294,11 @@
           var zs = zIF[ordre[o]];
           for (var q = 0; q < zs.length; q++) {
             var zz = zs[q];
-            if (zz.tCasse == null || zz.tCasse < tTouche || zz.tCasse > bar.t) continue;
+        // Les éléments de structure portent désormais l'instant où ils sont
+        // CONNUS. On les compare donc à l'instant de la DÉCISION — la
+        // clôture de la bougie de 5 minutes — et non à son ouverture, qui
+        // écartait tout ce qui se confirmait pendant la bougie en cours.
+            if (zz.tCasse == null || zz.tCasse < tTouche || zz.tCasse > tD) continue;
             if ((zz.haussier ? -1 : 1) !== dir) continue;
             choisi = { z: zz, tf: ordre[o] }; break;
           }
@@ -312,7 +316,7 @@
           var cisdOk = false, limCisd = bar.t - CFG.react * 5 * 60000;
           for (var q3 = cisdClock.length - 1; q3 >= 0; q3--) {
             var zc = cisdClock[q3];
-            if (zc.t > bar.t || zc.t < limCisd) continue;
+            if (zc.t > tD || zc.t < limCisd) continue;
             if (zc.haussier === (dir > 0)) { cisdOk = true; break; }
           }
           if (!cisdOk) { etapes = etapeCourante; etapeParJour[e.jour] = etapeCourante; continue; }

@@ -267,14 +267,16 @@
       var aIFVG = false, tfIFVG = null;
       for (var q = ifvgFin.length - 1; q >= 0; q--) {
         var f = ifvgFin[q];
-        if (f.t > bar.t || f.t < Math.max(limite, sweep.t)) continue;
+        // comparé à l'instant de la décision (clôture de la bougie), puisque
+        // les éléments de structure portent maintenant leur instant de CONNAISSANCE
+        if (f.t > tD || f.t < Math.max(limite, sweep.t)) continue;
         // un FVG cassé donne l'inversion OPPOSÉE à son sens
         if ((f.haussier ? -1 : 1) === b.dir) { aIFVG = true; tfIFVG = f.tf; break; }
       }
       var aCISD = false;
       for (var q2 = cisdClock.length - 1; q2 >= 0; q2--) {
         var c2 = cisdClock[q2];
-        if (c2.t > bar.t || c2.t < Math.max(limite, sweep.t)) continue;
+        if (c2.t > tD || c2.t < Math.max(limite, sweep.t)) continue;
         if (c2.haussier === (b.dir > 0)) { aCISD = true; break; }
       }
       // variante du plan : « clôture au-dessus/en-dessous de la M15 précédente »
