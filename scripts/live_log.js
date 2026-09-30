@@ -157,13 +157,34 @@ function ecrire(db) {
 // Quelle étape de la chaîne a bloqué ? C'est le « raisonnement » que
 // l'utilisateur veut lire en rentrant.
 function blocage(d) {
+  // ── UN RATTRAPAGE DOIT RACONTER LA SÉANCE, PAS L'INSTANT PRÉSENT ──────
+  // Quand GitHub abandonne les créneaux de la séance — mesuré le 30 septembre,
+  // les trois créneaux perdus, le travail parti à 16 h 26 — le seul relevé de
+  // la journée tombe l'après-midi. Il disait alors « hors fenêtre, biais
+  // haussier », c'est-à-dire l'état du marché à 13 h 40, ce qui n'apprend
+  // RIEN sur ce qui s'est passé entre 09 h et 10 h. Le modèle garde à part ce
+  // qu'il a vu dans la fenêtre : c'est ça qu'on consigne.
+  const f = d.etapeFenetre;
+  if (d.hors && f) {
+    const hh = m => String(Math.floor(m / 60)).padStart(2, '0') + ' h ' + String(m % 60).padStart(2, '0');
+    const quand = `Séance du jour (relevée après coup, dernière bougie vue à ` +
+                  `${new Date(f.t).toISOString().slice(11, 16)} UTC)`;
+    if (f.dir === 0) return { etape: 'biais', dit: `${quand} : biais resté neutre (score ${f.score}/4, il en faut ${d.cfg.seuil}) — aucune position possible.` };
+    const s2 = f.dir > 0 ? 'haussier' : 'baissier';
+    if (f.dol == null) return { etape: 'dol', dit: `${quand} : biais ${s2}, mais plus aucune liquidité intacte dans ce sens.` };
+    if (!f.key) return { etape: 'niveau', dit: `${quand} : biais ${s2}, DOL à ${f.dol} — mais aucun niveau clé valide du bon côté.` };
+    const k2 = `${f.key.type} ${f.key.tf} (${f.key.bas} – ${f.key.haut})`;
+    if (!f.ifvg) return { etape: 'ifvg', dit: `${quand} : biais ${s2}, niveau ${k2} retenu, mais aucune inversion confirmée par clôture de corps.` };
+    return { etape: 'stop', dit: `${quand} : inversion ${f.ifvg.tf} confirmée sur ${k2}, mais le stop était trop serré face à l'ATR.` };
+  }
+
   if (d.dir === 0)  return { etape: 'biais', dit: `Biais neutre (score ${d.score}/4, il en faut ${d.cfg.seuil}) — aucune position possible.` };
   const sens = d.dir > 0 ? 'haussier' : 'baissier';
   if (d.dol == null) return { etape: 'dol', dit: `Biais ${sens}, mais plus aucune liquidité intacte dans ce sens.` };
   if (!d.key)        return { etape: 'niveau', dit: `Biais ${sens}, DOL à ${d.dol} — mais aucun niveau clé valide du bon côté.` };
   const k = `${d.key.type} ${d.key.tf} (${d.key.bas} – ${d.key.haut})`;
-  // Hors fenêtre, la machine à états ne tourne pas : on ne SAIT pas si le
-  // prix a touché le niveau. On ne l'affirme donc pas.
+  // Hors fenêtre et sans étape de séance (week-end, jour férié) : on ne SAIT
+  // pas si le prix a touché le niveau. On ne l'affirme donc pas.
   if (d.hors) return { etape: 'fenetre', dit: `Hors fenêtre. Biais ${sens}, DOL à ${d.dol}, niveau le plus proche ${k}.` };
   if (d.etat === 'ATTEND_TOUCHE') return { etape: 'touche', dit: `Biais ${sens}, niveau ${k} repéré — le prix n'y est pas encore venu.` };
   if (!d.ifvg)       return { etape: 'ifvg', dit: `Le prix a touché ${k}, mais aucune inversion confirmée par clôture de corps.` };
@@ -582,8 +603,24 @@ function ecrireKintt(db) {
   // et ne déclenche que le soir : sans cette seconde condition, ces
   // journées-là ne laissaient aucune trace de ce que le modèle avait vu,
   // alors qu'expliquer son silence est la moitié de l'intérêt du relevé.
-  const jourDejaDecrit = db.passages.some(p => p.jour === jourCourant) ||
-                         db.signaux.some(x => x.jour === jourCourant);
+  // ⚠️ « DÉCRITE » NE VEUT PAS DIRE « UN PASSAGE EXISTE ».
+  // Le test portait sur l'existence d'un passage ce jour-là, quelle que soit
+  // son heure. Or le robot tourne aussi la nuit : le 30 septembre, un passage
+  // de 01 h 20 New York — marché fermé, « hors fenêtre » — a suffi à marquer
+  // la journée décrite. Les rattrapages de l'après-midi n'ont donc RIEN
+  // consigné de la séance, et il ne reste aucune trace de ce que le modèle a
+  // vu entre 09 h et 10 h. Une nuit ne décrit pas une séance.
+  //
+  // Est décrit un jour qui porte soit un signal, soit un passage tombé DANS
+  // la fenêtre, soit un passage de rattrapage explicitement marqué comme tel.
+  // Un passage ne décrit la séance que s'il a été pris PENDANT la fenêtre, ou
+  // APRÈS sa fermeture. `apresCoup` ne suffit pas : le passage de 01 h 20 du
+  // 30 septembre le portait, et il précédait la séance de huit heures.
+  const minNY = hNY2 => +hNY2.slice(0, 2) * 60 + +hNY2.slice(3);
+  const jourDejaDecrit =
+    db.signaux.some(x => x.jour === jourCourant) ||
+    db.passages.some(p => p.jour === jourCourant && p.heureNY &&
+                          minNY(p.heureNY) >= Modele.CFG.ghDeb);
   if (neuf) { /* déjà journalisé ci-dessus */ }
   else if (f.ouverte || FORCE || !jourDejaDecrit) {
     const b = blocage(d);

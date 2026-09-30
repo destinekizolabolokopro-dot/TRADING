@@ -299,6 +299,86 @@ if (fs.existsSync(jf)) {
 // ═══════════════════════════════════════════════════════════════════════════
 // ═══════════════════════════════════════════════════════════════════════════
 // ═══════════════════════════════════════════════════════════════════════════
+console.log('\n── LE ROBOT PEUT-IL VRAIMENT VOIR LA SÉANCE ? ────────────────');
+// BUG RÉEL, mesuré le 30 septembre. Les trois créneaux prévus — 10 h 17,
+// 11 h 47, 12 h 37 — n'ont AUCUN été honorés par GitHub. Le travail est parti
+// à 16 h 26 puis 17 h 00, soit après la fin de la fenêtre : deux exécutions de
+// dix-neuf secondes, un simple rattrapage, et la séance pas surveillée du tout.
+//
+// Ces vérifications portent sur l'ARITHMÉTIQUE du planning, parce qu'elle est
+// facile à casser sans s'en apercevoir : un travail GitHub meurt à 360 minutes,
+// et un créneau qui dépasse cette limite se fait tuer en cours de route — en
+// laissant croire à un relevé qui n'a pas eu lieu.
+
+{
+  const yml = fs.readFileSync(path.join(RACINE, '.github/workflows/seance.yml'), 'utf-8');
+  const crons = [...yml.matchAll(/- cron: '(\d+) (\d+) \* \* 1-5'/g)]
+    .map(m => +m[2] * 60 + +m[1]);
+  const lim = +(yml.match(/timeout-minutes:\s*(\d+)/) || [])[1];
+  const marge = +(yml.match(/LIMITE=\$\(\(DEPART \+ (\d+) \* 60\)\)/) || [])[1];
+  const deb = 13 * 60 + 15, fin = 15 * 60 + 45;
+
+  t('le planning de la séance a plusieurs départs', () => {
+    if (crons.length < 4)
+      throw new Error(crons.length + ' créneau(x) : un seul abandon suffirait à perdre la journée');
+  });
+
+  t('aucun créneau ne se fait tuer avant la fin de son travail', () => {
+    if (!(marge > 0)) throw new Error('la borne interne LIMITE est introuvable');
+    if (marge + 10 > lim)
+      throw new Error(`le script court ${marge} min mais le travail est tué à ${lim}`);
+    if (lim >= 360) throw new Error(`timeout-minutes ${lim} : GitHub tue à 360`);
+  });
+
+  t('chaque créneau atteint la fenêtre et en couvre un bout', () => {
+    const vains = crons.filter(d => deb > d + marge);
+    if (vains.length) throw new Error(vains.length +
+      ' créneau(x) mourraient avant l\'ouverture — ils occupent la place pour rien');
+  });
+
+  t('au moins un créneau couvre la fenêtre en entier', () => {
+    const complets = crons.filter(d => Math.min(fin, d + marge) >= fin);
+    if (!complets.length) throw new Error('aucun créneau ne va jusqu\'à 15 h 45');
+  });
+
+  t('un départ retardataire ne tue pas un travail déjà en attente', () => {
+    // C'est ce qui serait arrivé le 30 septembre : un travail parti à 6 h et
+    // sagement en attente aurait été annulé à 16 h 26 par un retardataire,
+    // juste avant de servir à quelque chose.
+    const m = yml.match(/group:\s*seance[\s\S]{0,80}?cancel-in-progress:\s*(\w+)/);
+    if (!m) throw new Error('groupe de concurrence introuvable');
+    if (m[1] !== 'false')
+      throw new Error('cancel-in-progress: ' + m[1] + ' — un retardataire tuerait le gardien');
+  });
+}
+
+t('une nuit ne décrit pas une séance', () => {
+  // Le 30 septembre, un passage de 01 h 20 New York — marché fermé — a marqué
+  // la journée « décrite ». Les rattrapages de l'après-midi n'ont donc RIEN
+  // consigné de la séance : il ne reste aucune trace de ce que le modèle a vu
+  // entre 09 h et 10 h.
+  const src = fs.readFileSync(path.join(RACINE, 'scripts/live_log.js'), 'utf-8');
+  const m = src.match(/const jourDejaDecrit =[\s\S]{0,400}?;/);
+  if (!m) throw new Error('le test du jour décrit est introuvable');
+  if (!/minNY\(p\.heureNY\) >= Modele\.CFG\.ghDeb/.test(m[0]))
+    throw new Error('un passage de n\'importe quelle heure suffit encore à marquer la journée décrite');
+  if (/apresCoup/.test(m[0]))
+    throw new Error('le drapeau `apresCoup` sert encore de preuve — il était posé à 01 h 20 du matin');
+});
+
+t('un relevé de rattrapage raconte la SÉANCE, pas l\'heure du relevé', () => {
+  // Quand GitHub abandonne les créneaux, le seul relevé de la journée tombe
+  // l'après-midi. Il disait « hors fenêtre, biais haussier » — l'état du
+  // marché à 13 h 40, qui n'apprend rien sur ce qui s'est passé de 09 h à 10 h.
+  const mod = fs.readFileSync(path.join(RACINE, 'js/modele.js'), 'utf-8');
+  if (!/etapeFenetre:/.test(mod))
+    throw new Error('le modèle ne garde pas ce qu\'il a vu dans la fenêtre');
+  const src = fs.readFileSync(path.join(RACINE, 'scripts/live_log.js'), 'utf-8');
+  if (!/d\.etapeFenetre/.test(src))
+    throw new Error('le rattrapage n\'utilise pas l\'état de la séance');
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
 console.log('\n── LA STRATÉGIE NE DOIT PAS CONNAÎTRE L\'AVENIR ───────────────');
 // LE PIRE BUG DU PROJET, et aucun test ne le voyait.
 //

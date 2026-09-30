@@ -151,16 +151,33 @@
    "etapeBloquee": "fenetre",
    "dit": "Hors fenêtre. Biais haussier, DOL à 30737, niveau le plus proche ITL M15 (30564.25 – 30613.25).",
    "apresCoup": true
+  },
+  {
+   "ts": "2026-09-30T17:52:02.630Z",
+   "bougie": "2026-09-30T17:40:00.000Z",
+   "jour": "2026-09-30",
+   "heureNY": "13:40",
+   "prix": 30834,
+   "retardMin": 12,
+   "biais": "haussier",
+   "score": 4,
+   "dol": 30999.5,
+   "niveau": "RB M5",
+   "etat": "ATTEND_IFVG",
+   "niveauxParUnite": "M5:97 M15:78 M30:73 H1:107 H4:95",
+   "etapeBloquee": "stop",
+   "dit": "Séance du jour (relevée après coup, dernière bougie vue à 13:55 UTC) : inversion 5m confirmée sur ITL M30 (30704.5 – 30749.5), mais le stop était trop serré face à l'ATR.",
+   "apresCoup": true
   }
  ],
  "bilan": {
-  "maj": "2026-09-30T06:05:11.618Z",
+  "maj": "2026-09-30T17:52:02.630Z",
   "total": 0,
   "clos": 0,
   "ouverts": 0,
   "reussite": null,
   "cumulR": 0,
-  "passages": 9
+  "passages": 10
  },
  "archive": [
   {
