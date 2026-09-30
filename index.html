@@ -821,7 +821,13 @@ function paintTrade(){
     '<div class="trade">' +
       '<div class="t-head"><span class="t-dir ' + (L ? 'long' : 'short') + '">' + t.sens + '</span>' +
         '<span class="t-tf">' + (t.niveau || '') + '</span>' +
-        '<span class="t-rr">RR ' + Number(t.rr).toFixed(2) + '</span></div>' +
+        // ⚠️ Ce chiffre était lu dans le champ `rr` du signal, qui portait
+        // 0,61 — le gain si tout est touché, PAS le rapport à l'objectif.
+        // La page annonçait donc « RR 0,61 » pour un objectif situé à deux
+        // fois et demie le risque. On le CALCULE désormais à partir des
+        // niveaux, ce qui corrige aussi tout l'historique déjà écrit.
+        '<span class="t-rr">objectif ' + (dt / dp).toFixed(2).replace('.', ',') +
+          '\u00d7 le risque</span></div>' +
       '<div class="t-grid">' +
         '<div class="t-cell"><div class="t-k">Entrée</div><div class="t-v mono">' + fmt(t.entree) + '</div></div>' +
         '<div class="t-cell"><div class="t-k">Stop</div><div class="t-v sl mono">' + fmt(t.sl) + '</div>' +
@@ -1055,6 +1061,9 @@ async function refresh(){
     // signaux, et doivent tous les deux entrer au journal.
     if(t && !D.hors)
       History.record([{ sym:'NQ', dir:t.sens, entry:t.entree, sl:t.sl, tp:t.tp, rr:t.rr,
+        // Sans ce champ, un gain serait compté 2,50 fois le risque alors que
+        // 90 % de la position est vendue au premier objectif : 0,61.
+        gainMax:t.gainSiTout,
         key: t.t + '|' + t.sens + '|' + t.entree, ts: t.t,
         note:'IFVG ' + t.tf + ' sur ' + t.niveau, tf:t.tf, price:D.prix }], 'MECH');
   }
@@ -1095,7 +1104,13 @@ async function chargerDistant(){
 function enLigne(s, source){
   return {
     ts: Date.parse(s.bougie), source: source, symbol:'NQ', direction:s.sens,
-    entry:s.entree, sl:s.sl, tp:s.tp, rr:s.rr,
+    entry:s.entree, sl:s.sl, tp:s.tp,
+    // Recalculé, jamais lu : le champ `rr` des signaux d'avant le correctif
+    // vaut 0,61 au lieu de 2,50. Le déduire des niveaux répare l'historique
+    // sans le réécrire.
+    rr: (s.entree != null && s.sl != null && s.tp != null && s.entree !== s.sl)
+        ? +(Math.abs(s.tp - s.entree) / Math.abs(s.entree - s.sl)).toFixed(2)
+        : s.rr,
     r: s.r, status: s.statut === 'clos' ? 'closed' : 'open',
     // ⚠️ La phrase stockée dans le journal est FIGÉE à la date du signal.
     // Deux positions du 28 septembre parlaient encore en R longtemps après
@@ -1186,7 +1201,12 @@ function paintJournal(){
   // Pratique pour comparer deux marchés, illisible pour savoir ce qu'on gagne.
   // Chaque case donne donc l'euro en gros et le R en petit.
   const eu = v => v == null ? '—' : sgn(Math.round(v * uR), 0) + dev;
-  const pr = v => v == null ? '' : '<span class="bsub"> ' + sgn(v) + ' R</span>';
+  // ⚠️ Cette ligne ajoutait « +0,60 R » sous chaque euro. Le R avait été
+  // banni de tout ce qu'un humain lit, et il revenait par là — composé à
+  // l'exécution, donc invisible pour le test qui ne relit que le source.
+  // Le chiffre utile à côté de l'euro, c'est la PART DU RISQUE, dite en clair.
+  const pr = v => v == null ? '' : '<span class="bsub"> ' +
+    (Math.abs(v) >= 0.005 ? sgn(+(v * 100).toFixed(0), 0) + ' % du risque' : '') + '</span>';
   // Le seuil d'équilibre : le taux de réussite minimum sous lequel on perd.
   // Sans lui, « 83 % de réussite » ne veut rien dire — il en faut parfois 69.
   const seuil = (st.gainMoy && st.perteMoy)
@@ -1252,7 +1272,9 @@ function paintJournal(){
                 : x.heureNY ? '<span class="jr-t">' + x.heureNY + ' NY</span>' : '') + '</span>' +
       '<span class="jr-r ' + (ouvert ? 'open' : r > 0 ? 'pos' : 'neg') + '">' +
         '<span class="jv">' + verdict + '</span>' +
-        (ouvert ? '' : '<span class="jn mono">' + sgn(r) + ' R · ' + sgn(Math.round(r * uR),0) + dev + '</span>') +
+        // Idem : « +0,60 R · +150 € » devient « +150 € · 60 % du risque ».
+        (ouvert ? '' : '<span class="jn mono">' + sgn(Math.round(r * uR),0) + dev +
+          ' · ' + sgn(+(r * 100).toFixed(0), 0) + ' % du risque</span>') +
       '</span>' +
       '<span class="jr-p mono">entrée ' + fmt(x.entry) + ' · cible ' + fmt(x.tp) +
         ' · stop ' + fmt(x.sl) + '</span></div>';

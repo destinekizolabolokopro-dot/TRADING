@@ -422,7 +422,7 @@ button,input,select{font:inherit;color:inherit}
   et <b>KINTT</b> — le plan source appliqué à la lettre, fenêtre <span id="f-kfen">—</span>
   à New York, objectif sur une zone. Leurs journaux et leurs bilans sont séparés ;
   aucune moyenne n’est faite entre les deux.
-  <br><b>Dernière mise à jour du site : 29/09/2026 à 22 h 46 UTC.</b>
+  <br><b>Dernière mise à jour du site : 30/09/2026 à 06 h 06 UTC.</b>
   Si cette date ne correspond pas à ce qui t’a été annoncé, la page vient du cache :
   tire-la vers le bas pour la recharger.
   <b>Comptage prudent :</b> quand une bougie de 5 minutes touche l’objectif et le stop, c’est le
@@ -1431,13 +1431,48 @@ if (typeof window !== 'undefined') window.CFD = CFD;
 
   // ───────────────────────────────────────────────── agrégation d'unités ─────
   /** Regroupe n bougies en une. Sert à fabriquer le 4H, absent de Yahoo. */
+  /**
+   * ⚠️ REGROUPEMENT ANCRÉ SUR L'HORLOGE, PAS SUR L'INDICE DU TABLEAU.
+   *
+   * La première version faisait `for (i = 0; i + n <= cs.length; i += n)` :
+   * elle groupait les bougies par paquets de quatre À PARTIR DU DÉBUT DU
+   * TABLEAU. Conséquence, mesurée : Yahoo sert une fenêtre glissante, donc le
+   * tableau ne commence pas au même endroit d'un jour à l'autre — et la
+   * « bougie H4 » contenant 11 h 00 changeait de bornes selon le jour où on
+   * posait la question. Le même instant tombait dans des bougies différentes.
+   * Deux exécutions du même modèle, sur les mêmes données, ne voyaient pas le
+   * même graphique.
+   *
+   * On découpe donc sur la grille du temps : une bougie de 4 h commence à
+   * 00 h, 04 h, 08 h… quel que soit le contenu du tableau. C'est ce que fait
+   * n'importe quelle plateforme, et c'est ce qui rend le résultat reproductible.
+   */
   function agreger(cs, n) {
-    const out = [];
-    for (let i = 0; i + n <= cs.length; i += n) {
-      const p = cs.slice(i, i + n);
-      out.push({ t: p[0].t, o: p[0].o, c: p[n - 1].c,
-        h: Math.max(...p.map(x => x.h)), l: Math.min(...p.map(x => x.l)) });
+    if (!cs || cs.length < 2) return [];
+    // Le pas de la série se déduit des données : l'écart le plus fréquent
+    // entre deux bougies. Le déduire évite de le passer en paramètre et de
+    // le voir diverger de la réalité.
+    const ecarts = {};
+    for (let i = 1; i < cs.length; i++) {
+      const d = cs[i].t - cs[i - 1].t;
+      if (d > 0) ecarts[d] = (ecarts[d] || 0) + 1;
     }
+    const pas = +Object.keys(ecarts).sort((a, b) => ecarts[b] - ecarts[a])[0];
+    const bloc = pas * n;
+    const out = [];
+    let cle = null, cur = null;
+    for (const b of cs) {
+      const k = Math.floor(b.t / bloc) * bloc;
+      if (k !== cle) {
+        if (cur) out.push(cur);
+        cle = k; cur = { t: k, o: b.o, c: b.c, h: b.h, l: b.l };
+      } else {
+        cur.c = b.c;
+        if (b.h > cur.h) cur.h = b.h;
+        if (b.l < cur.l) cur.l = b.l;
+      }
+    }
+    if (cur) out.push(cur);
     return out;
   }
 
@@ -1592,6 +1627,51 @@ if (typeof window !== 'undefined') window.CFD = CFD;
   }
 
   /** Index de la dernière bougie dont l'horodatage est ≤ t (anti-anticipation). */
+  /**
+   * ⚠️ LA BOUGIE EN COURS N'EST PAS UNE BOUGIE.
+   *
+   * `idxA` rend la bougie QUI CONTIENT l'instant t. Sur une unité supérieure,
+   * cette bougie n'est pas finie : son plus haut, son plus bas et sa clôture
+   * ne seront connus que dans une à quatre heures. La lire, c'est lire
+   * l'avenir. Mesuré sur une bougie H4 réelle :
+   *
+   *     ouverture 01 h 00 · plus haut 31058, atteint dans la 1re heure
+   *     le code interrogeait ce plus haut dès 01 h 10 — il ne serait
+   *     définitif qu'à 05 h 00.
+   *
+   * `idxClos` rend la dernière bougie TERMINÉE : celle dont la suivante a
+   * déjà ouvert. C'est la seule qu'un humain devant son écran connaisse.
+   */
+  // Le pas d'une série, déduit de ses données et retenu : la fonction est
+  // appelée des dizaines de milliers de fois dans une boucle.
+  var _pas = typeof WeakMap === 'function' ? new WeakMap() : null;
+  function pasDe(serie) {
+    if (_pas && _pas.has(serie)) return _pas.get(serie);
+    var e = {}, i;
+    for (i = 1; i < serie.length; i++) {
+      var d = serie[i].t - serie[i - 1].t;
+      if (d > 0) e[d] = (e[d] || 0) + 1;
+    }
+    var k = Object.keys(e), best = 0, n = -1;
+    for (i = 0; i < k.length; i++) if (e[k[i]] > n) { n = e[k[i]]; best = +k[i]; }
+    if (_pas) _pas.set(serie, best);
+    return best;
+  }
+
+  function idxClos(serie, t) {
+    // ⚠️ UNE BOUGIE EST CLOSE QUAND SA DURÉE EST ÉCOULÉE, pas quand la
+    // suivante est livrée. La première version attendait l'arrivée de la
+    // bougie suivante : au bord de la série, elle reculait donc d'un cran
+    // sans raison, et la stratégie rendait un résultat différent selon qu'on
+    // lui donnait ou non des bougies POSTÉRIEURES à sa décision. C'est
+    // exactement ce que la vérification « sans l'avenir » a attrapé.
+    var pas = pasDe(serie);
+    var i = idxA(serie, t);
+    if (!pas) return i;
+    while (i >= 0 && serie[i].t + pas > t) i--;
+    return i;
+  }
+
   function idxA(serie, t) {
     let lo = 0, hi = serie.length - 1, r = -1;
     while (lo <= hi) { const m = (lo + hi) >> 1; if (serie[m].t <= t) { r = m; lo = m + 1; } else hi = m - 1; }
@@ -1599,7 +1679,7 @@ if (typeof window !== 'undefined') window.CFD = CFD;
   }
   root.ST = { agreger: agreger, fvgs: fvgs, etatFVG: etatFVG, hierarchie: hierarchie,
     niveau1: niveau1, niveauSup: niveauSup, cisd: cisd, rejectionBlocks: rejectionBlocks,
-    atr: atr, idxA: idxA };
+    atr: atr, idxA: idxA, idxClos: idxClos, pasDe: pasDe };
 })(typeof window !== 'undefined' ? window : this);
 
 </script>
@@ -1895,7 +1975,20 @@ if (typeof window !== 'undefined') window.CFD = CFD;
         var iRes = z.casse != null ? z.casse : z.touche;
         if (iRes == null) return;
         var respecte = z.casse == null;
-        out.push({ t: cs[iRes].t, c: (z.haussier ? 1 : -1) * (respecte ? 1 : -1) });
+        // ⚠️ L'INSTANT OÙ ON L'APPREND, PAS CELUI OÙ ÇA COMMENCE. `cs[iRes].t`
+        // est l'OUVERTURE de la bougie qui tranche : sur le journalier, c'est
+        // vingt-quatre heures avant qu'on puisse le savoir. On date donc
+        // l'événement à la CLÔTURE de cette bougie, c'est-à-dire à l'ouverture
+        // de la suivante. Tant qu'il n'y a pas de suivante, on ne sait rien.
+        // ⚠️ DATÉ À LA CLÔTURE DE LA BOUGIE QUI TRANCHE, calculée par sa
+        // DURÉE et non par l'arrivée de la bougie suivante. Passer par
+        // `cs[iRes + 1]` rendait l'événement invisible tant que la bougie
+        // d'après n'était pas livrée : la stratégie ne disait alors pas la
+        // même chose selon qu'on lui donnait ou non des bougies postérieures
+        // à sa décision. C'est ce que la vérification « sans l'avenir » a
+        // attrapé, après un premier correctif incomplet.
+        var tRes = cs[iRes].t + ST.pasDe(cs);
+        out.push({ t: tRes, c: (z.haussier ? 1 : -1) * (respecte ? 1 : -1) });
       });
       return out.sort(function (a, b) { return a.t - b.t; });
     });
@@ -1994,7 +2087,7 @@ if (typeof window !== 'undefined') window.CFD = CFD;
     }
 
     function dolNiveau(t, dir, px) {
-      var idx = ST.idxA(D.h1, t); if (idx < 0) return null;
+      var idx = ST.idxClos(D.h1, t); if (idx < 0) return null;
       var liste = dir > 0 ? hierH1.ith : hierH1.itl, best = null;
       for (var i = 0; i < liste.length; i++) {
         var sw = liste[i];
@@ -2019,11 +2112,17 @@ if (typeof window !== 'undefined') window.CFD = CFD;
 
     for (var i = 60; i < clock.length; i++) {
       var bar = clock[i], e = heure(bar.t), px = bar.c;
+      // L'INSTANT DE LA DÉCISION est la CLÔTURE de cette bougie de 5 minutes,
+      // pas son ouverture : le modèle lit `bar.c`. Tout ce qui s'est terminé à
+      // cet instant est connu, la bougie de 5 minutes comprise. Dater la
+      // décision à l'ouverture reculerait tout d'un cran — une sur-correction
+      // aussi fausse que le regard en avant qu'on vient de retirer.
+      var tD = clock[i + 1] ? clock[i + 1].t : bar.t + 300000;
       if (parJour[e.jour] === undefined) { parJour[e.jour] = 0; etat = 'CHERCHE'; key = null; }
       if (e.dow < 1 || e.dow > 5 || e.min < CFG.ghDeb || e.min >= CFG.ghFin) continue;
       if (parJour[e.jour] >= CFG.maxJour) continue;
 
-      var b = biaisA(prep, bar.t);
+      var b = biaisA(prep, tD);
       var etapeCourante = { score: b.score, dir: b.dir, dol: null, key: null, ifvg: null, t: bar.t };
       if (b.dir === 0) { etapes = etapeCourante; continue; }
       if (b.dir !== dir) { dir = b.dir; etat = 'CHERCHE'; key = null; }
@@ -2035,7 +2134,7 @@ if (typeof window !== 'undefined') window.CFD = CFD;
       if (etat === 'CHERCHE') {
         var best = null;
         for (var n = 0; n < niveaux.length; n++) {
-          var z = niveaux[n], idx = ST.idxA(z.cs, bar.t);
+          var z = niveaux[n], idx = ST.idxClos(z.cs, tD);
           if (z.ne == null || z.ne > idx || idx - z.ne > CFG.keyAge) continue;
           if (z.vu && z.vu > bar.t) continue;
           if (z.casse != null && z.casse <= idx) continue;
@@ -2068,7 +2167,7 @@ if (typeof window !== 'undefined') window.CFD = CFD;
         etapeCourante.ifvg = choisi;
 
         // ── LE SECOND MARCHÉ DOIT DIRE LA MÊME CHOSE ───────── [PLAN SOURCE]
-        if (choisi && !confirme2(bar.t, dir)) { etapes = etapeCourante; continue; }
+        if (choisi && !confirme2(tD, dir)) { etapes = etapeCourante; continue; }
 
         // ── IFVG *ET* CISD ─────────────────────────────────── [PLAN SOURCE]
         // Le plan liste les deux : « IFVG + CISD présents ». Le modèle se
@@ -2129,7 +2228,18 @@ if (typeof window !== 'undefined') window.CFD = CFD;
               // modèle sait calculer de plus proche de ça. Borné à tp2 R pour
               // que le runner reste atteignable.
               tp: +objectif(L, entree, risq, dol).toFixed(2),
-              rr: CFG.part * CFG.tp1 + (1 - CFG.part) * CFG.tp2,
+              // ⚠️ CE CHAMP S'APPELAIT `rr` ET N'EN ÉTAIT PAS UN. Il portait
+              // `part × tp1 + (1 − part) × tp2` = 0,61, c'est-à-dire le GAIN
+              // SI TOUT EST TOUCHÉ — pas le rapport entre l'objectif et le
+              // risque, qui vaut 2,50. Le site affichait donc « RR 0,61 » pour
+              // un objectif situé à deux fois et demie le risque, et
+              // scripts/kintt_test.js s'en servait comme PLAFOND de suivi :
+              // il mesurait le modèle avec un objectif final à 0,61 au lieu de
+              // 2,50, soit 2 116 € annoncés là où il y en avait 2 622.
+              // Les deux nombres existent, ils ne disent pas la même chose et
+              // ils portent désormais deux noms différents.
+              rr: +(Math.abs(objectif(L, entree, risq, dol) - entree) / risq).toFixed(2),
+              gainSiTout: +(CFG.part * CFG.tp1 + (1 - CFG.part) * CFG.tp2).toFixed(2),
               tf: choisi.tf, niveau: key.type + ' ' + key.tf, dol: dol,
               // Le contexte est figé ICI, au moment du signal. Sans ça, celui
               // qui lit le journal voit le biais et le DOL de la DERNIÈRE
@@ -2163,17 +2273,18 @@ if (typeof window !== 'undefined') window.CFD = CFD;
     // affichait l'état de la séance précédente comme s'il était courant.
     // Hors fenêtre, on relit toujours la dernière bougie connue.
     if (horsFenetre || etapes == null) {
-      var bAff = biaisA(prep, finB.t);
+      var tFinD = finB.t + 300000;          // clôture de la dernière bougie connue
+      var bAff = biaisA(prep, tFinD);
       dir = bAff.dir;
       etapes = { score: bAff.score, dir: bAff.dir, t: finB.t, ifvg: null,
-                 dol: bAff.dir === 0 ? null : dolNiveau(finB.t, bAff.dir, finB.c),
+                 dol: bAff.dir === 0 ? null : dolNiveau(tFinD, bAff.dir, finB.c),
                  key: null };
       if (bAff.dir !== 0) {
         var meilleur = null, iFin = clock.length - 1;
         for (var nn = 0; nn < niveaux.length; nn++) {
-          var zA = niveaux[nn], idxA = ST.idxA(zA.cs, finB.t);
+          var zA = niveaux[nn], idxA = ST.idxClos(zA.cs, tFinD);
           if (zA.ne == null || zA.ne > idxA || idxA - zA.ne > CFG.keyAge) continue;
-          if (zA.vu && zA.vu > finB.t) continue;
+          if (zA.vu && zA.vu > tFinD) continue;
           if (zA.casse != null && zA.casse <= idxA) continue;
           if (zA.haussier !== (bAff.dir > 0)) continue;
           var dA = bAff.dir > 0 ? finB.c - zA.haut : zA.bas - finB.c;
@@ -2192,9 +2303,9 @@ if (typeof window !== 'undefined') window.CFD = CFD;
       var n = 0, proche = null, type = null, liste = [];
       if (dir !== 0) niveaux.forEach(function (z) {
         if (z.tf !== nom) return;
-        var idx = ST.idxA(z.cs, fin.t);
+        var idx = ST.idxClos(z.cs, fin.t + 300000);
         if (z.ne == null || z.ne > idx || idx - z.ne > CFG.keyAge) return;
-        if (z.vu && z.vu > fin.t) return;
+        if (z.vu && z.vu > fin.t + 300000) return;
         if (z.casse != null && z.casse <= idx) return;
         if (z.haussier !== (dir > 0)) return;
         var d = dir > 0 ? fin.c - z.haut : z.bas - fin.c;
@@ -2359,6 +2470,14 @@ if (typeof window !== 'undefined') window.CFD = CFD;
     // le seul point que le plan rend identifiable. [CHOIX]
     buf: 0.02,               // tampon, en % du prix
     atrMin: 0.3,             // [CHOIX] stop minimum, en fraction d'ATR
+    // « le dernier mouvement » se lit de deux façons, et l'écart est énorme :
+    //   'balayage' — sous l'extrémité du balayage. Prudent, mais le balayage
+    //                peut dater de vingt bougies : le stop devient très large.
+    //   'recent'   — sous le plus bas des `stopBarres` dernières bougies,
+    //                c'est-à-dire sous LE RETOURNEMENT lui-même. C'est la
+    //                lecture serrée, et c'est elle qui fait les grands RR.
+    stopMode: 'balayage',    // 'balayage' | 'recent'
+    stopBarres: 3,           // [CHOIX] ne sert qu'en mode 'recent'
 
     // ── L'OBJECTIF ─────────────────────────────────────────── [PLAN §8]
     // « haut/bas de session, PD High/Low, ou extrémité d'un CRT H1/H4 ».
@@ -2366,6 +2485,10 @@ if (typeof window !== 'undefined') window.CFD = CFD;
     // le haut et le bas de la veille. On vise le plus proche des trois qui
     // soit devant nous. [CHOIX] sur le choix du plus proche.
     objectif: 'zone',        // 'zone' | 'R'
+    // Le plan liste TROIS endroits possibles et ne dit pas lequel choisir.
+    // Viser le plus proche sécurise le trade et écrase le RR ; viser le plus
+    // loin fait l'inverse. C'est LE choix qui décide de tout.
+    cible: 'proche',         // 'proche' | 'loin'
     tpR: 2.5,                // utilisé seulement si objectif === 'R'
     rrMin: 1.0,              // [CHOIX] en dessous, le trade ne vaut pas le risque
 
@@ -2396,7 +2519,17 @@ if (typeof window !== 'undefined') window.CFD = CFD;
       ST.fvgs(cs).forEach(function (z) {
         var iRes = z.casse != null ? z.casse : z.touche;
         if (iRes == null) return;
-        out.push({ t: cs[iRes].t, c: (z.haussier ? 1 : -1) * (z.casse == null ? 1 : -1) });
+        // Daté à la CLÔTURE de la bougie qui tranche, pas à son ouverture :
+        // sinon le biais connaît l'issue d'une bougie H4 quatre heures trop tôt.
+        // ⚠️ DATÉ À LA CLÔTURE DE LA BOUGIE QUI TRANCHE, calculée par sa
+        // DURÉE et non par l'arrivée de la bougie suivante. Passer par
+        // `cs[iRes + 1]` rendait l'événement invisible tant que la bougie
+        // d'après n'était pas livrée : la stratégie ne disait alors pas la
+        // même chose selon qu'on lui donnait ou non des bougies postérieures
+        // à sa décision. C'est ce que la vérification « sans l'avenir » a
+        // attrapé, après un premier correctif incomplet.
+        var tRes = cs[iRes].t + ST.pasDe(cs);
+        out.push({ t: tRes, c: (z.haussier ? 1 : -1) * (z.casse == null ? 1 : -1) });
       });
       return out.sort(function (a, b) { return a.t - b.t; });
     });
@@ -2464,19 +2597,26 @@ if (typeof window !== 'undefined') window.CFD = CFD;
       if (e.min < CFG.obs || e.min >= CFG.fin) continue;
       if (parJour[e.jour] >= CFG.maxJour) continue;
 
-      var b = biais(prep, bar.t);
+      // L'INSTANT DE LA DÉCISION est la CLÔTURE de cette bougie de 5 minutes,
+      // pas son ouverture : le modèle lit `bar.c`. Tout ce qui s'est terminé à
+      // cet instant-là est connu, y compris la bougie de 5 minutes elle-même.
+      // Dater la décision à l'ouverture reculerait tout d'une bougie et ferait
+      // rater les signaux d'un cran — une sur-correction aussi fausse que le
+      // regard en avant qu'on vient de retirer.
+      var tD = clock[i + 1] ? clock[i + 1].t : bar.t + 300000;
+      var b = biais(prep, tD);
       var etape = { t: bar.t, score: b.score, dir: b.dir, zone: null, sweep: null, conf: null };
       E0.barres++;
       if (b.dir === 0) { E0.biaisNeutre++; etapes = etape; continue; }
       // « Narrative confirmée sur NQ et ES ENSEMBLE »
-      if (prepE && biais(prepE, bar.t).dir !== b.dir) { E0.esDesaccord++; etape.conf = 'ES en désaccord'; etapes = etape; continue; }
+      if (prepE && biais(prepE, tD).dir !== b.dir) { E0.esDesaccord++; etape.conf = 'ES en désaccord'; etapes = etape; continue; }
 
       // ── LA ZONE : intacte, du bon sens, et le prix arrive dedans ────────
       var idxJ = null, zone = null;
       for (var z2 = 0; z2 < zones.length; z2++) {
         var Z = zones[z2];
         if (Z.haussier !== (b.dir > 0)) continue;
-        var idx = ST.idxA(Z.cs, bar.t);
+        var idx = ST.idxClos(Z.cs, tD);
         if (Z.ne == null || Z.ne > idx || idx - Z.ne > CFG.ageMax) continue;
         if (Z.casse != null && Z.casse <= idx) continue;
         // « unmitigated » : jamais touchée AVANT la séance du jour
@@ -2531,7 +2671,7 @@ if (typeof window !== 'undefined') window.CFD = CFD;
       // variante du plan : « clôture au-dessus/en-dessous de la M15 précédente »
       var aM15 = false;
       if (CFG.accepteM15) {
-        var i15 = ST.idxA(D.m15, bar.t);
+        var i15 = ST.idxClos(D.m15, tD);
         var prec = D.m15[i15 - 1];
         if (prec) aM15 = b.dir > 0 ? px > prec.h : px < prec.l;
       }
@@ -2542,7 +2682,16 @@ if (typeof window !== 'undefined') window.CFD = CFD;
 
       // ── LE STOP : sous le dernier mouvement, c'est-à-dire le balayage ───
       var L = b.dir > 0, entree = px, buf = entree * CFG.buf / 100;
-      var sl = L ? sweep.ext - buf : sweep.ext + buf;
+      var ancre = sweep.ext;
+      if (CFG.stopMode === 'recent') {
+        // sous le retournement, pas sous le balayage : on prend l'extrémité
+        // des dernières bougies, bornée au balayage lui-même.
+        var d0 = Math.max(sweep.i, i - CFG.stopBarres + 1);
+        ancre = L ? Infinity : -Infinity;
+        for (var r0 = d0; r0 <= i; r0++)
+          ancre = L ? Math.min(ancre, clock[r0].l) : Math.max(ancre, clock[r0].h);
+      }
+      var sl = L ? ancre - buf : ancre + buf;
       if (L ? sl >= entree : sl <= entree) { E0.stopMauvaisCote++; etapes = etape; continue; }
       var risq = Math.abs(entree - sl);
       if (!atrC[i] || risq < atrC[i] * CFG.atrMin) { E0.stopTropSerre++; etapes = etape; continue; }
@@ -2556,14 +2705,19 @@ if (typeof window !== 'undefined') window.CFD = CFD;
         for (var k2 = deb; k2 <= i; k2++) { hS = Math.max(hS, clock[k2].h); bS = Math.min(bS, clock[k2].l); }
         cands.push(L ? hS : bS);
         // haut / bas de la VEILLE — « PD » lu Previous Day
-        var iD = ST.idxA(D.d1, bar.t), veille = D.d1[iD - 1];
+        var iD = ST.idxClos(D.d1, tD), veille = D.d1[iD];
         if (veille) cands.push(L ? veille.h : veille.l);
-        // extrémité de la bougie H4 en cours — le « CRT H1/H4 » du plan
-        var iH4 = ST.idxA(h4, bar.t);
+        // ⚠️ « extrémité d'un CRT H1/H4 » — mais la bougie H4 EN COURS n'a pas
+        // encore d'extrémité. Le code lisait son plus haut avant qu'il existe,
+        // et visait donc un niveau que le prix était déjà connu pour atteindre.
+        // On prend la dernière bougie H4 TERMINÉE.
+        var iH4 = ST.idxClos(h4, tD);
         if (h4[iH4]) cands.push(L ? h4[iH4].h : h4[iH4].l);
         // le plus proche qui soit DEVANT nous
         var devant = cands.filter(function (v) { return v != null && isFinite(v) && (L ? v > entree : v < entree); });
-        if (devant.length) tp = L ? Math.min.apply(null, devant) : Math.max.apply(null, devant);
+        if (devant.length) tp = CFG.cible === 'loin'
+          ? (L ? Math.max.apply(null, devant) : Math.min.apply(null, devant))
+          : (L ? Math.min.apply(null, devant) : Math.max.apply(null, devant));
       }
       if (tp == null) tp = L ? entree + risq * CFG.tpR : entree - risq * CFG.tpR;
       var rr = Math.abs(tp - entree) / risq;
@@ -2787,7 +2941,13 @@ if (typeof window !== 'undefined') window.Compte = Compte;
       h.push({ id: Date.now() + '-' + t.sym + '-' + source + '-' + Math.random().toString(36).slice(2, 6),
         ts: t.ts || Date.now(), key: t.key != null ? t.key : null,
         source: source, symbol: t.sym, direction: t.dir,
-        entry: +t.entry, sl: +t.sl, tp: +t.tp, rr: +t.rr, motif: t.note || '',
+        entry: +t.entry, sl: +t.sl, tp: +t.tp, rr: +t.rr,
+        // CE QUE LA POSITION VAUT SI TOUT EST TOUCHÉ — et ce n'est PAS le
+        // rapport à l'objectif. Avec 90 % vendus au premier objectif, une
+        // position qui atteint sa cible rapporte 0,61 fois le risque, pas
+        // 2,50. Confondre les deux multipliait le gain par quatre.
+        gainMax: t.gainMax != null ? +t.gainMax : null,
+        motif: t.note || '',
         tf: t.tf || null, style: t.style || null,
         status: 'open', result: null, r: null });
       added++;
@@ -2805,7 +2965,15 @@ if (typeof window !== 'undefined') window.Compte = Compte;
       var hit = null;
       if (x.direction === 'LONG') { if (p <= x.sl) hit = 'loss'; else if (p >= x.tp) hit = 'win'; }
       else { if (p >= x.sl) hit = 'loss'; else if (p <= x.tp) hit = 'win'; }
-      if (hit) { x.status = 'closed'; x.result = hit; x.closedTs = Date.now(); x.r = hit === 'win' ? x.rr : -1; changed = true; }
+      if (hit) {
+        x.status = 'closed'; x.result = hit; x.closedTs = Date.now();
+        // Un gain vaut `gainMax`, pas `rr`. Les enregistrements d'avant ce
+        // correctif n'ont pas le champ : leur `rr` valait alors 0,61, qui
+        // était justement le gain si tout est touché — on retombe donc sur
+        // la bonne valeur pour eux aussi.
+        x.r = hit === 'win' ? (x.gainMax != null ? x.gainMax : x.rr) : -1;
+        changed = true;
+      }
     });
     if (changed) save(h);
   }
@@ -2887,14 +3055,14 @@ if (typeof window !== 'undefined') window.Compte = Compte;
 <script>
 'use strict';
 /**
- * HISTORIQUE MESURÉ — les 41 signaux que le modèle produit sur les vraies
- * bougies NQ du 2026-07-22 au 2026-09-28.
+ * HISTORIQUE MESURÉ — les 25 signaux que le modèle produit sur les vraies
+ * bougies NQ du 2026-07-24 au 2026-09-28.
  *
  * Fenêtre : 09 h 00 → 10 h 00 New York.
  *
  * ⚠️ CE NE SONT PAS DES POSITIONS QUI ONT ÉTÉ ENVOYÉES. Ce sont des signaux
  * RECONSTITUÉS a posteriori, au prix de clôture exact de la bougie qui les a
- * déclenchés. Le R affiché est net de frais : 0,25 point de slippage par côté
+ * déclenchés. Le résultat est net de frais : 0,25 point de slippage par côté
  * et 4,00 $ de commission, soit 0,70 point par trade.
  *
  * ⚠️ COMPTAGE PRUDENT. Une bougie de 5 minutes ne dit pas dans quel ordre son
@@ -2905,8 +3073,8 @@ if (typeof window !== 'undefined') window.Compte = Compte;
  * Les signaux des huit derniers jours sont suivis directement en 1 minute
  * (colonne « tf »), là il n'y a plus d'hypothèse du tout.
  *
- *   41 signaux · 87.8 % de réussite
- *   brut +10.60 R      net +10.24 R  (+2560 €)
+ *   25 signaux · 76.0 % de réussite
+ *   avant frais +723 €      net +676 €  (risque 250 € par trade)
  *
  * ⚠️ CES CHIFFRES NE SONT PAS REPRODUCTIBLES À L'IDENTIQUE. La profondeur des
  * séries Yahoo est courte et glissante : la même commande relancée deux heures
@@ -2915,59 +3083,48 @@ if (typeof window !== 'undefined') window.Compte = Compte;
  * Régénéré par scripts/gen_mesure.js — ne pas éditer à la main.
  *
  * Colonnes : jour, minute NY, sens, niveau, unité de suivi, entrée, stop,
- *            objectif, RR visé, R net, R brut, sortie, horodatage, durée (min).
+ *            objectif, objectif en multiples du risque, gain si tout est touché,
+ *            résultat net, résultat avant frais, sortie, horodatage, durée (min).
  */
 var Mesure = (function () {
   var BRUT = [
-  ["2026-07-22",545,"LONG","ITL M5","5m",29059.75,28985.5,29245.37,0.61,0.601,0.61,"gain",1784725500000,50],
-  ["2026-07-22",560,"LONG","CISD M15","5m",29089.25,29024.98,29249.93,0.61,0.599,0.61,"gain",1784726400000,35],
-  ["2026-07-23",585,"SHORT","CISD M5","5m",28760,28931.01,28332.48,0.61,0.356,0.36000000000000004,"gain partiel",1784814300000,25],
-  ["2026-07-24",585,"SHORT","FVG M5","5m",28501.25,28676.05,28064.25,0.61,0.356,0.36000000000000004,"gain partiel",1784900700000,85],
-  ["2026-07-29",540,"SHORT","RB M15","5m",27881.5,27999.81,27585.74,0.61,0.604,0.61,"gain",1785330000000,85],
-  ["2026-07-29",590,"SHORT","CISD M5","5m",27753.5,28007.7,27117.99,0.61,0.473,0.47575403575413056,"sortie horaire +",1785333000000,130],
-  ["2026-08-04",540,"LONG","RB M5","5m",29218,29145.63,29398.94,0.61,0.35,0.36000000000000004,"gain partiel",1785848400000,30],
-  ["2026-08-04",570,"LONG","CISD M15","5m",29382.75,28979.24,30391.52,0.61,0.434,0.43552548139285036,"sortie horaire +",1785850200000,150],
-  ["2026-08-12",555,"LONG","ITL M5","5m",29961.5,29886.53,30148.92,0.61,0.351,0.36000000000000004,"gain partiel",1786540500000,15],
-  ["2026-08-13",540,"LONG","RB H4","5m",29908.75,29816.82,30138.57,0.61,0.602,0.61,"gain",1786626000000,45],
-  ["2026-08-17",555,"SHORT","CISD M5","5m",30211,30252.17,30108.08,0.61,-1.017,-1,"perte",1786972500000,15],
-  ["2026-08-18",545,"SHORT","CISD M5","5m",29693.5,29767.25,29509.11,0.61,0.351,0.36000000000000004,"gain partiel",1787058300000,30],
-  ["2026-08-18",585,"SHORT","CISD M15","5m",29657.25,29752.98,29417.94,0.61,0.353,0.36000000000000004,"gain partiel",1787060700000,15],
-  ["2026-08-21",545,"SHORT","RB M15","5m",29487.75,29593.34,29223.77,0.61,0.603,0.61,"gain",1787317500000,75],
-  ["2026-08-21",550,"SHORT","ITH M15","5m",29469,29633.58,29057.56,0.61,0.356,0.36000000000000004,"gain partiel",1787317800000,150],
-  ["2026-08-24",570,"SHORT","CISD M15","5m",29112.75,29188.04,28924.52,0.61,0.351,0.36000000000000004,"gain partiel",1787578200000,115],
-  ["2026-08-24",575,"SHORT","ITH H4","5m",29080,29237.26,28686.84,0.61,0.356,0.36000000000000004,"gain partiel",1787578500000,55],
-  ["2026-08-25",540,"SHORT","RB M30","5m",29324.5,29380.96,29183.35,0.61,0.348,0.36000000000000004,"gain partiel",1787662800000,30],
-  ["2026-08-25",560,"SHORT","RB M30","5m",29319.25,29390.71,29140.61,0.61,0.35,0.36000000000000004,"gain partiel",1787664000000,15],
-  ["2026-08-27",560,"SHORT","CISD H4","5m",29537.5,29572.13,29450.92,0.61,0.34,0.36000000000000004,"gain partiel",1787836800000,10],
-  ["2026-08-31",575,"SHORT","RB H4","5m",29398.75,29487.27,29177.45,0.61,0.352,0.36000000000000004,"gain partiel",1788183300000,60],
-  ["2026-09-01",540,"SHORT","CISD M30","5m",29099.25,29213.53,28813.55,0.61,0.354,0.36000000000000004,"gain partiel",1788267600000,45],
-  ["2026-09-01",550,"SHORT","FVG M5","5m",29093,29168.27,28904.81,0.61,0.351,0.36000000000000004,"gain partiel",1788268200000,25],
-  ["2026-09-03",550,"LONG","ITL M5","5m",29239.25,29155.86,29447.73,0.61,0.352,0.36000000000000004,"gain partiel",1788441000000,25],
-  ["2026-09-03",565,"LONG","CISD M5","5m",29249,29078.6,29675,0.61,0.356,0.36000000000000004,"gain partiel",1788441900000,40],
-  ["2026-09-08",570,"SHORT","CISD M15","5m",29600.5,29708.18,29331.3,0.61,0.353,0.36000000000000004,"gain partiel",1788874200000,100],
-  ["2026-09-08",575,"SHORT","RB M15","5m",29568,29683.65,29278.86,0.61,0.354,0.36000000000000004,"gain partiel",1788874500000,90],
-  ["2026-09-10",560,"SHORT","FVG M30","5m",29056.5,29129.75,28873.39,0.61,-1.01,-1,"perte",1789046400000,15],
-  ["2026-09-10",590,"SHORT","FVG M30","5m",29105.75,29238.03,28775.04,0.61,-1.005,-1,"perte",1789048200000,30],
-  ["2026-09-11",595,"LONG","FVG M5","5m",29472.75,29388.17,29684.2,0.61,-1.008,-1,"perte",1789134900000,5],
-  ["2026-09-16",585,"LONG","FVG M15","5m",29461.75,29370.18,29690.67,0.61,0.368,0.37528895023883646,"sortie horaire +",1789566300000,135],
-  ["2026-09-21",545,"LONG","CISD M5","1m",30233.25,30196.06,30326.22,0.61,0.341,0.36000000000000004,"gain partiel",1789995900000,26],
-  ["2026-09-21",570,"LONG","FVG M15","1m",30252,30152.8,30500,0.61,0.603,0.61,"gain",1789997400000,53],
-  ["2026-09-22",540,"LONG","RB M5","1m",30767.5,30692.89,30954.04,0.61,0.601,0.61,"gain",1790082000000,71],
-  ["2026-09-22",550,"LONG","ITL M15","1m",30769.75,30741.13,30841.29,0.61,0.586,0.61,"gain",1790082600000,21],
-  ["2026-09-23",545,"SHORT","CISD M30","1m",30948.5,31001.26,30816.6,0.61,-1.013,-1,"perte",1790168700000,24],
-  ["2026-09-23",570,"SHORT","FVG M30","1m",30926.5,30998.24,30747.15,0.61,0.6,0.61,"gain",1790170200000,40],
-  ["2026-09-24",570,"LONG","RB M5","1m",30540,30480.57,30688.58,0.61,0.348,0.36000000000000004,"gain partiel",1790256600000,24],
-  ["2026-09-24",575,"LONG","RB H4","1m",30595.5,30549.02,30711.69,0.61,0.345,0.36000000000000004,"gain partiel",1790256900000,13],
-  ["2026-09-28",570,"SHORT","ITH M5","1m",30677,30834.54,30283.15,0.61,0.461,0.46505161811229756,"sortie horaire +",1790602200000,150],
-  ["2026-09-28",575,"SHORT","RB M5","1m",30643,30809.51,30226.71,0.61,0.435,0.4389721489552856,"sortie horaire +",1790602500000,145]
+  ["2026-07-24",595,"SHORT","RB M5","5m",28322.25,29212.91,26095.61,2.5,0.61,-0.302,-0.3011818905083408,"sortie horaire −",1784901300000,125],
+  ["2026-07-28",570,"SHORT","RB M5","5m",27877,27986.3,27603.75,2.5,0.61,0.604,0.61,"gain",1785245400000,45],
+  ["2026-07-29",540,"SHORT","RB M15","5m",27881.5,27999.81,27585.74,2.5,0.61,0.604,0.61,"gain",1785330000000,85],
+  ["2026-07-29",590,"SHORT","CISD M5","5m",27753.5,28007.7,27117.99,2.5,0.61,0.473,0.47575403575413056,"sortie horaire +",1785333000000,130],
+  ["2026-07-31",580,"SHORT","CISD M30","5m",28419,28618.74,27919.66,2.5,0.61,0.421,0.4243351797780276,"sortie horaire +",1785505200000,140],
+  ["2026-07-31",585,"SHORT","FVG H1","5m",28360.5,28460.19,28111.28,2.5,0.61,0.353,0.36000000000000004,"gain partiel",1785505500000,10],
+  ["2026-08-04",540,"LONG","RB M5","5m",29218,29145.63,29398.94,2.5,0.61,0.35,0.36000000000000004,"gain partiel",1785848400000,30],
+  ["2026-08-04",570,"LONG","FVG M5","5m",29382.75,28979.24,30391.52,2.5,0.61,0.434,0.43552548139285036,"sortie horaire +",1785850200000,150],
+  ["2026-08-18",545,"SHORT","CISD M5","5m",29693.5,29767.25,29509.11,2.5,0.61,0.351,0.36000000000000004,"gain partiel",1787058300000,30],
+  ["2026-08-18",585,"SHORT","CISD M15","5m",29657.25,29752.98,29417.94,2.5,0.61,0.353,0.36000000000000004,"gain partiel",1787060700000,15],
+  ["2026-08-21",595,"SHORT","FVG H4","5m",29303.5,29369.94,29137.39,2.5,0.61,0.349,0.36000000000000004,"gain partiel",1787320500000,10],
+  ["2026-08-24",580,"SHORT","CISD M15","5m",28978.75,29110.93,28648.29,2.5,0.61,-1.005,-1,"perte",1787578800000,105],
+  ["2026-08-27",560,"SHORT","ITH M30","5m",29537.5,29572.13,29450.92,2.5,0.61,0.34,0.36000000000000004,"gain partiel",1787836800000,10],
+  ["2026-08-27",570,"SHORT","ITH M5","5m",29463.5,29518.07,29327.07,2.5,0.61,-1.013,-1,"perte",1787837400000,10],
+  ["2026-08-31",575,"SHORT","CISD H4","5m",29398.75,29487.27,29177.45,2.5,0.61,0.352,0.36000000000000004,"gain partiel",1788183300000,60],
+  ["2026-09-01",540,"SHORT","CISD M30","5m",29099.25,29213.53,28813.55,2.5,0.61,0.354,0.36000000000000004,"gain partiel",1788267600000,45],
+  ["2026-09-01",550,"SHORT","FVG M5","5m",29093,29168.27,28904.81,2.5,0.61,0.351,0.36000000000000004,"gain partiel",1788268200000,25],
+  ["2026-09-10",590,"SHORT","ITH H1","5m",29105.75,29238.03,28775.04,2.5,0.61,-1.005,-1,"perte",1789048200000,30],
+  ["2026-09-14",545,"SHORT","ITH M5","5m",28837.25,28926.32,28614.58,2.5,0.61,-1.008,-1,"perte",1789391100000,25],
+  ["2026-09-14",575,"SHORT","RB M5","5m",28889,28979.11,28663.72,2.5,0.61,-1.008,-1,"perte",1789392900000,10],
+  ["2026-09-21",570,"LONG","CISD M5","5m",30252,30152.8,30500,2.5,0.61,0.603,0.61,"gain",1789997400000,50],
+  ["2026-09-21",575,"LONG","ITL H4","5m",30296.5,30241.26,30434.59,2.5,0.61,0.597,0.61,"gain",1789997700000,25],
+  ["2026-09-22",580,"LONG","ITL M5","1m",30902.25,30835.53,31069.05,2.5,0.61,0.35,0.36000000000000004,"gain partiel",1790084400000,16],
+  ["2026-09-22",590,"LONG","ITL M5","1m",30941.25,30805.5,31280.63,2.5,0.61,0.355,0.36000000000000004,"gain partiel",1790085000000,48],
+  ["2026-09-28",580,"SHORT","RB M5","1m",30611.5,30714.99,30352.78,2.5,0.61,0.45,0.45662844045562584,"sortie horaire +",1790602800000,140]
   ];
-  var CLES = ['jour','minNY','sens','niveau','tf','entry','sl','tp','rr','r','rBrut','sortie','ts','duree'];
+  var CLES = ['jour','minNY','sens','niveau','tf','entry','sl','tp','rr','gainMax','r','rBrut','sortie','ts','duree'];
   var LISTE = BRUT.map(function (l) {
     var o = {}; CLES.forEach(function (k, i) { o[k] = l[i]; });
     o.source = 'MESURE'; o.symbol = 'NQ'; o.direction = o.sens;
     o.status = 'closed'; o.result = o.r > 0 ? 'win' : 'loss';
+    // Plus un seul R dans ce qu'un humain lit : « brut +0,61 R » s'affichait
+    // dans l'infobulle de chaque ligne du journal. Le motif parle argent, sur
+    // le risque de référence, et dit la part du risque en clair.
     o.motif = o.sortie + ' · suivi en ' + o.tf + ' · ' + o.niveau +
-              ' · brut ' + (o.rBrut > 0 ? '+' : '') + o.rBrut + ' R';
+              ' · avant frais ' + (o.rBrut > 0 ? '+' : '') + Math.round(o.rBrut * 250) +
+              ' € (' + (o.rBrut > 0 ? '+' : '') + Math.round(o.rBrut * 100) + ' % du risque)';
     return o;
   });
   function liste() { return LISTE.slice(); }
@@ -3458,7 +3615,13 @@ function paintTrade(){
     '<div class="trade">' +
       '<div class="t-head"><span class="t-dir ' + (L ? 'long' : 'short') + '">' + t.sens + '</span>' +
         '<span class="t-tf">' + (t.niveau || '') + '</span>' +
-        '<span class="t-rr">RR ' + Number(t.rr).toFixed(2) + '</span></div>' +
+        // ⚠️ Ce chiffre était lu dans le champ `rr` du signal, qui portait
+        // 0,61 — le gain si tout est touché, PAS le rapport à l'objectif.
+        // La page annonçait donc « RR 0,61 » pour un objectif situé à deux
+        // fois et demie le risque. On le CALCULE désormais à partir des
+        // niveaux, ce qui corrige aussi tout l'historique déjà écrit.
+        '<span class="t-rr">objectif ' + (dt / dp).toFixed(2).replace('.', ',') +
+          '\u00d7 le risque</span></div>' +
       '<div class="t-grid">' +
         '<div class="t-cell"><div class="t-k">Entrée</div><div class="t-v mono">' + fmt(t.entree) + '</div></div>' +
         '<div class="t-cell"><div class="t-k">Stop</div><div class="t-v sl mono">' + fmt(t.sl) + '</div>' +
@@ -3692,6 +3855,9 @@ async function refresh(){
     // signaux, et doivent tous les deux entrer au journal.
     if(t && !D.hors)
       History.record([{ sym:'NQ', dir:t.sens, entry:t.entree, sl:t.sl, tp:t.tp, rr:t.rr,
+        // Sans ce champ, un gain serait compté 2,50 fois le risque alors que
+        // 90 % de la position est vendue au premier objectif : 0,61.
+        gainMax:t.gainSiTout,
         key: t.t + '|' + t.sens + '|' + t.entree, ts: t.t,
         note:'IFVG ' + t.tf + ' sur ' + t.niveau, tf:t.tf, price:D.prix }], 'MECH');
   }
@@ -3732,7 +3898,13 @@ async function chargerDistant(){
 function enLigne(s, source){
   return {
     ts: Date.parse(s.bougie), source: source, symbol:'NQ', direction:s.sens,
-    entry:s.entree, sl:s.sl, tp:s.tp, rr:s.rr,
+    entry:s.entree, sl:s.sl, tp:s.tp,
+    // Recalculé, jamais lu : le champ `rr` des signaux d'avant le correctif
+    // vaut 0,61 au lieu de 2,50. Le déduire des niveaux répare l'historique
+    // sans le réécrire.
+    rr: (s.entree != null && s.sl != null && s.tp != null && s.entree !== s.sl)
+        ? +(Math.abs(s.tp - s.entree) / Math.abs(s.entree - s.sl)).toFixed(2)
+        : s.rr,
     r: s.r, status: s.statut === 'clos' ? 'closed' : 'open',
     // ⚠️ La phrase stockée dans le journal est FIGÉE à la date du signal.
     // Deux positions du 28 septembre parlaient encore en R longtemps après
@@ -3823,7 +3995,12 @@ function paintJournal(){
   // Pratique pour comparer deux marchés, illisible pour savoir ce qu'on gagne.
   // Chaque case donne donc l'euro en gros et le R en petit.
   const eu = v => v == null ? '—' : sgn(Math.round(v * uR), 0) + dev;
-  const pr = v => v == null ? '' : '<span class="bsub"> ' + sgn(v) + ' R</span>';
+  // ⚠️ Cette ligne ajoutait « +0,60 R » sous chaque euro. Le R avait été
+  // banni de tout ce qu'un humain lit, et il revenait par là — composé à
+  // l'exécution, donc invisible pour le test qui ne relit que le source.
+  // Le chiffre utile à côté de l'euro, c'est la PART DU RISQUE, dite en clair.
+  const pr = v => v == null ? '' : '<span class="bsub"> ' +
+    (Math.abs(v) >= 0.005 ? sgn(+(v * 100).toFixed(0), 0) + ' % du risque' : '') + '</span>';
   // Le seuil d'équilibre : le taux de réussite minimum sous lequel on perd.
   // Sans lui, « 83 % de réussite » ne veut rien dire — il en faut parfois 69.
   const seuil = (st.gainMoy && st.perteMoy)
@@ -3889,7 +4066,9 @@ function paintJournal(){
                 : x.heureNY ? '<span class="jr-t">' + x.heureNY + ' NY</span>' : '') + '</span>' +
       '<span class="jr-r ' + (ouvert ? 'open' : r > 0 ? 'pos' : 'neg') + '">' +
         '<span class="jv">' + verdict + '</span>' +
-        (ouvert ? '' : '<span class="jn mono">' + sgn(r) + ' R · ' + sgn(Math.round(r * uR),0) + dev + '</span>') +
+        // Idem : « +0,60 R · +150 € » devient « +150 € · 60 % du risque ».
+        (ouvert ? '' : '<span class="jn mono">' + sgn(Math.round(r * uR),0) + dev +
+          ' · ' + sgn(+(r * 100).toFixed(0), 0) + ' % du risque</span>') +
       '</span>' +
       '<span class="jr-p mono">entrée ' + fmt(x.entry) + ' · cible ' + fmt(x.tp) +
         ' · stop ' + fmt(x.sl) + '</span></div>';

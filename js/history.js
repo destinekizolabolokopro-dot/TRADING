@@ -45,7 +45,13 @@
       h.push({ id: Date.now() + '-' + t.sym + '-' + source + '-' + Math.random().toString(36).slice(2, 6),
         ts: t.ts || Date.now(), key: t.key != null ? t.key : null,
         source: source, symbol: t.sym, direction: t.dir,
-        entry: +t.entry, sl: +t.sl, tp: +t.tp, rr: +t.rr, motif: t.note || '',
+        entry: +t.entry, sl: +t.sl, tp: +t.tp, rr: +t.rr,
+        // CE QUE LA POSITION VAUT SI TOUT EST TOUCHÉ — et ce n'est PAS le
+        // rapport à l'objectif. Avec 90 % vendus au premier objectif, une
+        // position qui atteint sa cible rapporte 0,61 fois le risque, pas
+        // 2,50. Confondre les deux multipliait le gain par quatre.
+        gainMax: t.gainMax != null ? +t.gainMax : null,
+        motif: t.note || '',
         tf: t.tf || null, style: t.style || null,
         status: 'open', result: null, r: null });
       added++;
@@ -63,7 +69,15 @@
       var hit = null;
       if (x.direction === 'LONG') { if (p <= x.sl) hit = 'loss'; else if (p >= x.tp) hit = 'win'; }
       else { if (p >= x.sl) hit = 'loss'; else if (p <= x.tp) hit = 'win'; }
-      if (hit) { x.status = 'closed'; x.result = hit; x.closedTs = Date.now(); x.r = hit === 'win' ? x.rr : -1; changed = true; }
+      if (hit) {
+        x.status = 'closed'; x.result = hit; x.closedTs = Date.now();
+        // Un gain vaut `gainMax`, pas `rr`. Les enregistrements d'avant ce
+        // correctif n'ont pas le champ : leur `rr` valait alors 0,61, qui
+        // était justement le gain si tout est touché — on retombe donc sur
+        // la bonne valeur pour eux aussi.
+        x.r = hit === 'win' ? (x.gainMax != null ? x.gainMax : x.rr) : -1;
+        changed = true;
+      }
     });
     if (changed) save(h);
   }

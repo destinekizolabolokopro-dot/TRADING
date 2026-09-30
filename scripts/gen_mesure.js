@@ -76,14 +76,20 @@ const COUT_PTS = 0.25 * 2 + 4.00 / 20;
     const n = fin.barres;
     if (r === null) continue;
     const e = M.heure(s.t);
+    // ⚠️ La colonne portait `part × tp1 + (1 − part) × tp2` = 0,61 sous le nom
+    // « rr ». Ce n'est pas un rapport à l'objectif — celui-là vaut 2,50 — mais
+    // le GAIN SI TOUT EST TOUCHÉ. Les deux nombres sont écrits, chacun sous son
+    // nom, pour que la page n'ait plus à deviner lequel elle affiche.
     lignes.push([e.jour, e.min, s.sens, s.niveau, fin1m ? '1m' : '5m',
-      s.entree, s.sl, s.tp, +(C.part * C.tp1 + (1 - C.part) * C.tp2).toFixed(2),
+      s.entree, s.sl, s.tp,
+      +(Math.abs(s.tp - s.entree) / s.risq).toFixed(2),
+      +(C.part * C.tp1 + (1 - C.part) * C.tp2).toFixed(2),
       +(r - COUT_PTS / s.risq).toFixed(3), r, o, s.t, n * pas]);
   }
 
-  const R = lignes.reduce((a, l) => a + l[9], 0);
-  const brut = lignes.reduce((a, l) => a + l[10], 0);
-  const g = lignes.filter(l => l[9] > 0).length;
+  const R = lignes.reduce((a, l) => a + l[10], 0);
+  const brut = lignes.reduce((a, l) => a + l[11], 0);
+  const g = lignes.filter(l => l[10] > 0).length;
   const hm = m => String(Math.floor(m / 60)).padStart(2, '0') + ' h ' + String(m % 60).padStart(2, '0');
   const jours = lignes.map(l => l[0]).sort();
 
@@ -96,7 +102,7 @@ const COUT_PTS = 0.25 * 2 + 4.00 / 20;
  *
  * ⚠️ CE NE SONT PAS DES POSITIONS QUI ONT ÉTÉ ENVOYÉES. Ce sont des signaux
  * RECONSTITUÉS a posteriori, au prix de clôture exact de la bougie qui les a
- * déclenchés. Le R affiché est net de frais : 0,25 point de slippage par côté
+ * déclenchés. Le résultat est net de frais : 0,25 point de slippage par côté
  * et 4,00 $ de commission, soit 0,70 point par trade.
  *
  * ⚠️ COMPTAGE PRUDENT. Une bougie de 5 minutes ne dit pas dans quel ordre son
@@ -108,7 +114,7 @@ const COUT_PTS = 0.25 * 2 + 4.00 / 20;
  * (colonne « tf »), là il n'y a plus d'hypothèse du tout.
  *
  *   ${lignes.length} signaux · ${(g / lignes.length * 100).toFixed(1)} % de réussite
- *   brut ${brut >= 0 ? '+' : ''}${brut.toFixed(2)} R      net ${R >= 0 ? '+' : ''}${R.toFixed(2)} R  (${R >= 0 ? '+' : ''}${Math.round(R * 250)} €)
+ *   avant frais ${brut >= 0 ? '+' : ''}${Math.round(brut * 250)} €      net ${R >= 0 ? '+' : ''}${Math.round(R * 250)} €  (risque 250 € par trade)
  *
  * ⚠️ CES CHIFFRES NE SONT PAS REPRODUCTIBLES À L'IDENTIQUE. La profondeur des
  * séries Yahoo est courte et glissante : la même commande relancée deux heures
@@ -117,7 +123,8 @@ const COUT_PTS = 0.25 * 2 + 4.00 / 20;
  * Régénéré par scripts/gen_mesure.js — ne pas éditer à la main.
  *
  * Colonnes : jour, minute NY, sens, niveau, unité de suivi, entrée, stop,
- *            objectif, RR visé, R net, R brut, sortie, horodatage, durée (min).
+ *            objectif, objectif en multiples du risque, gain si tout est touché,
+ *            résultat net, résultat avant frais, sortie, horodatage, durée (min).
  */
 var Mesure = (function () {
   var BRUT = [
@@ -125,13 +132,17 @@ var Mesure = (function () {
   const corps = lignes.map(l => '  ' + JSON.stringify(l)).join(',\n');
   const pied = `
   ];
-  var CLES = ['jour','minNY','sens','niveau','tf','entry','sl','tp','rr','r','rBrut','sortie','ts','duree'];
+  var CLES = ['jour','minNY','sens','niveau','tf','entry','sl','tp','rr','gainMax','r','rBrut','sortie','ts','duree'];
   var LISTE = BRUT.map(function (l) {
     var o = {}; CLES.forEach(function (k, i) { o[k] = l[i]; });
     o.source = 'MESURE'; o.symbol = 'NQ'; o.direction = o.sens;
     o.status = 'closed'; o.result = o.r > 0 ? 'win' : 'loss';
+    // Plus un seul R dans ce qu'un humain lit : « brut +0,61 R » s'affichait
+    // dans l'infobulle de chaque ligne du journal. Le motif parle argent, sur
+    // le risque de référence, et dit la part du risque en clair.
     o.motif = o.sortie + ' · suivi en ' + o.tf + ' · ' + o.niveau +
-              ' · brut ' + (o.rBrut > 0 ? '+' : '') + o.rBrut + ' R';
+              ' · avant frais ' + (o.rBrut > 0 ? '+' : '') + Math.round(o.rBrut * 250) +
+              ' € (' + (o.rBrut > 0 ? '+' : '') + Math.round(o.rBrut * 100) + ' % du risque)';
     return o;
   });
   function liste() { return LISTE.slice(); }
@@ -141,6 +152,6 @@ if (typeof window !== 'undefined') window.Mesure = Mesure;
 `;
   fs.writeFileSync(path.join(RACINE, 'js/mesure.js'), tete + corps + pied);
   console.log(`js/mesure.js régénéré : ${lignes.length} signaux · ${(g / lignes.length * 100).toFixed(1)} % · ` +
-    `net ${R >= 0 ? '+' : ''}${R.toFixed(2)} R (${Math.round(R * 250)} €)`);
+    `net ${R >= 0 ? '+' : ''}${Math.round(R * 250)} € (risque 250 € par trade)`);
   console.log(`   dont ${lignes.filter(l => l[4] === '1m').length} suivis en 1 minute (plus aucune hypothèse)`);
 })().catch(e => { console.error('ERREUR :', e.message); process.exit(1); });

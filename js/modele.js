@@ -101,7 +101,20 @@
         var iRes = z.casse != null ? z.casse : z.touche;
         if (iRes == null) return;
         var respecte = z.casse == null;
-        out.push({ t: cs[iRes].t, c: (z.haussier ? 1 : -1) * (respecte ? 1 : -1) });
+        // ⚠️ L'INSTANT OÙ ON L'APPREND, PAS CELUI OÙ ÇA COMMENCE. `cs[iRes].t`
+        // est l'OUVERTURE de la bougie qui tranche : sur le journalier, c'est
+        // vingt-quatre heures avant qu'on puisse le savoir. On date donc
+        // l'événement à la CLÔTURE de cette bougie, c'est-à-dire à l'ouverture
+        // de la suivante. Tant qu'il n'y a pas de suivante, on ne sait rien.
+        // ⚠️ DATÉ À LA CLÔTURE DE LA BOUGIE QUI TRANCHE, calculée par sa
+        // DURÉE et non par l'arrivée de la bougie suivante. Passer par
+        // `cs[iRes + 1]` rendait l'événement invisible tant que la bougie
+        // d'après n'était pas livrée : la stratégie ne disait alors pas la
+        // même chose selon qu'on lui donnait ou non des bougies postérieures
+        // à sa décision. C'est ce que la vérification « sans l'avenir » a
+        // attrapé, après un premier correctif incomplet.
+        var tRes = cs[iRes].t + ST.pasDe(cs);
+        out.push({ t: tRes, c: (z.haussier ? 1 : -1) * (respecte ? 1 : -1) });
       });
       return out.sort(function (a, b) { return a.t - b.t; });
     });
@@ -200,7 +213,7 @@
     }
 
     function dolNiveau(t, dir, px) {
-      var idx = ST.idxA(D.h1, t); if (idx < 0) return null;
+      var idx = ST.idxClos(D.h1, t); if (idx < 0) return null;
       var liste = dir > 0 ? hierH1.ith : hierH1.itl, best = null;
       for (var i = 0; i < liste.length; i++) {
         var sw = liste[i];
@@ -225,11 +238,17 @@
 
     for (var i = 60; i < clock.length; i++) {
       var bar = clock[i], e = heure(bar.t), px = bar.c;
+      // L'INSTANT DE LA DÉCISION est la CLÔTURE de cette bougie de 5 minutes,
+      // pas son ouverture : le modèle lit `bar.c`. Tout ce qui s'est terminé à
+      // cet instant est connu, la bougie de 5 minutes comprise. Dater la
+      // décision à l'ouverture reculerait tout d'un cran — une sur-correction
+      // aussi fausse que le regard en avant qu'on vient de retirer.
+      var tD = clock[i + 1] ? clock[i + 1].t : bar.t + 300000;
       if (parJour[e.jour] === undefined) { parJour[e.jour] = 0; etat = 'CHERCHE'; key = null; }
       if (e.dow < 1 || e.dow > 5 || e.min < CFG.ghDeb || e.min >= CFG.ghFin) continue;
       if (parJour[e.jour] >= CFG.maxJour) continue;
 
-      var b = biaisA(prep, bar.t);
+      var b = biaisA(prep, tD);
       var etapeCourante = { score: b.score, dir: b.dir, dol: null, key: null, ifvg: null, t: bar.t };
       if (b.dir === 0) { etapes = etapeCourante; continue; }
       if (b.dir !== dir) { dir = b.dir; etat = 'CHERCHE'; key = null; }
@@ -241,7 +260,7 @@
       if (etat === 'CHERCHE') {
         var best = null;
         for (var n = 0; n < niveaux.length; n++) {
-          var z = niveaux[n], idx = ST.idxA(z.cs, bar.t);
+          var z = niveaux[n], idx = ST.idxClos(z.cs, tD);
           if (z.ne == null || z.ne > idx || idx - z.ne > CFG.keyAge) continue;
           if (z.vu && z.vu > bar.t) continue;
           if (z.casse != null && z.casse <= idx) continue;
@@ -274,7 +293,7 @@
         etapeCourante.ifvg = choisi;
 
         // ── LE SECOND MARCHÉ DOIT DIRE LA MÊME CHOSE ───────── [PLAN SOURCE]
-        if (choisi && !confirme2(bar.t, dir)) { etapes = etapeCourante; continue; }
+        if (choisi && !confirme2(tD, dir)) { etapes = etapeCourante; continue; }
 
         // ── IFVG *ET* CISD ─────────────────────────────────── [PLAN SOURCE]
         // Le plan liste les deux : « IFVG + CISD présents ». Le modèle se
@@ -335,7 +354,18 @@
               // modèle sait calculer de plus proche de ça. Borné à tp2 R pour
               // que le runner reste atteignable.
               tp: +objectif(L, entree, risq, dol).toFixed(2),
-              rr: CFG.part * CFG.tp1 + (1 - CFG.part) * CFG.tp2,
+              // ⚠️ CE CHAMP S'APPELAIT `rr` ET N'EN ÉTAIT PAS UN. Il portait
+              // `part × tp1 + (1 − part) × tp2` = 0,61, c'est-à-dire le GAIN
+              // SI TOUT EST TOUCHÉ — pas le rapport entre l'objectif et le
+              // risque, qui vaut 2,50. Le site affichait donc « RR 0,61 » pour
+              // un objectif situé à deux fois et demie le risque, et
+              // scripts/kintt_test.js s'en servait comme PLAFOND de suivi :
+              // il mesurait le modèle avec un objectif final à 0,61 au lieu de
+              // 2,50, soit 2 116 € annoncés là où il y en avait 2 622.
+              // Les deux nombres existent, ils ne disent pas la même chose et
+              // ils portent désormais deux noms différents.
+              rr: +(Math.abs(objectif(L, entree, risq, dol) - entree) / risq).toFixed(2),
+              gainSiTout: +(CFG.part * CFG.tp1 + (1 - CFG.part) * CFG.tp2).toFixed(2),
               tf: choisi.tf, niveau: key.type + ' ' + key.tf, dol: dol,
               // Le contexte est figé ICI, au moment du signal. Sans ça, celui
               // qui lit le journal voit le biais et le DOL de la DERNIÈRE
@@ -369,17 +399,18 @@
     // affichait l'état de la séance précédente comme s'il était courant.
     // Hors fenêtre, on relit toujours la dernière bougie connue.
     if (horsFenetre || etapes == null) {
-      var bAff = biaisA(prep, finB.t);
+      var tFinD = finB.t + 300000;          // clôture de la dernière bougie connue
+      var bAff = biaisA(prep, tFinD);
       dir = bAff.dir;
       etapes = { score: bAff.score, dir: bAff.dir, t: finB.t, ifvg: null,
-                 dol: bAff.dir === 0 ? null : dolNiveau(finB.t, bAff.dir, finB.c),
+                 dol: bAff.dir === 0 ? null : dolNiveau(tFinD, bAff.dir, finB.c),
                  key: null };
       if (bAff.dir !== 0) {
         var meilleur = null, iFin = clock.length - 1;
         for (var nn = 0; nn < niveaux.length; nn++) {
-          var zA = niveaux[nn], idxA = ST.idxA(zA.cs, finB.t);
+          var zA = niveaux[nn], idxA = ST.idxClos(zA.cs, tFinD);
           if (zA.ne == null || zA.ne > idxA || idxA - zA.ne > CFG.keyAge) continue;
-          if (zA.vu && zA.vu > finB.t) continue;
+          if (zA.vu && zA.vu > tFinD) continue;
           if (zA.casse != null && zA.casse <= idxA) continue;
           if (zA.haussier !== (bAff.dir > 0)) continue;
           var dA = bAff.dir > 0 ? finB.c - zA.haut : zA.bas - finB.c;
@@ -398,9 +429,9 @@
       var n = 0, proche = null, type = null, liste = [];
       if (dir !== 0) niveaux.forEach(function (z) {
         if (z.tf !== nom) return;
-        var idx = ST.idxA(z.cs, fin.t);
+        var idx = ST.idxClos(z.cs, fin.t + 300000);
         if (z.ne == null || z.ne > idx || idx - z.ne > CFG.keyAge) return;
-        if (z.vu && z.vu > fin.t) return;
+        if (z.vu && z.vu > fin.t + 300000) return;
         if (z.casse != null && z.casse <= idx) return;
         if (z.haussier !== (dir > 0)) return;
         var d = dir > 0 ? fin.c - z.haut : z.bas - fin.c;

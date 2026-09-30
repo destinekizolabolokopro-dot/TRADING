@@ -19,13 +19,48 @@
 
   // ───────────────────────────────────────────────── agrégation d'unités ─────
   /** Regroupe n bougies en une. Sert à fabriquer le 4H, absent de Yahoo. */
+  /**
+   * ⚠️ REGROUPEMENT ANCRÉ SUR L'HORLOGE, PAS SUR L'INDICE DU TABLEAU.
+   *
+   * La première version faisait `for (i = 0; i + n <= cs.length; i += n)` :
+   * elle groupait les bougies par paquets de quatre À PARTIR DU DÉBUT DU
+   * TABLEAU. Conséquence, mesurée : Yahoo sert une fenêtre glissante, donc le
+   * tableau ne commence pas au même endroit d'un jour à l'autre — et la
+   * « bougie H4 » contenant 11 h 00 changeait de bornes selon le jour où on
+   * posait la question. Le même instant tombait dans des bougies différentes.
+   * Deux exécutions du même modèle, sur les mêmes données, ne voyaient pas le
+   * même graphique.
+   *
+   * On découpe donc sur la grille du temps : une bougie de 4 h commence à
+   * 00 h, 04 h, 08 h… quel que soit le contenu du tableau. C'est ce que fait
+   * n'importe quelle plateforme, et c'est ce qui rend le résultat reproductible.
+   */
   function agreger(cs, n) {
-    const out = [];
-    for (let i = 0; i + n <= cs.length; i += n) {
-      const p = cs.slice(i, i + n);
-      out.push({ t: p[0].t, o: p[0].o, c: p[n - 1].c,
-        h: Math.max(...p.map(x => x.h)), l: Math.min(...p.map(x => x.l)) });
+    if (!cs || cs.length < 2) return [];
+    // Le pas de la série se déduit des données : l'écart le plus fréquent
+    // entre deux bougies. Le déduire évite de le passer en paramètre et de
+    // le voir diverger de la réalité.
+    const ecarts = {};
+    for (let i = 1; i < cs.length; i++) {
+      const d = cs[i].t - cs[i - 1].t;
+      if (d > 0) ecarts[d] = (ecarts[d] || 0) + 1;
     }
+    const pas = +Object.keys(ecarts).sort((a, b) => ecarts[b] - ecarts[a])[0];
+    const bloc = pas * n;
+    const out = [];
+    let cle = null, cur = null;
+    for (const b of cs) {
+      const k = Math.floor(b.t / bloc) * bloc;
+      if (k !== cle) {
+        if (cur) out.push(cur);
+        cle = k; cur = { t: k, o: b.o, c: b.c, h: b.h, l: b.l };
+      } else {
+        cur.c = b.c;
+        if (b.h > cur.h) cur.h = b.h;
+        if (b.l < cur.l) cur.l = b.l;
+      }
+    }
+    if (cur) out.push(cur);
     return out;
   }
 
@@ -180,6 +215,51 @@
   }
 
   /** Index de la dernière bougie dont l'horodatage est ≤ t (anti-anticipation). */
+  /**
+   * ⚠️ LA BOUGIE EN COURS N'EST PAS UNE BOUGIE.
+   *
+   * `idxA` rend la bougie QUI CONTIENT l'instant t. Sur une unité supérieure,
+   * cette bougie n'est pas finie : son plus haut, son plus bas et sa clôture
+   * ne seront connus que dans une à quatre heures. La lire, c'est lire
+   * l'avenir. Mesuré sur une bougie H4 réelle :
+   *
+   *     ouverture 01 h 00 · plus haut 31058, atteint dans la 1re heure
+   *     le code interrogeait ce plus haut dès 01 h 10 — il ne serait
+   *     définitif qu'à 05 h 00.
+   *
+   * `idxClos` rend la dernière bougie TERMINÉE : celle dont la suivante a
+   * déjà ouvert. C'est la seule qu'un humain devant son écran connaisse.
+   */
+  // Le pas d'une série, déduit de ses données et retenu : la fonction est
+  // appelée des dizaines de milliers de fois dans une boucle.
+  var _pas = typeof WeakMap === 'function' ? new WeakMap() : null;
+  function pasDe(serie) {
+    if (_pas && _pas.has(serie)) return _pas.get(serie);
+    var e = {}, i;
+    for (i = 1; i < serie.length; i++) {
+      var d = serie[i].t - serie[i - 1].t;
+      if (d > 0) e[d] = (e[d] || 0) + 1;
+    }
+    var k = Object.keys(e), best = 0, n = -1;
+    for (i = 0; i < k.length; i++) if (e[k[i]] > n) { n = e[k[i]]; best = +k[i]; }
+    if (_pas) _pas.set(serie, best);
+    return best;
+  }
+
+  function idxClos(serie, t) {
+    // ⚠️ UNE BOUGIE EST CLOSE QUAND SA DURÉE EST ÉCOULÉE, pas quand la
+    // suivante est livrée. La première version attendait l'arrivée de la
+    // bougie suivante : au bord de la série, elle reculait donc d'un cran
+    // sans raison, et la stratégie rendait un résultat différent selon qu'on
+    // lui donnait ou non des bougies POSTÉRIEURES à sa décision. C'est
+    // exactement ce que la vérification « sans l'avenir » a attrapé.
+    var pas = pasDe(serie);
+    var i = idxA(serie, t);
+    if (!pas) return i;
+    while (i >= 0 && serie[i].t + pas > t) i--;
+    return i;
+  }
+
   function idxA(serie, t) {
     let lo = 0, hi = serie.length - 1, r = -1;
     while (lo <= hi) { const m = (lo + hi) >> 1; if (serie[m].t <= t) { r = m; lo = m + 1; } else hi = m - 1; }
@@ -187,5 +267,5 @@
   }
   root.ST = { agreger: agreger, fvgs: fvgs, etatFVG: etatFVG, hierarchie: hierarchie,
     niveau1: niveau1, niveauSup: niveauSup, cisd: cisd, rejectionBlocks: rejectionBlocks,
-    atr: atr, idxA: idxA };
+    atr: atr, idxA: idxA, idxClos: idxClos, pasDe: pasDe };
 })(typeof window !== 'undefined' ? window : this);
