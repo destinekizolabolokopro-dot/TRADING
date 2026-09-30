@@ -297,6 +297,113 @@ if (fs.existsSync(jf)) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
+console.log('\n── UN CHIFFRE PORTE LE NOM DE CE QU\'IL EST ───────────────────');
+// BUG RÉEL, trouvé parce que quelqu'un a demandé « 33 % de réussite, mais
+// combien de RR ? ». Le champ s'appelait `rr` et valait 0,61. Ce n'était pas
+// un rapport à l'objectif — celui-là vaut 2,50 — mais le GAIN SI TOUT EST
+// TOUCHÉ, puisque 90 % de la position est vendue au premier objectif.
+// Conséquences, toutes silencieuses :
+//   · le site affichait « RR 0,61 » pour un objectif à 2,5 fois le risque ;
+//   · scripts/kintt_test.js s'en servait comme PLAFOND de suivi et mesurait
+//     donc le modèle avec un objectif final à 0,61 : 2 116 € annoncés au lieu
+//     de 2 622 € ;
+//   · js/history.js comptait un gain local à `rr`, ce qui aurait multiplié le
+//     gain par quatre dès que le champ serait corrigé.
+
+if (dispo) {
+  const lireR = (s2, i, r) => {
+    const f = path.join(CACHE, `${s2}_${i}_${r}.json`);
+    return fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf-8')) : null;
+  };
+  const DR = {}, ER = {};
+  for (const x of Modele.SERIES) DR[x.cle] = lireR('NQF', x.interval, x.range);
+  for (const x of Modele.SERIES2) ER[x.cle] = lireR('ESF', x.interval, x.range);
+  const dr = DR.m5 ? Modele.evaluer(DR, ER.m5 ? ER : null) : null;
+  const kr = DR.m5 ? Kintt.evaluer(DR, ER.m5 ? ER : null) : null;
+
+  for (const [nom, sigs] of [['modèle', (dr && dr.tousSignaux) || []],
+                             ['kintt', (kr && kr.tousSignaux) || []]]) {
+    t(nom + ' : `rr` est bien le rapport entre l\'objectif et le risque', () => {
+      for (const x of sigs) {
+        const vrai = Math.abs(x.tp - x.entree) / Math.abs(x.entree - x.sl);
+        if (Math.abs(x.rr - vrai) > 0.02)
+          throw new Error(`${new Date(x.t).toISOString().slice(0, 16)} : rr ${x.rr} pour un objectif à ${vrai.toFixed(2)} fois le risque`);
+      }
+    });
+  }
+
+  t('le modèle dit AUSSI ce que vaut la position si tout est touché', () => {
+    // Les deux nombres existent et ne se confondent plus. Sans le second,
+    // js/history.js n'a rien pour compter un gain et retombe sur `rr`.
+    const attendu = +(Modele.CFG.part * Modele.CFG.tp1 +
+                      (1 - Modele.CFG.part) * Modele.CFG.tp2).toFixed(2);
+    for (const x of (dr && dr.tousSignaux) || []) {
+      if (x.gainSiTout == null) throw new Error('champ gainSiTout absent');
+      if (Math.abs(x.gainSiTout - attendu) > 1e-9)
+        throw new Error(`gainSiTout ${x.gainSiTout} au lieu de ${attendu}`);
+    }
+  });
+}
+
+t('js/history.js compte un gain avec le gain, pas avec le rapport', () => {
+  const src = fs.readFileSync(path.join(RACINE, 'js/history.js'), 'utf-8');
+  const sans = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+  if (/'win'\s*\?\s*x\.rr\s*:/.test(sans))
+    throw new Error('un gain local vaut encore x.rr — quatre fois trop');
+  if (!/gainMax/.test(sans)) throw new Error('le champ gainMax n\'est pas utilisé');
+});
+
+t('le site déduit le rapport des NIVEAUX et ne le lit pas', () => {
+  // Les signaux déjà écrits au journal portent l'ancienne valeur. Recalculer
+  // à l'affichage répare l'historique sans le réécrire.
+  const h = fs.readFileSync(path.join(RACINE, 'index.html'), 'utf-8');
+  if (/rr:\s*s\.rr\s*,/.test(h)) throw new Error('le journal relit le champ figé');
+  if (!/Math\.abs\(s\.tp - s\.entree\) \/ Math\.abs\(s\.entree - s\.sl\)/.test(h))
+    throw new Error('le rapport n\'est pas recalculé à la lecture');
+});
+
+t('scripts/kintt_test.js ne plafonne par signal que pour kintt', () => {
+  // C'est ce plafond appliqué au modèle qui a fait annoncer 2 116 € pendant
+  // des jours, au lieu de 2 622 €.
+  const src = fs.readFileSync(path.join(RACINE, 'scripts/kintt_test.js'), 'utf-8');
+  if (!/parSignal/.test(src)) throw new Error('le plafond s\'applique encore à tout le monde');
+  // Le nom d'une mesure contient des parenthèses — « kintt (10h-12h) » — donc
+  // on lit l'appel jusqu'au bout de sa ligne, pas jusqu'à la première.
+  const appels = [...src.matchAll(/mesurer\((.*)$/gm)].map(m => m[1])
+    .filter(a => !/^sigs, cfg, nom/.test(a));
+  for (const a of appels) {
+    if (/Modele\.CFG/.test(a) && /true/.test(a))
+      throw new Error('le modèle est mesuré avec un plafond par signal : ' + a);
+    if (/Kintt\.CFG/.test(a) && !/true/.test(a) && !/parSignal/.test(a))
+      throw new Error('kintt est mesuré SANS plafond par signal : ' + a);
+  }
+});
+
+t('la reconstitution porte les deux nombres, sous deux noms', () => {
+  const src = fs.readFileSync(path.join(RACINE, 'js/mesure.js'), 'utf-8');
+  if (!/'rr','gainMax'/.test(src.replace(/\s/g, '')))
+    throw new Error('js/mesure.js ne distingue pas les deux — régénérer avec gen_mesure.js');
+  const ctx2 = {}; global.window = ctx2;
+  new Function('window', src + '\nreturn Mesure;')(ctx2);
+  const L2 = ctx2.Mesure.liste();
+  for (const x of L2) {
+    const vrai = Math.abs(x.tp - x.entry) / Math.abs(x.entry - x.sl);
+    if (Math.abs(x.rr - vrai) > 0.02)
+      throw new Error(`${x.jour} : rr ${x.rr} pour un objectif à ${vrai.toFixed(2)} fois le risque`);
+  }
+});
+
+t('plus un seul R dans les phrases de la reconstitution', () => {
+  // « brut +0,61 R » s'affichait dans l'infobulle de chaque ligne du journal.
+  // Composé à l'exécution, il échappait au test qui ne relit que le source.
+  const src = fs.readFileSync(path.join(RACINE, 'js/mesure.js'), 'utf-8');
+  const ctx2 = {}; global.window = ctx2;
+  new Function('window', src + '\nreturn Mesure;')(ctx2);
+  const fautifs = ctx2.Mesure.liste().filter(x => /\d[,.]\d\s*R\b|\d\s*R\b/.test(x.motif || ''));
+  if (fautifs.length) throw new Error(fautifs.length + ' phrase(s), ex. « ' + fautifs[0].motif + ' »');
+});
+
 console.log('\n── LA STRATÉGIE KINTT ────────────────────────────────────────');
 // Deuxième stratégie, suivant le plan source « 10AM OXXC ». Elle tourne à
 // côté de js/modele.js, elle ne le remplace pas. Les mêmes invariants lui
@@ -707,8 +814,19 @@ const err2 = [];
 p.removeAllListeners('pageerror'); p.on('pageerror', e => err2.push('ERREUR JS : ' + e.message));
 await p.goto('http://127.0.0.1:' + port + '/index.html', { waitUntil: 'load' });
 await p.waitForTimeout(3000);
+// Le R traqué DANS LE TEXTE AFFICHÉ, pas dans le source. « +0,60 R » était
+// composé à l'exécution par concaténation : aucun test relisant les fichiers
+// ne pouvait le voir, et il s'affichait sur chaque ligne du journal.
+const enR = await p.evaluate(() => {
+  const t = document.body.innerText || '';
+  return [...new Set((t.match(/[-+−]?\\d+([.,]\\d+)?[ \\u00a0]*R(?![\\wÀ-ÿ])/g) || []))].slice(0, 6);
+});
+// Les infobulles ne sont pas dans innerText : on lit aussi les attributs title.
+const enRTitres = await p.evaluate(() =>
+  [...new Set([...document.querySelectorAll('[title]')]
+    .flatMap(e => (e.getAttribute('title').match(/[-+−]?\\d+([.,]\\d+)?[ \\u00a0]*R(?![\\wÀ-ÿ])/g) || [])))].slice(0, 6));
 const kintt = {
-  err: err2,
+  err: err2, enR, enRTitres,
   tag: (await p.textContent('#k-tag') || '').trim(),
   texte: (await p.textContent('#kintt') || '').trim(),
   jauge: await p.evaluate(() => document.querySelector('#k-gauge').style.width),
@@ -768,6 +886,10 @@ console.log(JSON.stringify(out)); await b.close();`;
     });
     t('brancher KINTT n\'a pas vidé le panneau du modèle', () => {
       if (!(K3.chaine > 200)) throw new Error('la chaîne du modèle ne fait plus que ' + K3.chaine + ' caractères');
+    });
+    t('la page affichée ne parle plus en R, nulle part', () => {
+      const f = (K3.enR || []).concat(K3.enRTitres || []);
+      if (f.length) throw new Error('reste à l\'écran : ' + [...new Set(f)].join(', '));
     });
     t('KINTT dit combien de trades portent son chiffre', () => {
       // « +304 € » sans « 3 trades » est un mensonge par omission.

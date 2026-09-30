@@ -18,13 +18,20 @@ for (const x of Modele.SERIES2) E[x.cle] = lire('ESF', x.interval, x.range);
 if (!D.m5) { console.error('Cache absent.'); process.exit(1); }
 
 const RISQUE = 250, COUT = 0.7;
-function mesurer(sigs, cfg, nom) {
+function mesurer(sigs, cfg, nom, parSignal) {
   const T = [];
   for (const s of sigs) {
     // kintt vise un PRIX, pas un multiple du risque. Le suivi partagé
     // raisonne en multiples : on lui donne donc, pour ce signal-là, le
     // multiple équivalent. Sans ça le plafond vaut NaN et tout s'effondre.
-    const c2 = Object.assign({}, cfg, { tp2: s.rr != null ? s.rr : cfg.tp2 });
+    //
+    // ⚠️ CETTE LIGNE S'APPLIQUAIT AUSSI AU MODÈLE, et c'était faux. Le champ
+    // `rr` du modèle valait 0,61 — le gain si tout est touché, pas le rapport
+    // à l'objectif — et il écrasait donc tp2 : le modèle était mesuré avec un
+    // objectif final à 0,61 fois le risque au lieu de 2,50. Résultat annoncé
+    // 2 116 € au lieu de 2 622 €, pendant des jours. Le plafond par signal ne
+    // concerne QUE les stratégies qui visent une zone.
+    const c2 = parSignal && s.rr != null ? Object.assign({}, cfg, { tp2: s.rr }) : cfg;
     const fin = Position.suivre(s, D.m5, c2, {
       prudent: true, maxBarres: 200, depuis: s.t,
       heure: Modele.heure, jourSignal: Modele.heure(s.t).jour });
@@ -44,7 +51,7 @@ function mesurer(sigs, cfg, nom) {
   console.log(`  ${nom.padEnd(22)} ${String(n).padStart(3)} trades · ${(pos.length / n * 100).toFixed(1).padStart(5)} % gagnés · ` +
     `${eu(moy * RISQUE).padStart(7)} par trade · ${eu(R * RISQUE).padStart(8)} au total`);
   console.log(`  ${''.padEnd(22)} gain ${eu(gM * RISQUE)} · perte ${eu(-pM * RISQUE)} · seuil ${seuil.toFixed(1)} % · ` +
-    `creux ${eu(-dd * RISQUE)} · RR visé ${(T.reduce((a, x) => a + (x.rr || 0), 0) / n).toFixed(2)}`);
+    `creux ${eu(-dd * RISQUE)} · objectif visé ${(T.reduce((a, x) => a + (x.rr || 0), 0) / n).toFixed(2)}× le risque`);
   const par = {}; T.forEach(x => par[x.o] = (par[x.o] || 0) + 1);
   console.log(`  ${''.padEnd(22)} issues : ` + Object.keys(par).sort().map(k => k + ' ' + par[k]).join(' · '));
   return { n, wr: pos.length / n * 100, euros: R * RISQUE, jours: [...new Set(T.map(x => x.jour))] };
@@ -55,7 +62,7 @@ const dm = Modele.evaluer(D, E);
 mesurer(dm.tousSignaux, Modele.CFG, 'modele (09h-10h)');
 console.log('');
 const dk = Kintt.evaluer(D, E);
-mesurer(dk.tousSignaux, Kintt.CFG, 'kintt (10h-12h)');
+mesurer(dk.tousSignaux, Kintt.CFG, 'kintt (10h-12h)', true);
 console.log('\n  où passent les bougies :');
 const E1 = dk.entonnoir;
 for (const k of Object.keys(E1)) console.log('    ' + k.padEnd(20) + String(E1[k]).padStart(6));
@@ -74,6 +81,6 @@ const CAS = [
 ];
 for (const [nom, opt] of CAS) {
   Object.assign(Kintt.CFG, base, opt);
-  mesurer(Kintt.evaluer(D, E).tousSignaux, Kintt.CFG, nom);
+  mesurer(Kintt.evaluer(D, E).tousSignaux, Kintt.CFG, nom, true);
 }
 Object.assign(Kintt.CFG, base);

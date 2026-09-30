@@ -335,7 +335,18 @@
               // modèle sait calculer de plus proche de ça. Borné à tp2 R pour
               // que le runner reste atteignable.
               tp: +objectif(L, entree, risq, dol).toFixed(2),
-              rr: CFG.part * CFG.tp1 + (1 - CFG.part) * CFG.tp2,
+              // ⚠️ CE CHAMP S'APPELAIT `rr` ET N'EN ÉTAIT PAS UN. Il portait
+              // `part × tp1 + (1 − part) × tp2` = 0,61, c'est-à-dire le GAIN
+              // SI TOUT EST TOUCHÉ — pas le rapport entre l'objectif et le
+              // risque, qui vaut 2,50. Le site affichait donc « RR 0,61 » pour
+              // un objectif situé à deux fois et demie le risque, et
+              // scripts/kintt_test.js s'en servait comme PLAFOND de suivi :
+              // il mesurait le modèle avec un objectif final à 0,61 au lieu de
+              // 2,50, soit 2 116 € annoncés là où il y en avait 2 622.
+              // Les deux nombres existent, ils ne disent pas la même chose et
+              // ils portent désormais deux noms différents.
+              rr: +(Math.abs(objectif(L, entree, risq, dol) - entree) / risq).toFixed(2),
+              gainSiTout: +(CFG.part * CFG.tp1 + (1 - CFG.part) * CFG.tp2).toFixed(2),
               tf: choisi.tf, niveau: key.type + ' ' + key.tf, dol: dol,
               // Le contexte est figé ICI, au moment du signal. Sans ça, celui
               // qui lit le journal voit le biais et le DOL de la DERNIÈRE

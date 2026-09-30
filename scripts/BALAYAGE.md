@@ -746,9 +746,16 @@ tournent et se mesurent l'une contre l'autre.
 ### Ce que le plan produit vraiment
 
 ```
-  modele (09h-10h)     41 trades ·  87,8 % ·  +52 € /trade ·  +2 116 €
+  modele (09h-10h)     41 trades ·  87,8 % ·  +64 € /trade ·  +2 622 €
   kintt  (10h-12h)      3 trades ·  33,3 % · +101 € /trade ·    +304 €
 ```
+
+> ⚠️ **Le chiffre du modèle a d'abord été annoncé à +2 116 €, et c'était faux.**
+> Le champ `rr` des signaux valait 0,61 — le **gain si tout est touché**, pas le
+> rapport à l'objectif, qui vaut 2,50 — et `kintt_test.js` s'en servait comme
+> plafond de suivi. Il mesurait donc le modèle avec un objectif final à 0,61
+> fois le risque. Corrigé : les deux nombres portent deux noms, `rr` et
+> `gainSiTout`, et six vérifications interdisent qu'ils se reconfondent.
 
 **Trois trades en soixante jours.** Environ un par mois. L'entonnoir dit
 pourquoi :
