@@ -14,6 +14,11 @@
  *
  *   node scripts/epreuves.js            le Nasdaq
  *   node scripts/epreuves.js --tous     les quatre marchés ensemble
+ *   node scripts/epreuves.js --rapide   saute les épreuves à 200 tirages
+ *
+ * Les épreuves 1 à 3 rejouent deux cents fois tout l'échantillon sur des
+ * bougies de 1 minute : comptez une dizaine de minutes sur quatre marchés.
+ * Les épreuves 4 à 6 sont immédiates.
  */
 const fs = require('fs'), path = require('path');
 const RACINE = path.resolve(__dirname, '..');
@@ -85,6 +90,8 @@ console.log(`║  LES ÉPREUVES · ${String(MARCHES.length)} marché(s) · ${Str
 console.log('╚══════════════════════════════════════════════════════════════════════╝');
 console.log(`\nLA STRATÉGIE TELLE QU'ELLE EST : ${REEL.n} trades · ${pc(REEL.wr)} · ${eu(REEL.moy * RISQUE)} par trade · ${eu(REEL.som * RISQUE)}\n`);
 
+const RAPIDE = process.argv.includes('--rapide');
+
 function epreuve(titre, question, echantillons) {
   const b = echantillons.map(bilan).filter(Boolean);
   if (!b.length) { console.log(`\n── ${titre}\n   (aucun trade produit)`); return; }
@@ -114,7 +121,7 @@ function epreuve(titre, question, echantillons) {
 // On garde TOUT : les mêmes instants, les mêmes stops, la même gestion. On ne
 // tire au sort que le SENS. Si le résultat ne baisse pas, le biais haussier /
 // baissier — la moitié de la machinerie — ne sert à rien.
-{
+if (!RAPIDE) {
   const ech = [];
   for (let g = 1; g <= 200; g++) {
     const r = alea(g * 7919), T = [];
@@ -134,7 +141,7 @@ function epreuve(titre, question, echantillons) {
 // même risque en points — mais à une bougie tirée au sort. Si ça fait aussi
 // bien, toute la détection (biais, DOL, niveau clé, touche, inversion) ne
 // sert qu'à choisir une heure qui n'a pas d'importance.
-{
+if (!RAPIDE) {
   const ech = [];
   for (let g = 1; g <= 200; g++) {
     const r = alea(g * 104729), T = [];
@@ -162,7 +169,7 @@ function epreuve(titre, question, echantillons) {
 }
 
 // ── 3. TOUT AU HASARD ─────────────────────────────────────────────────────
-{
+if (!RAPIDE) {
   const ech = [];
   for (let g = 1; g <= 200; g++) {
     const r = alea(g * 15485863), T = [];
@@ -207,9 +214,11 @@ function epreuve(titre, question, echantillons) {
     console.log(`      ${String(slip).padStart(5)} point(s)      ${eu(b.moy * RISQUE).padStart(8)}` +
       (b.moy <= 0 ? '   ❌ négative' : ''));
   }
-  console.log(rupture === null
-    ? '   ✅ tient jusqu\'à 3 points de dérapage par côté'
-    : `   ⚠️  devient perdante dès ${rupture} point(s) de dérapage par côté`);
+  if (rupture === null) console.log('   ✅ tient jusqu\'à 3 points de dérapage par côté');
+  else if (rupture === 0) console.log('   ❌ perdante MÊME SANS AUCUN FRAIS. Le dérapage n\'y est pour rien :\n' +
+    '      c\'est la stratégie elle-même qui ne gagne pas sur cet échantillon.');
+  else console.log(`   ⚠️  ne supporte que moins de ${rupture} point(s) de dérapage par côté.\n` +
+    `      Le marché réel en coûte souvent un quart de point : la marge est donc nulle.`);
 }
 
 // ── 5. L'HYPOTHÈSE INTRABOUGIE PÈSE COMBIEN ? ─────────────────────────────
@@ -261,18 +270,24 @@ function epreuve(titre, question, echantillons) {
     jour: jr, n: parJour[jr].length,
     reste: total - parJour[jr].reduce((a, x) => a + x, 0)
   })).sort((a, b) => a.reste - b.reste);
-  const negatifs = sans.filter(x => x.reste <= 0).length;
+  // ⚠️ LA QUESTION EST « LE SIGNE CHANGE-T-IL », pas « le reste est-il
+  // négatif ». Une première version comptait les journées dont le retrait
+  // laissait un total négatif — ce qui, quand le total est DÉJÀ négatif,
+  // compte presque toutes les journées et ne veut rien dire.
+  const positif = total > 0;
+  const bascule = sans.filter(x => (x.reste > 0) !== positif).length;
   console.log(`      total avec tout            ${eu(total * RISQUE).padStart(9)}`);
   for (const x of sans.slice(0, 3))
     console.log(`      sans le ${x.jour} (${String(x.n)} trade${x.n > 1 ? 's' : ''})  ${eu(x.reste * RISQUE).padStart(9)}` +
-      (x.reste <= 0 ? '   ❌ le total devient négatif' : ''));
+      ((x.reste > 0) !== positif ? '   ❌ le signe bascule' : ''));
   console.log(`      ...`);
   for (const x of sans.slice(-2))
     console.log(`      sans le ${x.jour} (${String(x.n)} trade${x.n > 1 ? 's' : ''})  ${eu(x.reste * RISQUE).padStart(9)}`);
   console.log(`   ${jours.length} journées. Retirer la pire en fait ${eu(sans[sans.length - 1].reste * RISQUE)},` +
     ` retirer la meilleure ${eu(sans[0].reste * RISQUE)}.`);
-  if (negatifs) console.log(`   ❌ ${negatifs} journée(s) sur ${jours.length} suffisent, à elles seules, ` +
-    `à rendre le total négatif.\n      Le résultat tient à une poignée de séances, pas à une régularité.`);
+  if (bascule) console.log(`   ❌ ${bascule} journée(s) sur ${jours.length} renversent le signe du total à elles seules\n` +
+    `      (${positif ? 'de positif à négatif' : 'de négatif à positif'}). Le résultat tient à une\n` +
+    `      poignée de séances, pas à une régularité.`);
   else console.log(`   ✅ aucune journée seule ne renverse le signe du total.`);
 }
 

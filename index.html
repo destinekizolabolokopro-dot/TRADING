@@ -739,7 +739,11 @@ function paintKintt(){
       '<b>Relevé en direct de KINTT :</b> ' +
       (KDIST_ETAT === 'indisponible' ? 'journal non joignable pour l’instant.'
        : KDIST && KDIST.signaux.length ? KDIST.signaux.length + ' signal(aux), aucun encore clos.'
-       : 'aucun signal relevé pour l’instant. La fenêtre 10 h → 12 h est étroite et le filtre « zone intacte » très sélectif.') +
+       // Un panneau qui ne donne pas de décompte laisse croire qu'il n'a pas
+       // regardé. « 0 trade » est une information ; le silence n'en est pas une.
+       : '<b>0 trade</b> relevé pour l’instant. La fenêtre 10 h → 12 h est étroite et le filtre '
+         + '« zone jamais touchée » très sélectif : sur l’historique complet, la stratégie '
+         + 'ne déclenche rien du tout.') +
       '</div>';
   }
 
