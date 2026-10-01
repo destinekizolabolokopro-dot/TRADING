@@ -1,54 +1,484 @@
 {
- "maj": "2026-09-30T23:11:01.458Z",
+ "maj": "2026-10-01T00:35:38.184Z",
  "source": "yahoo",
  "eurusd": 1.1334,
  "confirmePar": "ES=F",
  "sansConfirmation": false,
- "prix": 30773.75,
- "derniereBougie": 1790809200000,
+ "prix": 30768,
+ "derniereBougie": 1790814300000,
  "retardMin": 11,
  "hors": true,
  "etat": "ATTEND_IFVG",
- "dir": 0,
- "score": 0,
- "dol": null,
- "key": null,
+ "dir": 1,
+ "score": 2,
+ "dol": 30906,
+ "key": {
+  "type": "FVG",
+  "tf": "M15",
+  "bas": 30754.25,
+  "haut": 30767.75
+ },
  "ifvg": null,
  "parTF": [
   {
    "tf": "M5",
-   "n": 0,
-   "distance": null,
-   "type": null,
-   "liste": []
+   "n": 83,
+   "distance": 0.5,
+   "type": "CISD",
+   "liste": [
+    {
+     "type": "CISD",
+     "d": 0.5,
+     "bas": 30717.5,
+     "haut": 30767.5
+    },
+    {
+     "type": "ITL",
+     "d": 2.75,
+     "bas": 30754.25,
+     "haut": 30765.25
+    },
+    {
+     "type": "RB",
+     "d": 5.25,
+     "bas": 30754.25,
+     "haut": 30762.75
+    },
+    {
+     "type": "FVG",
+     "d": 8,
+     "bas": 30754.25,
+     "haut": 30760
+    },
+    {
+     "type": "CISD",
+     "d": 17.75,
+     "bas": 30688,
+     "haut": 30750.25
+    },
+    {
+     "type": "FVG",
+     "d": 27.25,
+     "bas": 30737.5,
+     "haut": 30740.75
+    },
+    {
+     "type": "ITL",
+     "d": 32.25,
+     "bas": 30684.5,
+     "haut": 30735.75
+    },
+    {
+     "type": "CISD",
+     "d": 32.5,
+     "bas": 30709.75,
+     "haut": 30735.5
+    },
+    {
+     "type": "RB",
+     "d": 39.5,
+     "bas": 30712.75,
+     "haut": 30728.5
+    },
+    {
+     "type": "CISD",
+     "d": 49.5,
+     "bas": 30672.75,
+     "haut": 30718.5
+    },
+    {
+     "type": "CISD",
+     "d": 56,
+     "bas": 30706.5,
+     "haut": 30712
+    },
+    {
+     "type": "CISD",
+     "d": 61,
+     "bas": 30691.75,
+     "haut": 30707
+    },
+    {
+     "type": "RB",
+     "d": 62.5,
+     "bas": 30688,
+     "haut": 30705.5
+    },
+    {
+     "type": "CISD",
+     "d": 67.25,
+     "bas": 30696.25,
+     "haut": 30700.75
+    }
+   ]
   },
   {
    "tf": "M15",
-   "n": 0,
-   "distance": null,
-   "type": null,
-   "liste": []
+   "n": 67,
+   "distance": 0.25,
+   "type": "FVG",
+   "liste": [
+    {
+     "type": "FVG",
+     "d": 0.25,
+     "bas": 30754.25,
+     "haut": 30767.75
+    },
+    {
+     "type": "FVG",
+     "d": 19,
+     "bas": 30740.5,
+     "haut": 30749
+    },
+    {
+     "type": "CISD",
+     "d": 27.75,
+     "bas": 30703.5,
+     "haut": 30740.25
+    },
+    {
+     "type": "CISD",
+     "d": 28.75,
+     "bas": 30688,
+     "haut": 30739.25
+    },
+    {
+     "type": "ITL",
+     "d": 39.75,
+     "bas": 30636.5,
+     "haut": 30728.25
+    },
+    {
+     "type": "ITL",
+     "d": 40.75,
+     "bas": 30679,
+     "haut": 30727.25
+    },
+    {
+     "type": "CISD",
+     "d": 41,
+     "bas": 30704.25,
+     "haut": 30727
+    },
+    {
+     "type": "CISD",
+     "d": 49.5,
+     "bas": 30672.75,
+     "haut": 30718.5
+    },
+    {
+     "type": "CISD",
+     "d": 55.25,
+     "bas": 30682.75,
+     "haut": 30712.75
+    },
+    {
+     "type": "ITL",
+     "d": 58,
+     "bas": 30662.25,
+     "haut": 30710
+    },
+    {
+     "type": "CISD",
+     "d": 65.75,
+     "bas": 30688.25,
+     "haut": 30702.25
+    },
+    {
+     "type": "CISD",
+     "d": 70.5,
+     "bas": 30622,
+     "haut": 30697.5
+    },
+    {
+     "type": "RB",
+     "d": 72.25,
+     "bas": 30622,
+     "haut": 30695.75
+    },
+    {
+     "type": "RB",
+     "d": 75.25,
+     "bas": 30636.5,
+     "haut": 30692.75
+    }
+   ]
   },
   {
    "tf": "M30",
-   "n": 0,
-   "distance": null,
-   "type": null,
-   "liste": []
+   "n": 64,
+   "distance": 5.75,
+   "type": "CISD",
+   "liste": [
+    {
+     "type": "CISD",
+     "d": 5.75,
+     "bas": 30741,
+     "haut": 30762.25
+    },
+    {
+     "type": "RB",
+     "d": 14.25,
+     "bas": 30710,
+     "haut": 30753.75
+    },
+    {
+     "type": "ITL",
+     "d": 18.5,
+     "bas": 30704.5,
+     "haut": 30749.5
+    },
+    {
+     "type": "ITL",
+     "d": 21.25,
+     "bas": 30636.5,
+     "haut": 30746.75
+    },
+    {
+     "type": "CISD",
+     "d": 27.75,
+     "bas": 30712,
+     "haut": 30740.25
+    },
+    {
+     "type": "RB",
+     "d": 38.25,
+     "bas": 30708.75,
+     "haut": 30729.75
+    },
+    {
+     "type": "CISD",
+     "d": 41.5,
+     "bas": 30704.25,
+     "haut": 30726.5
+    },
+    {
+     "type": "CISD",
+     "d": 53,
+     "bas": 30688,
+     "haut": 30715
+    },
+    {
+     "type": "CISD",
+     "d": 55.25,
+     "bas": 30682.75,
+     "haut": 30712.75
+    },
+    {
+     "type": "RB",
+     "d": 70.5,
+     "bas": 30622,
+     "haut": 30697.5
+    },
+    {
+     "type": "RB",
+     "d": 75.25,
+     "bas": 30636.5,
+     "haut": 30692.75
+    },
+    {
+     "type": "FVG",
+     "d": 80,
+     "bas": 30623,
+     "haut": 30688
+    },
+    {
+     "type": "CISD",
+     "d": 86.75,
+     "bas": 30629,
+     "haut": 30681.25
+    },
+    {
+     "type": "RB",
+     "d": 87.5,
+     "bas": 30664.25,
+     "haut": 30680.5
+    }
+   ]
   },
   {
    "tf": "H1",
-   "n": 0,
-   "distance": null,
-   "type": null,
-   "liste": []
+   "n": 101,
+   "distance": 5.75,
+   "type": "RB",
+   "liste": [
+    {
+     "type": "RB",
+     "d": 5.75,
+     "bas": 30710,
+     "haut": 30762.25
+    },
+    {
+     "type": "FVG",
+     "d": 13.75,
+     "bas": 30751.5,
+     "haut": 30754.25
+    },
+    {
+     "type": "ITL",
+     "d": 16.5,
+     "bas": 30636.5,
+     "haut": 30751.5
+    },
+    {
+     "type": "RB",
+     "d": 31.75,
+     "bas": 30662.25,
+     "haut": 30736.25
+    },
+    {
+     "type": "FVG",
+     "d": 85,
+     "bas": 30606,
+     "haut": 30683
+    },
+    {
+     "type": "ITL",
+     "d": 110,
+     "bas": 30356.75,
+     "haut": 30658
+    },
+    {
+     "type": "CISD",
+     "d": 120.25,
+     "bas": 30539.75,
+     "haut": 30647.75
+    },
+    {
+     "type": "CISD",
+     "d": 121,
+     "bas": 30592.25,
+     "haut": 30647
+    },
+    {
+     "type": "RB",
+     "d": 158.25,
+     "bas": 30564.25,
+     "haut": 30609.75
+    },
+    {
+     "type": "ITL",
+     "d": 162,
+     "bas": 30512.25,
+     "haut": 30606
+    },
+    {
+     "type": "CISD",
+     "d": 168.25,
+     "bas": 30537.75,
+     "haut": 30599.75
+    },
+    {
+     "type": "ITL",
+     "d": 174,
+     "bas": 30504.5,
+     "haut": 30594
+    },
+    {
+     "type": "FVG",
+     "d": 175.75,
+     "bas": 30584.75,
+     "haut": 30592.25
+    },
+    {
+     "type": "CISD",
+     "d": 176,
+     "bas": 30549,
+     "haut": 30592
+    }
+   ]
   },
   {
    "tf": "H4",
-   "n": 0,
-   "distance": null,
-   "type": null,
-   "liste": []
+   "n": 92,
+   "distance": 8.75,
+   "type": "ITL",
+   "liste": [
+    {
+     "type": "ITL",
+     "d": 8.75,
+     "bas": 30356.75,
+     "haut": 30759.25
+    },
+    {
+     "type": "CISD",
+     "d": 11,
+     "bas": 30662.25,
+     "haut": 30757
+    },
+    {
+     "type": "CISD",
+     "d": 78.75,
+     "bas": 30512.25,
+     "haut": 30689.25
+    },
+    {
+     "type": "FVG",
+     "d": 166.5,
+     "bas": 30266.75,
+     "haut": 30601.5
+    },
+    {
+     "type": "ITL",
+     "d": 178,
+     "bas": 30370,
+     "haut": 30590
+    },
+    {
+     "type": "RB",
+     "d": 180,
+     "bas": 30504.5,
+     "haut": 30588
+    },
+    {
+     "type": "CISD",
+     "d": 188,
+     "bas": 30409.25,
+     "haut": 30580
+    },
+    {
+     "type": "ITL",
+     "d": 485,
+     "bas": 30028.5,
+     "haut": 30283
+    },
+    {
+     "type": "FVG",
+     "d": 565.75,
+     "bas": 30188.25,
+     "haut": 30202.25
+    },
+    {
+     "type": "FVG",
+     "d": 595.5,
+     "bas": 30130.5,
+     "haut": 30172.5
+    },
+    {
+     "type": "CISD",
+     "d": 623.75,
+     "bas": 30127.25,
+     "haut": 30144.25
+    },
+    {
+     "type": "CISD",
+     "d": 634,
+     "bas": 30069.25,
+     "haut": 30134
+    },
+    {
+     "type": "FVG",
+     "d": 697,
+     "bas": 30040.25,
+     "haut": 30071
+    },
+    {
+     "type": "FVG",
+     "d": 750,
+     "bas": 29993.25,
+     "haut": 30018
+    }
+   ]
   }
  ],
  "trade": null,
@@ -67,7 +497,7 @@
   "dol": 30370,
   "biaisDir": -1,
   "biaisScore": -2,
-  "barre": 12957,
+  "barre": 12958,
   "derniere": false
  },
  "cfg": {
@@ -94,8 +524,8 @@
  },
  "kintt": {
   "hors": true,
-  "prix": 30773.75,
-  "derniereBougie": 1790809200000,
+  "prix": 30768,
+  "derniereBougie": 1790814300000,
   "etape": {
    "t": 1790783700000,
    "score": 4,
@@ -110,9 +540,9 @@
    "barres": 1500,
    "biaisNeutre": 562,
    "esDesaccord": 427,
-   "pasDeZone": 316,
+   "pasDeZone": 315,
    "avant10h": 47,
-   "pasDeBalayage": 126,
+   "pasDeBalayage": 127,
    "pasDeConfirmation": 21,
    "stopMauvaisCote": 0,
    "stopTropSerre": 0,
