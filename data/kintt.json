@@ -16,16 +16,23 @@
    "prix": 30614.5,
    "etapeBloquee": "biais",
    "dit": "Biais neutre (score 0 sur 4, il en faut 2) — le plan interdit d'entrer."
+  },
+  {
+   "ts": "2026-10-01T15:03:52.161Z",
+   "jour": "2026-10-01",
+   "prix": 30625.75,
+   "etapeBloquee": "balayage",
+   "dit": "Prix dans FVG M15 (30670.5 – 30700.5), mais aucun balayage du plus bas ou du plus haut de séance."
   }
  ],
  "bilan": {
-  "maj": "2026-09-30T05:31:21.305Z",
+  "maj": "2026-10-01T15:03:52.161Z",
   "total": 0,
   "clos": 0,
   "ouverts": 0,
   "reussite": null,
   "cumulR": 0,
   "euros": 0,
-  "passages": 2
+  "passages": 3
  }
 }
