@@ -234,10 +234,19 @@
     // Le relevé automatique ne se déclenche pas de façon fiable : s'il ne
     // tourne qu'une fois dans la séance, il doit quand même retrouver les
     // deux signaux possibles de la journée, pas uniquement le plus récent.
+    var etapeParJour = {};
     var parJour = {}, dernier = null, etapes = null, tous = [];
 
     for (var i = 60; i < clock.length; i++) {
       var bar = clock[i], e = heure(bar.t), px = bar.c;
+      // ── CE QUE LE MODÈLE A VU PENDANT LA SÉANCE ───────────────────────
+      // `etapes` finit par décrire la DERNIÈRE bougie reçue, qui est presque
+      // toujours hors fenêtre : quand GitHub abandonne les créneaux de la
+      // séance — mesuré le 30 septembre, les trois créneaux perdus — le
+      // rattrapage de l'après-midi racontait l'état de 13 h 40, pas ce qui
+      // s'était passé entre 09 h et 10 h. On garde donc à part la dernière
+      // étape vue DANS la fenêtre, jour par jour.
+      if (!etapeParJour[e.jour]) etapeParJour[e.jour] = null;
       // L'INSTANT DE LA DÉCISION est la CLÔTURE de cette bougie de 5 minutes,
       // pas son ouverture : le modèle lit `bar.c`. Tout ce qui s'est terminé à
       // cet instant est connu, la bougie de 5 minutes comprise. Dater la
@@ -250,19 +259,19 @@
 
       var b = biaisA(prep, tD);
       var etapeCourante = { score: b.score, dir: b.dir, dol: null, key: null, ifvg: null, t: bar.t };
-      if (b.dir === 0) { etapes = etapeCourante; continue; }
+      if (b.dir === 0) { etapes = etapeCourante; etapeParJour[e.jour] = etapeCourante; continue; }
       if (b.dir !== dir) { dir = b.dir; etat = 'CHERCHE'; key = null; }
 
       var dol = dolNiveau(bar.t, dir, px);
       etapeCourante.dol = dol;
-      if (dol == null) { etapes = etapeCourante; continue; }
+      if (dol == null) { etapes = etapeCourante; etapeParJour[e.jour] = etapeCourante; continue; }
 
       if (etat === 'CHERCHE') {
         var best = null;
         for (var n = 0; n < niveaux.length; n++) {
           var z = niveaux[n], idx = ST.idxClos(z.cs, tD);
           if (z.ne == null || z.ne > idx || idx - z.ne > CFG.keyAge) continue;
-          if (z.vu && z.vu > bar.t) continue;
+          if (z.vu && z.vu > tD) continue;
           if (z.casse != null && z.casse <= idx) continue;
           if (z.haussier !== (dir > 0)) continue;
           var d = dir > 0 ? px - z.haut : z.bas - px;
@@ -279,13 +288,17 @@
       }
 
       if (etat === 'ATTEND_IFVG' && key) {
-        if (i - legDeb > CFG.react) { etat = 'CHERCHE'; key = null; etapes = etapeCourante; continue; }
+        if (i - legDeb > CFG.react) { etat = 'CHERCHE'; key = null; etapes = etapeCourante; etapeParJour[e.jour] = etapeCourante; continue; }
         var choisi = null, ordre = ['5m', '2m', '1m'];
         for (var o = 0; o < ordre.length && !choisi; o++) {
           var zs = zIF[ordre[o]];
           for (var q = 0; q < zs.length; q++) {
             var zz = zs[q];
-            if (zz.tCasse == null || zz.tCasse < tTouche || zz.tCasse > bar.t) continue;
+        // Les éléments de structure portent désormais l'instant où ils sont
+        // CONNUS. On les compare donc à l'instant de la DÉCISION — la
+        // clôture de la bougie de 5 minutes — et non à son ouverture, qui
+        // écartait tout ce qui se confirmait pendant la bougie en cours.
+            if (zz.tCasse == null || zz.tCasse < tTouche || zz.tCasse > tD) continue;
             if ((zz.haussier ? -1 : 1) !== dir) continue;
             choisi = { z: zz, tf: ordre[o] }; break;
           }
@@ -293,7 +306,7 @@
         etapeCourante.ifvg = choisi;
 
         // ── LE SECOND MARCHÉ DOIT DIRE LA MÊME CHOSE ───────── [PLAN SOURCE]
-        if (choisi && !confirme2(tD, dir)) { etapes = etapeCourante; continue; }
+        if (choisi && !confirme2(tD, dir)) { etapes = etapeCourante; etapeParJour[e.jour] = etapeCourante; continue; }
 
         // ── IFVG *ET* CISD ─────────────────────────────────── [PLAN SOURCE]
         // Le plan liste les deux : « IFVG + CISD présents ». Le modèle se
@@ -303,10 +316,10 @@
           var cisdOk = false, limCisd = bar.t - CFG.react * 5 * 60000;
           for (var q3 = cisdClock.length - 1; q3 >= 0; q3--) {
             var zc = cisdClock[q3];
-            if (zc.t > bar.t || zc.t < limCisd) continue;
+            if (zc.t > tD || zc.t < limCisd) continue;
             if (zc.haussier === (dir > 0)) { cisdOk = true; break; }
           }
-          if (!cisdOk) { etapes = etapeCourante; continue; }
+          if (!cisdOk) { etapes = etapeCourante; etapeParJour[e.jour] = etapeCourante; continue; }
         }
 
         if (choisi) {
@@ -380,7 +393,7 @@
           }
         }
       }
-      etapes = etapeCourante;
+      etapes = etapeCourante; etapeParJour[e.jour] = etapeCourante;
     }
 
     // ── HORS FENÊTRE ────────────────────────────────────────────────────
@@ -463,6 +476,11 @@
       dernierSignal: dernier,
       tousSignaux: tous,
       hors: horsFenetre,
+      // L'état vu DANS la fenêtre du jour de la dernière bougie. C'est lui
+      // qu'un relevé de rattrapage doit raconter : « voici où la chaîne s'est
+      // arrêtée pendant la séance », et non « voici où en est le marché
+      // maintenant », qui n'apprend rien sur une séance déjà finie.
+      etapeFenetre: etapeParJour[heure(fin.t).jour] || null,
       sansConfirmation: sansConfirmation,
       cfg: CFG
     };
