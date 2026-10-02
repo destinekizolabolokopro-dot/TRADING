@@ -23,16 +23,23 @@
    "prix": 30605.25,
    "etapeBloquee": "zone",
    "dit": "Biais baissier, mais aucune zone intacte (M15 → H4) où le prix soit venu."
+  },
+  {
+   "ts": "2026-10-02T16:17:48.169Z",
+   "jour": "2026-10-02",
+   "prix": 31111.5,
+   "etapeBloquee": "es",
+   "dit": "Le NQ est haussier, l'ES dit le contraire — le plan exige les deux ensemble."
   }
  ],
  "bilan": {
-  "maj": "2026-10-01T17:03:37.297Z",
+  "maj": "2026-10-02T16:17:48.169Z",
   "total": 0,
   "clos": 0,
   "ouverts": 0,
   "reussite": null,
   "cumulR": 0,
   "euros": 0,
-  "passages": 3
+  "passages": 4
  }
 }
