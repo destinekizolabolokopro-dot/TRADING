@@ -36,6 +36,8 @@ for (const a of process.argv.slice(2)) {
   if ((m = a.match(/^--partiel=([\d.]+)$/))) AMD.CFG.part = +m[1];
   if ((m = a.match(/^--tp1=([\d.]+)$/))) AMD.CFG.tp1 = +m[1];
   if ((m = a.match(/^--tp2=([\d.]+)$/))) AMD.CFG.tp2 = +m[1];
+  // SMT : la divergence avec le marché corrélé au moment du balayage.
+  if ((m = a.match(/^--smt=(ignore|exige|confirme)$/))) AMD.CFG.smt = m[1];
 }
 const DEM = (process.argv.find(a => a.startsWith('--marches=')) || '').slice(10);
 const SYMS = DEM ? DEM.split(',').map(x => x.trim().toUpperCase() + '=F')
@@ -55,13 +57,16 @@ console.log('╚═════════════════════�
 for (const l of J.banniere(AL, Object.keys(PS).map(sym => ({ sym, S: PS[sym] })))) console.log('   ' + l);
 console.log(`\n   manipulation ${Math.floor(AMD.CFG.manipDeb/60)}h-${Math.floor(AMD.CFG.manipFin/60)}h NY · ` +
   `cible ${AMD.CFG.cible} · délai ${AMD.CFG.delai} bougies · portée ${AMD.CFG.fvgPortee} ATR · ` +
-  `${AMD.CFG.part ? Math.round(AMD.CFG.part * 100) + ' % à ' + AMD.CFG.tp1 : 'rien vendu'} · plafond ${AMD.CFG.tp2} R`);
+  `${AMD.CFG.part ? Math.round(AMD.CFG.part * 100) + ' % à ' + AMD.CFG.tp1 : 'rien vendu'} · plafond ${AMD.CFG.tp2} R · SMT ${AMD.CFG.smt}`);
 
 const T = [];
 let ecartes = 0;
+// Le marché corrélé de chacun : NQ regarde ES, ES regarde NQ. C'est la paire
+// que le plan source lui-même désigne.
+const CORREL = { 'NQ=F': 'ES=F', 'ES=F': 'NQ=F', 'YM=F': 'ES=F', 'RTY=F': 'ES=F' };
 for (const sym of Object.keys(PS)) {
   const S = PS[sym];
-  const sigs = AMD.evaluer(S).tousSignaux;
+  const sigs = AMD.evaluer(S, { E: PS[CORREL[sym]] }).tousSignaux;
   for (const s of sigs) {
     if (!J.jouable(sym, Math.abs(s.risq), RISQUE)) { ecartes++; continue; }
     const m1 = S.m1, f1 = m1 && m1.length && m1[0].t <= s.t, cs = f1 ? m1 : S.m5;
@@ -72,7 +77,7 @@ for (const sym of Object.keys(PS)) {
     } catch (e) { continue; }
     if (!fin || fin.ouverte) continue;
     T.push({ sym, jour: s.jour, min: s.min, sens: s.sens, manip: s.manip, risq: s.risq,
-             r: fin.r - Position.cout(s.risq), sortie: fin.sortie });
+             smt: s.smt, r: fin.r - Position.cout(s.risq), sortie: fin.sortie });
   }
 }
 if (ecartes) console.log(`   ${ecartes} signal(aux) écarté(s) : stop trop large pour ${RISQUE} € de budget.`);
@@ -117,6 +122,7 @@ tableau('PAR SENS', x => x.sens);
 tableau('PAR GRANDE LIQUIDITÉ BALAYÉE', x => x.manip);
 tableau('PAR PORTE DE SORTIE', x => x.sortie);
 tableau('PAR HEURE D\'ENTRÉE (NY)', x => String(Math.floor(x.min / 60)).padStart(2, '0') + 'h');
+tableau('PAR DIVERGENCE SMT', x => x.smt === true ? 'divergence' : x.smt === false ? 'les deux suivent' : 'non jugeable');
 
 // ── L'ÉPREUVE DES FRAIS ───────────────────────────────────────────────────
 // Tout l'avantage de ce modèle vient des sorties au point mort, qui supposent

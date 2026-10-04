@@ -30,6 +30,7 @@ for (const a of process.argv.slice(2)) {
   if ((m = a.match(/^--tp2=([\d.]+)$/))) AMD.CFG.tp2 = +m[1];
   if ((m = a.match(/^--delai=(\d+)$/))) AMD.CFG.delaiMin = +m[1];
   if ((m = a.match(/^--portee=([\d.]+)$/))) AMD.CFG.fvgPortee = +m[1];
+  if ((m = a.match(/^--smt=(ignore|exige|confirme)$/))) AMD.CFG.smt = m[1];
 }
 // En longue période le M30 n'existe pas : le modèle se rabat sur H1 et H4.
 AMD.CFG.unitesFVG = ['h1', 'h4'];
@@ -74,13 +75,14 @@ L.jeu(SYMS).then(PS => {
   console.log(`      le comptage prudent fait compter le stop. Le résultat est pessimiste,`);
   console.log(`      mais l'incertitude est grande. Ce test juge l'IDÉE, pas le rendement.`);
   console.log(`\n   manipulation ${Math.floor(AMD.CFG.manipDeb/60)}h-${Math.floor(AMD.CFG.manipFin/60)}h NY · cible ${AMD.CFG.cible} · ` +
-    `${AMD.CFG.part ? Math.round(AMD.CFG.part*100) + ' % à ' + AMD.CFG.tp1 : 'rien vendu, point mort à ' + AMD.CFG.tp1} · plafond ${AMD.CFG.tp2} R`);
+    `${AMD.CFG.part ? Math.round(AMD.CFG.part*100) + ' % à ' + AMD.CFG.tp1 : 'rien vendu, point mort à ' + AMD.CFG.tp1} · plafond ${AMD.CFG.tp2} R · SMT ${AMD.CFG.smt}`);
 
   const T = [];
   let ecartes = 0, ambigus = 0;
   for (const sym of Object.keys(PS)) {
     const S = PS[sym];
-    for (const s of AMD.evaluer(S, { execution: 'h1' }).tousSignaux) {
+    const CORREL = { 'NQ=F': 'ES=F', 'ES=F': 'NQ=F', 'YM=F': 'ES=F', 'RTY=F': 'ES=F' };
+    for (const s of AMD.evaluer(S, { execution: 'h1', E: PS[CORREL[sym]] }).tousSignaux) {
       const coutUn = Math.abs(s.risq) * (POINT[sym] || 2) / TAUX;
       if (coutUn > RISQUE) { ecartes++; continue; }
       let fin2;
@@ -91,7 +93,7 @@ L.jeu(SYMS).then(PS => {
       if (!fin2 || fin2.ouverte) continue;
       ambigus += fin2.ambigu > 0 ? 1 : 0;
       T.push({ sym, jour: s.jour, min: s.min, sens: s.sens, manip: s.manip, risq: s.risq,
-               t: s.t, r: fin2.r - Position.cout(s.risq), sortie: fin2.sortie });
+               smt: s.smt, t: s.t, r: fin2.r - Position.cout(s.risq), sortie: fin2.sortie });
     }
   }
   T.sort((a, b) => a.t - b.t);
@@ -150,6 +152,7 @@ L.jeu(SYMS).then(PS => {
   tab('PAR SENS', x => x.sens);
   tab('PAR GRANDE LIQUIDITÉ BALAYÉE', x => x.manip);
   tab('PAR PORTE DE SORTIE', x => x.sortie);
+  tab('PAR DIVERGENCE SMT', x => x.smt === true ? 'divergence' : x.smt === false ? 'les deux suivent' : 'non jugeable');
 
   // frais
   console.log('\n   ── LE POINT DE RUPTURE DES FRAIS');

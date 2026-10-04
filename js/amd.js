@@ -49,6 +49,28 @@
     delaiMin: 240,
     // ── GRANDE LIQUIDITÉ : quels bassins comptent ───────────────────────
     veille: true, semaine: true, h4: true, h1: true,
+
+    // ── SMT : LA DIVERGENCE AVEC LE MARCHÉ CORRÉLÉ ───────────────────────
+    // Au moment du balayage, le marché corrélé fait-il le même extrême ?
+    //
+    //   NQ fait un nouveau plus-haut, l'ES NE LE FAIT PAS
+    //     → le balayage n'est pas porté par l'ensemble du marché, c'est une
+    //       manipulation : DIVERGENCE, et le scénario de retournement est
+    //       renforcé.
+    //   les deux font le nouveau plus-haut
+    //     → le mouvement est général, le balayage peut être réel.
+    //
+    //   'ignore'   on ne regarde pas le marché corrélé (comportement d'origine)
+    //   'exige'    on ne prend QUE s'il y a divergence
+    //   'confirme' on ne prend QUE s'il n'y en a pas — l'inverse, pour
+    //              vérifier que la divergence n'est pas qu'un filtre au hasard
+    smt: 'ignore',
+    // La fenêtre de comparaison, en minutes avant le balayage.
+    smtMin: 120,
+    // Tolérance : « ne fait pas le même extrême » doit vouloir dire quelque
+    // chose. Exprimée en fraction de l'étendue de la fenêtre sur le marché
+    // corrélé, pour être sans unité et comparable entre indices.
+    smtTol: 0.02,
     // ── FVG RETENUS ─────────────────────────────────────────────────────
     unitesFVG: ['m30', 'h1'],
     // Le prix doit être à moins de `fvgPortee` ATR du FVG retenu.
@@ -119,6 +141,44 @@
     return out;
   }
 
+  /**
+   * SMT — Y A-T-IL DIVERGENCE AVEC LE MARCHÉ CORRÉLÉ ?
+   *
+   * `haut` dit si le balayage a pris un sommet. On regarde la fenêtre des
+   * `smtMin` dernières minutes sur le marché corrélé et on demande : sa
+   * dernière bougie fait-elle, elle aussi, l'extrême de cette fenêtre ?
+   *
+   *   non  → DIVERGENCE : le corrélé n'a pas suivi.
+   *   oui  → pas de divergence : les deux marchés ont fait le même extrême.
+   *
+   * Tout est lu sur des bougies déjà closes à l'instant de la décision : la
+   * comparaison porte sur la même fenêtre temporelle des deux côtés, jamais
+   * sur une bougie en cours.
+   *
+   * @returns true s'il y a divergence, false sinon, null si on ne peut pas
+   *          juger (pas de marché corrélé, fenêtre trop pauvre).
+   */
+  function smt(E, t, haut) {
+    if (!E || !E.length) return null;
+    var pas = ST.pasDe(E);
+    var fen = [];
+    for (var i = 0; i < E.length; i++) {
+      // Une bougie ne compte que si elle est CLOSE à l'instant t.
+      if (E[i].t + pas > t) break;
+      if (E[i].t + pas >= t - CFG.smtMin * 60000) fen.push(E[i]);
+    }
+    if (fen.length < 3) return null;
+    var der = fen[fen.length - 1];
+    var hi = -Infinity, lo = Infinity;
+    for (var k = 0; k < fen.length; k++) { hi = Math.max(hi, fen[k].h); lo = Math.min(lo, fen[k].l); }
+    var etendue = hi - lo;
+    if (!(etendue > 0)) return null;
+    var tol = CFG.smtTol * etendue;
+    // Le corrélé fait-il l'extrême de la fenêtre sur sa dernière bougie ?
+    var suit = haut ? der.h >= hi - tol : der.l <= lo + tol;
+    return !suit;
+  }
+
   /** Haut et bas de séance régulière, par journée. */
   function seances(m5) {
     var par = {};
@@ -152,6 +212,8 @@
     opts = opts || {};
     var cleExe = opts.execution || 'm5';
     var m5 = D[cleExe];
+    // Le marché corrélé, pour la divergence SMT. Absent = filtre inactif.
+    var Ecs = opts.E && opts.E[cleExe] ? opts.E[cleExe] : null;
     if (!m5 || m5.length < 200 || !D.h1) return { tousSignaux: [], manips: [] };
     var pas = ST.pasDe(m5);
     // Les unités supérieures sont agrégées de ce qui existe. En longue
@@ -264,9 +326,15 @@
           var gl = grands[g];
           if (gl.haut ? bar.h >= gl.prix : bar.l <= gl.prix) {
             // Un sommet balayé annonce une DESCENTE, et réciproquement.
-            manip = { sens: gl.haut ? -1 : 1, prix: gl.prix, nom: gl.nom,
+            // SMT évalué À L'INSTANT DU BALAYAGE, pas plus tard : c'est là
+            // que l'information existe, et la retarder serait lire l'avenir
+            // à rebours.
+            var div = smt(Ecs, tD, gl.haut);
+            if (CFG.smt === 'exige' && div !== true) continue;
+            if (CFG.smt === 'confirme' && div !== false) continue;
+            manip = { sens: gl.haut ? -1 : 1, prix: gl.prix, nom: gl.nom, smt: div,
                       ext: gl.haut ? bar.h : bar.l, i: i, t: tD };
-            manips.push({ nom: gl.nom, jour: e.jour, min: e.min, sens: manip.sens });
+            manips.push({ nom: gl.nom, jour: e.jour, min: e.min, sens: manip.sens, smt: div });
             break;
           }
         }
@@ -344,7 +412,7 @@
 
       tous.push({ sens: L ? 'LONG' : 'SHORT', t: tD, entree: entree, sl: sl, risq: risq,
                   tp1: L ? entree + risq * CFG.tp1 : entree - risq * CFG.tp1,
-                  tp: tp, dol: cible, manip: manip.nom, manipPrix: manip.prix,
+                  tp: tp, dol: cible, manip: manip.nom, manipPrix: manip.prix, smt: manip.smt,
                   jour: e.jour, min: e.min });
       parJour[e.jour] = (parJour[e.jour] || 0) + 1;
       manip = null;   // un scénario par manipulation
@@ -353,5 +421,5 @@
     return { tousSignaux: tous, manips: manips };
   }
 
-  root.AMD = { evaluer: evaluer, CFG: CFG, heure: heure };
+  root.AMD = { evaluer: evaluer, CFG: CFG, heure: heure, smt: smt };
 })(typeof window !== 'undefined' ? window : this);
