@@ -76,10 +76,28 @@ function bilan(T) {
   return { n, som, moy: som / n, wr: g.length / n * 100 };
 }
 if (process.argv.includes('--sansplafond')) Modele.CFG.maxJour = 100;
+// Réglages passés en ligne de commande, pour soumettre une candidate issue de
+// scripts/recherche.js aux mêmes épreuves que le modèle en place.
+//   --slx=6 --fenetre=8,10 --part=0.9 --tp1=0.4 --tp2=2.5 --sortie=aucune
+for (const a of process.argv) {
+  let m;
+  if ((m = a.match(/^--slx=(\d+(?:\.\d+)?)$/))) Modele.CFG.slx = +m[1];
+  if ((m = a.match(/^--fenetre=(\d+),(\d+)$/))) { Modele.CFG.ghDeb = +m[1] * 60; Modele.CFG.ghFin = +m[2] * 60; }
+  if ((m = a.match(/^--part=(\d*(?:\.\d+)?)$/))) Modele.CFG.part = +m[1];
+  if ((m = a.match(/^--tp1=(\d*(?:\.\d+)?)$/))) Modele.CFG.tp1 = +m[1];
+  if ((m = a.match(/^--tp2=(\d*(?:\.\d+)?)$/))) Modele.CFG.tp2 = +m[1];
+  if (a === '--sortie=aucune') Modele.CFG.sortieMin = null;
+  if ((m = a.match(/^--sortie=(\d+)$/))) Modele.CFG.sortieMin = +m[1] * 60;
+}
 const FORME = (process.argv.find(a => a.startsWith('--sorties=')) || '').split('=')[1];
 if (FORME === 'rien2') Object.assign(Modele.CFG, { part: 0, tp1: 1.0, tp2: 2.0 });
 const VARIANTE = [process.argv.includes('--sansplafond') ? 'sans plafond journalier' : null,
-                  FORME ? 'sortie ' + FORME : null].filter(Boolean).join(' + ');
+                  FORME ? 'sortie ' + FORME : null,
+                  process.argv.some(a => /^--(slx|fenetre|part|tp1|tp2|sortie)=/.test(a))
+                    ? `stop ×${Modele.CFG.slx} · ${Math.floor(Modele.CFG.ghDeb / 60)}h-${Math.floor(Modele.CFG.ghFin / 60)}h · ` +
+                      `${Math.round(Modele.CFG.part * 100)} % à ${Modele.CFG.tp1} · reste ${Modele.CFG.tp2} · ` +
+                      `sortie ${Modele.CFG.sortieMin == null ? 'aucune' : Math.floor(Modele.CFG.sortieMin / 60) + ' h'}`
+                    : null].filter(Boolean).join(' + ');
 const SIG = JEU.map(j => ({ j, sigs: Modele.evaluer(j.D, j.E).tousSignaux }));
 
 function reel() {
