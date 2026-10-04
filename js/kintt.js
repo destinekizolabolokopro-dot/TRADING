@@ -126,19 +126,27 @@
     return series.map(function (cs) {
       var out = [];
       ST.fvgs(cs).forEach(function (z) {
-        var iRes = z.casse != null ? z.casse : z.touche;
-        if (iRes == null) return;
-        // Daté à la CLÔTURE de la bougie qui tranche, pas à son ouverture :
-        // sinon le biais connaît l'issue d'une bougie H4 quatre heures trop tôt.
-        // ⚠️ DATÉ À LA CLÔTURE DE LA BOUGIE QUI TRANCHE, calculée par sa
-        // DURÉE et non par l'arrivée de la bougie suivante. Passer par
-        // `cs[iRes + 1]` rendait l'événement invisible tant que la bougie
-        // d'après n'était pas livrée : la stratégie ne disait alors pas la
-        // même chose selon qu'on lui donnait ou non des bougies postérieures
-        // à sa décision. C'est ce que la vérification « sans l'avenir » a
-        // attrapé, après un premier correctif incomplet.
-        var tRes = cs[iRes].t + ST.pasDe(cs);
-        out.push({ t: tRes, c: (z.haussier ? 1 : -1) * (z.casse == null ? 1 : -1) });
+      // ⚠️ UNE ZONE A DEUX VIES, ET CHACUNE DOIT RESTER DATÉE DE SON MOMENT.
+      //
+      // La version précédente n'émettait qu'UN événement par zone : celui de
+      // la cassure si elle existait, sinon celui de la touche. Conséquence,
+      // mesurée le 4 octobre : une zone H1 touchée le 1er octobre à 10 h
+      // émettait « respectée » à cette date-là ; cassée le 2 octobre, cet
+      // événement DISPARAISSAIT et était remplacé par « non respectée » à la
+      // date de cassure. Le biais du 1er octobre changeait donc après coup.
+      //
+      // Effet réel : le robot a consigné deux signaux le 1er octobre ; rejoué
+      // trois jours plus tard, le modèle n'en voyait plus aucun. Le backtest
+      // mesurait une stratégie que personne ne pouvait trader, et le journal
+      // en direct devenait incomparable avec lui.
+      //
+      // On émet donc LES DEUX : « respectée » à la touche, « non respectée »
+      // à la cassure. Ce qui était vrai à un instant le reste.
+        var pas = ST.pasDe(cs);
+        if (z.touche != null && (z.casse == null || z.touche < z.casse))
+          out.push({ t: cs[z.touche].t + pas, c: (z.haussier ? 1 : -1) });
+        if (z.casse != null)
+          out.push({ t: cs[z.casse].t + pas, c: (z.haussier ? -1 : 1) });
       });
       return out.sort(function (a, b) { return a.t - b.t; });
     });
@@ -267,14 +275,16 @@
       var aIFVG = false, tfIFVG = null;
       for (var q = ifvgFin.length - 1; q >= 0; q--) {
         var f = ifvgFin[q];
-        if (f.t > bar.t || f.t < Math.max(limite, sweep.t)) continue;
+        // comparé à l'instant de la décision (clôture de la bougie), puisque
+        // les éléments de structure portent maintenant leur instant de CONNAISSANCE
+        if (f.t > tD || f.t < Math.max(limite, sweep.t)) continue;
         // un FVG cassé donne l'inversion OPPOSÉE à son sens
         if ((f.haussier ? -1 : 1) === b.dir) { aIFVG = true; tfIFVG = f.tf; break; }
       }
       var aCISD = false;
       for (var q2 = cisdClock.length - 1; q2 >= 0; q2--) {
         var c2 = cisdClock[q2];
-        if (c2.t > bar.t || c2.t < Math.max(limite, sweep.t)) continue;
+        if (c2.t > tD || c2.t < Math.max(limite, sweep.t)) continue;
         if (c2.haussier === (b.dir > 0)) { aCISD = true; break; }
       }
       // variante du plan : « clôture au-dessus/en-dessous de la M15 précédente »

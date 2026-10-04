@@ -29,7 +29,7 @@ function pres(a, b, tol, quoi) {
 const ctx = {};
 for (const f of ['js/structure.js', 'js/position.js', 'js/modele.js', 'js/kintt.js'])
   new Function('root', 'ST', fs.readFileSync(path.join(RACINE, f), 'utf-8')).call(ctx, ctx, ctx.ST);
-const { Position, Modele, Kintt } = ctx;
+const { Position, Modele, Kintt, ST } = ctx;
 const CFG = Modele.CFG;
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -299,6 +299,86 @@ if (fs.existsSync(jf)) {
 // ═══════════════════════════════════════════════════════════════════════════
 // ═══════════════════════════════════════════════════════════════════════════
 // ═══════════════════════════════════════════════════════════════════════════
+console.log('\n── LE ROBOT PEUT-IL VRAIMENT VOIR LA SÉANCE ? ────────────────');
+// BUG RÉEL, mesuré le 30 septembre. Les trois créneaux prévus — 10 h 17,
+// 11 h 47, 12 h 37 — n'ont AUCUN été honorés par GitHub. Le travail est parti
+// à 16 h 26 puis 17 h 00, soit après la fin de la fenêtre : deux exécutions de
+// dix-neuf secondes, un simple rattrapage, et la séance pas surveillée du tout.
+//
+// Ces vérifications portent sur l'ARITHMÉTIQUE du planning, parce qu'elle est
+// facile à casser sans s'en apercevoir : un travail GitHub meurt à 360 minutes,
+// et un créneau qui dépasse cette limite se fait tuer en cours de route — en
+// laissant croire à un relevé qui n'a pas eu lieu.
+
+{
+  const yml = fs.readFileSync(path.join(RACINE, '.github/workflows/seance.yml'), 'utf-8');
+  const crons = [...yml.matchAll(/- cron: '(\d+) (\d+) \* \* 1-5'/g)]
+    .map(m => +m[2] * 60 + +m[1]);
+  const lim = +(yml.match(/timeout-minutes:\s*(\d+)/) || [])[1];
+  const marge = +(yml.match(/LIMITE=\$\(\(DEPART \+ (\d+) \* 60\)\)/) || [])[1];
+  const deb = 13 * 60 + 15, fin = 15 * 60 + 45;
+
+  t('le planning de la séance a plusieurs départs', () => {
+    if (crons.length < 4)
+      throw new Error(crons.length + ' créneau(x) : un seul abandon suffirait à perdre la journée');
+  });
+
+  t('aucun créneau ne se fait tuer avant la fin de son travail', () => {
+    if (!(marge > 0)) throw new Error('la borne interne LIMITE est introuvable');
+    if (marge + 10 > lim)
+      throw new Error(`le script court ${marge} min mais le travail est tué à ${lim}`);
+    if (lim >= 360) throw new Error(`timeout-minutes ${lim} : GitHub tue à 360`);
+  });
+
+  t('chaque créneau atteint la fenêtre et en couvre un bout', () => {
+    const vains = crons.filter(d => deb > d + marge);
+    if (vains.length) throw new Error(vains.length +
+      ' créneau(x) mourraient avant l\'ouverture — ils occupent la place pour rien');
+  });
+
+  t('au moins un créneau couvre la fenêtre en entier', () => {
+    const complets = crons.filter(d => Math.min(fin, d + marge) >= fin);
+    if (!complets.length) throw new Error('aucun créneau ne va jusqu\'à 15 h 45');
+  });
+
+  t('un départ retardataire ne tue pas un travail déjà en attente', () => {
+    // C'est ce qui serait arrivé le 30 septembre : un travail parti à 6 h et
+    // sagement en attente aurait été annulé à 16 h 26 par un retardataire,
+    // juste avant de servir à quelque chose.
+    const m = yml.match(/group:\s*seance[\s\S]{0,80}?cancel-in-progress:\s*(\w+)/);
+    if (!m) throw new Error('groupe de concurrence introuvable');
+    if (m[1] !== 'false')
+      throw new Error('cancel-in-progress: ' + m[1] + ' — un retardataire tuerait le gardien');
+  });
+}
+
+t('une nuit ne décrit pas une séance', () => {
+  // Le 30 septembre, un passage de 01 h 20 New York — marché fermé — a marqué
+  // la journée « décrite ». Les rattrapages de l'après-midi n'ont donc RIEN
+  // consigné de la séance : il ne reste aucune trace de ce que le modèle a vu
+  // entre 09 h et 10 h.
+  const src = fs.readFileSync(path.join(RACINE, 'scripts/live_log.js'), 'utf-8');
+  const m = src.match(/const jourDejaDecrit =[\s\S]{0,400}?;/);
+  if (!m) throw new Error('le test du jour décrit est introuvable');
+  if (!/minNY\(p\.heureNY\) >= Modele\.CFG\.ghDeb/.test(m[0]))
+    throw new Error('un passage de n\'importe quelle heure suffit encore à marquer la journée décrite');
+  if (/apresCoup/.test(m[0]))
+    throw new Error('le drapeau `apresCoup` sert encore de preuve — il était posé à 01 h 20 du matin');
+});
+
+t('un relevé de rattrapage raconte la SÉANCE, pas l\'heure du relevé', () => {
+  // Quand GitHub abandonne les créneaux, le seul relevé de la journée tombe
+  // l'après-midi. Il disait « hors fenêtre, biais haussier » — l'état du
+  // marché à 13 h 40, qui n'apprend rien sur ce qui s'est passé de 09 h à 10 h.
+  const mod = fs.readFileSync(path.join(RACINE, 'js/modele.js'), 'utf-8');
+  if (!/etapeFenetre:/.test(mod))
+    throw new Error('le modèle ne garde pas ce qu\'il a vu dans la fenêtre');
+  const src = fs.readFileSync(path.join(RACINE, 'scripts/live_log.js'), 'utf-8');
+  if (!/d\.etapeFenetre/.test(src))
+    throw new Error('le rattrapage n\'utilise pas l\'état de la séance');
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
 console.log('\n── LA STRATÉGIE NE DOIT PAS CONNAÎTRE L\'AVENIR ───────────────');
 // LE PIRE BUG DU PROJET, et aucun test ne le voyait.
 //
@@ -358,14 +438,24 @@ if (dispo) {
         if (!T2.m5 || T2.m5.length < 200 || !T2.m1 || T2.m1.length < 500) continue;
         const r = strat.evaluer(T2, E2);
         const vus = (r && r.tousSignaux) || [];
-        for (const sig of jugeables.filter(x => x.t < tc)) {
+        const att = jugeables.filter(x => x.t < tc);
+        for (const sig of att) {
           compares++;
           const q = new Date(sig.t).toISOString().slice(0, 16).replace('T', ' ');
           const vu = vus.filter(x => x.t === sig.t)[0];
-          if (!vu) { ecarts.push(q + ' disparait'); continue; }
+          if (!vu) { ecarts.push(q + ' disparait sans l\'avenir'); continue; }
           for (const champ of ['sens', 'entree', 'sl', 'tp'])
             if (String(vu[champ]) !== String(sig[champ]))
               ecarts.push(`${q} · ${champ} ${sig[champ]} -> ${vu[champ]}`);
+        }
+        // L'AUTRE SENS : un signal qui existait à l'époque et que les données
+        // postérieures effacent. Borné à la même période jugeable.
+        for (const vu of vus) {
+          if (vu.t <= t0 + 2 * 24 * 3600 * 1000) continue;
+          compares++;
+          if (!att.some(x => x.t === vu.t))
+            ecarts.push(new Date(vu.t).toISOString().slice(0, 16).replace('T', ' ') +
+              ' EFFACÉ par les données postérieures');
         }
       }
       if (ecarts.length) throw new Error([...new Set(ecarts)].slice(0, 4).join(' | ') +
@@ -394,14 +484,28 @@ if (dispo) {
         const T2 = couper(base, tc), E2 = baseE ? couper(baseE, tc) : null;
         if (!T2.m5 || T2.m5.length < 200) continue;
         const vus = (strat.evaluer(T2, E2) || {}).tousSignaux || [];
-        for (const sig of sigs.filter(x => x.t < tc)) {
+        const attendus = sigs.filter(x => x.t < tc);
+        for (const sig of attendus) {
           compares++;
           const q = new Date(sig.t).toISOString().slice(0, 16).replace('T', ' ');
           const vu = vus.filter(x => x.t === sig.t)[0];
-          if (!vu) { ecarts.push(q + ' disparait'); continue; }
+          if (!vu) { ecarts.push(q + ' disparait sans l\'avenir'); continue; }
           for (const champ of ['sens', 'entree', 'sl', 'tp'])
             if (String(vu[champ]) !== String(sig[champ]))
               ecarts.push(`${q} · ${champ} ${sig[champ]} -> ${vu[champ]}`);
+        }
+        // ⚠️ L'AUTRE SENS, ET C'EST CELUI QUI MANQUAIT.
+        // La version précédente ne vérifiait que « un signal du passé
+        // survit-il quand on retire l'avenir ». Elle ne voyait donc pas le
+        // cas inverse : un signal qui EXISTAIT à l'époque et que les données
+        // postérieures EFFACENT. C'est pourtant ce qui s'est produit — le
+        // robot a consigné deux signaux le 1er octobre, et le modèle rejoué
+        // trois jours plus tard n'en voyait plus aucun.
+        for (const vu of vus) {
+          compares++;
+          if (attendus.some(x => x.t === vu.t)) continue;
+          ecarts.push(new Date(vu.t).toISOString().slice(0, 16).replace('T', ' ') +
+            ' EFFACÉ par les données postérieures');
         }
       }
       if (ecarts.length) throw new Error([...new Set(ecarts)].slice(0, 4).join(' | ') +
@@ -409,6 +513,57 @@ if (dispo) {
       if (!compares) throw new Error('aucune comparaison possible');
       console.log(`     (${compares} comparaisons sur tout l'historique)`);
     });
+  }
+
+  // ── L'INVARIANT DIRECT, SUR LES BRIQUES ELLES-MÊMES ──────────────────────
+  // La vérification par troncature de signaux ne voit pas un décalage d'UNE
+  // bougie : vérifiée, elle rattrape bien une cassure de FVG datée trop tôt,
+  // mais laisse passer un rejection block et un STL décalés d'un cran. Il faut
+  // donc contrôler les briques, et pas seulement ce qu'on en fait.
+  //
+  // LA RÈGLE, en une phrase : un élément de structure ne peut pas être connu
+  // avant que la dernière bougie dont il dépend soit CLOSE. On le vérifie en
+  // coupant la série à l'instant que l'élément s'attribue et en exigeant qu'il
+  // apparaisse quand même. Trois défauts réels ont été trouvés comme ça :
+  //   · un rejection block réclame la bougie SUIVANTE (« creux local ») et se
+  //     datait de celle du milieu — une bougie d'avance, quatre heures en H4 ;
+  //   · un STL se disait connu à l'OUVERTURE de la bougie qui le confirme ;
+  //   · un CISD, décidé par une clôture, se datait de l'ouverture.
+  {
+    const series = [['5 min', DA.m5], ['15 min', DA.m15], ['1 h', DA.h1]];
+    const briques = [
+      ['FVG', cs => ST.fvgs(cs).map(z => ({ q: z.t, c: [z.bas, z.haut, z.haussier].join('|') }))],
+      ['FVG cassé', cs => ST.fvgs(cs).filter(z => z.tCasse != null)
+        .map(z => ({ q: z.tCasse, c: [z.bas, z.haut, z.haussier, 'K'].join('|') }))],
+      ['CISD', cs => ST.cisd(cs).map(z => ({ q: z.t, c: [z.bas, z.haut, z.haussier].join('|') }))],
+      ['rejection block', cs => ST.rejectionBlocks(cs).map(z => ({ q: z.t, c: [z.bas, z.haut, z.haussier].join('|') }))],
+      ['STL', cs => ST.hierarchie(cs).stl.map(z => ({ q: z.vu, c: String(z.prix) }))],
+      ['ITL', cs => ST.hierarchie(cs).itl.map(z => ({ q: z.vu, c: String(z.prix) }))]
+    ];
+    for (const [nomS, cs] of series) {
+      if (!cs || cs.length < 500) continue;
+      const pas = ST.pasDe(cs);
+      for (const [nomB, extrait] of briques) {
+        t(`${nomB} ${nomS} : connu seulement quand sa dernière bougie est close`, () => {
+          const tout = extrait(cs);
+          if (!tout.length) return;
+          // on éprouve quelques éléments répartis dans l'historique
+          const pasEch = Math.max(1, Math.floor(tout.length / 12));
+          const fautifs = [];
+          for (let k = pasEch; k < tout.length; k += pasEch) {
+            const e = tout[k];
+            if (!(e.q > 0)) { fautifs.push('horodatage absent'); continue; }
+            // la série telle qu'elle est connue à l'instant que l'élément s'attribue
+            const vue = cs.filter(b => b.t + pas <= e.q);
+            if (vue.length < 5) continue;
+            if (!extrait(vue).some(x => x.c === e.c && x.q === e.q))
+              fautifs.push(new Date(e.q).toISOString().slice(0, 16) + ' (' + e.c + ')');
+          }
+          if (fautifs.length) throw new Error(fautifs.length +
+            ' élément(s) se disent connus trop tôt, ex. ' + fautifs[0]);
+        });
+      }
+    }
   }
 
   t('aucune unité supérieure n\'est lue en cours de formation', () => {
@@ -1094,9 +1249,20 @@ CE QUI N'EST PAS VÉRIFIÉ ICI — et où un bug peut donc encore passer :
   · KINTT n'a que quelques trades relevés : son panneau est vérifié comme
     MÉCANISME (branché, affiché, journal cohérent), jamais comme résultat.
     Tant que le nombre de trades clos est sous vingt, son bilan ne dit rien.
-  · Le DÉCLENCHEMENT du robot est contourné, pas garanti : un travail démarre
-    à 11 h 47 UTC et attend la séance. Si CE déclenchement-là manque aussi,
-    seuls les passages du soir restent.
+  · Le DÉCLENCHEMENT du robot est contourné, pas garanti. Cinq créneaux
+    démarrent avant la séance et attendent, et l'arithmétique de chacun est
+    vérifiée — mais si GitHub les abandonne TOUS, comme le 30 septembre où les
+    trois d'alors ont été perdus, il ne reste que le rattrapage du soir.
+  · Le REGARD EN AVANT est désormais attaqué de deux côtés : on coupe les
+    bougies après un signal et on exige le même signal, et on coupe la série à
+    l'instant que chaque brique s'attribue et on exige qu'elle apparaisse
+    quand même. La seconde a trouvé trois défauts que la première ne voyait
+    pas — un décalage d'UNE bougie lui échappe. Il peut en rester ailleurs :
+    ces deux filets ne couvrent que js/structure.js et les deux stratégies.
+  · LA PROFONDEUR DES DONNÉES est un plafond dur, mesuré : Yahoo refuse toute
+    bougie de 5 minutes au-delà de 60 jours (quatre fenêtres demandées, quatre
+    refus). Aucune des deux stratégies ne peut donc être jugée sur autre chose
+    que deux mois — et kintt produit environ un trade par mois.
   · L'EXÉCUTION RÉELLE. Aucun ordre n'est passé : le dérapage, les frais réels
     et le refus d'un courtier ne sont que des hypothèses.
   · Les DONNÉES YAHOO au-delà de leur forme : si elles sont fausses mais bien

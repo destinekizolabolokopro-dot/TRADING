@@ -422,7 +422,7 @@ button,input,select{font:inherit;color:inherit}
   et <b>KINTT</b> — le plan source appliqué à la lettre, fenêtre <span id="f-kfen">—</span>
   à New York, objectif sur une zone. Leurs journaux et leurs bilans sont séparés ;
   aucune moyenne n’est faite entre les deux.
-  <br><b>Dernière mise à jour du site : 03/10/2026 à 00 h 32 UTC.</b>
+  <br><b>Dernière mise à jour du site : 04/10/2026 à 13 h 38 UTC.</b>
   Si cette date ne correspond pas à ce qui t’a été annoncé, la page vient du cache :
   tire-la vers le bas pour la recharger.
   <b>Comptage prudent :</b> quand une bougie de 5 minutes touche l’objectif et le stop, c’est le
@@ -1484,18 +1484,25 @@ if (typeof window !== 'undefined') window.CFD = CFD;
    * l'inversion (IFVG).
    */
   function fvgs(cs) {
+    // ⚠️ CHAQUE HORODATAGE EST CELUI OÙ ON L'APPREND, PAS CELUI OÙ ÇA COMMENCE.
+    // `cs[k].t` est l'OUVERTURE de la bougie ; une cassure se juge sur sa
+    // CLÔTURE, donc elle n'est connue qu'une durée de bougie plus tard. Sur le
+    // 15 minutes, lire l'ouverture avance le signal d'un quart d'heure ; sur le
+    // 4 heures, de quatre heures. C'est la même faute qui a gonflé les trois
+    // quarts du résultat, à un autre endroit.
+    const pas = pasDe(cs);
     const z = [];
     for (let i = 2; i < cs.length; i++) {
       if (cs[i].l > cs[i - 2].h)
-        z.push({ bas: cs[i - 2].h, haut: cs[i].l, haussier: true, ne: i, t: cs[i].t });
+        z.push({ bas: cs[i - 2].h, haut: cs[i].l, haussier: true, ne: i, t: cs[i].t + pas });
       else if (cs[i].h < cs[i - 2].l)
-        z.push({ bas: cs[i].h, haut: cs[i - 2].l, haussier: false, ne: i, t: cs[i].t });
+        z.push({ bas: cs[i].h, haut: cs[i - 2].l, haussier: false, ne: i, t: cs[i].t + pas });
     }
     z.forEach(x => {
       x.casse = null; x.tCasse = null; x.touche = null; x.tTouche = null;
       for (let k = x.ne + 1; k < cs.length; k++) {
-        if (x.touche == null && cs[k].l <= x.haut && cs[k].h >= x.bas) { x.touche = k; x.tTouche = cs[k].t; }
-        if (x.haussier ? cs[k].c < x.bas : cs[k].c > x.haut) { x.casse = k; x.tCasse = cs[k].t; break; }
+        if (x.touche == null && cs[k].l <= x.haut && cs[k].h >= x.bas) { x.touche = k; x.tTouche = cs[k].t + pas; }
+        if (x.haussier ? cs[k].c < x.bas : cs[k].c > x.haut) { x.casse = k; x.tCasse = cs[k].t + pas; break; }
       }
     });
     return z;
@@ -1534,11 +1541,15 @@ if (typeof window !== 'undefined') window.CFD = CFD;
    * l'avenir.
    */
   function niveau1(cs, bas) {                       // STL / STH
+    const pas = pasDe(cs);
     const out = [];
     for (let i = 1; i < cs.length - 1; i++) {
       const a = cs[i - 1], m = cs[i], b = cs[i + 1];
       if (bas ? (a.l > m.l && b.l > m.l) : (a.h < m.h && b.h < m.h))
-        out.push({ prix: bas ? m.l : m.h, i, t: m.t, vu: b.t });
+        // `vu` = quand le niveau devient connaissable. La bougie de droite le
+        // confirme par sa CLÔTURE, pas par son ouverture : sur le 1 heure,
+        // lire `b.t` rendait le niveau lisible une heure trop tôt.
+        out.push({ prix: bas ? m.l : m.h, i, t: m.t, vu: b.t + pas });
     }
     return out;
   }
@@ -1569,6 +1580,7 @@ if (typeof window !== 'undefined') window.CFD = CFD;
    * UNCONFIRMED ASSUMPTION : la source cite « CISD » sans le définir.
    */
   function cisd(cs) {
+    const pas = pasDe(cs);
     const out = [];
     for (let i = 2; i < cs.length; i++) {
       for (const haussier of [true, false]) {
@@ -1581,8 +1593,10 @@ if (typeof window !== 'undefined') window.CFD = CFD;
         if (deb > i - 1) continue;                       // pas de série
         const ouv = cs[deb].o;
         if (haussier ? cs[i].c > ouv : cs[i].c < ouv) {
+          // Le CISD est décidé par la CLÔTURE de la bougie i : c'est donc à
+          // ce moment-là qu'il existe, pas à son ouverture.
           out.push({ bas: haussier ? ext : ouv, haut: haussier ? ouv : ext,
-            haussier, ne: i, t: cs[i].t, type: 'CISD' });
+            haussier, ne: i, t: cs[i].t + pas, type: 'CISD' });
         }
       }
     }
@@ -1598,15 +1612,21 @@ if (typeof window !== 'undefined') window.CFD = CFD;
    * Le seuil « la mèche fait au moins la moitié du range » est de nous.
    */
   function rejectionBlocks(cs, ratio) {
+    // ⚠️ LE MOTIF EXIGE LA BOUGIE SUIVANTE : « creux local » veut dire que
+    // celle d'après ne descend pas plus bas. Le bloc était pourtant daté de la
+    // bougie du MILIEU et son index de formation `ne` valait i — il devenait
+    // donc utilisable une bougie avant d'être reconnaissable. Sur le 4 heures,
+    // quatre heures d'avance sur le marché.
+    const pas = pasDe(cs);
     const r = ratio == null ? 0.5 : ratio, out = [];
     for (let i = 1; i < cs.length - 1; i++) {
       const c = cs[i], rng = c.h - c.l; if (rng <= 0) continue;
       const corpsH = Math.max(c.o, c.c), corpsB = Math.min(c.o, c.c);
       // mèche basse longue + creux local → bloc haussier
       if ((corpsB - c.l) / rng >= r && cs[i - 1].l > c.l && cs[i + 1].l > c.l)
-        out.push({ bas: c.l, haut: corpsB, haussier: true, ne: i, t: c.t, type: 'RB' });
+        out.push({ bas: c.l, haut: corpsB, haussier: true, ne: i + 1, t: cs[i + 1].t + pas, type: 'RB' });
       if ((c.h - corpsH) / rng >= r && cs[i - 1].h < c.h && cs[i + 1].h < c.h)
-        out.push({ bas: corpsH, haut: c.h, haussier: false, ne: i, t: c.t, type: 'RB' });
+        out.push({ bas: corpsH, haut: c.h, haussier: false, ne: i + 1, t: cs[i + 1].t + pas, type: 'RB' });
     }
     return out;
   }
@@ -1972,23 +1992,27 @@ if (typeof window !== 'undefined') window.CFD = CFD;
     return series.map(function (cs) {
       var out = [];
       ST.fvgs(cs).forEach(function (z) {
-        var iRes = z.casse != null ? z.casse : z.touche;
-        if (iRes == null) return;
-        var respecte = z.casse == null;
-        // ⚠️ L'INSTANT OÙ ON L'APPREND, PAS CELUI OÙ ÇA COMMENCE. `cs[iRes].t`
-        // est l'OUVERTURE de la bougie qui tranche : sur le journalier, c'est
-        // vingt-quatre heures avant qu'on puisse le savoir. On date donc
-        // l'événement à la CLÔTURE de cette bougie, c'est-à-dire à l'ouverture
-        // de la suivante. Tant qu'il n'y a pas de suivante, on ne sait rien.
-        // ⚠️ DATÉ À LA CLÔTURE DE LA BOUGIE QUI TRANCHE, calculée par sa
-        // DURÉE et non par l'arrivée de la bougie suivante. Passer par
-        // `cs[iRes + 1]` rendait l'événement invisible tant que la bougie
-        // d'après n'était pas livrée : la stratégie ne disait alors pas la
-        // même chose selon qu'on lui donnait ou non des bougies postérieures
-        // à sa décision. C'est ce que la vérification « sans l'avenir » a
-        // attrapé, après un premier correctif incomplet.
-        var tRes = cs[iRes].t + ST.pasDe(cs);
-        out.push({ t: tRes, c: (z.haussier ? 1 : -1) * (respecte ? 1 : -1) });
+      // ⚠️ UNE ZONE A DEUX VIES, ET CHACUNE DOIT RESTER DATÉE DE SON MOMENT.
+      //
+      // La version précédente n'émettait qu'UN événement par zone : celui de
+      // la cassure si elle existait, sinon celui de la touche. Conséquence,
+      // mesurée le 4 octobre : une zone H1 touchée le 1er octobre à 10 h
+      // émettait « respectée » à cette date-là ; cassée le 2 octobre, cet
+      // événement DISPARAISSAIT et était remplacé par « non respectée » à la
+      // date de cassure. Le biais du 1er octobre changeait donc après coup.
+      //
+      // Effet réel : le robot a consigné deux signaux le 1er octobre ; rejoué
+      // trois jours plus tard, le modèle n'en voyait plus aucun. Le backtest
+      // mesurait une stratégie que personne ne pouvait trader, et le journal
+      // en direct devenait incomparable avec lui.
+      //
+      // On émet donc LES DEUX : « respectée » à la touche, « non respectée »
+      // à la cassure. Ce qui était vrai à un instant le reste.
+        var pas = ST.pasDe(cs);
+        if (z.touche != null && (z.casse == null || z.touche < z.casse))
+          out.push({ t: cs[z.touche].t + pas, c: (z.haussier ? 1 : -1) });
+        if (z.casse != null)
+          out.push({ t: cs[z.casse].t + pas, c: (z.haussier ? -1 : 1) });
       });
       return out.sort(function (a, b) { return a.t - b.t; });
     });
@@ -2108,10 +2132,19 @@ if (typeof window !== 'undefined') window.CFD = CFD;
     // Le relevé automatique ne se déclenche pas de façon fiable : s'il ne
     // tourne qu'une fois dans la séance, il doit quand même retrouver les
     // deux signaux possibles de la journée, pas uniquement le plus récent.
+    var etapeParJour = {};
     var parJour = {}, dernier = null, etapes = null, tous = [];
 
     for (var i = 60; i < clock.length; i++) {
       var bar = clock[i], e = heure(bar.t), px = bar.c;
+      // ── CE QUE LE MODÈLE A VU PENDANT LA SÉANCE ───────────────────────
+      // `etapes` finit par décrire la DERNIÈRE bougie reçue, qui est presque
+      // toujours hors fenêtre : quand GitHub abandonne les créneaux de la
+      // séance — mesuré le 30 septembre, les trois créneaux perdus — le
+      // rattrapage de l'après-midi racontait l'état de 13 h 40, pas ce qui
+      // s'était passé entre 09 h et 10 h. On garde donc à part la dernière
+      // étape vue DANS la fenêtre, jour par jour.
+      if (!etapeParJour[e.jour]) etapeParJour[e.jour] = null;
       // L'INSTANT DE LA DÉCISION est la CLÔTURE de cette bougie de 5 minutes,
       // pas son ouverture : le modèle lit `bar.c`. Tout ce qui s'est terminé à
       // cet instant est connu, la bougie de 5 minutes comprise. Dater la
@@ -2124,19 +2157,19 @@ if (typeof window !== 'undefined') window.CFD = CFD;
 
       var b = biaisA(prep, tD);
       var etapeCourante = { score: b.score, dir: b.dir, dol: null, key: null, ifvg: null, t: bar.t };
-      if (b.dir === 0) { etapes = etapeCourante; continue; }
+      if (b.dir === 0) { etapes = etapeCourante; etapeParJour[e.jour] = etapeCourante; continue; }
       if (b.dir !== dir) { dir = b.dir; etat = 'CHERCHE'; key = null; }
 
       var dol = dolNiveau(bar.t, dir, px);
       etapeCourante.dol = dol;
-      if (dol == null) { etapes = etapeCourante; continue; }
+      if (dol == null) { etapes = etapeCourante; etapeParJour[e.jour] = etapeCourante; continue; }
 
       if (etat === 'CHERCHE') {
         var best = null;
         for (var n = 0; n < niveaux.length; n++) {
           var z = niveaux[n], idx = ST.idxClos(z.cs, tD);
           if (z.ne == null || z.ne > idx || idx - z.ne > CFG.keyAge) continue;
-          if (z.vu && z.vu > bar.t) continue;
+          if (z.vu && z.vu > tD) continue;
           if (z.casse != null && z.casse <= idx) continue;
           if (z.haussier !== (dir > 0)) continue;
           var d = dir > 0 ? px - z.haut : z.bas - px;
@@ -2153,13 +2186,17 @@ if (typeof window !== 'undefined') window.CFD = CFD;
       }
 
       if (etat === 'ATTEND_IFVG' && key) {
-        if (i - legDeb > CFG.react) { etat = 'CHERCHE'; key = null; etapes = etapeCourante; continue; }
+        if (i - legDeb > CFG.react) { etat = 'CHERCHE'; key = null; etapes = etapeCourante; etapeParJour[e.jour] = etapeCourante; continue; }
         var choisi = null, ordre = ['5m', '2m', '1m'];
         for (var o = 0; o < ordre.length && !choisi; o++) {
           var zs = zIF[ordre[o]];
           for (var q = 0; q < zs.length; q++) {
             var zz = zs[q];
-            if (zz.tCasse == null || zz.tCasse < tTouche || zz.tCasse > bar.t) continue;
+        // Les éléments de structure portent désormais l'instant où ils sont
+        // CONNUS. On les compare donc à l'instant de la DÉCISION — la
+        // clôture de la bougie de 5 minutes — et non à son ouverture, qui
+        // écartait tout ce qui se confirmait pendant la bougie en cours.
+            if (zz.tCasse == null || zz.tCasse < tTouche || zz.tCasse > tD) continue;
             if ((zz.haussier ? -1 : 1) !== dir) continue;
             choisi = { z: zz, tf: ordre[o] }; break;
           }
@@ -2167,7 +2204,7 @@ if (typeof window !== 'undefined') window.CFD = CFD;
         etapeCourante.ifvg = choisi;
 
         // ── LE SECOND MARCHÉ DOIT DIRE LA MÊME CHOSE ───────── [PLAN SOURCE]
-        if (choisi && !confirme2(tD, dir)) { etapes = etapeCourante; continue; }
+        if (choisi && !confirme2(tD, dir)) { etapes = etapeCourante; etapeParJour[e.jour] = etapeCourante; continue; }
 
         // ── IFVG *ET* CISD ─────────────────────────────────── [PLAN SOURCE]
         // Le plan liste les deux : « IFVG + CISD présents ». Le modèle se
@@ -2177,10 +2214,10 @@ if (typeof window !== 'undefined') window.CFD = CFD;
           var cisdOk = false, limCisd = bar.t - CFG.react * 5 * 60000;
           for (var q3 = cisdClock.length - 1; q3 >= 0; q3--) {
             var zc = cisdClock[q3];
-            if (zc.t > bar.t || zc.t < limCisd) continue;
+            if (zc.t > tD || zc.t < limCisd) continue;
             if (zc.haussier === (dir > 0)) { cisdOk = true; break; }
           }
-          if (!cisdOk) { etapes = etapeCourante; continue; }
+          if (!cisdOk) { etapes = etapeCourante; etapeParJour[e.jour] = etapeCourante; continue; }
         }
 
         if (choisi) {
@@ -2254,7 +2291,7 @@ if (typeof window !== 'undefined') window.CFD = CFD;
           }
         }
       }
-      etapes = etapeCourante;
+      etapes = etapeCourante; etapeParJour[e.jour] = etapeCourante;
     }
 
     // ── HORS FENÊTRE ────────────────────────────────────────────────────
@@ -2337,6 +2374,11 @@ if (typeof window !== 'undefined') window.CFD = CFD;
       dernierSignal: dernier,
       tousSignaux: tous,
       hors: horsFenetre,
+      // L'état vu DANS la fenêtre du jour de la dernière bougie. C'est lui
+      // qu'un relevé de rattrapage doit raconter : « voici où la chaîne s'est
+      // arrêtée pendant la séance », et non « voici où en est le marché
+      // maintenant », qui n'apprend rien sur une séance déjà finie.
+      etapeFenetre: etapeParJour[heure(fin.t).jour] || null,
       sansConfirmation: sansConfirmation,
       cfg: CFG
     };
@@ -2517,19 +2559,27 @@ if (typeof window !== 'undefined') window.CFD = CFD;
     return series.map(function (cs) {
       var out = [];
       ST.fvgs(cs).forEach(function (z) {
-        var iRes = z.casse != null ? z.casse : z.touche;
-        if (iRes == null) return;
-        // Daté à la CLÔTURE de la bougie qui tranche, pas à son ouverture :
-        // sinon le biais connaît l'issue d'une bougie H4 quatre heures trop tôt.
-        // ⚠️ DATÉ À LA CLÔTURE DE LA BOUGIE QUI TRANCHE, calculée par sa
-        // DURÉE et non par l'arrivée de la bougie suivante. Passer par
-        // `cs[iRes + 1]` rendait l'événement invisible tant que la bougie
-        // d'après n'était pas livrée : la stratégie ne disait alors pas la
-        // même chose selon qu'on lui donnait ou non des bougies postérieures
-        // à sa décision. C'est ce que la vérification « sans l'avenir » a
-        // attrapé, après un premier correctif incomplet.
-        var tRes = cs[iRes].t + ST.pasDe(cs);
-        out.push({ t: tRes, c: (z.haussier ? 1 : -1) * (z.casse == null ? 1 : -1) });
+      // ⚠️ UNE ZONE A DEUX VIES, ET CHACUNE DOIT RESTER DATÉE DE SON MOMENT.
+      //
+      // La version précédente n'émettait qu'UN événement par zone : celui de
+      // la cassure si elle existait, sinon celui de la touche. Conséquence,
+      // mesurée le 4 octobre : une zone H1 touchée le 1er octobre à 10 h
+      // émettait « respectée » à cette date-là ; cassée le 2 octobre, cet
+      // événement DISPARAISSAIT et était remplacé par « non respectée » à la
+      // date de cassure. Le biais du 1er octobre changeait donc après coup.
+      //
+      // Effet réel : le robot a consigné deux signaux le 1er octobre ; rejoué
+      // trois jours plus tard, le modèle n'en voyait plus aucun. Le backtest
+      // mesurait une stratégie que personne ne pouvait trader, et le journal
+      // en direct devenait incomparable avec lui.
+      //
+      // On émet donc LES DEUX : « respectée » à la touche, « non respectée »
+      // à la cassure. Ce qui était vrai à un instant le reste.
+        var pas = ST.pasDe(cs);
+        if (z.touche != null && (z.casse == null || z.touche < z.casse))
+          out.push({ t: cs[z.touche].t + pas, c: (z.haussier ? 1 : -1) });
+        if (z.casse != null)
+          out.push({ t: cs[z.casse].t + pas, c: (z.haussier ? -1 : 1) });
       });
       return out.sort(function (a, b) { return a.t - b.t; });
     });
@@ -2658,14 +2708,16 @@ if (typeof window !== 'undefined') window.CFD = CFD;
       var aIFVG = false, tfIFVG = null;
       for (var q = ifvgFin.length - 1; q >= 0; q--) {
         var f = ifvgFin[q];
-        if (f.t > bar.t || f.t < Math.max(limite, sweep.t)) continue;
+        // comparé à l'instant de la décision (clôture de la bougie), puisque
+        // les éléments de structure portent maintenant leur instant de CONNAISSANCE
+        if (f.t > tD || f.t < Math.max(limite, sweep.t)) continue;
         // un FVG cassé donne l'inversion OPPOSÉE à son sens
         if ((f.haussier ? -1 : 1) === b.dir) { aIFVG = true; tfIFVG = f.tf; break; }
       }
       var aCISD = false;
       for (var q2 = cisdClock.length - 1; q2 >= 0; q2--) {
         var c2 = cisdClock[q2];
-        if (c2.t > bar.t || c2.t < Math.max(limite, sweep.t)) continue;
+        if (c2.t > tD || c2.t < Math.max(limite, sweep.t)) continue;
         if (c2.haussier === (b.dir > 0)) { aCISD = true; break; }
       }
       // variante du plan : « clôture au-dessus/en-dessous de la M15 précédente »
@@ -3055,8 +3107,8 @@ if (typeof window !== 'undefined') window.Compte = Compte;
 <script>
 'use strict';
 /**
- * HISTORIQUE MESURÉ — les 25 signaux que le modèle produit sur les vraies
- * bougies NQ du 2026-07-24 au 2026-09-28.
+ * HISTORIQUE MESURÉ — les 37 signaux que le modèle produit sur les vraies
+ * bougies NQ du 2026-07-28 au 2026-10-01.
  *
  * Fenêtre : 09 h 00 → 10 h 00 New York.
  *
@@ -3073,8 +3125,8 @@ if (typeof window !== 'undefined') window.Compte = Compte;
  * Les signaux des huit derniers jours sont suivis directement en 1 minute
  * (colonne « tf »), là il n'y a plus d'hypothèse du tout.
  *
- *   25 signaux · 76.0 % de réussite
- *   avant frais +723 €      net +676 €  (risque 250 € par trade)
+ *   37 signaux · 67.6 % de réussite
+ *   avant frais -522 €      net -604 €  (risque 250 € par trade)
  *
  * ⚠️ CES CHIFFRES NE SONT PAS REPRODUCTIBLES À L'IDENTIQUE. La profondeur des
  * séries Yahoo est courte et glissante : la même commande relancée deux heures
@@ -3088,31 +3140,43 @@ if (typeof window !== 'undefined') window.Compte = Compte;
  */
 var Mesure = (function () {
   var BRUT = [
-  ["2026-07-24",595,"SHORT","RB M5","5m",28322.25,29212.91,26095.61,2.5,0.61,-0.302,-0.3011818905083408,"sortie horaire −",1784901300000,125],
-  ["2026-07-28",570,"SHORT","RB M5","5m",27877,27986.3,27603.75,2.5,0.61,0.604,0.61,"gain",1785245400000,45],
+  ["2026-07-28",540,"SHORT","RB M5","5m",27980,28087.38,27711.54,2.5,0.61,0.603,0.61,"gain",1785243600000,45],
+  ["2026-07-28",570,"SHORT","ITH M15","5m",27877,27986.3,27603.75,2.5,0.61,0.604,0.61,"gain",1785245400000,45],
   ["2026-07-29",540,"SHORT","RB M15","5m",27881.5,27999.81,27585.74,2.5,0.61,0.604,0.61,"gain",1785330000000,85],
-  ["2026-07-29",590,"SHORT","CISD M5","5m",27753.5,28007.7,27117.99,2.5,0.61,0.473,0.47575403575413056,"sortie horaire +",1785333000000,130],
-  ["2026-07-31",580,"SHORT","CISD M30","5m",28419,28618.74,27919.66,2.5,0.61,0.421,0.4243351797780276,"sortie horaire +",1785505200000,140],
+  ["2026-07-29",545,"SHORT","CISD M5","5m",27893.75,27963.07,27720.46,2.5,0.61,0.35,0.36000000000000004,"gain partiel",1785330300000,15],
+  ["2026-07-31",580,"SHORT","CISD M5","5m",28419,28618.74,27919.66,2.5,0.61,0.421,0.4243351797780276,"sortie horaire +",1785505200000,140],
   ["2026-07-31",585,"SHORT","FVG H1","5m",28360.5,28460.19,28111.28,2.5,0.61,0.353,0.36000000000000004,"gain partiel",1785505500000,10],
   ["2026-08-04",540,"LONG","RB M5","5m",29218,29145.63,29398.94,2.5,0.61,0.35,0.36000000000000004,"gain partiel",1785848400000,30],
-  ["2026-08-04",570,"LONG","FVG M5","5m",29382.75,28979.24,30391.52,2.5,0.61,0.434,0.43552548139285036,"sortie horaire +",1785850200000,150],
+  ["2026-08-04",545,"LONG","FVG M5","5m",29227.75,29116.37,29506.21,2.5,0.61,0.354,0.36000000000000004,"gain partiel",1785848700000,20],
+  ["2026-08-05",540,"LONG","CISD M15","5m",29937.5,29875.55,30092.37,2.5,0.61,0.349,0.36000000000000004,"gain partiel",1785934800000,30],
+  ["2026-08-05",545,"LONG","CISD M15","5m",29937.75,29874.8,30095.13,2.5,0.61,0.349,0.36000000000000004,"gain partiel",1785935100000,25],
+  ["2026-08-14",580,"LONG","RB H4","5m",30261,30080.79,30711.52,2.5,0.61,-1.004,-1,"perte",1786714800000,100],
+  ["2026-08-14",585,"LONG","CISD M30","5m",30238,30149.81,30458.48,2.5,0.61,-1.008,-1,"perte",1786715100000,35],
+  ["2026-08-17",570,"SHORT","CISD M5","5m",30196.5,30295.66,29948.61,2.5,0.61,0.353,0.36000000000000004,"gain partiel",1786973400000,55],
   ["2026-08-18",545,"SHORT","CISD M5","5m",29693.5,29767.25,29509.11,2.5,0.61,0.351,0.36000000000000004,"gain partiel",1787058300000,30],
-  ["2026-08-18",585,"SHORT","CISD M15","5m",29657.25,29752.98,29417.94,2.5,0.61,0.353,0.36000000000000004,"gain partiel",1787060700000,15],
+  ["2026-08-18",550,"SHORT","CISD M15","5m",29696.25,29759.01,29539.36,2.5,0.61,0.349,0.36000000000000004,"gain partiel",1787058600000,25],
   ["2026-08-21",595,"SHORT","FVG H4","5m",29303.5,29369.94,29137.39,2.5,0.61,0.349,0.36000000000000004,"gain partiel",1787320500000,10],
   ["2026-08-24",580,"SHORT","CISD M15","5m",28978.75,29110.93,28648.29,2.5,0.61,-1.005,-1,"perte",1787578800000,105],
+  ["2026-08-24",585,"SHORT","FVG M5","5m",28990.75,29074.94,28780.27,2.5,0.61,0.352,0.36000000000000004,"gain partiel",1787579100000,10],
+  ["2026-08-26",580,"LONG","RB M15","5m",29291,29218.57,29472.08,2.5,0.61,0.35,0.36000000000000004,"gain partiel",1787751600000,25],
   ["2026-08-27",560,"SHORT","ITH M30","5m",29537.5,29572.13,29450.92,2.5,0.61,0.34,0.36000000000000004,"gain partiel",1787836800000,10],
-  ["2026-08-27",570,"SHORT","ITH M5","5m",29463.5,29518.07,29327.07,2.5,0.61,-1.013,-1,"perte",1787837400000,10],
+  ["2026-08-27",565,"SHORT","ITH M5","5m",29524.75,29610.37,29310.7,2.5,0.61,0.352,0.36000000000000004,"gain partiel",1787837100000,15],
   ["2026-08-31",575,"SHORT","CISD H4","5m",29398.75,29487.27,29177.45,2.5,0.61,0.352,0.36000000000000004,"gain partiel",1788183300000,60],
-  ["2026-09-01",540,"SHORT","CISD M30","5m",29099.25,29213.53,28813.55,2.5,0.61,0.354,0.36000000000000004,"gain partiel",1788267600000,45],
-  ["2026-09-01",550,"SHORT","FVG M5","5m",29093,29168.27,28904.81,2.5,0.61,0.351,0.36000000000000004,"gain partiel",1788268200000,25],
+  ["2026-08-31",580,"SHORT","CISD M5","5m",29407.25,29461.78,29270.94,2.5,0.61,-1.013,-1,"perte",1788183600000,5],
+  ["2026-09-01",570,"SHORT","CISD M30","5m",29099,29131.28,29018.3,2.5,0.61,-1.022,-1,"perte",1788269400000,5],
+  ["2026-09-03",550,"LONG","RB H4","5m",29239.25,29155.86,29447.73,2.5,0.61,0.352,0.36000000000000004,"gain partiel",1788441000000,25],
+  ["2026-09-03",565,"LONG","CISD M5","5m",29249,29126.6,29555,2.5,0.61,0.354,0.36000000000000004,"gain partiel",1788441900000,40],
   ["2026-09-10",590,"SHORT","ITH H1","5m",29105.75,29238.03,28775.04,2.5,0.61,-1.005,-1,"perte",1789048200000,30],
-  ["2026-09-14",545,"SHORT","ITH M5","5m",28837.25,28926.32,28614.58,2.5,0.61,-1.008,-1,"perte",1789391100000,25],
-  ["2026-09-14",575,"SHORT","RB M5","5m",28889,28979.11,28663.72,2.5,0.61,-1.008,-1,"perte",1789392900000,10],
-  ["2026-09-21",570,"LONG","CISD M5","5m",30252,30152.8,30500,2.5,0.61,0.603,0.61,"gain",1789997400000,50],
-  ["2026-09-21",575,"LONG","ITL H4","5m",30296.5,30241.26,30434.59,2.5,0.61,0.597,0.61,"gain",1789997700000,25],
-  ["2026-09-22",580,"LONG","ITL M5","1m",30902.25,30835.53,31069.05,2.5,0.61,0.35,0.36000000000000004,"gain partiel",1790084400000,16],
-  ["2026-09-22",590,"LONG","ITL M5","1m",30941.25,30805.5,31280.63,2.5,0.61,0.355,0.36000000000000004,"gain partiel",1790085000000,48],
-  ["2026-09-28",580,"SHORT","RB M5","1m",30611.5,30714.99,30352.78,2.5,0.61,0.45,0.45662844045562584,"sortie horaire +",1790602800000,140]
+  ["2026-09-10",595,"SHORT","ITH H1","5m",29099.75,29256.03,28709.05,2.5,0.61,-1.004,-1,"perte",1789048500000,25],
+  ["2026-09-14",540,"SHORT","ITH M5","5m",28842.25,28911.32,28669.57,2.5,0.61,-1.01,-1,"perte",1789390800000,20],
+  ["2026-09-14",545,"SHORT","ITH M5","5m",28837.25,28908.32,28659.58,2.5,0.61,-1.01,-1,"perte",1789391100000,15],
+  ["2026-09-15",580,"LONG","CISD M15","5m",29435.75,29371.2,29597.12,2.5,0.61,-1.011,-1,"perte",1789479600000,25],
+  ["2026-09-16",540,"SHORT","ITH M15","5m",29367,29494.49,29048.27,2.5,0.61,-1.005,-1,"perte",1789563600000,115],
+  ["2026-09-16",555,"SHORT","CISD M15","5m",29388.25,29430.76,29281.97,2.5,0.61,-1.016,-1,"perte",1789564500000,30],
+  ["2026-09-22",580,"LONG","ITL M5","5m",30902.25,30803.53,31149.05,2.5,0.61,0.353,0.36000000000000004,"gain partiel",1790084400000,15],
+  ["2026-09-28",580,"SHORT","RB M5","1m",30611.5,30714.99,30352.78,2.5,0.61,0.45,0.45662844045562584,"sortie horaire +",1790602800000,140],
+  ["2026-10-01",540,"SHORT","CISD M15","1m",30820,30877.66,30675.86,2.5,0.61,0.348,0.36000000000000004,"gain partiel",1790859600000,30],
+  ["2026-10-01",555,"SHORT","CISD M5","1m",30823,30921.66,30576.35,2.5,0.61,0.353,0.36000000000000004,"gain partiel",1790860500000,18]
   ];
   var CLES = ['jour','minNY','sens','niveau','tf','entry','sl','tp','rr','gainMax','r','rBrut','sortie','ts','duree'];
   var LISTE = BRUT.map(function (l) {
@@ -3533,7 +3597,11 @@ function paintKintt(){
       '<b>Relevé en direct de KINTT :</b> ' +
       (KDIST_ETAT === 'indisponible' ? 'journal non joignable pour l’instant.'
        : KDIST && KDIST.signaux.length ? KDIST.signaux.length + ' signal(aux), aucun encore clos.'
-       : 'aucun signal relevé pour l’instant. La fenêtre 10 h → 12 h est étroite et le filtre « zone intacte » très sélectif.') +
+       // Un panneau qui ne donne pas de décompte laisse croire qu'il n'a pas
+       // regardé. « 0 trade » est une information ; le silence n'en est pas une.
+       : '<b>0 trade</b> relevé pour l’instant. La fenêtre 10 h → 12 h est étroite et le filtre '
+         + '« zone jamais touchée » très sélectif : sur l’historique complet, la stratégie '
+         + 'ne déclenche rien du tout.') +
       '</div>';
   }
 
