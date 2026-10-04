@@ -36,9 +36,15 @@
 (function (root) {
 
   var CFG = {
-    // ── MANIPULATION ────────────────────────────────────────────────────
+    // ── MANIPULATION ─────────────────────────────────────────── [MESURÉ]
     // La fenêtre où la grande liquidité doit être balayée, heure de New York.
-    manipDeb: 9 * 60, manipFin: 10 * 60,
+    //
+    // 08 h → 10 h, et ce n'est pas un réglage choisi à la main : sur deux ans,
+    // 64 % des balayages de grande liquidité y tombent (scripts/heure_liq.js).
+    // Les niveaux que tout le monde voit — veille, semaine — partent dès 08 h ;
+    // les bassins H1 intermédiaires se font prendre plus tard, pic à 09 h-10 h,
+    // soit 15 h-16 h à Paris.
+    manipDeb: 8 * 60, manipFin: 10 * 60,
     // ── DISTRIBUTION ────────────────────────────────────────────────────
     // La fenêtre où l'IFVG d'entrée est accepté, après la manipulation.
     distDeb: 9 * 60, distFin: 12 * 60,
@@ -64,7 +70,12 @@
     //   'exige'    on ne prend QUE s'il y a divergence
     //   'confirme' on ne prend QUE s'il n'y en a pas — l'inverse, pour
     //              vérifier que la divergence n'est pas qu'un filtre au hasard
-    smt: 'ignore',
+    // Défaut : EXIGÉE. Sur deux ans, c'est le réglage à la meilleure marge
+    // (+22,7 % contre +20,0 % sans filtre) et surtout au creux maximal le plus
+    // faible — 768 € contre 1 286 €, pour une tolérance de 1 850 € sur un
+    // compte financé de 50 000 €. Il rapporte moins au total, 13 036 € contre
+    // 19 990 € : gagner moins vite sans mourir est le bon arbitrage ici.
+    smt: 'exige',
     // La fenêtre de comparaison, en minutes avant le balayage.
     smtMin: 120,
     // Tolérance : « ne fait pas le même extrême » doit vouloir dire quelque
@@ -258,6 +269,21 @@
     // ── parcours, bougie de 5 minutes par bougie de 5 minutes ────────────
     var tous = [], parJour = {}, manip = null, jourManip = null;
     var manips = [];   // toutes les manipulations détectées, abouties ou non
+    // L'ÉTAPE COURANTE, pour que le site puisse dire où en est le scénario.
+    // Le backtest n'en a pas besoin ; un panneau en direct, si. Sans elle il
+    // ne resterait qu'à afficher « aucun signal », ce qui ne renseigne sur
+    // rien : on ne saurait pas si le balayage a eu lieu, si une liquidité
+    // interne existe, ni ce qu'on attend.
+    var etapeJour = {}, etapeCourante = null;
+    function etape(e2) {
+      if (!etapeCourante || etapeCourante.jour !== e2.jour) {
+        etapeCourante = { jour: e2.jour, min: e2.min, manip: null, dir: 0, internes: 0,
+                          cible: null, fvg: null, ifvg: null, signal: null, pris: 0 };
+        etapeJour[e2.jour] = etapeCourante;
+      }
+      etapeCourante.min = e2.min;
+      return etapeCourante;
+    }
 
     for (var i = 60; i < m5.length; i++) {
       var bar = m5[i], e = heure(bar.t);
@@ -266,6 +292,7 @@
       if (e.dow < 1 || e.dow > 5) continue;
 
       if (jourManip !== e.jour) { manip = null; jourManip = e.jour; }
+      var EC = etape(e);
 
       // ── 1. LA GRANDE LIQUIDITÉ DU JOUR ───────────────────────────────
       // Reconstituée une fois par journée, à partir de ce qui est clos.
@@ -334,6 +361,8 @@
             if (CFG.smt === 'confirme' && div !== false) continue;
             manip = { sens: gl.haut ? -1 : 1, prix: gl.prix, nom: gl.nom, smt: div,
                       ext: gl.haut ? bar.h : bar.l, i: i, t: tD };
+            EC.manip = { nom: gl.nom, prix: gl.prix, ext: manip.ext, smt: div, t: tD };
+            EC.dir = manip.sens;
             manips.push({ nom: gl.nom, jour: e.jour, min: e.min, sens: manip.sens, smt: div });
             break;
           }
@@ -359,9 +388,11 @@
           internes.push(b.prix);
         });
       });
+      EC.internes = internes.length;
       if (!internes.length) continue;
       internes.sort(function (a, b2) { return L ? a - b2 : b2 - a; });
       var cible = CFG.cible === 'loin' ? internes[internes.length - 1] : internes[0];
+      EC.cible = cible;
 
       // ── 4. UN FVG RETENU : bon sens, et une interne derrière lui ──────
       var a = atr[i] || 0;
@@ -383,6 +414,7 @@
           zOk = z; break;
         }
       }
+      if (zOk) EC.fvg = { bas: zOk.bas, haut: zOk.haut, haussier: zOk.haussier };
       if (!zOk) continue;
 
       // ── 5. L'ENTRÉE : UNIQUEMENT SUR UN IFVG DU BON SENS ─────────────
@@ -394,6 +426,7 @@
         if (z2.sens !== dir) continue;
         decl = z2; break;
       }
+      if (decl) EC.ifvg = { bas: decl.bas, haut: decl.haut, t: decl.t };
       if (!decl) continue;
 
       // ── 6. NIVEAUX ────────────────────────────────────────────────────
@@ -415,10 +448,20 @@
                   tp: tp, dol: cible, manip: manip.nom, manipPrix: manip.prix, smt: manip.smt,
                   jour: e.jour, min: e.min });
       parJour[e.jour] = (parJour[e.jour] || 0) + 1;
+      EC.signal = tous[tous.length - 1];
+      EC.pris = parJour[e.jour];
       manip = null;   // un scénario par manipulation
     }
 
-    return { tousSignaux: tous, manips: manips };
+    // L'étape rendue est celle du DERNIER jour présent dans les bougies, pas
+    // celle d'aujourd'hui : si le robot a du retard, le panneau doit décrire
+    // la séance qu'il a réellement vue, et le dire.
+    var jours = Object.keys(etapeJour).sort();
+    var etatCourant = jours.length ? etapeJour[jours[jours.length - 1]] : null;
+    return { tousSignaux: tous, manips: manips, etape: etatCourant,
+             dernier: tous.length ? tous[tous.length - 1] : null,
+             fenetre: { manipDeb: CFG.manipDeb, manipFin: CFG.manipFin,
+                        distDeb: CFG.distDeb, distFin: CFG.distFin }, smt: CFG.smt };
   }
 
   root.AMD = { evaluer: evaluer, CFG: CFG, heure: heure, smt: smt };

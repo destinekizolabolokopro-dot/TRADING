@@ -280,6 +280,10 @@ button,input,select{font:inherit;color:inherit}
 @media (prefers-reduced-motion:reduce){
   *{animation-duration:.01ms!important;transition-duration:.01ms!important}
 }
+.strats{display:flex;flex-wrap:wrap;gap:10px 16px}
+.chk{display:inline-flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;
+     padding:4px 8px;border:1px solid var(--li,#2a2f3a);border-radius:6px}
+.chk input{cursor:pointer}
 </style>
 </head>
 <body>
@@ -293,6 +297,7 @@ button,input,select{font:inherit;color:inherit}
     <a href="#scope" class="on">Radar</a>
     <a href="#pan-chain">Chaîne</a>
     <a href="#pan-kintt">KINTT</a>
+    <a href="#pan-amd">AMD</a>
     <a href="#pan-journal">Historique</a>
     <a href="#settings" id="n-set">Réglages</a>
   </nav>
@@ -376,6 +381,29 @@ button,input,select{font:inherit;color:inherit}
       <div id="kintt"></div>
     </section>
 
+    <!-- ── AMD ──────────────────────────────────────────────────────────
+         Manipulation puis distribution. La grande liquidité est balayée dans
+         la fenêtre du matin, puis le prix repart en sens inverse chercher les
+         liquidités internes. L'entrée se fait uniquement sur un IFVG allant
+         dans le sens prévu, et la divergence SMT avec l'ES dit si le balayage
+         était une vraie manipulation.
+
+         Les trois stratégies tournent côte à côte sur les mêmes bougies et
+         gardent des bilans séparés : une moyenne des trois ne décrirait
+         aucune des trois.                                               -->
+    <section class="pan" id="pan-amd">
+      <div class="pan-h"><h2>AMD · manipulation puis distribution</h2>
+        <span class="tag" id="a-tag">—</span></div>
+      <div class="gauge"><i id="a-gauge"></i></div>
+      <div class="fld"><label for="a-smt">Divergence SMT avec l'ES</label>
+        <select id="a-smt">
+          <option value="exige">Exigée — ne prendre que les vraies manipulations</option>
+          <option value="ignore">Ignorée — prendre tous les balayages</option>
+          <option value="confirme">Inversée — ne prendre que les balayages confirmés</option>
+        </select></div>
+      <div id="amd"></div>
+    </section>
+
     <section class="pan" id="pan-journal">
       <div class="pan-h"><h2>Historique</h2><span class="tag" id="j-tag">—</span></div>
       <div class="jfilters" id="jchips"></div>
@@ -394,6 +422,12 @@ button,input,select{font:inherit;color:inherit}
       <div class="fld"><label for="c-contrat">Contrat</label>
         <select id="c-contrat"><option value="MNQ">MNQ (micro)</option><option value="NQ">NQ (plein)</option></select></div>
       <div class="msg" id="c-msg"></div>
+      <div class="fld"><label>Stratégies affichées</label>
+        <div id="c-strats" class="strats"></div></div>
+      <div class="msg">
+        Décocher une stratégie masque son panneau. Elle continue d'être
+        calculée : masquer n'est pas éteindre, et son historique reste intact.
+      </div>
       <div class="fld"><label for="tok">Jeton OANDA (temps réel)</label>
         <input id="tok" type="password" autocomplete="off" spellcheck="false"
                placeholder="xxxxxxxx-xxxxxxxxxxxxxxxx"></div>
@@ -436,6 +470,7 @@ button,input,select{font:inherit;color:inherit}
 <script src="js/position.js"></script>
 <script src="js/modele.js"></script>
 <script src="js/kintt.js"></script>
+<script src="js/amd.js"></script>
 <script src="js/compte.js"></script>
 <script src="js/history.js"></script>
 <script src="js/mesure.js"></script>
@@ -978,7 +1013,209 @@ $('#chips').addEventListener('click', e => {
   FILTRE = b.dataset.k; paintChips(); majBlips();
 });
 
-function paintAll(){ paintTop(); paintChain(); paintKintt(); paintTrade(); paintJournal(); paintRadar(); paintTFs(); paintFooter(); }
+
+/* ── LE REGISTRE DES STRATÉGIES ───────────────────────────────────────────
+   Une seule liste décrit toutes les stratégies : son panneau, son onglet, et
+   comment la calculer sur des bougies. Ajouter une stratégie, c'est ajouter
+   UNE entrée ici — pas chercher ses mentions dans la page.
+
+   Elles tournent toutes sur LES MÊMES bougies et gardent des bilans séparés.
+   Une moyenne des trois ne décrirait aucune des trois.                     */
+const STRATS = [
+  { cle:'mech',  nom:'Modèle', pan:'pan-chain', onglet:'Chaîne',
+    calcul:null },   /* le modèle principal est calculé à part */
+  { cle:'kintt', nom:'KINTT', pan:'pan-kintt', onglet:'KINTT',
+    calcul:(brut) => window.Kintt ? Kintt.evaluer(brut) : null },
+  { cle:'amd',   nom:'AMD', pan:'pan-amd', onglet:'AMD',
+    calcul:(brut) => window.AMD ? AMD.evaluer(brut, { E:null }) : null }
+];
+const CLE_STRATS = 'strats.visibles';
+function stratsVisibles(){
+  try{
+    const v = JSON.parse(localStorage.getItem(CLE_STRATS) || 'null');
+    if(v && typeof v === 'object') return v;
+  }catch(e){}
+  const d = {}; STRATS.forEach(x => d[x.cle] = true); return d;
+}
+function stratsEcrire(v){ try{ localStorage.setItem(CLE_STRATS, JSON.stringify(v)); }catch(e){} }
+function appliquerStrats(){
+  const v = stratsVisibles();
+  for(const st of STRATS){
+    const pan = document.getElementById(st.pan);
+    if(pan) pan.style.display = v[st.cle] === false ? 'none' : '';
+    const a = Array.from(document.querySelectorAll('.nav a'))
+      .find(x => x.getAttribute('href') === '#' + st.pan);
+    if(a) a.style.display = v[st.cle] === false ? 'none' : '';
+  }
+}
+function paintStratsChoix(){
+  const box = $('#c-strats'); if(!box) return;
+  const v = stratsVisibles();
+  box.innerHTML = STRATS.map(st =>
+    '<label class="chk"><input type="checkbox" data-strat="' + st.cle + '"' +
+    (v[st.cle] === false ? '' : ' checked') + '> ' + st.nom + '</label>').join('');
+  box.querySelectorAll('input[data-strat]').forEach(inp => {
+    inp.addEventListener('change', () => {
+      const w = stratsVisibles();
+      w[inp.dataset.strat] = inp.checked;
+      stratsEcrire(w); appliquerStrats();
+    });
+  });
+}
+
+/* ── AMD : le réglage SMT, gardé dans ce navigateur ──────────────────────
+   Le défaut est « exigée » : c'est le réglage qui a la meilleure marge
+   mesurée (+22,7 % sur deux ans) et le creux maximal le plus faible,
+   768 € contre 1 850 € de tolérance sur un compte financé de 50 000 €.
+   Gagner moins vite en ne mourant pas est le bon arbitrage ici.          */
+const CLE_SMT = 'amd.smt';
+function smtLu(){
+  try{ const v = localStorage.getItem(CLE_SMT); if(v) return v; }catch(e){}
+  return 'exige';
+}
+function smtAppliquer(){
+  const v = smtLu();
+  if(window.AMD && AMD.CFG) AMD.CFG.smt = v;
+  const sel = $('#a-smt'); if(sel) sel.value = v;
+}
+
+function paintAmd(){
+  const box = $('#amd'); if(!box) return;
+  const A = D && D.amd;
+  const c = window.AMD ? AMD.CFG : null;
+  const dev = window.Compte ? Compte.sym(Compte.lire().devise) : ' €';
+  const h = m => Math.floor(m / 60) + ' h';
+  const fen = (A && A.fenetre) || c || {};
+
+  if(!A || !c){
+    $('#a-tag').textContent = '—';
+    $('#a-gauge').style.width = '0%';
+    box.innerHTML = '<div class="empty"><b>Pas encore de relevé</b>' +
+      'AMD n’a pas encore tourné sur une bougie. Le panneau se remplit au ' +
+      'premier passage.</div>';
+    return;
+  }
+
+  const e = A.etape;
+  const sens = e && e.dir > 0 ? 'haussier' : e && e.dir < 0 ? 'baissier' : null;
+  // Le réglage SMT affiché est celui du relevé quand il vient du robot : lui
+  // seul dispose des deux marchés, donc lui seul applique vraiment le filtre.
+  // Afficher le réglage local là où il n'a pas servi serait un mensonge.
+  const smtActif = A.smt || c.smt;
+  const nowNY = window.AMD ? AMD.heure(Date.now()) : null;
+  const min = nowNY ? nowNY.min : null;
+  const ouvre = nowNY && nowNY.dow >= 1 && nowNY.dow <= 5 &&
+                min >= fen.manipDeb && min < fen.manipFin;
+
+  const etapes = [
+    { t:'Fenêtre de manipulation ' + h(fen.manipDeb) + ' → ' + h(fen.manipFin) + ' New York',
+      ok: !!ouvre,
+      d: ouvre ? 'Ouverte — on guette le balayage de la grande liquidité.'
+        : 'Fermée. Hors de cette fenêtre, aucun scénario ne démarre.',
+      long:'Mesuré sur deux ans : 64 % des balayages de grande liquidité tombent entre 8 h et 10 h New York, soit 14 h – 16 h à Paris.' },
+    { t:'Grande liquidité balayée',
+      ok: !!(e && e.manip),
+      d: e && e.manip
+        ? 'Le ' + (e.manip.nom === 'veille' ? 'repère de la veille'
+            : e.manip.nom === 'semaine' ? 'repère de la semaine passée'
+            : 'sommet ' + e.manip.nom) + ' à ' + fmt(e.manip.prix) +
+          ' a été pris jusqu’à ' + fmt(e.manip.ext) + '.'
+        : 'Aucun repère majeur franchi dans la fenêtre. C’est le point de départ obligatoire.',
+      long:'Haut et bas de la veille, de la semaine passée, et sommets ou creux intermédiaires H4 et H1 encore intacts.' },
+    { t:'Divergence SMT avec l’ES',
+      ok: !!(e && e.manip && e.manip.smt === true),
+      attente: !!(e && e.manip && e.manip.smt === null),
+      d: !e || !e.manip ? 'Jugée au moment du balayage.'
+        : e.manip.smt === true ? 'L’ES n’a PAS suivi : le balayage n’est pas porté par tout le marché, c’est une manipulation.'
+        : e.manip.smt === false ? 'L’ES a fait le même extrême : le mouvement est général, le balayage peut être réel.'
+        : 'Indisponible — les bougies de l’ES ne sont pas servies à ce navigateur. Le filtre est inactif.',
+      long:'Divergence mesurée sur les 120 minutes précédentes, sur bougies closes des deux côtés. Réglage appliqué : ' +
+           (smtActif === 'exige' ? 'exigée' : smtActif === 'confirme' ? 'inversée' : 'ignorée') +
+           (D && D.source === 'robot' ? ' (par le robot, qui dispose des deux marchés).' : '.') },
+    { t:'Liquidité interne en sens inverse',
+      ok: !!(e && e.internes > 0),
+      d: e && e.internes > 0
+        ? e.internes + ' bassin(s) intact(s) ' + (sens === 'haussier' ? 'au-dessus' : 'en dessous') +
+          (e.cible != null ? ', le plus proche à ' + fmt(e.cible) : '') + '.'
+        : 'Aucun swing intact dans le sens prévu. Sans cible, pas de scénario.',
+      long:'« Les petites » : au-dessus ou en dessous de chaque swing H4, H1 et M30.' },
+    { t:'FVG retenu, avec une interne derrière lui',
+      ok: !!(e && e.fvg),
+      d: e && e.fvg
+        ? 'FVG ' + (e.fvg.haussier ? 'haussier' : 'baissier') + ' entre ' + fmt(e.fvg.bas) + ' et ' + fmt(e.fvg.haut) + '.'
+        : 'Aucun FVG H1 ou M30 du bon sens à portée, avec une liquidité interne au-delà.',
+      long:'Le FVG doit pointer à l’inverse du balayage ET avoir une liquidité interne derrière lui.' },
+    { t:'Entrée : IFVG dans le sens prévu',
+      ok: !!(e && e.ifvg),
+      attente: !!(e && e.fvg && !e.ifvg),
+      d: e && e.ifvg ? 'IFVG confirmé entre ' + fmt(e.ifvg.bas) + ' et ' + fmt(e.ifvg.haut) + '.'
+        : e && e.fvg ? 'On attend l’inversion. C’est la seule porte d’entrée.'
+        : 'Cherchée seulement une fois le reste en place.',
+      long:'Un FVG cassé par sa clôture devient un signal du sens opposé : c’est l’IFVG.' }
+  ];
+
+  const n = etapes.filter(x => x.ok).length;
+  $('#a-tag').textContent = n + '/' + etapes.length +
+    (e && e.signal ? ' · signal' : '') +
+    (e && e.jour ? ' · ' + e.jour : '');
+  $('#a-gauge').style.width = Math.round(n / etapes.length * 100) + '%';
+
+  let out = '<div class="t-why" style="margin:0 0 10px">' +
+    'La grande liquidité est balayée entre <b>' + h(fen.manipDeb) + ' et ' + h(fen.manipFin) +
+    '</b> New York — c’est la <b>manipulation</b>. Le prix repart ensuite en sens inverse ' +
+    'chercher les <b>liquidités internes</b> : c’est la <b>distribution</b>. ' +
+    'On entre uniquement sur un <b>IFVG</b> allant dans ce sens, stop au-delà de l’extrême ' +
+    'du balayage.</div>';
+
+  out += '<ol class="chain">';
+  for(const x of etapes){
+    const cls = x.ok ? 'ok' : x.attente ? 'wait' : 'no';
+    out += '<li class="' + cls + '"><b>' + x.t + '</b><span>' + x.d + '</span>' +
+           '<em>' + x.long + '</em></li>';
+  }
+  out += '</ol>';
+
+  if(e && e.signal){
+    const t = e.signal;
+    const q = window.Compte ? Compte.calibrer(t.entree, t.sl, t.tp) : null;
+    out += '<div class="t-card"><div class="t-h"><b>' +
+      (t.sens === 'LONG' ? 'Achat' : 'Vente') + '</b> · ' + e.jour + '</div>' +
+      '<div class="t-g"><span>Entrée</span><b class="mono">' + fmt(t.entree) + '</b>' +
+      '<span>Stop</span><b class="mono">' + fmt(t.sl) + '</b>' +
+      '<span>Objectif</span><b class="mono">' + fmt(t.tp) + '</b>' +
+      '<span>Rapport</span><b class="mono">' +
+        (Math.abs(t.tp - t.entree) / Math.abs(t.entree - t.sl)).toFixed(2).replace('.', ',') + '</b>' +
+      (q && !q.tropPetit ? '<span>Contrats</span><b class="mono">' + q.contrats + '</b>' +
+        '<span>Risque</span><b class="mono">' + q.risqueDev + dev + '</b>' : '') +
+      '</div>' +
+      (q && q.tropPetit ? '<div class="t-why">Stop trop large pour un seul contrat à ce risque : ' +
+        'ce signal n’est pas prenable. Le backtest écarte les mêmes.</div>' : '') +
+      '</div>';
+  } else {
+    out += '<div class="empty"><b>Aucun signal</b>' +
+      (e ? 'Le scénario est à ' + n + ' étape(s) sur ' + etapes.length + ' pour la séance du ' + e.jour + '.'
+         : 'Aucune séance examinée.') + '</div>';
+  }
+
+  // Ce que le panneau NE dit pas, et qu'il faut savoir en le lisant.
+  if(A.signaux != null)
+    out += '<div class="t-why" style="margin-top:10px">' +
+      '<b>Relevé en direct d’AMD :</b> ' + A.manips + ' manipulation(s) détectée(s), ' +
+      A.signaux + ' signal(aux) sur les bougies servies' +
+      (A.signaux === 0 ? ' — aucun, et c’est une information : la chaîne est exigeante.' : '.') +
+      '</div>';
+
+  out += '<div class="t-why" style="margin-top:10px">' +
+    '<b>Réserves.</b> Mesuré sur deux ans en exécution 1 heure : 147 trades, ' +
+    '37,4 % de réussite, marge +20 % ; en exigeant la divergence SMT, 82 trades, ' +
+    '41,5 %, marge +22,7 % et un creux maximal de 768 ' + dev.trim() + '. ' +
+    'L’exécution réelle en 5 minutes n’a été mesurée que sur 60 jours. ' +
+    'Aucun ordre n’est passé : ce panneau signale, il n’exécute pas.</div>';
+
+  box.innerHTML = out;
+}
+
+function paintAll(){ paintTop(); paintChain(); paintKintt(); paintAmd(); paintTrade(); paintJournal(); paintRadar(); paintTFs(); paintFooter(); }
 
 /* ── cycle de rafraîchissement ──────────────────────────────────────── */
 const SERIES = [['1m','8d'],['2m','60d'],['5m','60d'],['15m','60d'],['60m','3mo'],['1d','1y']];
@@ -1048,6 +1285,10 @@ async function refresh(){
       // panneau serait vide dès qu'on branche le flux direct, c'est-à-dire
       // exactement quand on regarde le marché.
       if(D && window.Kintt){ try{ D.kintt = Kintt.evaluer(brut); }catch(e){ D.kintt = null; } }
+      // AMD tourne sur les mêmes bougies. Le marché corrélé n'est pas servi à
+      // ce navigateur : la divergence SMT est donc indisponible en direct, et
+      // le panneau le DIT au lieu de faire comme si le filtre s'appliquait.
+      if(D && window.AMD){ try{ D.amd = AMD.evaluer(brut, { E:null }); }catch(e){ D.amd = null; } }
       if(D) D.source = 'cfd';
     } else {
       D = await etatDistant();
@@ -1428,6 +1669,18 @@ if(window.CFD && CFD.actif()) $('#tok').placeholder = 'jeton enregistré';
 if(!window.matchMedia('(prefers-reduced-motion: reduce)').matches) boucle(performance.now());
 else drawRadar(0);
 setInterval(paintTop, 1000);
+// ── DÉMARRAGE DES STRATÉGIES ─────────────────────────────────────────────
+// Ces trois lignes étaient d'abord tombées dans le bouton « Enregistrer » du
+// jeton OANDA : le sélecteur n'existait donc que pour qui branche un flux
+// direct, et pour personne d'autre. Le test en navigateur l'a vu — aucune
+// case à cocher dans la page — là où la lecture du code ne l'avait pas vu.
+appliquerStrats(); paintStratsChoix(); smtAppliquer();
+// Changer le réglage SMT change ce que la stratégie accepte : on recalcule
+// tout de suite plutôt que d'attendre le prochain rafraîchissement.
+if($('#a-smt')) $('#a-smt').addEventListener('change', () => {
+  try{ localStorage.setItem(CLE_SMT, $('#a-smt').value); }catch(e){}
+  smtAppliquer(); refresh();
+});
 refresh();
 setInterval(refresh, 300000);   // le modèle travaille en M5/M15 : 5 minutes suffisent
 </script>

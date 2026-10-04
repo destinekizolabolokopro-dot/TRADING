@@ -29,7 +29,7 @@ let m;
 for (const a of process.argv.slice(2)) {
   if ((m = a.match(/^--fenetre=(\d+),(\d+)$/))) { AMD.CFG.manipDeb = +m[1] * 60; AMD.CFG.manipFin = +m[2] * 60; }
   if ((m = a.match(/^--cible=(proche|loin)$/))) AMD.CFG.cible = m[1];
-  if ((m = a.match(/^--delai=(\d+)$/))) AMD.CFG.delai = +m[1];
+  if ((m = a.match(/^--delai=(\d+)$/))) AMD.CFG.delaiMin = +m[1];
   if ((m = a.match(/^--portee=([\d.]+)$/))) AMD.CFG.fvgPortee = +m[1];
   // La description ne parle pas de partiel : elle dit de viser la liquidité
   // interne. --partiel=0 tient la position entière jusqu'à l'objectif.
@@ -56,7 +56,7 @@ console.log('║  MODÈLE AMD · manipulation puis distribution                 
 console.log('╚══════════════════════════════════════════════════════════════════════╝');
 for (const l of J.banniere(AL, Object.keys(PS).map(sym => ({ sym, S: PS[sym] })))) console.log('   ' + l);
 console.log(`\n   manipulation ${Math.floor(AMD.CFG.manipDeb/60)}h-${Math.floor(AMD.CFG.manipFin/60)}h NY · ` +
-  `cible ${AMD.CFG.cible} · délai ${AMD.CFG.delai} bougies · portée ${AMD.CFG.fvgPortee} ATR · ` +
+  `cible ${AMD.CFG.cible} · délai ${AMD.CFG.delaiMin} min · portée ${AMD.CFG.fvgPortee} ATR · ` +
   `${AMD.CFG.part ? Math.round(AMD.CFG.part * 100) + ' % à ' + AMD.CFG.tp1 : 'rien vendu'} · plafond ${AMD.CFG.tp2} R · SMT ${AMD.CFG.smt}`);
 
 const T = [];

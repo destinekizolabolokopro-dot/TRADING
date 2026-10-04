@@ -1124,7 +1124,31 @@ const kintt = {
   fen: (await p.textContent('#f-kfen') || '').trim(),
   // Le panneau du modèle doit rester rempli lui aussi : brancher une seconde
   // stratégie ne doit pas casser la première.
-  chaine: (await p.textContent('#chain') || '').trim().length
+  chaine: (await p.textContent('#chain') || '').trim().length,
+  // ── LA TROISIÈME STRATÉGIE ─────────────────────────────────────────────
+  // Brancher AMD ne doit ni casser les deux autres, ni afficher un panneau
+  // vide : un panneau qui existe et ne dit rien est pire qu'absent.
+  amd: {
+    texte: (await p.textContent('#amd') || '').trim(),
+    tag: (await p.textContent('#a-tag') || '').trim(),
+    jauge: await p.evaluate(() => document.querySelector('#a-gauge').style.width),
+    smt: await p.evaluate(() => document.querySelector('#a-smt').value),
+    // Le sélecteur de stratégies doit proposer une case par stratégie.
+    cases: await p.evaluate(() => [...document.querySelectorAll('#c-strats input[data-strat]')]
+      .map(e => e.dataset.strat)),
+    // Décocher doit vraiment masquer le panneau.
+    masque: await p.evaluate(async () => {
+      const inp = document.querySelector('#c-strats input[data-strat=\"amd\"]');
+      if (!inp) return 'case absente';
+      inp.checked = false; inp.dispatchEvent(new Event('change'));
+      await new Promise(r => setTimeout(r, 120));
+      const cache = document.getElementById('pan-amd').style.display === 'none';
+      inp.checked = true; inp.dispatchEvent(new Event('change'));
+      await new Promise(r => setTimeout(r, 120));
+      const revenu = document.getElementById('pan-amd').style.display !== 'none';
+      return cache && revenu ? 'ok' : 'masquage : ' + cache + ', retour : ' + revenu;
+    })
+  }
 };
 srv.close();
 const out = {
@@ -1182,6 +1206,39 @@ console.log(JSON.stringify(out)); await b.close();`;
       const f = (K3.enR || []).concat(K3.enRTitres || []);
       if (f.length) throw new Error('reste à l\'écran : ' + [...new Set(f)].join(', '));
     });
+    // ── AMD, LA TROISIÈME STRATÉGIE ───────────────────────────────────────
+    const A3 = (res.kintt || {}).amd || {};
+    t('le panneau AMD se remplit au lieu de rester vide', () => {
+      if (!A3.texte) throw new Error('panneau vide');
+      if (/Pas encore de relevé/.test(A3.texte))
+        throw new Error('AMD ne reçoit rien : ni le navigateur ni le relevé ne le calculent');
+      if (A3.texte.length < 300) throw new Error('panneau trop court : ' + A3.texte.length + ' caractères');
+    });
+    t('le compteur et la jauge d\'AMD sont renseignés', () => {
+      if (!/^\d\/\d/.test(A3.tag)) throw new Error('compteur : « ' + A3.tag + ' »');
+      if (!/%$/.test(A3.jauge || '')) throw new Error('jauge : « ' + A3.jauge + ' »');
+    });
+    t('AMD dit ce que vaut sa mesure, pas seulement son état', () => {
+      // Un panneau qui annonce une stratégie sans dire sur quoi elle est
+      // mesurée invite à la trader en croyant qu'elle est prouvée.
+      if (!/trades/.test(A3.texte)) throw new Error('aucun décompte de trades affiché');
+      if (!/Réserves/.test(A3.texte)) throw new Error('aucune réserve affichée');
+    });
+    t('le réglage SMT est proposé et vaut un choix connu', () => {
+      if (!['exige', 'ignore', 'confirme'].includes(A3.smt))
+        throw new Error('réglage SMT : « ' + A3.smt + ' »');
+    });
+    t('le sélecteur propose une case par stratégie', () => {
+      for (const c of ['mech', 'kintt', 'amd'])
+        if (!(A3.cases || []).includes(c)) throw new Error('case absente : ' + c);
+    });
+    t('décocher une stratégie masque vraiment son panneau', () => {
+      if (A3.masque !== 'ok') throw new Error(String(A3.masque));
+    });
+    t('brancher AMD n\'a pas vidé le panneau de KINTT', () => {
+      if (!((res.kintt || {}).texte || '').length) throw new Error('le panneau KINTT est vide');
+    });
+
     t('KINTT dit combien de trades portent son chiffre', () => {
       // « +304 € » sans « 3 trades » est un mensonge par omission.
       if (!/trade/.test(K3.texte)) throw new Error('aucun décompte de trades affiché');

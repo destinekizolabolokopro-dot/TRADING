@@ -1,12 +1,12 @@
 {
- "maj": "2026-10-04T13:38:14.980Z",
+ "maj": "2026-10-04T21:50:35.978Z",
  "source": "yahoo",
- "eurusd": 1.125,
+ "eurusd": 1.1263,
  "confirmePar": "ES=F",
  "sansConfirmation": false,
  "prix": 31061.75,
  "derniereBougie": 1790974500000,
- "retardMin": 2443,
+ "retardMin": 2936,
  "hors": true,
  "etat": "CHERCHE",
  "dir": 1,
@@ -607,6 +607,43 @@
    "seuil": 0,
    "pireCreux": 0,
    "risqueParTrade": 250
+  }
+ },
+ "amd": {
+  "etape": {
+   "jour": "2026-10-02",
+   "min": 1015,
+   "dir": -1,
+   "internes": 262,
+   "cible": 30913.25,
+   "pris": 0,
+   "manip": {
+    "nom": "veille",
+    "prix": 30883.5,
+    "ext": 30936,
+    "smt": true,
+    "t": 1790942700000
+   },
+   "fvg": null,
+   "ifvg": null,
+   "signal": null
+  },
+  "fenetre": {
+   "manipDeb": 480,
+   "manipFin": 600,
+   "distDeb": 540,
+   "distFin": 720
+  },
+  "smt": "exige",
+  "signaux": 63,
+  "manips": 84,
+  "dernier": {
+   "sens": "SHORT",
+   "t": 1790777700000,
+   "entree": 30830.5,
+   "sl": 30903.59975,
+   "tp": 30647.750624999997,
+   "smt": true
   }
  }
 }
