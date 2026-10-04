@@ -42,8 +42,11 @@
     // ── DISTRIBUTION ────────────────────────────────────────────────────
     // La fenêtre où l'IFVG d'entrée est accepté, après la manipulation.
     distDeb: 9 * 60, distFin: 12 * 60,
-    // Bougies de 5 minutes au maximum entre la manipulation et l'entrée.
-    delai: 48,
+    // Délai maximal entre la manipulation et l'entrée, EN MINUTES. Exprimé
+    // en minutes et non en bougies, pour que le modèle garde le même sens
+    // quelle que soit l'unité d'exécution — 48 bougies valent quatre heures
+    // en 5 minutes et deux jours en 1 heure.
+    delaiMin: 240,
     // ── GRANDE LIQUIDITÉ : quels bassins comptent ───────────────────────
     veille: true, semaine: true, h4: true, h1: true,
     // ── FVG RETENUS ─────────────────────────────────────────────────────
@@ -139,10 +142,23 @@
    * Évalue le modèle. Rend tous les signaux de la période.
    * @param D { m1, m2, m5, m15, h1, d1 }
    */
-  function evaluer(D) {
-    if (!D || !D.m5 || D.m5.length < 200 || !D.h1 || !D.m15) return { tousSignaux: [] };
-    var m5 = D.m5, pas = ST.pasDe(m5);
-    var m30 = ST.agreger(D.m15, 2), h4 = ST.agreger(D.h1, 4);
+  /**
+   * @param D     les séries disponibles
+   * @param opts  { execution: 'm5' | 'h1' } l'unité qui décide. Par défaut le
+   *              5 minutes. Le 1 heure permet de remonter à deux ans, au prix
+   *              d'une incertitude intrabougie bien plus grande.
+   */
+  function evaluer(D, opts) {
+    opts = opts || {};
+    var cleExe = opts.execution || 'm5';
+    var m5 = D[cleExe];
+    if (!m5 || m5.length < 200 || !D.h1) return { tousSignaux: [], manips: [] };
+    var pas = ST.pasDe(m5);
+    // Les unités supérieures sont agrégées de ce qui existe. En longue
+    // période, le 15 minutes n'existe pas : il n'y a donc pas de M30, et le
+    // modèle se rabat sur H1 et H4. C'est une perte de finesse assumée.
+    var m30 = D.m15 && D.m15.length > 30 ? ST.agreger(D.m15, 2) : null;
+    var h4 = ST.agreger(D.h1, 4);
     var series = { m30: m30, h1: D.h1, h4: h4 };
 
     // ── les bassins, par unité ────────────────────────────────────────────
@@ -150,6 +166,8 @@
     CFG.unitesInt.concat(['h1', 'h4']).forEach(function (u) {
       if (!B[u] && series[u] && series[u].length > 30) B[u] = bassins(series[u], m5);
     });
+    // Le délai converti en nombre de bougies de l'unité d'exécution.
+    var delaiBarres = Math.max(1, Math.round(CFG.delaiMin * 60000 / pas));
 
     // ── les FVG des unités retenues, horodatés ───────────────────────────
     var Z = {};
@@ -256,7 +274,7 @@
       }
       if (manip == null) continue;
       if (e.min < CFG.distDeb || e.min >= CFG.distFin) continue;
-      if (i - manip.i > CFG.delai) continue;
+      if (i - manip.i > delaiBarres) continue;
       if ((parJour[e.jour] || 0) >= CFG.maxJour) continue;
 
       var dir = manip.sens, L = dir > 0;
