@@ -75,6 +75,11 @@ function bilan(T) {
   const g = T.filter(x => x > 0);
   return { n, som, moy: som / n, wr: g.length / n * 100 };
 }
+if (process.argv.includes('--sansplafond')) Modele.CFG.maxJour = 100;
+const FORME = (process.argv.find(a => a.startsWith('--sorties=')) || '').split('=')[1];
+if (FORME === 'rien2') Object.assign(Modele.CFG, { part: 0, tp1: 1.0, tp2: 2.0 });
+const VARIANTE = [process.argv.includes('--sansplafond') ? 'sans plafond journalier' : null,
+                  FORME ? 'sortie ' + FORME : null].filter(Boolean).join(' + ');
 const SIG = JEU.map(j => ({ j, sigs: Modele.evaluer(j.D, j.E).tousSignaux }));
 
 function reel() {
@@ -88,9 +93,17 @@ const REEL = bilan(reel());
 console.log('\n╔══════════════════════════════════════════════════════════════════════╗');
 console.log(`║  LES ÉPREUVES · ${String(MARCHES.length)} marché(s) · ${String(REEL.n).padStart(3)} trades réels                       ║`);
 console.log('╚══════════════════════════════════════════════════════════════════════╝');
-console.log(`\nLA STRATÉGIE TELLE QU'ELLE EST : ${REEL.n} trades · ${pc(REEL.wr)} · ${eu(REEL.moy * RISQUE)} par trade · ${eu(REEL.som * RISQUE)}\n`);
+if (VARIANTE) console.log(`\n⚙️  VARIANTE ÉPROUVÉE : ${VARIANTE}`);
+console.log(`\nLA STRATÉGIE ${VARIANTE ? 'AINSI MODIFIÉE' : 'TELLE QU\'ELLE EST'} : ${REEL.n} trades · ${pc(REEL.wr)} · ${eu(REEL.moy * RISQUE)} par trade · ${eu(REEL.som * RISQUE)}\n`);
 
 const RAPIDE = process.argv.includes('--rapide');
+
+// ── UNE VARIANTE PEUT ÊTRE SOUMISE AUX MÊMES ÉPREUVES ─────────────────────
+// L'ablation désigne des candidats à la simplification. Un candidat ne vaut
+// rien tant qu'il n'a pas passé CES épreuves-là : améliorer le total est
+// facile, battre le hasard ne l'est pas.
+//   --sansplafond   retire le plafond de deux trades par jour
+//   --sorties=X     remplace la forme de sortie (ex. --sorties=rien2)
 
 function epreuve(titre, question, echantillons) {
   const b = echantillons.map(bilan).filter(Boolean);

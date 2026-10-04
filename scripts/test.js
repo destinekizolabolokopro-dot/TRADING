@@ -438,14 +438,24 @@ if (dispo) {
         if (!T2.m5 || T2.m5.length < 200 || !T2.m1 || T2.m1.length < 500) continue;
         const r = strat.evaluer(T2, E2);
         const vus = (r && r.tousSignaux) || [];
-        for (const sig of jugeables.filter(x => x.t < tc)) {
+        const att = jugeables.filter(x => x.t < tc);
+        for (const sig of att) {
           compares++;
           const q = new Date(sig.t).toISOString().slice(0, 16).replace('T', ' ');
           const vu = vus.filter(x => x.t === sig.t)[0];
-          if (!vu) { ecarts.push(q + ' disparait'); continue; }
+          if (!vu) { ecarts.push(q + ' disparait sans l\'avenir'); continue; }
           for (const champ of ['sens', 'entree', 'sl', 'tp'])
             if (String(vu[champ]) !== String(sig[champ]))
               ecarts.push(`${q} · ${champ} ${sig[champ]} -> ${vu[champ]}`);
+        }
+        // L'AUTRE SENS : un signal qui existait à l'époque et que les données
+        // postérieures effacent. Borné à la même période jugeable.
+        for (const vu of vus) {
+          if (vu.t <= t0 + 2 * 24 * 3600 * 1000) continue;
+          compares++;
+          if (!att.some(x => x.t === vu.t))
+            ecarts.push(new Date(vu.t).toISOString().slice(0, 16).replace('T', ' ') +
+              ' EFFACÉ par les données postérieures');
         }
       }
       if (ecarts.length) throw new Error([...new Set(ecarts)].slice(0, 4).join(' | ') +
@@ -474,14 +484,28 @@ if (dispo) {
         const T2 = couper(base, tc), E2 = baseE ? couper(baseE, tc) : null;
         if (!T2.m5 || T2.m5.length < 200) continue;
         const vus = (strat.evaluer(T2, E2) || {}).tousSignaux || [];
-        for (const sig of sigs.filter(x => x.t < tc)) {
+        const attendus = sigs.filter(x => x.t < tc);
+        for (const sig of attendus) {
           compares++;
           const q = new Date(sig.t).toISOString().slice(0, 16).replace('T', ' ');
           const vu = vus.filter(x => x.t === sig.t)[0];
-          if (!vu) { ecarts.push(q + ' disparait'); continue; }
+          if (!vu) { ecarts.push(q + ' disparait sans l\'avenir'); continue; }
           for (const champ of ['sens', 'entree', 'sl', 'tp'])
             if (String(vu[champ]) !== String(sig[champ]))
               ecarts.push(`${q} · ${champ} ${sig[champ]} -> ${vu[champ]}`);
+        }
+        // ⚠️ L'AUTRE SENS, ET C'EST CELUI QUI MANQUAIT.
+        // La version précédente ne vérifiait que « un signal du passé
+        // survit-il quand on retire l'avenir ». Elle ne voyait donc pas le
+        // cas inverse : un signal qui EXISTAIT à l'époque et que les données
+        // postérieures EFFACENT. C'est pourtant ce qui s'est produit — le
+        // robot a consigné deux signaux le 1er octobre, et le modèle rejoué
+        // trois jours plus tard n'en voyait plus aucun.
+        for (const vu of vus) {
+          compares++;
+          if (attendus.some(x => x.t === vu.t)) continue;
+          ecarts.push(new Date(vu.t).toISOString().slice(0, 16).replace('T', ' ') +
+            ' EFFACÉ par les données postérieures');
         }
       }
       if (ecarts.length) throw new Error([...new Set(ecarts)].slice(0, 4).join(' | ') +
