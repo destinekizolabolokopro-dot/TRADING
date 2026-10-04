@@ -79,7 +79,13 @@ const SORTIES = [
   ['50 % à 1,0 · reste 2,5', { part: 0.5, tp1: 1.0, tp2: 2.5 }],
   ['30 % à 1,0 · reste 3,0', { part: 0.3, tp1: 1.0, tp2: 3.0 }],
   ['rien vendu · 2,0',       { part: 0,   tp1: 1.0, tp2: 2.0 }],
-  ['rien vendu · 3,0',       { part: 0,   tp1: 1.0, tp2: 3.0 }]
+  ['rien vendu · 3,0',       { part: 0,   tp1: 1.0, tp2: 3.0 }],
+  // AJOUTÉ APRÈS COUP, et c'est un trou que j'avais laissé : la mesure de
+  // l'excursion favorable montre que 56 % des trades atteignent 1 R mais
+  // seulement 22 % atteignent 2,5 R. Un objectif unique à 1 R, sans partiel,
+  // méritait donc d'être essayé — il ne l'était pas.
+  ['rien vendu · 1,0',       { part: 0,   tp1: 1.0, tp2: 1.0 }],
+  ['rien vendu · 1,5',       { part: 0,   tp1: 1.0, tp2: 1.5 }]
 ];
 const HEURES = [[12 * 60, 'midi'], [16 * 60, '16 h'], [null, 'aucune']];
 
