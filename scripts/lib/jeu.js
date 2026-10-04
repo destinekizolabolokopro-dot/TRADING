@@ -125,4 +125,37 @@ function banniere(al, marches) {
   return L;
 }
 
-module.exports = { RACINE, contexte, dossier, lireSerie, lireMarche, aligner, couvertureM1, banniere, jour };
+
+/**
+ * UN TRADE EST-IL SEULEMENT PRENABLE ?
+ *
+ * Le backtest raisonne à risque fixe — 250 € par trade — comme si on pouvait
+ * acheter 0,3 contrat. On ne peut pas. Le plus petit lot est UN micro-contrat,
+ * et son risque est imposé par la distance du stop :
+ *
+ *     risque minimum = distance du stop en points × valeur du point
+ *
+ * Sur le Nasdaq avec un stop ×6, le stop médian fait 136 points, soit 250 €
+ * pour un seul MNQ — et jusqu'à 410 points, soit 754 €. Les trades à stop
+ * large ne sont donc PAS prenables à 250 € de budget : les compter au même
+ * risque que les autres fabrique un résultat que personne ne peut reproduire.
+ *
+ * js/compte.js le savait déjà côté site (`tropPetit`). Le backtest l'ignorait.
+ * Cette fonction met les deux d'accord.
+ */
+const POINT = {       // valeur d'un point, en dollars, sur le micro-contrat
+  'NQ=F': 2,          // MNQ  Micro E-mini Nasdaq
+  'ES=F': 5,          // MES  Micro E-mini S&P 500
+  'YM=F': 0.5,        // MYM  Micro E-mini Dow
+  'RTY=F': 5          // M2K  Micro E-mini Russell 2000
+};
+const TAUX_USD = 1.08;   // EUR/USD de référence, aligné sur js/compte.js
+
+function jouable(sym, risqPoints, budgetEur) {
+  const vp = POINT[sym];
+  if (!vp || !(risqPoints > 0)) return true;          // marché inconnu : on ne juge pas
+  const coutUnContratEur = risqPoints * vp / TAUX_USD;
+  return coutUnContratEur <= (budgetEur || 250);
+}
+
+module.exports = { RACINE, POINT, TAUX_USD, jouable, contexte, dossier, lireSerie, lireMarche, aligner, couvertureM1, banniere, jour };

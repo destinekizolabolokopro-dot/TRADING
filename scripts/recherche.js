@@ -58,7 +58,7 @@ for (const sym of [...new Set(MARCHES.flatMap(m => [m[0], m[2]]))]) {
   const S = ser(sym); if (S && S.m5 && S.m5.length > 80) PAR_SYM[sym] = S;
 }
 const ALIGNE = JEUX.aligner(Object.keys(PAR_SYM).map(sym => ({ sym, S: PAR_SYM[sym] })));
-const JEU = MARCHES.map(([s, n, c]) => ({ nom: n, D: PAR_SYM[s], E: PAR_SYM[c] })).filter(x => x.D);
+const JEU = MARCHES.map(([s, n, c]) => ({ nom: n, sym: s, D: PAR_SYM[s], E: PAR_SYM[c] })).filter(x => x.D);
 if (!JEU.length) { console.error('Cache absent.'); process.exit(1); }
 for (const l of JEUX.banniere(ALIGNE, JEU.map(j => ({ sym: '', S: j.D })))) console.log(l);
 
@@ -108,7 +108,11 @@ for (const slx of STOPS) for (const [deb, fin, nomF] of FENETRES) {
   const c = charger();
   Object.assign(c.Modele.CFG, { slx, ghDeb: deb, ghFin: fin });
   const cle = slx + '|' + nomF;
-  ENTREES[cle] = JEU.map(j => ({ j, sigs: c.Modele.evaluer(j.D, j.E).tousSignaux, M: c.Modele, P: c.Position }));
+  // Un stop trop large pour un micro-contrat n'est pas prenable : écarté,
+  // sinon la combinaison gagne avec des trades que personne ne peut passer.
+  ENTREES[cle] = JEU.map(j => ({ j, M: c.Modele, P: c.Position,
+    sigs: c.Modele.evaluer(j.D, j.E).tousSignaux
+      .filter(s => JEUX.jouable(j.sym, Math.abs(s.risq), RISQUE)) }));
 }
 
 function rejouer(cle, sortie, heure) {

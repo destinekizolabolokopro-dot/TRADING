@@ -52,7 +52,7 @@ const SYMBOLES = [...new Set(MARCHES.flat())];
 const PAR_SYM = {};
 for (const sym of SYMBOLES) { const S = ser(sym); if (S && S.m5 && S.m5.length > 80) PAR_SYM[sym] = S; }
 const ALIGNE = JEUX.aligner(Object.keys(PAR_SYM).map(sym => ({ sym, S: PAR_SYM[sym] })));
-const JEU = MARCHES.map(([s, c]) => ({ D: PAR_SYM[s], E: PAR_SYM[c] })).filter(x => x.D);
+const JEU = MARCHES.map(([s, c]) => ({ sym: s, D: PAR_SYM[s], E: PAR_SYM[c] })).filter(x => x.D);
 if (!JEU.length) { console.error('Cache absent.'); process.exit(1); }
 
 // Un générateur reproductible : une épreuve qui change de réponse à chaque
@@ -107,7 +107,18 @@ const VARIANTE = [process.argv.includes('--sansplafond') ? 'sans plafond journal
                       `${Math.round(Modele.CFG.part * 100)} % à ${Modele.CFG.tp1} · reste ${Modele.CFG.tp2} · ` +
                       `sortie ${Modele.CFG.sortieMin == null ? 'aucune' : Math.floor(Modele.CFG.sortieMin / 60) + ' h'}`
                     : null].filter(Boolean).join(' + ');
-const SIG = JEU.map(j => ({ j, sigs: Modele.evaluer(j.D, j.E).tousSignaux }));
+// Un signal dont le stop coûte plus que le budget pour UN micro-contrat n'est
+// pas prenable : il est écarté, comme le site l'écarte déjà (js/compte.js).
+const BUDGET = RISQUE;
+let ECARTES = 0;
+const SIG = JEU.map(j => {
+  const tous = Modele.evaluer(j.D, j.E).tousSignaux;
+  const sigs = tous.filter(s => JEUX.jouable(j.sym, Math.abs(s.risq), BUDGET));
+  ECARTES += tous.length - sigs.length;
+  return { j, sigs };
+});
+if (ECARTES) console.log(`   ${ECARTES} signal(aux) écarté(s) : stop trop large pour ${BUDGET} € de budget ` +
+  `(un micro-contrat coûterait davantage).`);
 
 function reel() {
   const T = [];
