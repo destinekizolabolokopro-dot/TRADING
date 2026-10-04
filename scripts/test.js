@@ -1065,10 +1065,13 @@ p.on('console', m => { if (m.type() === 'error' && !/ERR_CERT|file:|Failed to lo
 await p.route('**://query*.finance.yahoo.com/**', r => r.fulfill({ status: 500, body: '{}' }));
 await p.goto('file://${RACINE}/TRADEassist.html', { waitUntil: 'load' });
 await p.waitForTimeout(2500);
-// Le radar est un canvas : s'il ne dessine rien, la page a l'air correcte et
-// le cœur visuel du site est mort. On compte les pixels non transparents.
+// LA SPHÈRE est un canvas : si elle ne dessine rien, la page a l'air correcte
+// et son cœur visuel est mort. On compte les pixels non transparents.
+// (Le radar qu'on vérifiait ici a été retiré : il fallait lire une légende de
+// trois lignes pour en tirer un chiffre que les tuiles donnent en clair.)
 const radar = await p.evaluate(() => {
-  const c = document.querySelector('canvas'); if (!c) return -1;
+  const c = document.querySelector('candle-sphere canvas') || document.querySelector('canvas');
+  if (!c) return -1;
   const g = c.getContext('2d'); if (!g) return -1;
   const d = g.getImageData(0, 0, c.width, c.height).data;
   let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i] > 8) n++;
@@ -1125,6 +1128,20 @@ const kintt = {
   // Le panneau du modèle doit rester rempli lui aussi : brancher une seconde
   // stratégie ne doit pas casser la première.
   chaine: (await p.textContent('#chain') || '').trim().length,
+  // ── LE HERO, LE BANDEAU, LES CARTES ────────────────────────────────────
+  // Trois blocs qui se remplissent en JavaScript : s'ils restent vides, la
+  // page garde l'air d'une maquette et personne ne le voit en relisant le
+  // code. Le bandeau, lui, était resté vide pendant une version entière
+  // parce qu'une erreur plus haut interrompait tout le rendu.
+  hero: {
+    horloge: (await p.textContent('#h-clock') || '').trim(),
+    pouls: (await p.textContent('#pulse-g') || '').trim(),
+    bandeau: (await p.textContent('#mq-t') || '').trim(),
+    cartes: await p.evaluate(() => document.querySelectorAll('.carte').length),
+    fenetre: (await p.textContent('#tf-tag') || '').trim(),
+    // La sphère ne doit afficher AUCUN prix : la maquette en inventait deux.
+    sphereTexte: await p.evaluate(() => (document.querySelector('candle-sphere') || {}).textContent || '')
+  },
   // ── LA TROISIÈME STRATÉGIE ─────────────────────────────────────────────
   // Brancher AMD ne doit ni casser les deux autres, ni afficher un panneau
   // vide : un panneau qui existe et ne dit rien est pire qu'absent.
@@ -1153,7 +1170,11 @@ const kintt = {
 srv.close();
 const out = {
   err, pied: (await p.textContent('#f-mes') || '').trim(),
-  titre: /Où se forme le signal/.test(await p.textContent('body')),
+  // Le titre « Où se forme le signal » coiffait le radar, retiré depuis. On
+  // vérifie le titre du hero, et qu'il porte bien ses DEUX lignes : la
+  // seconde est celle qui porte la lueur d'accent, et un titre amputé de sa
+  // moitié ne se verrait pas en relisant le code.
+  titre: /Chaque séance\.\s*Chaque signal\./.test(await p.textContent('body')),
   radar, deborde, panneaux, kintt
 };
 console.log(JSON.stringify(out)); await b.close();`;
@@ -1171,7 +1192,7 @@ console.log(JSON.stringify(out)); await b.close();`;
       if (!res.pied || res.pied === '—') throw new Error('pied vide');
       if (!/\d+ signaux/.test(res.pied)) throw new Error('pied : ' + res.pied.slice(0, 60));
     });
-    t('le radar dessine vraiment quelque chose', () => {
+    t('la sphère dessine vraiment quelque chose', () => {
       if (res.radar < 0) throw new Error('aucun canvas trouvé');
       if (res.radar < 500) throw new Error('canvas quasi vide : ' + res.radar + ' pixels');
     });
@@ -1237,6 +1258,27 @@ console.log(JSON.stringify(out)); await b.close();`;
     });
     t('brancher AMD n\'a pas vidé le panneau de KINTT', () => {
       if (!((res.kintt || {}).texte || '').length) throw new Error('le panneau KINTT est vide');
+    });
+
+    // ── LE HERO ET SES BLOCS ──────────────────────────────────────────────
+    const H3 = (res.kintt || {}).hero || {};
+    t('l\'horloge du hero affiche bien une heure', () => {
+      if (!/^Paris · \d\d:\d\d:\d\d$/.test(H3.horloge)) throw new Error('« ' + H3.horloge + ' »');
+    });
+    t('le pouls du marché est rempli avec de vraies valeurs', () => {
+      if (!H3.pouls) throw new Error('vide');
+      if (/—\s*—\s*—/.test(H3.pouls)) throw new Error('tout à « — » : le relevé n\'arrive pas');
+      if (!/Fenêtre/.test(H3.pouls)) throw new Error('contenu inattendu : ' + H3.pouls.slice(0, 60));
+    });
+    t('le bandeau défilant porte des valeurs, pas du décor', () => {
+      if (!H3.bandeau) throw new Error('bandeau vide');
+      if (!/pts/.test(H3.bandeau)) throw new Error('aucune distance : ' + H3.bandeau.slice(0, 60));
+    });
+    t('une carte par stratégie visible', () => {
+      if (H3.cartes !== 3) throw new Error(H3.cartes + ' carte(s) au lieu de 3');
+    });
+    t('la fenêtre de séance est affichée sous le titre', () => {
+      if (!/\d\d h \d\d – \d\d h \d\d NY/.test(H3.fenetre)) throw new Error('« ' + H3.fenetre + ' »');
     });
 
     t('KINTT dit combien de trades portent son chiffre', () => {

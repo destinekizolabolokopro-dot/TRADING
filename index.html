@@ -148,9 +148,17 @@ button,input,select{font:inherit;color:inherit}
 .btn[disabled]{opacity:.4;cursor:not-allowed}
 
 /* ── grille principale ───────────────────────────────────────────────── */
-.wrap{display:flex;align-items:stretch;min-height:calc(100vh - 53px)}
-.left{flex:1 1 auto;min-width:0;padding:22px 26px 28px;border-right:1px solid var(--rule2)}
-.right{flex:0 0 420px;width:420px;display:flex;flex-direction:column;gap:14px;padding:22px 22px 28px}
+/* Plus de deux colonnes pleine largeur collées aux bords : tout est centré
+   à 1320 px comme la barre de navigation et les en-têtes de section. */
+.wrap{max-width:1320px;margin:0 auto;padding:18px clamp(16px,3vw,40px) 0;
+  display:grid;gap:16px;align-items:start;
+  grid-template-columns:minmax(0,1fr) minmax(0,420px)}
+.sec-b{max-width:1320px;margin:0 auto;padding:18px clamp(16px,3vw,40px) 0}
+.duo{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(min(100%,400px),1fr));
+  align-items:start;margin-top:16px}
+@media (max-width:1000px){.wrap{grid-template-columns:minmax(0,1fr)}}
+.left{min-width:0;display:flex;flex-direction:column;gap:16px}
+.right{min-width:0;display:flex;flex-direction:column;gap:16px}
 
 .lede{display:flex;align-items:flex-end;gap:20px;margin-bottom:18px;flex-wrap:wrap}
 .eyebrow{font-family:var(--mono);font-size:11.5px;font-weight:500;
@@ -168,22 +176,6 @@ button,input,select{font:inherit;color:inherit}
 .chip.on{background:rgba(145,132,217,.16);color:var(--a300);
   box-shadow:inset 0 0 0 1px var(--a400), 0 0 16px rgba(145,132,217,.30)}
 
-/* ── le radar ────────────────────────────────────────────────────────── */
-.scope{position:relative;display:grid;place-items:center;min-height:420px}
-.scope::before{
-  content:"";position:absolute;width:min(470px,86%);aspect-ratio:1;border-radius:50%;
-  background:radial-gradient(circle,rgba(145,132,217,.20),transparent 68%);
-  filter:blur(12px);pointer-events:none;
-}
-#radar{display:block;max-width:100%;height:auto;position:relative}
-.ov{position:absolute;bottom:2px;font-size:11.5px;pointer-events:none}
-.ov.l{left:0}
-.ov.r{right:0;text-align:right}
-.lg{display:flex;align-items:center;gap:7px;color:var(--dim);margin-top:5px}
-.lg s{width:8px;height:8px;border-radius:2px;display:block;flex:none}
-.ov.r .k{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--dim)}
-.ov.r .v{font-size:22px;font-weight:600;letter-spacing:-.02em;margin-top:2px}
-.ov.r .s{font-size:12.5px;color:var(--muted)}
 
 /* ── tuiles par unité de temps ───────────────────────────────────────── */
 .tiles{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-top:22px}
@@ -357,6 +349,119 @@ button,input,select{font:inherit;color:inherit}
      padding:6px 11px;box-shadow:inset 0 0 0 1px var(--rule2);border-radius:var(--pill);
      font:400 12px/1 var(--mono);letter-spacing:.04em}
 .chk input{cursor:pointer}
+
+
+/* ═══ LE HERO ═══════════════════════════════════════════════════════════
+   Repris de la maquette : grille auto-fit, grand titre en clamp, la seconde
+   ligne en accent avec sa lueur. Le conteneur est borné à 1320 px comme la
+   barre de navigation, pour que les deux s'alignent. */
+.hero{max-width:1320px;margin:0 auto;padding:clamp(28px,5vw,64px) clamp(16px,3vw,40px) 0}
+.hero-g{display:grid;gap:24px;align-items:center;
+  grid-template-columns:repeat(auto-fit,minmax(min(100%,440px),1fr))}
+.hero-l{display:flex;flex-direction:column;gap:18px;min-width:0}
+.hero-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.live-b{display:inline-flex;align-items:center;gap:8px;color:var(--gain);
+  font:400 11.5px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase}
+.live-b i{width:7px;height:7px;border-radius:50%;background:var(--gain);
+  animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:.45;box-shadow:0 0 0 0 rgba(70,224,168,.6)}
+  50%{opacity:1;box-shadow:0 0 0 6px rgba(70,224,168,0)}}
+.clock{font-size:11.5px;padding:4px 11px;border-radius:var(--pill);
+  background:rgba(233,233,237,.07);box-shadow:inset 0 0 0 1px rgba(233,233,237,.14);
+  color:rgba(233,233,237,.75)}
+.hero-h1{font-size:clamp(40px,7.2vw,96px);font-weight:500;line-height:.96;
+  letter-spacing:-.05em;text-wrap:balance}
+.hero-h1 span{color:var(--a300);
+  text-shadow:0 0 28px rgba(145,132,217,.85),0 0 2px rgba(210,206,253,.6)}
+.hero-lede{font-size:17px;line-height:1.55;color:var(--muted);max-width:470px;text-wrap:pretty}
+.hero-cta{display:flex;gap:10px;flex-wrap:wrap}
+.hero-cta .btn{text-decoration:none;display:inline-flex;align-items:center;padding:11px 20px}
+.hero-facts{display:flex;gap:clamp(18px,4vw,40px);flex-wrap:wrap;margin-top:4px}
+.hero-facts b{display:block;font-size:22px;font-weight:500;color:var(--ink-fort)}
+.hero-facts i{display:block;font:400 11px/1 var(--mono);letter-spacing:.1em;
+  text-transform:uppercase;color:var(--dim);margin-top:6px;font-style:normal}
+
+/* La sphère déborde volontairement de son cadre, comme dans la maquette. */
+.hero-r{position:relative;height:clamp(380px,52vw,620px);min-width:0}
+.hero-r candle-sphere{position:absolute;inset:-40px -20px}
+.pulse{position:absolute;right:0;bottom:0;width:min(340px,92%);padding:16px;
+  border-radius:var(--r18);background:rgba(22,24,38,.86);
+  -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
+  box-shadow:inset 0 0 0 1px rgba(145,132,217,.45),0 0 40px rgba(145,132,217,.25)}
+.pulse-h{display:flex;align-items:center;gap:9px;margin-bottom:14px;
+  font:400 11px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;
+  color:rgba(233,233,237,.82)}
+.pdot{width:18px;height:18px;border-radius:50%;display:grid;place-items:center;
+  background:rgba(70,224,168,.14)}
+.pdot i{width:7px;height:7px;border-radius:50%;background:var(--gain);
+  box-shadow:0 0 8px var(--gain)}
+.pulse-g{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 18px}
+.pulse-g div b{display:block;font-family:var(--mono);font-size:15px;font-weight:500;
+  color:var(--ink-fort)}
+.pulse-g div i{display:block;font:400 10.5px/1 var(--mono);letter-spacing:.1em;
+  text-transform:uppercase;color:var(--dim);margin-top:5px;font-style:normal}
+.pulse-g div u{display:block;font-size:11px;color:var(--faint);margin-top:3px;
+  text-decoration:none}
+
+/* ═══ LES CARTES DE STRATÉGIE ═══════════════════════════════════════════
+   Reprises de la maquette : une carte par stratégie, avec sa jauge de risque
+   en segments. Cliquer une carte fait défiler jusqu'à son panneau — elle ne
+   l'ACTIVE pas : les trois tournent en permanence, et c'est voulu. */
+.cartes{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr))}
+.carte{position:relative;text-align:left;cursor:pointer;border:0;padding:18px;
+  border-radius:var(--r18);background:var(--panel);color:var(--ink);
+  box-shadow:inset 0 0 0 1px var(--n800);transition:box-shadow .18s,background .18s}
+.carte:hover{box-shadow:inset 0 0 0 1px var(--n600),0 0 24px rgba(145,132,217,.18)}
+.carte.on{box-shadow:var(--elev-acc)}
+.carte-n{font-size:17px;font-weight:500;letter-spacing:-.01em}
+.carte-h{font:400 11px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;
+  color:var(--dim);margin-top:6px}
+.carte-g{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 14px;margin-top:16px}
+.carte-g b{display:block;font-family:var(--mono);font-size:15px;font-weight:500;color:var(--ink-fort)}
+.carte-g i{display:block;font:400 10px/1 var(--mono);letter-spacing:.09em;
+  text-transform:uppercase;color:var(--dim);margin-top:5px;font-style:normal}
+.carte-g .pos{color:var(--gain)} .carte-g .neg{color:var(--loss)}
+.risq{display:flex;gap:3px;margin-top:16px}
+.risq s{width:14px;height:5px;border-radius:3px;background:rgba(233,233,237,.12)}
+.risq s.f{background:var(--acc)}
+.risq s.f.hi{background:var(--loss)} .risq s.f.lo{background:var(--gain)}
+.risq-l{font:400 10px/1 var(--mono);letter-spacing:.09em;text-transform:uppercase;
+  color:var(--dim);margin-top:8px}
+
+/* ═══ LE BANDEAU DÉFILANT ═══════════════════════════════════════════════
+   Il porte les distances par unité de temps, qui sont déjà calculées et
+   vraies. Un bandeau de cours inventés n'aurait été qu'une décoration
+   mensongère sur une page qui affiche de vrais prix. */
+.mq{margin-top:clamp(28px,5vw,56px);padding:15px 0;overflow:hidden;
+  background:var(--glow-faible);
+  border-top:1px solid rgba(145,132,217,.25);border-bottom:1px solid rgba(145,132,217,.25)}
+.mq-t{display:flex;gap:34px;width:max-content;animation:mq 48s linear infinite;
+  font:400 14px/1 var(--mono);white-space:nowrap}
+.mq-t span{color:var(--dim)}
+.mq-t b{color:var(--ink);font-weight:500}
+.mq-t em{font-style:normal}
+@keyframes mq{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+.mq:hover .mq-t{animation-play-state:paused}
+
+/* ═══ LES EN-TÊTES DE SECTION ═══════════════════════════════════════════ */
+.sec-h{max-width:1320px;margin:0 auto;padding:clamp(34px,5vw,64px) clamp(16px,3vw,40px) 0;
+  display:flex;align-items:flex-end;justify-content:space-between;gap:24px;flex-wrap:wrap}
+.sec-h h2{font-size:clamp(28px,4.4vw,52px);font-weight:500;line-height:1;
+  letter-spacing:-.045em;max-width:720px;text-wrap:balance;margin-top:12px}
+/* La fenêtre de la séance : elle était portée par l'eyebrow du bloc radar,
+   supprimé avec lui. Elle vit maintenant sous le titre de la section. */
+.sec-s{font-size:12px;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--dim);margin-top:12px}
+
+@media (max-width:900px){
+  .hero-r{height:clamp(300px,70vw,420px)}
+  .pulse{position:static;width:100%;margin-top:14px}
+  .hero-r candle-sphere{inset:-10px}
+}
+@media (prefers-reduced-motion:reduce){
+  .mq-t{animation:none}
+  .live-b i{animation:none}
+}
 </style>
 </head>
 <body>
@@ -367,8 +472,8 @@ button,input,select{font:inherit;color:inherit}
     <span class="wm">TRADEassist<span>MECH</span></span>
   </div>
   <nav class="nav">
-    <a href="#scope" class="on">Radar</a>
-    <a href="#pan-chain">Chaîne</a>
+    <a href="#scope" class="on">Terminal</a>
+    <a href="#strategies">Stratégies</a>
     <a href="#pan-kintt">KINTT</a>
     <a href="#pan-amd">AMD</a>
     <a href="#pan-journal">Historique</a>
@@ -383,42 +488,70 @@ button,input,select{font:inherit;color:inherit}
   <button class="btn" id="b-alert" title="Activer les alertes">Alertes</button>
 </header>
 
-<div class="wrap">
-
-  <!-- ── colonne gauche : le balayage ──────────────────────────────── -->
-  <main class="left">
-    <div class="lede">
-      <div>
-        <div class="eyebrow" id="tf-tag">09 h 30 – 10 h 00 NY</div>
-        <h1>Où se forme le signal</h1>
-        <p>Chaque point est un niveau clé encore valide dans le sens du biais.
-           Le rayon est sa distance au prix : plus il est proche du centre,
-           plus le prix en est près.</p>
+<!-- ── LE HERO ──────────────────────────────────────────────────────────
+     Repris de la maquette Méridien : badge en direct, horloge, grand titre,
+     trois faits, et la sphère de chandeliers. Tous les chiffres affichés ici
+     sont RÉELS — l'état de la fenêtre, le prix, le retard du relevé. La
+     maquette y mettait des prix inventés ; sur une page qui en affiche de
+     vrais dix centimètres plus bas, c'eût été le seul chiffre faux. -->
+<section class="hero">
+  <div class="hero-g">
+    <div class="hero-l">
+      <div class="hero-top">
+        <span class="live-b"><i></i>Marchés · en direct</span>
+        <span class="clock mono" id="h-clock">Paris · —</span>
       </div>
-      <div class="chips" id="chips"></div>
+      <h1 class="hero-h1">Chaque séance.<br><span>Chaque signal.</span></h1>
+      <p class="hero-lede">Trois stratégies ICT tournent côte à côte sur les mêmes
+        bougies, de 8 h à 10 h à New York. Elles signalent — elles ne passent
+        aucun ordre.</p>
+      <div class="hero-cta">
+        <a class="btn" href="#scope">Voir la séance →</a>
+        <a class="btn q" href="#pan-amd">Les stratégies</a>
+      </div>
+      <div class="hero-facts">
+        <div><b class="mono">3</b><i>Stratégies</i></div>
+        <div><b class="mono">2 ans</b><i>Mesurés</i></div>
+        <div><b class="mono">157</b><i>Vérifications</i></div>
+      </div>
     </div>
 
-    <section class="scope" id="scope">
-      <canvas id="radar" width="620" height="560"
-              aria-label="Niveaux clés valides par unité de temps"></canvas>
-      <div class="ov l">
-        <div class="lg"><s style="background:#d2cefd"></s>Balayé à l’instant</div>
-        <div class="lg"><s style="background:rgba(145,132,217,.5)"></s>Rayon = distance au prix</div>
-        <div class="lg"><s style="background:rgba(233,233,237,.25)"></s>Angle = unité de temps</div>
+    <div class="hero-r">
+      <candle-sphere mode="Chandeliers" glow="1" animate="true"
+        up="#46e0a8" down="#ff6f91" accent="#9184d9"></candle-sphere>
+      <div class="pulse" id="pulse">
+        <div class="pulse-h"><span class="pdot"><i></i></span>Pouls du marché</div>
+        <div class="pulse-g" id="pulse-g"></div>
       </div>
-      <div class="ov r">
-        <div class="k">Le plus proche</div>
-        <div class="v mono" id="near-v">—</div>
-        <div class="s" id="near-s">en attente des bougies</div>
-      </div>
-    </section>
+    </div>
+  </div>
+</section>
 
-    <div class="tiles" id="tfs"></div>
-  </main>
+<!-- Le bandeau défilant porte les distances par unité de temps, qui sont
+     déjà calculées et vraies. Un bandeau de cours inventés n'aurait rien
+     apporté qu'une décoration mensongère. -->
+<div class="mq" id="mq" aria-hidden="true"><div class="mq-t" id="mq-t"></div></div>
 
-  <!-- ── colonne droite : l’état, la position, le journal ──────────── -->
-  <aside class="right">
+<!-- ═══ LE TERMINAL ═══════════════════════════════════════════════════
+     La maquette appelle cette section « le terminal ». Chez nous elle porte
+     la séance, la position et la chaîne de décision — pas un carnet d'ordres
+     ni un ticket d'achat : ce site ne passe aucun ordre, il signale.
 
+     LE RADAR A ÉTÉ RETIRÉ. C'était un nuage de points polaires où l'angle
+     codait l'unité de temps et le rayon la distance au prix : il fallait lire
+     une légende pour comprendre un seul chiffre, que les tuiles donnent en
+     clair juste en dessous. -->
+<div class="sec-h">
+  <div>
+    <div class="eyebrow">Le terminal</div>
+    <h2>Tout pour lire la séance.</h2>
+    <div class="sec-s mono" id="tf-tag">—</div>
+  </div>
+  <div class="chips" id="chips"></div>
+</div>
+
+<div class="wrap" id="scope">
+  <main class="left">
     <section class="pan">
       <div class="sess">
         <div class="sess-t">
@@ -436,12 +569,30 @@ button,input,select{font:inherit;color:inherit}
       <div id="trade"></div>
     </section>
 
+    <div class="tiles" id="tfs"></div>
+  </main>
+
+  <aside class="right">
     <section class="pan" id="pan-chain">
       <div class="pan-h"><h2>La chaîne</h2><span class="tag" id="chain-tag">—</span></div>
       <div class="gauge"><i id="gauge"></i></div>
       <div id="chain"></div>
     </section>
+  </aside>
+</div>
 
+<!-- ═══ LES STRATÉGIES ════════════════════════════════════════════════
+     Trois lectures du même marché, sur les mêmes bougies, avec des bilans
+     SÉPARÉS. Une moyenne des trois ne décrirait aucune des trois. -->
+<div class="sec-h" id="strategies">
+  <div>
+    <div class="eyebrow">Les stratégies</div>
+    <h2>Trois lectures. Trois bilans.</h2>
+  </div>
+</div>
+<div class="sec-b">
+  <div class="cartes" id="cartes"></div>
+  <div class="duo">
     <!-- ── KINTT ────────────────────────────────────────────────────────
          La seconde stratégie : le plan source suivi à la lettre, fenêtre
          10 h → 12 h New York. Elle tourne à côté du modèle, sur les mêmes
@@ -476,14 +627,33 @@ button,input,select{font:inherit;color:inherit}
         </select></div>
       <div id="amd"></div>
     </section>
+  </div>
+</div>
 
+<!-- ═══ L'HISTORIQUE ══════════════════════════════════════════════════ -->
+<div class="sec-h">
+  <div>
+    <div class="eyebrow">L'historique</div>
+    <h2>Chaque signal, tracé.</h2>
+  </div>
+</div>
+<div class="sec-b">
     <section class="pan" id="pan-journal">
       <div class="pan-h"><h2>Historique</h2><span class="tag" id="j-tag">—</span></div>
       <div class="jfilters" id="jchips"></div>
       <div id="bilan"></div>
       <div id="journal"></div>
     </section>
+</div>
 
+<!-- ═══ LES RÉGLAGES ══════════════════════════════════════════════════ -->
+<div class="sec-h">
+  <div>
+    <div class="eyebrow">Les réglages</div>
+    <h2>À votre main.</h2>
+  </div>
+</div>
+<div class="sec-b">
     <section class="pan" id="settings">
       <div class="pan-h"><h2>Réglages</h2></div>
       <div class="fld"><label for="c-capital">Capital</label>
@@ -515,8 +685,6 @@ button,input,select{font:inherit;color:inherit}
         Yahoo avec environ dix minutes de retard.
       </div>
     </section>
-
-  </aside>
 </div>
 
 <footer class="foot">
@@ -544,6 +712,7 @@ button,input,select{font:inherit;color:inherit}
 <script src="js/modele.js"></script>
 <script src="js/kintt.js"></script>
 <script src="js/amd.js"></script>
+<script src="js/sphere.js"></script>
 <script src="js/compte.js"></script>
 <script src="js/history.js"></script>
 <script src="js/mesure.js"></script>
@@ -968,98 +1137,16 @@ function paintTrade(){
     '</div>';
 }
 
-/* ── le radar (canvas Nocturne) ─────────────────────────────────────── */
-let blips = [], rafId = null;
-function majBlips(){
-  blips = [];
-  const vs = D && D.parTF; if(!Array.isArray(vs)) return;
-  const maxD = Math.max(1, ...vs.flatMap(v => (v.liste||[]).map(x => x.d)));
-  vs.forEach((v, i) => {
-    if(FILTRE !== 'Toutes' && FILTRE !== v.tf) return;
-    const base = i / TFS.length * Math.PI * 2;
-    (v.liste || []).forEach((z, j) => {
-      const jitter = (((j * 37) % 23) / 23 - 0.5) * (42 * Math.PI / 180);
-      blips.push({ ang: base + jitter, rad: 0.22 + (z.d / maxD) * 0.70,
-                   sym: z.type, tf: v.tf, ret: D.key && D.key.tf === v.tf && D.key.type === z.type && j === 0 });
-    });
-  });
-}
-function drawRadar(t){
-  const c = $('#radar'); if(!c) return;
-  const ctx = c.getContext('2d'); if(!ctx) return;
-  const dpr = window.devicePixelRatio || 1;
-  const W = 620, H = 560;
-  if(c.width !== W * dpr){ c.width = W * dpr; c.height = H * dpr; c.style.width = W + 'px'; c.style.height = H + 'px'; }
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  const cx = W / 2, cy = H / 2 - 8, R = 218;
-  ctx.clearRect(0, 0, W, H);
+/* ── LE RADAR A ÉTÉ RETIRÉ ───────────────────────────────────────────────
+   C'était un nuage de points polaires animé : l'angle codait l'unité de
+   temps, le rayon la distance au prix. Il fallait lire une légende de trois
+   lignes pour en tirer un seul chiffre — la distance au niveau le plus
+   proche — que les tuiles juste en dessous donnent en clair, par unité.
+   Quatre-vingts lignes de canvas et une boucle d'animation permanente pour
+   une information déjà affichée ailleurs, en plus lisible.
 
-  for(let i = 1; i <= 4; i++){
-    ctx.strokeStyle = hexA(INK, i === 4 ? .12 : .07); ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.arc(cx, cy, R * i / 4, 0, Math.PI * 2); ctx.stroke();
-  }
-  for(let i = 0; i < 20; i++){
-    const a = i / 20 * Math.PI * 2;
-    ctx.strokeStyle = hexA(INK, i % 4 === 0 ? .1 : .05);
-    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(a) * R, cy + Math.sin(a) * R); ctx.stroke();
-  }
-
-  const sweep = (t * 0.00055) % (Math.PI * 2);
-  const span = 0.85;
-  for(let k = 0; k < 26; k++){
-    const a = sweep - k / 26 * span;
-    ctx.strokeStyle = hexA(ACC, .16 * (1 - k / 26)); ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(a) * R, cy + Math.sin(a) * R); ctx.stroke();
-  }
-  ctx.strokeStyle = hexA(ACC3, .75); ctx.lineWidth = 1.4;
-  ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(sweep) * R, cy + Math.sin(sweep) * R); ctx.stroke();
-
-  TFS.forEach((nom, i) => {
-    const a = i / TFS.length * Math.PI * 2 - Math.PI / 2;
-    ctx.fillStyle = hexA(INK, FILTRE === 'Toutes' || FILTRE === nom ? .38 : .14);
-    ctx.font = '11px Inter, sans-serif';
-    ctx.textAlign = Math.cos(a) > .2 ? 'left' : Math.cos(a) < -.2 ? 'right' : 'center';
-    ctx.fillText(nom, cx + Math.cos(a) * (R + 14), cy + Math.sin(a) * (R + 14) + 4);
-  });
-  ctx.textAlign = 'left';
-
-  blips.forEach(b => {
-    const a = b.ang - Math.PI / 2;
-    const x = cx + Math.cos(a) * b.rad * R, y = cy + Math.sin(a) * b.rad * R;
-    let d = sweep - a; while(d < 0) d += Math.PI * 2; while(d > Math.PI * 2) d -= Math.PI * 2;
-    const lit = d < 1.6 ? 1 - d / 1.6 : 0;
-    ctx.strokeStyle = hexA(ACC, .1 + lit * .55); ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.arc(x, y, 5 + lit * 13, 0, Math.PI * 2); ctx.stroke();
-    ctx.fillStyle = hexA(ACC3, .35 + lit * .65);
-    if(lit > .4){ ctx.shadowColor = ACC; ctx.shadowBlur = 12 * lit; }
-    ctx.beginPath(); ctx.arc(x, y, b.ret ? 4.2 : 3.2, 0, Math.PI * 2); ctx.fill();
-    ctx.shadowBlur = 0;
-    if(lit > .25 || b.ret){
-      ctx.fillStyle = hexA(INK, .32 + lit * .5);
-      ctx.font = (lit > .5 || b.ret ? '600 ' : '') + '11px Inter, sans-serif';
-      ctx.fillText(b.sym, x + 9, y + 3.5);
-    }
-  });
-
-  ctx.fillStyle = hexA(ACC, .9);
-  ctx.beginPath(); ctx.arc(cx, cy, 2.6, 0, Math.PI * 2); ctx.fill();
-}
-function boucle(t){ drawRadar(t); rafId = requestAnimationFrame(boucle); }
-
-function paintRadar(){
-  majBlips();
-  const n = $('#near-v'), s = $('#near-s');
-  const vs = D && D.parTF;
-  const tous = Array.isArray(vs) ? vs.filter(v => v.distance != null) : [];
-  if(!tous.length){
-    n.textContent = '—';
-    s.textContent = D && D.dir === 0 ? 'biais neutre, aucun niveau retenu' : 'aucun niveau du bon côté';
-    return;
-  }
-  const best = tous.reduce((a, b) => b.distance < a.distance ? b : a);
-  n.textContent = best.distance.toFixed(1) + ' pts';
-  s.textContent = best.type + ' ' + best.tf;
-}
+   La valeur « le plus proche » qu'il affichait vit maintenant dans le pouls
+   du marché, en haut de page.                                            */
 
 /* ── tuiles par unité ───────────────────────────────────────────────── */
 function paintTFs(){
@@ -1083,7 +1170,7 @@ function paintChips(){
 }
 $('#chips').addEventListener('click', e => {
   const b = e.target.closest('.chip'); if(!b) return;
-  FILTRE = b.dataset.k; paintChips(); majBlips();
+  FILTRE = b.dataset.k; paintChips(); paintTFs();
 });
 
 
@@ -1131,7 +1218,7 @@ function paintStratsChoix(){
     inp.addEventListener('change', () => {
       const w = stratsVisibles();
       w[inp.dataset.strat] = inp.checked;
-      stratsEcrire(w); appliquerStrats();
+      stratsEcrire(w); appliquerStrats(); paintCartes();
     });
   });
 }
@@ -1294,7 +1381,98 @@ function paintAmd(){
   box.innerHTML = out;
 }
 
-function paintAll(){ paintTop(); paintChain(); paintKintt(); paintAmd(); paintTrade(); paintJournal(); paintRadar(); paintTFs(); paintFooter(); }
+
+/* ── LE HERO : HORLOGE ET POULS DU MARCHÉ ────────────────────────────────
+   Tous les chiffres affichés ici sont RÉELS. La maquette mettait un
+   « sentiment acheteur +18,1 » et un « volume 24 h 1,28 Md » inventés ; sur
+   une page qui affiche de vrais prix dix centimètres plus bas, un chiffre
+   décoratif se lit comme une donnée. On met donc ce qu'on sait vraiment :
+   le prix, la fenêtre, le niveau le plus proche, l'âge du relevé. */
+function paintHero(){
+  const h = $('#h-clock');
+  if(h){
+    const d = new Date().toLocaleTimeString('fr-FR', { timeZone:'Europe/Paris', hour12:false });
+    h.textContent = 'Paris · ' + d;
+  }
+  const g = $('#pulse-g'); if(!g) return;
+  const dev = window.Compte ? Compte.sym(Compte.lire().devise) : ' €';
+  const cel = (v, k, s2) => '<div><b>' + v + '</b><i>' + k + '</i>' +
+    (s2 ? '<u>' + s2 + '</u>' : '') + '</div>';
+
+  if(!D){ g.innerHTML = cel('—','Prix') + cel('—','Fenêtre') + cel('—','Plus proche') + cel('—','Relevé'); return; }
+
+  // le niveau le plus proche, qu'affichait le radar avant d'être retiré
+  const vs = Array.isArray(D.parTF) ? D.parTF.filter(v => v.distance != null) : [];
+  const best = vs.length ? vs.reduce((a,b) => b.distance < a.distance ? b : a) : null;
+  const age = D.derniereBougie ? Math.round((Date.now() - D.derniereBougie) / 60000) : null;
+
+  g.innerHTML =
+    cel(D.prix != null ? fmt(D.prix) : '—', 'Nasdaq 100', 'future NQ') +
+    cel(D.hors ? 'Fermée' : 'Ouverte', 'Fenêtre', '08 h → 10 h NY') +
+    cel(best ? best.distance.toFixed(1) + ' pts' : '—', 'Plus proche',
+        best ? best.type + ' ' + best.tf : 'aucun niveau du bon côté') +
+    cel(age != null ? (age < 90 ? age + ' min' : Math.round(age/60) + ' h') : '—', 'Relevé',
+        D.source === 'robot' ? 'par le robot' : 'flux direct');
+}
+
+/* ── LE BANDEAU DÉFILANT ─────────────────────────────────────────────────
+   Il porte les distances par unité de temps — déjà calculées, et vraies. La
+   liste est écrite DEUX FOIS : la translation va de 0 à −50 %, donc la
+   seconde moitié prend exactement la place de la première et la boucle ne se
+   voit pas. Sans le doublon, le bandeau se viderait à chaque tour. */
+function paintMarquee(){
+  const t = $('#mq-t'); if(!t) return;
+  const vs = Array.isArray(D && D.parTF) ? D.parTF.filter(v => v.distance != null) : [];
+  if(!vs.length){ t.innerHTML = ''; $('#mq').style.display = 'none'; return; }
+  $('#mq').style.display = '';
+  const un = vs.map(v =>
+    '<em><b>' + v.tf + '</b> <span>' + v.type + '</span> ' +
+    '<b style="color:var(--a300)">' + v.distance.toFixed(1) + ' pts</b></em>').join('');
+  t.innerHTML = un + un;
+}
+
+/* ── LES CARTES DE STRATÉGIE ─────────────────────────────────────────────
+   Une carte par stratégie, comme dans la maquette. Les chiffres sont ceux
+   MESURÉS dans ce dépôt, pas des valeurs d'illustration — et la carte dit
+   sur quoi ils portent, parce qu'une marge sans son échantillon ne veut rien
+   dire. Cliquer fait DÉFILER jusqu'au panneau : ça n'active rien, les trois
+   stratégies tournent en permanence et gardent des bilans séparés. */
+const CARTES = [
+  { cle:'mech',  nom:'Modèle',  pan:'pan-chain', horizon:'Intraday · 5 min', risque:3,
+    marge:6.1,  trades:168, duree:'60 jours', note:'Biais 4 unités, DOL, niveau clé, IFVG.' },
+  { cle:'kintt', nom:'KINTT',   pan:'pan-kintt', horizon:'Intraday · 10 h → 12 h', risque:2,
+    marge:null, trades:0,   duree:'60 jours', note:'Le plan source appliqué à la lettre.' },
+  { cle:'amd',   nom:'AMD',     pan:'pan-amd',   horizon:'Intraday · 8 h → 10 h', risque:4,
+    marge:22.7, trades:82,  duree:'2 ans', note:'Manipulation puis distribution, divergence SMT.' }
+];
+function paintCartes(){
+  const box = $('#cartes'); if(!box) return;
+  const vis = stratsVisibles();
+  box.innerHTML = CARTES.filter(c => vis[c.cle] !== false).map(c => {
+    const seg = Array.from({length:5}, (_, i) =>
+      '<s class="' + (i < c.risque ? 'f ' + (c.risque >= 4 ? 'hi' : c.risque === 3 ? '' : 'lo') : '') + '"></s>').join('');
+    const marge = c.marge == null ? '—'
+      : (c.marge >= 0 ? '+' : '−') + Math.abs(c.marge).toFixed(1).replace('.', ',') + ' %';
+    const cls = c.marge == null ? '' : c.marge > 0 ? 'pos' : 'neg';
+    return '<button class="carte" data-pan="' + c.pan + '" type="button">' +
+      '<div class="carte-n">' + c.nom + '</div>' +
+      '<div class="carte-h">' + c.horizon + '</div>' +
+      '<div class="carte-g">' +
+        '<div><b class="' + cls + '">' + marge + '</b><i>Marge</i></div>' +
+        '<div><b>' + (c.trades || '0') + '</b><i>Trades</i></div>' +
+      '</div>' +
+      '<div class="risq">' + seg + '</div>' +
+      '<div class="risq-l">Risque ' + c.risque + '/5 · mesuré sur ' + c.duree + '</div>' +
+      '</button>';
+  }).join('');
+  box.querySelectorAll('.carte').forEach(b => b.addEventListener('click', () => {
+    const p = document.getElementById(b.dataset.pan);
+    if(p) p.scrollIntoView({ behavior:'smooth', block:'start' });
+  }));
+}
+
+function paintAll(){ paintTop(); paintChain(); paintKintt(); paintAmd(); paintTrade();
+  paintJournal(); paintTFs(); paintCartes(); paintHero(); paintMarquee(); paintFooter(); }
 
 /* ── cycle de rafraîchissement ──────────────────────────────────────── */
 const SERIES = [['1m','8d'],['2m','60d'],['5m','60d'],['15m','60d'],['60m','3mo'],['1d','1y']];
@@ -1745,8 +1923,6 @@ etatDistant().then(e => {
 });
 chargerDistant().then(paintJournal);
 if(window.CFD && CFD.actif()) $('#tok').placeholder = 'jeton enregistré';
-if(!window.matchMedia('(prefers-reduced-motion: reduce)').matches) boucle(performance.now());
-else drawRadar(0);
 setInterval(paintTop, 1000);
 // ── DÉMARRAGE DES STRATÉGIES ─────────────────────────────────────────────
 // Ces trois lignes étaient d'abord tombées dans le bouton « Enregistrer » du
@@ -1754,6 +1930,9 @@ setInterval(paintTop, 1000);
 // direct, et pour personne d'autre. Le test en navigateur l'a vu — aucune
 // case à cocher dans la page — là où la lecture du code ne l'avait pas vu.
 appliquerStrats(); paintStratsChoix(); smtAppliquer();
+// L'horloge du hero bat à la seconde. Elle est la seule chose de la page qui
+// n'attend pas le relevé : si elle se figeait, on croirait la page morte.
+paintHero(); setInterval(paintHero, 1000);
 // Changer le réglage SMT change ce que la stratégie accepte : on recalcule
 // tout de suite plutôt que d'attendre le prochain rafraîchissement.
 if($('#a-smt')) $('#a-smt').addEventListener('change', () => {
