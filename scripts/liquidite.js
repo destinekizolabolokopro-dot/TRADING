@@ -39,8 +39,16 @@ Object.assign(Modele.CFG, { slx: 4, ghDeb: 8 * 60, ghFin: 10 * 60,
 const TICK = { 'NQ=F': 0.25, 'ES=F': 0.25, 'YM=F': 1, 'RTY=F': 0.1 };
 const TICKS_TOL = 4;
 
+// --marches=NQ,ES  restreint l'étude. Par défaut les quatre indices.
+const DEMANDES = (process.argv.find(a => a.startsWith('--marches=')) || '').slice(10);
+const COUPLES = DEMANDES
+  ? DEMANDES.split(',').map(x => x.trim().toUpperCase() + '=F')
+      .map((s, i, t) => [s, t[(i + 1) % t.length] || s])
+  : [['NQ=F', 'ES=F'], ['ES=F', 'NQ=F'], ['YM=F', 'ES=F'], ['RTY=F', 'ES=F']];
+const SYMS = [...new Set(COUPLES.flat())];
+
 const PS = {};
-for (const s of ['NQ=F', 'ES=F', 'YM=F', 'RTY=F']) {
+for (const s of SYMS) {
   const S = J.lireMarche(s, Modele.SERIES); if (S.m5 && S.m5.length > 80) PS[s] = S;
 }
 const AL = J.aligner(Object.keys(PS).map(sym => ({ sym, S: PS[sym] })));
@@ -122,7 +130,7 @@ function empiles(S, prix, t, haut, tol, cache) {
 
 // ── rejouer et classer ────────────────────────────────────────────────────
 const T = [];
-for (const [sym, cf] of [['NQ=F', 'ES=F'], ['ES=F', 'NQ=F'], ['YM=F', 'ES=F'], ['RTY=F', 'ES=F']]) {
+for (const [sym, cf] of COUPLES) {
   if (!PS[sym]) continue;
   const S = PS[sym], R = reperes(S), cacheH = {};
   for (const s of Modele.evaluer(S, PS[cf]).tousSignaux) {
@@ -174,8 +182,15 @@ console.log('── LA RÈGLE CANDIDATE DE LA LITTÉRATURE : exiger un bassin de
 ligne('qualité (HTF ou ≥2 empilés)', T.filter(x => x.etiq.length > 0 || x.emp >= 2));
 ligne('sans qualité', T.filter(x => x.etiq.length === 0 && x.emp < 2));
 ligne('tout', T);
-console.log('   → la règle de la littérature DÉGRADE le résultat : elle garde');
-console.log('     les trades à +14 € et jette ceux à +38 €.');
+// Verdict calculé, jamais écrit en dur : la version précédente affichait les
+// chiffres du run à quatre marchés même quand on en étudiait deux.
+{
+  const av = T.filter(x => x.etiq.length > 0 || x.emp >= 2);
+  const sa = T.filter(x => x.etiq.length === 0 && x.emp < 2);
+  const m = g => g.length ? g.reduce((a, x) => a + x.r, 0) / g.length * RISQUE : 0;
+  if (av.length && sa.length) console.log(`   → la règle de la littérature ${m(av) < m(sa) ? 'DÉGRADE' : 'améliore'} le résultat : ` +
+    `elle garde les trades à ${eu(m(av))}/trade et jette ceux à ${eu(m(sa))}/trade.`);
+}
 
 // ── CE QUE LA MESURE DÉSIGNE VRAIMENT ────────────────────────────────────
 // Une seule case concentre presque toute la perte : acheter vers le haut de
@@ -193,7 +208,7 @@ ligne('tout, sans la règle', T);
 
 // La règle tient-elle sur CHAQUE marché, ou vient-elle d'un seul ?
 console.log('\n   marché par marché, règle appliquée (c\'est le test anti-tri) :');
-for (const sym of ['NQ=F', 'ES=F', 'YM=F', 'RTY=F']) {
+for (const sym of SYMS) {
   const av = T.filter(x => x.sym === sym);
   const ap = av.filter(x => !estPDHAchat(x));
   if (!av.length) continue;
