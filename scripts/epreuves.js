@@ -123,6 +123,13 @@ const RAPIDE = process.argv.includes('--rapide');
 //   --sansplafond   retire le plafond de deux trades par jour
 //   --sorties=X     remplace la forme de sortie (ex. --sorties=rien2)
 
+// La fenêtre horaire peut être changée en ligne de commande : le texte des
+// épreuves doit dire la vraie fenêtre, jamais une valeur écrite en dur.
+function fenetreTexte() {
+  const h = m => String(Math.floor(m / 60)) + 'h' + (m % 60 ? String(m % 60).padStart(2, '0') : '');
+  return 'entre ' + h(Modele.CFG.ghDeb) + ' et ' + h(Modele.CFG.ghFin);
+}
+
 function epreuve(titre, question, echantillons) {
   const b = echantillons.map(bilan).filter(Boolean);
   if (!b.length) { console.log(`\n── ${titre}\n   (aucun trade produit)`); return; }
@@ -196,7 +203,7 @@ if (!RAPIDE) {
     ech.push(T);
   }
   epreuve('ÉPREUVE 2 · L\'INSTANT TIRÉ AU SORT DANS LA FENÊTRE',
-    'Mêmes jours, même sens, même risque — mais une bougie au hasard entre 9h et 10h.', ech);
+    'Mêmes jours, même sens, même risque — mais une bougie au hasard ' + fenetreTexte() + '.', ech);
 }
 
 // ── 3. TOUT AU HASARD ─────────────────────────────────────────────────────
