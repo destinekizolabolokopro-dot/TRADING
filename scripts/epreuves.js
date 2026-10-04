@@ -43,7 +43,16 @@ const pc = v => v == null ? '—' : v.toFixed(1).replace('.', ',') + ' %';
 const MARCHES = process.argv.includes('--tous')
   ? [['NQ=F', 'ES=F'], ['ES=F', 'NQ=F'], ['YM=F', 'ES=F'], ['RTY=F', 'ES=F']]
   : [['NQ=F', 'ES=F']];
-const JEU = MARCHES.map(([s, c]) => ({ D: ser(s), E: ser(c) })).filter(x => x.D);
+
+// Chaque symbole est chargé UNE fois, puis tous sont ramenés à la période que
+// tous couvrent (voir scripts/lib/jeu.js). Sans cela, un cache rafraîchi à
+// moitié fait comparer des périodes différentes sous le même total.
+const JEUX = require('./lib/jeu.js');
+const SYMBOLES = [...new Set(MARCHES.flat())];
+const PAR_SYM = {};
+for (const sym of SYMBOLES) { const S = ser(sym); if (S && S.m5 && S.m5.length > 80) PAR_SYM[sym] = S; }
+const ALIGNE = JEUX.aligner(Object.keys(PAR_SYM).map(sym => ({ sym, S: PAR_SYM[sym] })));
+const JEU = MARCHES.map(([s, c]) => ({ D: PAR_SYM[s], E: PAR_SYM[c] })).filter(x => x.D);
 if (!JEU.length) { console.error('Cache absent.'); process.exit(1); }
 
 // Un générateur reproductible : une épreuve qui change de réponse à chaque
@@ -111,6 +120,7 @@ const REEL = bilan(reel());
 console.log('\n╔══════════════════════════════════════════════════════════════════════╗');
 console.log(`║  LES ÉPREUVES · ${String(MARCHES.length)} marché(s) · ${String(REEL.n).padStart(3)} trades réels                       ║`);
 console.log('╚══════════════════════════════════════════════════════════════════════╝');
+for (const l of JEUX.banniere(ALIGNE, JEU.map(j => ({ sym: '', S: j.D })))) console.log('   ' + l);
 if (VARIANTE) console.log(`\n⚙️  VARIANTE ÉPROUVÉE : ${VARIANTE}`);
 console.log(`\nLA STRATÉGIE ${VARIANTE ? 'AINSI MODIFIÉE' : 'TELLE QU\'ELLE EST'} : ${REEL.n} trades · ${pc(REEL.wr)} · ${eu(REEL.moy * RISQUE)} par trade · ${eu(REEL.som * RISQUE)}\n`);
 
@@ -255,8 +265,17 @@ if (!RAPIDE) {
   if (rupture === null) console.log('   ✅ tient jusqu\'à 3 points de dérapage par côté');
   else if (rupture === 0) console.log('   ❌ perdante MÊME SANS AUCUN FRAIS. Le dérapage n\'y est pour rien :\n' +
     '      c\'est la stratégie elle-même qui ne gagne pas sur cet échantillon.');
-  else console.log(`   ⚠️  ne supporte que moins de ${rupture} point(s) de dérapage par côté.\n` +
-    `      Le marché réel en coûte souvent un quart de point : la marge est donc nulle.`);
+  else {
+    // Ce qui compte n'est pas le seuil brut mais sa distance au coût réel,
+    // de l'ordre d'un quart de point par côté sur ces contrats.
+    const marge = rupture / 0.25;
+    console.log(`   ${marge >= 4 ? '✅' : '⚠️ '} devient perdante à partir de ${rupture} point(s) de dérapage par côté.`);
+    console.log(`      Le marché réel en coûte souvent un quart de point, soit ${marge < 2 ? 'à peine' : marge >= 4 ? 'environ' : 'seulement'} ` +
+      `${marge % 1 ? marge.toFixed(1).replace('.', ',') : marge} fois moins : ` +
+      (marge >= 4 ? 'la marge encaisse une exécution nettement pire que prévu.'
+       : marge >= 2 ? 'la marge existe mais ne pardonne pas une mauvaise exécution.'
+       : 'la marge est quasi nulle.'));
+  }
 }
 
 // ── 5. L'HYPOTHÈSE INTRABOUGIE PÈSE COMBIEN ? ─────────────────────────────
@@ -266,6 +285,7 @@ if (!RAPIDE) {
 {
   console.log('\n── ÉPREUVE 5 · LE POIDS DE L\'HYPOTHÈSE INTRABOUGIE');
   console.log('   Quand une bougie touche l\'objectif ET le stop, qui gagne ?');
+  let ambigus = 0, trades = 0;
   for (const [nom, prudent] of [['prudent (le stop compte)', true], ['optimiste (l\'objectif compte)', false]]) {
     const T = [];
     for (const { j, sigs } of SIG) for (const s of sigs) {
@@ -274,13 +294,21 @@ if (!RAPIDE) {
         const fin = Position.suivre(s, f1 ? j.D.m1 : j.D.m5, Modele.CFG,
           { prudent, maxBarres: f1 ? 1000 : 200, depuis: s.t,
             heure: Modele.heure, jourSignal: Modele.heure(s.t).jour });
-        if (!fin.ouverte) T.push(fin.r - Position.cout(s.risq));
+        if (!fin.ouverte) {
+          T.push(fin.r - Position.cout(s.risq));
+          if (prudent) { trades++; if (fin.ambigu > 0) ambigus++; }
+        }
       } catch (e) { /* ignoré */ }
     }
     const b = bilan(T);
     console.log(`      ${nom.padEnd(32)} ${pc(b.wr).padStart(7)} · ${eu(b.moy * RISQUE).padStart(8)} par trade · ${eu(b.som * RISQUE).padStart(9)}`);
   }
-  console.log('   Plus l\'écart est grand, plus le résultat dépend d\'une convention et non du marché.');
+  // Le compte des trades concernés : sans lui, deux totaux identiques ne
+  // disent pas si la convention ne change rien ou si l'épreuve est muette.
+  console.log(`      trades où une bougie touche les deux : ${ambigus} sur ${trades}` +
+    (trades ? ` (${(ambigus / trades * 100).toFixed(1).replace('.', ',')} %)` : ''));
+  if (!ambigus) console.log('   ✅ aucune bougie ambiguë : le résultat ne doit rien à cette convention.');
+  else console.log('   Plus l\'écart est grand, plus le résultat dépend d\'une convention et non du marché.');
 }
 
 // ── 6. UN SEUL JOUR PÈSE COMBIEN ? ────────────────────────────────────────
