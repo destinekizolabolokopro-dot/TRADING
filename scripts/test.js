@@ -319,7 +319,23 @@ console.log('\n── LE ROBOT PEUT-IL VRAIMENT VOIR LA SÉANCE ? ────�
     .map(m => +m[2] * 60 + +m[1]);
   const lim = +(yml.match(/timeout-minutes:\s*(\d+)/) || [])[1];
   const marge = +(yml.match(/LIMITE=\$\(\(DEPART \+ (\d+) \* 60\)\)/) || [])[1];
-  const deb = 13 * 60 + 15, fin = 15 * 60 + 45;
+  // ⚠️ CE TEST ÉCRIVAIT LA FENÊTRE EN DUR — « 13 h 15 → 15 h 45 » — ce qui
+  // est exactement le défaut qu'il est censé interdire ailleurs. Quand AMD a
+  // ouvert à 08 h New York, la tâche planifiée a été corrigée et ce contrôle,
+  // lui, a continué de juger les créneaux sur l'ancienne fenêtre : il a
+  // déclaré inutiles quatre départs qui la couvrent parfaitement.
+  // Une valeur à deux endroits diverge toujours. Elle vient maintenant de
+  // scripts/fenetre.js, comme pour la tâche elle-même.
+  const _f = (() => {
+    try {
+      const b = require('child_process')
+        .execFileSync('node', [path.join(RACINE, 'scripts/fenetre.js')], { encoding: 'utf-8' })
+        .trim().split(/\s+/).map(Number);
+      const min = x => new Date(x * 1000).getUTCHours() * 60 + new Date(x * 1000).getUTCMinutes();
+      return { deb: min(b[0]), fin: min(b[1]) };
+    } catch (e) { return null; }
+  })();
+  const deb = _f ? _f.deb : 13 * 60 + 15, fin = _f ? _f.fin : 15 * 60 + 45;
 
   t('le planning de la séance a plusieurs départs', () => {
     if (crons.length < 4)
@@ -341,7 +357,8 @@ console.log('\n── LE ROBOT PEUT-IL VRAIMENT VOIR LA SÉANCE ? ────�
 
   t('au moins un créneau couvre la fenêtre en entier', () => {
     const complets = crons.filter(d => Math.min(fin, d + marge) >= fin);
-    if (!complets.length) throw new Error('aucun créneau ne va jusqu\'à 15 h 45');
+    if (!complets.length) throw new Error('aucun créneau ne va jusqu\'à ' +
+      Math.floor(fin / 60) + ' h ' + String(fin % 60).padStart(2, '0'));
   });
 
   t('un départ retardataire ne tue pas un travail déjà en attente', () => {
@@ -952,6 +969,31 @@ console.log('\n── LA FENÊTRE DU ROBOT SUIT CELLE DES STRATÉGIES ───�
     if (m > minNY) throw new Error('surveillance à ' + Math.floor(m / 60) + ' h ' + (m % 60) +
       ' alors que la première stratégie ouvre à ' + Math.floor(minNY / 60) + ' h');
     if (minNY - m > 60) throw new Error('surveillance ' + (minNY - m) + ' min trop tôt : du temps de machine pour rien');
+  });
+
+  t('les créneaux couvrent l\'ouverture de la fenêtre', () => {
+    // GitHub abandonne la plupart des créneaux : sur cinq jours ouvrés, dix
+    // départs honorés sur vingt-cinq, aucun avant 12 h 59 UTC. On ne peut pas
+    // le forcer à partir — seulement lui demander souvent. Ce contrôle
+    // interdit de retomber dans une liste courte ou tardive.
+    const f = path.join(RACINE, '.github/workflows/seance.yml');
+    if (!fs.existsSync(f)) return;
+    const y = fs.readFileSync(f, 'utf-8');
+    const crons = [...y.matchAll(/- cron: '(\d+) (\d+) \* \* 1-5'/g)]
+      .map(m => +m[2] * 60 + +m[1]).sort((a, b) => a - b);
+    if (crons.length < 10)
+      throw new Error(crons.length + ' créneau(x) : trop peu pour survivre aux abandons');
+    const deb = +brut.split(/\s+/)[0];
+    const ouvertureMin = new Date(deb * 1000).getUTCHours() * 60 + new Date(deb * 1000).getUTCMinutes();
+    // Un travail meurt à 360 min : un départ antérieur de plus de 330 min à
+    // l'ouverture serait tué AVANT de servir, en ayant l'air d'avoir tourné.
+    const utiles = crons.filter(c => c >= ouvertureMin - 330 && c <= ouvertureMin);
+    if (!utiles.length)
+      throw new Error('aucun créneau ne peut atteindre l\'ouverture de ' +
+        Math.floor(ouvertureMin / 60) + ' h ' + (ouvertureMin % 60) + ' UTC');
+    const trous = crons.slice(1).map((c, i) => c - crons[i]);
+    if (Math.max(...trous) > 60)
+      throw new Error('trou de ' + Math.max(...trous) + ' min entre deux départs');
   });
 
   t('la tâche planifiée n\'écrit plus d\'horaire en dur', () => {
