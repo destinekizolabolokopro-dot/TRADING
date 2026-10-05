@@ -30,17 +30,46 @@ on:
     # de multiplier les départs, très tôt, et de laisser le travail attendre —
     # il attend de toute façon jusqu'à 13 h 15, qu'il parte à 6 h ou à 12 h.
     #
-    # CINQ créneaux, et pas plus tôt : un travail GitHub meurt à 360 minutes.
-    # Partir à 5 h pour attendre 13 h 15 (488 min) ne donnerait rien — le
-    # travail serait tué AVANT la séance, en ayant l'air d'avoir tourné.
-    # Chacun de ces cinq départs atteint la fenêtre et en couvre au moins un
-    # bout ; celui de 08 h 13 n'en couvre qu'une demi-heure, mais c'est la
-    # demi-heure qui compte.
-    - cron: '13 8 * * 1-5'
-    - cron: '29 9 * * 1-5'
-    - cron: '17 10 * * 1-5'
-    - cron: '47 11 * * 1-5'
-    - cron: '37 12 * * 1-5'
+
+    #
+    # ── MESURÉ LE 5 OCTOBRE, ET C'EST LE CONSTAT QUI COMMANDE CETTE LISTE ──
+    # Sur cinq jours ouvrés, vingt-cinq départs attendus, DIX honorés. Aucun
+    # avant 12 h 59 UTC ; la plupart entre 16 h et 18 h 30, soit quatre à six
+    # heures de retard, donc après la fermeture de la fenêtre. Le lundi
+    # 5 octobre, les cinq créneaux ont été abandonnés : zéro exécution.
+    #
+    # On ne peut pas forcer GitHub à partir. On peut seulement LUI DEMANDER
+    # PLUS SOUVENT : il en abandonne la plupart, il lui en restera un.
+    #
+    # Pourquoi pas avant 06 h 15 : un travail meurt à 360 minutes, la fenêtre
+    # ouvre à 11 h 45 UTC. Partir à 06 h 00 pour attendre 345 minutes ferait
+    # tuer le travail juste avant qu'il serve — il aurait l'air d'avoir
+    # tourné. Le script refuse d'ailleurs ces départs-là et rend la main.
+    #
+    # Pourquoi les minutes sont dispersées : la plupart des tâches planifiées
+    # du monde tombent à l'heure pile et à la demie, et c'est précisément là
+    # que le planificateur sature.
+    - cron: '17 6 * * 1-5'
+    - cron: '41 6 * * 1-5'
+    - cron: '13 7 * * 1-5'
+    - cron: '38 7 * * 1-5'
+    - cron: '9 8 * * 1-5'
+    - cron: '34 8 * * 1-5'
+    - cron: '11 9 * * 1-5'
+    - cron: '36 9 * * 1-5'
+    - cron: '14 10 * * 1-5'
+    - cron: '39 10 * * 1-5'
+    - cron: '12 11 * * 1-5'
+    - cron: '37 11 * * 1-5'
+    - cron: '8 12 * * 1-5'
+    - cron: '33 12 * * 1-5'
+    - cron: '14 13 * * 1-5'
+    - cron: '42 13 * * 1-5'
+    - cron: '19 14 * * 1-5'
+    - cron: '47 14 * * 1-5'
+    - cron: '21 15 * * 1-5'
+    - cron: '49 15 * * 1-5'
+    - cron: '23 16 * * 1-5'
   workflow_dispatch:
 
 concurrency:
@@ -89,11 +118,19 @@ jobs:
           git config user.name  "journal-signaux"
           git config user.email "noreply@github.com"
 
-          # La fenêtre 09 h 00 → 10 h 00 New York tombe à 13 h 00 UTC l'été et
-          # à 14 h 00 l'hiver. On couvre les deux, plus la marge du retard
-          # Yahoo (dix à quinze minutes), donc 13 h 15 → 15 h 45 UTC.
-          DEBUT=$(date -u -d 'today 13:15' +%s)
-          FIN=$(date -u -d 'today 15:45' +%s)
+          # ⚠️ LA FENÊTRE N'EST PLUS ÉCRITE ICI. Elle l'était — « 13 h 15 →
+          # 15 h 45 UTC » — ce qui correspondait à 09 h → 10 h New York. Quand
+          # le modèle AMD a ouvert à 08 h, ce fichier n'a pas suivi : le robot
+          # aurait commencé à surveiller QUATRE-VINGT-DIX MINUTES après
+          # l'ouverture, en ratant l'heure où tombent 64 % des balayages de
+          # grande liquidité. Un réglage qui vit à deux endroits finit toujours
+          # par diverger, et personne ne le voit.
+          #
+          # scripts/fenetre.js déduit la fenêtre des trois stratégies, mesure
+          # lui-même le décalage horaire de New York — il change deux fois
+          # l'an — et rend deux dates en secondes.
+          read -r DEBUT FIN < <(node scripts/fenetre.js)
+          node scripts/fenetre.js --clair
           MAINTENANT=$(date -u +%s)
           DEPART=$MAINTENANT
 
@@ -104,6 +141,9 @@ jobs:
           # vingt minutes sous la limite dure pour laisser la dernière poussée
           # se terminer.
           LIMITE=$((DEPART + 330 * 60))
+          # La fin VOULUE est gardée à part : c'est elle qui dit ce qu'il
+          # fallait couvrir, quand `FIN` dira ce que ce travail-ci peut tenir.
+          FIN_VOULUE=$FIN
           [ "$FIN" -gt "$LIMITE" ] && FIN=$LIMITE
 
           if [ "$DEBUT" -gt "$LIMITE" ]; then
@@ -117,7 +157,7 @@ jobs:
 
           if [ "$MAINTENANT" -lt "$DEBUT" ]; then
             ATTENTE=$((DEBUT - MAINTENANT))
-            echo "Attente de $((ATTENTE / 60)) minutes jusqu'à 13 h 15 UTC…"
+            echo "Attente de $((ATTENTE / 60)) minutes jusqu'à $(date -u -d "@$DEBUT" '+%H:%M UTC')…"
             echo "Ce créneau couvrira la séance jusqu'à $(date -u -d "@$FIN" '+%H:%M UTC')."
             sleep "$ATTENTE"
           elif [ "$MAINTENANT" -gt "$FIN" ]; then
@@ -161,4 +201,19 @@ jobs:
             [ "$RESTE" -le 0 ] && break
             sleep $(( RESTE < 1200 ? RESTE : 1200 ))     # un passage toutes les 20 min
           done
+          # ── DIRE SI LA SÉANCE A VRAIMENT ÉTÉ COUVERTE ────────────────────
+          # Sans ces lignes, un travail parti quatre heures en retard se
+          # termine « avec succès » après un rattrapage de dix-neuf secondes,
+          # et rien ne distingue cette réussite-là d'une vraie surveillance.
+          # C'est exactement ce qui s'est produit du 29 septembre au 2 octobre
+          # sans que personne le voie.
+          DEBUT_REEL=$([ "$DEPART" -gt "$DEBUT" ] && echo "$DEPART" || echo "$DEBUT")
+          COUVERT=$(( ($(date -u +%s) - DEBUT_REEL) / 60 ))
+          TOTAL=$(( (FIN_VOULUE - DEBUT) / 60 ))
+          [ "$COUVERT" -lt 0 ] && COUVERT=0
           echo "Séance couverte en $PASSAGE passage(s)."
+          if [ "$PASSAGE" -le 1 ] || [ "$COUVERT" -lt $((TOTAL / 2)) ]; then
+            echo "::warning::Fenêtre surveillée $COUVERT min sur $TOTAL — ce n'est pas une séance couverte, c'est un rattrapage. Départ à $(date -u -d "@$DEPART" '+%H:%M UTC') pour une ouverture à $(date -u -d "@$DEBUT" '+%H:%M UTC')."
+          else
+            echo "Fenêtre surveillée $COUVERT min sur $TOTAL."
+          fi

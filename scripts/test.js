@@ -27,9 +27,12 @@ function pres(a, b, tol, quoi) {
 
 // ── chargement des modules du navigateur ───────────────────────────────────
 const ctx = {};
-for (const f of ['js/structure.js', 'js/position.js', 'js/modele.js', 'js/kintt.js'])
+// js/amd.js manquait à cette liste : la troisième stratégie échappait donc à
+// TOUS les contrôles partagés — réglages cohérents, absence de regard en
+// avant, bornes des objectifs. Elle est chargée comme les autres.
+for (const f of ['js/structure.js', 'js/position.js', 'js/modele.js', 'js/kintt.js', 'js/amd.js'])
   new Function('root', 'ST', fs.readFileSync(path.join(RACINE, f), 'utf-8')).call(ctx, ctx, ctx.ST);
-const { Position, Modele, Kintt, ST } = ctx;
+const { Position, Modele, Kintt, AMD, ST } = ctx;
 const CFG = Modele.CFG;
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -316,7 +319,23 @@ console.log('\n── LE ROBOT PEUT-IL VRAIMENT VOIR LA SÉANCE ? ────�
     .map(m => +m[2] * 60 + +m[1]);
   const lim = +(yml.match(/timeout-minutes:\s*(\d+)/) || [])[1];
   const marge = +(yml.match(/LIMITE=\$\(\(DEPART \+ (\d+) \* 60\)\)/) || [])[1];
-  const deb = 13 * 60 + 15, fin = 15 * 60 + 45;
+  // ⚠️ CE TEST ÉCRIVAIT LA FENÊTRE EN DUR — « 13 h 15 → 15 h 45 » — ce qui
+  // est exactement le défaut qu'il est censé interdire ailleurs. Quand AMD a
+  // ouvert à 08 h New York, la tâche planifiée a été corrigée et ce contrôle,
+  // lui, a continué de juger les créneaux sur l'ancienne fenêtre : il a
+  // déclaré inutiles quatre départs qui la couvrent parfaitement.
+  // Une valeur à deux endroits diverge toujours. Elle vient maintenant de
+  // scripts/fenetre.js, comme pour la tâche elle-même.
+  const _f = (() => {
+    try {
+      const b = require('child_process')
+        .execFileSync('node', [path.join(RACINE, 'scripts/fenetre.js')], { encoding: 'utf-8' })
+        .trim().split(/\s+/).map(Number);
+      const min = x => new Date(x * 1000).getUTCHours() * 60 + new Date(x * 1000).getUTCMinutes();
+      return { deb: min(b[0]), fin: min(b[1]) };
+    } catch (e) { return null; }
+  })();
+  const deb = _f ? _f.deb : 13 * 60 + 15, fin = _f ? _f.fin : 15 * 60 + 45;
 
   t('le planning de la séance a plusieurs départs', () => {
     if (crons.length < 4)
@@ -338,7 +357,8 @@ console.log('\n── LE ROBOT PEUT-IL VRAIMENT VOIR LA SÉANCE ? ────�
 
   t('au moins un créneau couvre la fenêtre en entier', () => {
     const complets = crons.filter(d => Math.min(fin, d + marge) >= fin);
-    if (!complets.length) throw new Error('aucun créneau ne va jusqu\'à 15 h 45');
+    if (!complets.length) throw new Error('aucun créneau ne va jusqu\'à ' +
+      Math.floor(fin / 60) + ' h ' + String(fin % 60).padStart(2, '0'));
   });
 
   t('un départ retardataire ne tue pas un travail déjà en attente', () => {
@@ -917,6 +937,77 @@ t('js/position.js est bien le seul à porter la règle', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
+console.log('\n── LA FENÊTRE DU ROBOT SUIT CELLE DES STRATÉGIES ─────────────');
+// Le fichier de la tâche planifiée portait « 13 h 15 → 15 h 45 UTC » en dur,
+// ce qui correspondait à 09 h → 10 h New York. Quand AMD a ouvert à 08 h, ce
+// fichier n'a pas suivi : le robot aurait surveillé quatre-vingt-dix minutes
+// trop tard, en ratant l'heure où tombent 64 % des balayages. Un réglage qui
+// vit à deux endroits finit par diverger — ces contrôles l'interdisent.
+{
+  const { execFileSync } = require('child_process');
+  let brut = null;
+  try { brut = execFileSync('node', [path.join(RACINE, 'scripts/fenetre.js')], { encoding: 'utf-8' }).trim(); }
+  catch (e) { brut = null; }
+
+  t('scripts/fenetre.js rend deux instants croissants', () => {
+    if (!brut) throw new Error('le script a échoué');
+    const [a, b] = brut.split(/\s+/).map(Number);
+    if (!Number.isFinite(a) || !Number.isFinite(b)) throw new Error('« ' + brut + ' »');
+    if (!(b > a)) throw new Error('fin avant début : ' + brut);
+    const h = (b - a) / 3600;
+    if (h < 1 || h > 9) throw new Error(h.toFixed(1) + ' h de surveillance, ce n\'est pas une séance');
+  });
+
+  t('la fenêtre couvre l\'ouverture de la stratégie la plus matinale', () => {
+    if (!brut) throw new Error('le script a échoué');
+    const deb = +brut.split(/\s+/)[0];
+    const minNY = Math.min(Modele.CFG.ghDeb, AMD ? AMD.CFG.manipDeb : Infinity);
+    // L'instant rendu, relu en heure de New York, doit tomber AVANT l'ouverture.
+    const ny = new Date(deb * 1000).toLocaleString('en-US', { timeZone: 'America/New_York' });
+    const d2 = new Date(ny);
+    const m = d2.getHours() * 60 + d2.getMinutes();
+    if (m > minNY) throw new Error('surveillance à ' + Math.floor(m / 60) + ' h ' + (m % 60) +
+      ' alors que la première stratégie ouvre à ' + Math.floor(minNY / 60) + ' h');
+    if (minNY - m > 60) throw new Error('surveillance ' + (minNY - m) + ' min trop tôt : du temps de machine pour rien');
+  });
+
+  t('les créneaux couvrent l\'ouverture de la fenêtre', () => {
+    // GitHub abandonne la plupart des créneaux : sur cinq jours ouvrés, dix
+    // départs honorés sur vingt-cinq, aucun avant 12 h 59 UTC. On ne peut pas
+    // le forcer à partir — seulement lui demander souvent. Ce contrôle
+    // interdit de retomber dans une liste courte ou tardive.
+    const f = path.join(RACINE, '.github/workflows/seance.yml');
+    if (!fs.existsSync(f)) return;
+    const y = fs.readFileSync(f, 'utf-8');
+    const crons = [...y.matchAll(/- cron: '(\d+) (\d+) \* \* 1-5'/g)]
+      .map(m => +m[2] * 60 + +m[1]).sort((a, b) => a - b);
+    if (crons.length < 10)
+      throw new Error(crons.length + ' créneau(x) : trop peu pour survivre aux abandons');
+    const deb = +brut.split(/\s+/)[0];
+    const ouvertureMin = new Date(deb * 1000).getUTCHours() * 60 + new Date(deb * 1000).getUTCMinutes();
+    // Un travail meurt à 360 min : un départ antérieur de plus de 330 min à
+    // l'ouverture serait tué AVANT de servir, en ayant l'air d'avoir tourné.
+    const utiles = crons.filter(c => c >= ouvertureMin - 330 && c <= ouvertureMin);
+    if (!utiles.length)
+      throw new Error('aucun créneau ne peut atteindre l\'ouverture de ' +
+        Math.floor(ouvertureMin / 60) + ' h ' + (ouvertureMin % 60) + ' UTC');
+    const trous = crons.slice(1).map((c, i) => c - crons[i]);
+    if (Math.max(...trous) > 60)
+      throw new Error('trou de ' + Math.max(...trous) + ' min entre deux départs');
+  });
+
+  t('la tâche planifiée n\'écrit plus d\'horaire en dur', () => {
+    const f = path.join(RACINE, '.github/workflows/seance.yml');
+    if (!fs.existsSync(f)) return;
+    const y = fs.readFileSync(f, 'utf-8');
+    const corps = y.split('\n').filter(l => !l.trim().startsWith('#')).join('\n');
+    const dur = corps.match(/date -u -d 'today \d\d:\d\d'/g);
+    if (dur) throw new Error('horaire écrit en dur : ' + dur.join(', '));
+    if (!/scripts\/fenetre\.js/.test(corps)) throw new Error('la fenêtre n\'est pas déduite des stratégies');
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 console.log('\n── LES DONNÉES D\'ENTRÉE SONT SAINES ──────────────────────────');
 // Le modèle ne vaut rien si on le nourrit de bougies fausses. Yahoo en sert :
 // il ajoute la cotation en cours comme une pseudo-bougie (ouverture = haut =
@@ -1065,10 +1156,13 @@ p.on('console', m => { if (m.type() === 'error' && !/ERR_CERT|file:|Failed to lo
 await p.route('**://query*.finance.yahoo.com/**', r => r.fulfill({ status: 500, body: '{}' }));
 await p.goto('file://${RACINE}/TRADEassist.html', { waitUntil: 'load' });
 await p.waitForTimeout(2500);
-// Le radar est un canvas : s'il ne dessine rien, la page a l'air correcte et
-// le cœur visuel du site est mort. On compte les pixels non transparents.
+// LA SPHÈRE est un canvas : si elle ne dessine rien, la page a l'air correcte
+// et son cœur visuel est mort. On compte les pixels non transparents.
+// (Le radar qu'on vérifiait ici a été retiré : il fallait lire une légende de
+// trois lignes pour en tirer un chiffre que les tuiles donnent en clair.)
 const radar = await p.evaluate(() => {
-  const c = document.querySelector('canvas'); if (!c) return -1;
+  const c = document.querySelector('candle-sphere canvas') || document.querySelector('canvas');
+  if (!c) return -1;
   const g = c.getContext('2d'); if (!g) return -1;
   const d = g.getImageData(0, 0, c.width, c.height).data;
   let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i] > 8) n++;
@@ -1124,12 +1218,54 @@ const kintt = {
   fen: (await p.textContent('#f-kfen') || '').trim(),
   // Le panneau du modèle doit rester rempli lui aussi : brancher une seconde
   // stratégie ne doit pas casser la première.
-  chaine: (await p.textContent('#chain') || '').trim().length
+  chaine: (await p.textContent('#chain') || '').trim().length,
+  // ── LE HERO, LE BANDEAU, LES CARTES ────────────────────────────────────
+  // Trois blocs qui se remplissent en JavaScript : s'ils restent vides, la
+  // page garde l'air d'une maquette et personne ne le voit en relisant le
+  // code. Le bandeau, lui, était resté vide pendant une version entière
+  // parce qu'une erreur plus haut interrompait tout le rendu.
+  hero: {
+    horloge: (await p.textContent('#h-clock') || '').trim(),
+    pouls: (await p.textContent('#pulse-g') || '').trim(),
+    bandeau: (await p.textContent('#mq-t') || '').trim(),
+    cartes: await p.evaluate(() => document.querySelectorAll('.carte').length),
+    fenetre: (await p.textContent('#tf-tag') || '').trim(),
+    // La sphère ne doit afficher AUCUN prix : la maquette en inventait deux.
+    sphereTexte: await p.evaluate(() => (document.querySelector('candle-sphere') || {}).textContent || '')
+  },
+  // ── LA TROISIÈME STRATÉGIE ─────────────────────────────────────────────
+  // Brancher AMD ne doit ni casser les deux autres, ni afficher un panneau
+  // vide : un panneau qui existe et ne dit rien est pire qu'absent.
+  amd: {
+    texte: (await p.textContent('#amd') || '').trim(),
+    tag: (await p.textContent('#a-tag') || '').trim(),
+    jauge: await p.evaluate(() => document.querySelector('#a-gauge').style.width),
+    smt: await p.evaluate(() => document.querySelector('#a-smt').value),
+    // Le sélecteur de stratégies doit proposer une case par stratégie.
+    cases: await p.evaluate(() => [...document.querySelectorAll('#c-strats input[data-strat]')]
+      .map(e => e.dataset.strat)),
+    // Décocher doit vraiment masquer le panneau.
+    masque: await p.evaluate(async () => {
+      const inp = document.querySelector('#c-strats input[data-strat=\"amd\"]');
+      if (!inp) return 'case absente';
+      inp.checked = false; inp.dispatchEvent(new Event('change'));
+      await new Promise(r => setTimeout(r, 120));
+      const cache = document.getElementById('pan-amd').style.display === 'none';
+      inp.checked = true; inp.dispatchEvent(new Event('change'));
+      await new Promise(r => setTimeout(r, 120));
+      const revenu = document.getElementById('pan-amd').style.display !== 'none';
+      return cache && revenu ? 'ok' : 'masquage : ' + cache + ', retour : ' + revenu;
+    })
+  }
 };
 srv.close();
 const out = {
   err, pied: (await p.textContent('#f-mes') || '').trim(),
-  titre: /Où se forme le signal/.test(await p.textContent('body')),
+  // Le titre « Où se forme le signal » coiffait le radar, retiré depuis. On
+  // vérifie le titre du hero, et qu'il porte bien ses DEUX lignes : la
+  // seconde est celle qui porte la lueur d'accent, et un titre amputé de sa
+  // moitié ne se verrait pas en relisant le code.
+  titre: /Chaque séance\.\s*Chaque signal\./.test(await p.textContent('body')),
   radar, deborde, panneaux, kintt
 };
 console.log(JSON.stringify(out)); await b.close();`;
@@ -1147,7 +1283,7 @@ console.log(JSON.stringify(out)); await b.close();`;
       if (!res.pied || res.pied === '—') throw new Error('pied vide');
       if (!/\d+ signaux/.test(res.pied)) throw new Error('pied : ' + res.pied.slice(0, 60));
     });
-    t('le radar dessine vraiment quelque chose', () => {
+    t('la sphère dessine vraiment quelque chose', () => {
       if (res.radar < 0) throw new Error('aucun canvas trouvé');
       if (res.radar < 500) throw new Error('canvas quasi vide : ' + res.radar + ' pixels');
     });
@@ -1182,6 +1318,60 @@ console.log(JSON.stringify(out)); await b.close();`;
       const f = (K3.enR || []).concat(K3.enRTitres || []);
       if (f.length) throw new Error('reste à l\'écran : ' + [...new Set(f)].join(', '));
     });
+    // ── AMD, LA TROISIÈME STRATÉGIE ───────────────────────────────────────
+    const A3 = (res.kintt || {}).amd || {};
+    t('le panneau AMD se remplit au lieu de rester vide', () => {
+      if (!A3.texte) throw new Error('panneau vide');
+      if (/Pas encore de relevé/.test(A3.texte))
+        throw new Error('AMD ne reçoit rien : ni le navigateur ni le relevé ne le calculent');
+      if (A3.texte.length < 300) throw new Error('panneau trop court : ' + A3.texte.length + ' caractères');
+    });
+    t('le compteur et la jauge d\'AMD sont renseignés', () => {
+      if (!/^\d\/\d/.test(A3.tag)) throw new Error('compteur : « ' + A3.tag + ' »');
+      if (!/%$/.test(A3.jauge || '')) throw new Error('jauge : « ' + A3.jauge + ' »');
+    });
+    t('AMD dit ce que vaut sa mesure, pas seulement son état', () => {
+      // Un panneau qui annonce une stratégie sans dire sur quoi elle est
+      // mesurée invite à la trader en croyant qu'elle est prouvée.
+      if (!/trades/.test(A3.texte)) throw new Error('aucun décompte de trades affiché');
+      if (!/Réserves/.test(A3.texte)) throw new Error('aucune réserve affichée');
+    });
+    t('le réglage SMT est proposé et vaut un choix connu', () => {
+      if (!['exige', 'ignore', 'confirme'].includes(A3.smt))
+        throw new Error('réglage SMT : « ' + A3.smt + ' »');
+    });
+    t('le sélecteur propose une case par stratégie', () => {
+      for (const c of ['mech', 'kintt', 'amd'])
+        if (!(A3.cases || []).includes(c)) throw new Error('case absente : ' + c);
+    });
+    t('décocher une stratégie masque vraiment son panneau', () => {
+      if (A3.masque !== 'ok') throw new Error(String(A3.masque));
+    });
+    t('brancher AMD n\'a pas vidé le panneau de KINTT', () => {
+      if (!((res.kintt || {}).texte || '').length) throw new Error('le panneau KINTT est vide');
+    });
+
+    // ── LE HERO ET SES BLOCS ──────────────────────────────────────────────
+    const H3 = (res.kintt || {}).hero || {};
+    t('l\'horloge du hero affiche bien une heure', () => {
+      if (!/^Paris · \d\d:\d\d:\d\d$/.test(H3.horloge)) throw new Error('« ' + H3.horloge + ' »');
+    });
+    t('le pouls du marché est rempli avec de vraies valeurs', () => {
+      if (!H3.pouls) throw new Error('vide');
+      if (/—\s*—\s*—/.test(H3.pouls)) throw new Error('tout à « — » : le relevé n\'arrive pas');
+      if (!/Fenêtre/.test(H3.pouls)) throw new Error('contenu inattendu : ' + H3.pouls.slice(0, 60));
+    });
+    t('le bandeau défilant porte des valeurs, pas du décor', () => {
+      if (!H3.bandeau) throw new Error('bandeau vide');
+      if (!/pts/.test(H3.bandeau)) throw new Error('aucune distance : ' + H3.bandeau.slice(0, 60));
+    });
+    t('une carte par stratégie visible', () => {
+      if (H3.cartes !== 3) throw new Error(H3.cartes + ' carte(s) au lieu de 3');
+    });
+    t('la fenêtre de séance est affichée sous le titre', () => {
+      if (!/\d\d h \d\d – \d\d h \d\d NY/.test(H3.fenetre)) throw new Error('« ' + H3.fenetre + ' »');
+    });
+
     t('KINTT dit combien de trades portent son chiffre', () => {
       // « +304 € » sans « 3 trades » est un mensonge par omission.
       if (!/trade/.test(K3.texte)) throw new Error('aucun décompte de trades affiché');

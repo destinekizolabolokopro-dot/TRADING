@@ -47,8 +47,16 @@ const ser = sym => {
   return S.m5 && S.m5.length > 80 ? S : null;
 };
 const MARCHES = [['NQ=F', 'ES=F'], ['ES=F', 'NQ=F'], ['YM=F', 'ES=F'], ['RTY=F', 'ES=F']];
-const JEU = MARCHES.map(([s, c]) => ({ D: ser(s), E: ser(c) })).filter(x => x.D);
+
+// Période commune imposée : retirer une règle et comparer n'a de sens que si
+// les quatre marchés couvrent les mêmes séances (voir scripts/lib/jeu.js).
+const JEUX = require('./lib/jeu.js');
+const PAR_SYM = {};
+for (const sym of [...new Set(MARCHES.flat())]) { const S = ser(sym); if (S && S.m5 && S.m5.length > 80) PAR_SYM[sym] = S; }
+const ALIGNE = JEUX.aligner(Object.keys(PAR_SYM).map(sym => ({ sym, S: PAR_SYM[sym] })));
+const JEU = MARCHES.map(([s, c]) => ({ D: PAR_SYM[s], E: PAR_SYM[c] })).filter(x => x.D);
 if (!JEU.length) { console.error('Cache absent.'); process.exit(1); }
+for (const l of JEUX.banniere(ALIGNE, JEU.map(j => ({ sym: '', S: j.D })))) console.log(l);
 
 const RISQUE = +(process.env.RISQUE_EUR || 250);
 const eu = v => (v >= 0 ? '+' : '−') + Math.round(Math.abs(v)) + ' €';

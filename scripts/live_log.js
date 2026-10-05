@@ -34,6 +34,7 @@ require(path.join(__dirname, '..', 'js', 'modele.js'));
 // C'est la seule façon de les comparer sans qu'un écart de données explique
 // l'écart de résultats — l'erreur déjà commise entre le robot et le banc d'essai.
 require(path.join(__dirname, '..', 'js', 'kintt.js'));
+require(path.join(__dirname, '..', 'js', 'amd.js'));
 
 const FICHIER = path.join(__dirname, '..', 'data', 'signaux.json');
 const ETAT    = path.join(__dirname, '..', 'data', 'etat.json');
@@ -218,6 +219,40 @@ function instantaneKintt(k, m5, m1) {
     entonnoir: k.entonnoir, cfg: k.cfg,
     // rejouée à chaque passage, pour ne jamais être en retard sur le code
     mesure: mesureKintt(k, m5 || [], m1 || [])
+  };
+}
+
+// L'instantané d'AMD. Même précaution que pour kintt : l'étape porte des
+// objets qui peuvent référencer des séries entières, et etat.json est
+// téléchargé à chaque ouverture de la page. On ne garde que des nombres.
+//
+// Le robot est le SEUL endroit où les deux marchés sont disponibles ensemble,
+// donc le seul où la divergence SMT avec l'ES peut être jugée. Dans le
+// navigateur elle reste indisponible, et le panneau le dit au lieu de faire
+// comme si le filtre s'appliquait.
+function instantaneAmd(a) {
+  if (!a) return null;
+  const e = a.etape;
+  const leger = e ? {
+    jour: e.jour, min: e.min, dir: e.dir, internes: e.internes, cible: e.cible,
+    pris: e.pris,
+    manip: e.manip ? { nom: e.manip.nom, prix: e.manip.prix, ext: e.manip.ext,
+                       smt: e.manip.smt, t: e.manip.t } : null,
+    fvg: e.fvg ? { bas: e.fvg.bas, haut: e.fvg.haut, haussier: e.fvg.haussier } : null,
+    ifvg: e.ifvg ? { bas: e.ifvg.bas, haut: e.ifvg.haut, t: e.ifvg.t } : null,
+    signal: e.signal ? { sens: e.signal.sens, t: e.signal.t, entree: e.signal.entree,
+                         sl: e.signal.sl, tp: e.signal.tp, tp1: e.signal.tp1,
+                         risq: e.signal.risq, dol: e.signal.dol, smt: e.signal.smt,
+                         manip: e.signal.manip } : null
+  } : null;
+  return {
+    etape: leger, fenetre: a.fenetre, smt: a.smt,
+    // Le nombre de signaux de la période couverte par les bougies : sans lui
+    // le panneau annoncerait une stratégie sans dire sur quoi elle porte.
+    signaux: a.tousSignaux ? a.tousSignaux.length : 0,
+    manips: a.manips ? a.manips.length : 0,
+    dernier: a.dernier ? { sens: a.dernier.sens, t: a.dernier.t, entree: a.dernier.entree,
+                           sl: a.dernier.sl, tp: a.dernier.tp, smt: a.dernier.smt } : null
   };
 }
 
@@ -426,6 +461,11 @@ function ecrireKintt(db) {
   let k = null;
   try { k = Kintt.evaluer(brut, brut2); }
   catch (e) { console.error('KINTT en échec : ' + e.message); }
+  // La troisième stratégie. Elle reçoit le SECOND MARCHÉ, ce qui n'arrive
+  // qu'ici : la divergence SMT a besoin des deux séries au même instant.
+  let a = null;
+  try { a = AMD.evaluer(brut, { E: brut2 }); }
+  catch (e) { console.error('AMD en échec : ' + e.message); }
   const e = Modele.heure(d.derniereBougie);
   const hNY = String(Math.floor(e.min / 60)).padStart(2, '0') + ':' + String(e.min % 60).padStart(2, '0');
   const db = charger();
@@ -471,7 +511,8 @@ function ecrireKintt(db) {
     // La seconde stratégie voyage dans le même fichier : le site n'a qu'un
     // seul instantané à charger, et les deux décrivent forcément la même
     // bougie — impossible d'afficher deux prix différents côte à côte.
-    kintt: instantaneKintt(k, brut.m5, brut.m1 || [])
+    kintt: instantaneKintt(k, brut.m5, brut.m1 || []),
+    amd: instantaneAmd(a)
   };
   // Marché fermé, rien n'a bougé : n'écrire que l'horodatage produirait un
   // commit toutes les cinq minutes pour rien — une trentaine par jour, qui

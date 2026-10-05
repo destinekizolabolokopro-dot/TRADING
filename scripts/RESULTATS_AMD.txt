@@ -1,0 +1,57 @@
+code 0
+
+╔══════════════════════════════════════════════════════════════════════╗
+║  LES ÉPREUVES DU MODÈLE AMD · 2 ans · 147 trades                    ║
+╚══════════════════════════════════════════════════════════════════════╝
+   2024-10-04 → 2026-10-02 · exécution 1 heure
+
+LE MODÈLE : 147 trades · 37,4 % · +136 € par trade · +19990 €
+
+── ÉPREUVE 1 · LE SENS TIRÉ À PILE OU FACE
+   Mêmes instants, mêmes stops, mais le sens au hasard. Le scénario sert-il ?
+   200 tirages · médiane −3 € par trade · de −49 € à +50 €
+   tirages au moins aussi bons que le modèle : 0/200  (0 %)
+   ✅ le modèle bat le hasard dans ce test
+
+── ÉPREUVE 2 · L'INSTANT TIRÉ AU SORT DANS LA FENÊTRE
+   Mêmes jours, même sens, même risque — mais une bougie au hasard entre 9h et 12h NY.
+   200 tirages · médiane +38 € par trade · de +3 € à +68 €
+   tirages au moins aussi bons que le modèle : 0/200  (0 %)
+   ✅ le modèle bat le hasard dans ce test
+
+── ÉPREUVE 3 · TOUT AU HASARD (instant ET sens)
+   Il ne reste que la fenêtre horaire, la taille du stop et la gestion de sortie.
+   200 tirages · médiane −7 € par trade · de −54 € à +39 €
+   tirages au moins aussi bons que le modèle : 0/200  (0 %)
+   ✅ le modèle bat le hasard dans ce test
+
+── ÉPREUVE 4 · LE POINT DE RUPTURE DES FRAIS
+          0 point(s)    +140 €/trade     +20541 €
+       0.25 point(s)    +136 €/trade     +19990 €
+        0.5 point(s)    +132 €/trade     +19440 €
+          1 point(s)    +125 €/trade     +18338 €
+          2 point(s)    +110 €/trade     +16136 €
+          3 point(s)     +95 €/trade     +13933 €
+          5 point(s)     +65 €/trade      +9528 €
+   ✅ tient jusqu'à 5 points de dérapage par côté
+
+── ÉPREUVE 5 · LE POIDS DE L'HYPOTHÈSE INTRABOUGIE
+      prudent (le stop compte)          37,4 % ·   +136 € par trade ·  +19990 €
+      optimiste (l'objectif compte)     43,5 % ·   +178 € par trade ·  +26115 €
+      trades où une bougie touche les deux : 11 sur 147 (7,5 %)
+
+── ÉPREUVE 6 · LE POIDS D'UN SEUL MOIS, ET D'UN SEUL TRADE
+      total sur tout               +19990 €
+      sans 2025-05 (15 trades)       +16858 €
+      sans 2025-07 (10 trades)       +17192 €
+      sans 2025-10 (12 trades)       +18460 €
+      ...
+      sans 2024-12 ( 4 trades)       +20518 €
+      sans 2026-04 ( 7 trades)       +20747 €
+      24 mois · retirer le meilleur laisse +16858 €
+      ✅ aucun mois seul ne renverse le signe du total.
+      les 5 plus gros gains pèsent +3117 € sur +19990 € (16 % du total)   ✅
+      sans eux : +16873 €  ✅ encore positif
+
+
+[exited with code 0]
