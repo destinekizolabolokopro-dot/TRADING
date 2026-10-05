@@ -27,9 +27,12 @@ function pres(a, b, tol, quoi) {
 
 // ── chargement des modules du navigateur ───────────────────────────────────
 const ctx = {};
-for (const f of ['js/structure.js', 'js/position.js', 'js/modele.js', 'js/kintt.js'])
+// js/amd.js manquait à cette liste : la troisième stratégie échappait donc à
+// TOUS les contrôles partagés — réglages cohérents, absence de regard en
+// avant, bornes des objectifs. Elle est chargée comme les autres.
+for (const f of ['js/structure.js', 'js/position.js', 'js/modele.js', 'js/kintt.js', 'js/amd.js'])
   new Function('root', 'ST', fs.readFileSync(path.join(RACINE, f), 'utf-8')).call(ctx, ctx, ctx.ST);
-const { Position, Modele, Kintt, ST } = ctx;
+const { Position, Modele, Kintt, AMD, ST } = ctx;
 const CFG = Modele.CFG;
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -915,6 +918,52 @@ t('js/position.js est bien le seul à porter la règle', () => {
   const src = fs.readFileSync(path.join(RACINE, 'js/position.js'), 'utf-8');
   if (!/part1\s*=\s*true/.test(src)) throw new Error('la règle a disparu du module partagé');
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+console.log('\n── LA FENÊTRE DU ROBOT SUIT CELLE DES STRATÉGIES ─────────────');
+// Le fichier de la tâche planifiée portait « 13 h 15 → 15 h 45 UTC » en dur,
+// ce qui correspondait à 09 h → 10 h New York. Quand AMD a ouvert à 08 h, ce
+// fichier n'a pas suivi : le robot aurait surveillé quatre-vingt-dix minutes
+// trop tard, en ratant l'heure où tombent 64 % des balayages. Un réglage qui
+// vit à deux endroits finit par diverger — ces contrôles l'interdisent.
+{
+  const { execFileSync } = require('child_process');
+  let brut = null;
+  try { brut = execFileSync('node', [path.join(RACINE, 'scripts/fenetre.js')], { encoding: 'utf-8' }).trim(); }
+  catch (e) { brut = null; }
+
+  t('scripts/fenetre.js rend deux instants croissants', () => {
+    if (!brut) throw new Error('le script a échoué');
+    const [a, b] = brut.split(/\s+/).map(Number);
+    if (!Number.isFinite(a) || !Number.isFinite(b)) throw new Error('« ' + brut + ' »');
+    if (!(b > a)) throw new Error('fin avant début : ' + brut);
+    const h = (b - a) / 3600;
+    if (h < 1 || h > 9) throw new Error(h.toFixed(1) + ' h de surveillance, ce n\'est pas une séance');
+  });
+
+  t('la fenêtre couvre l\'ouverture de la stratégie la plus matinale', () => {
+    if (!brut) throw new Error('le script a échoué');
+    const deb = +brut.split(/\s+/)[0];
+    const minNY = Math.min(Modele.CFG.ghDeb, AMD ? AMD.CFG.manipDeb : Infinity);
+    // L'instant rendu, relu en heure de New York, doit tomber AVANT l'ouverture.
+    const ny = new Date(deb * 1000).toLocaleString('en-US', { timeZone: 'America/New_York' });
+    const d2 = new Date(ny);
+    const m = d2.getHours() * 60 + d2.getMinutes();
+    if (m > minNY) throw new Error('surveillance à ' + Math.floor(m / 60) + ' h ' + (m % 60) +
+      ' alors que la première stratégie ouvre à ' + Math.floor(minNY / 60) + ' h');
+    if (minNY - m > 60) throw new Error('surveillance ' + (minNY - m) + ' min trop tôt : du temps de machine pour rien');
+  });
+
+  t('la tâche planifiée n\'écrit plus d\'horaire en dur', () => {
+    const f = path.join(RACINE, '.github/workflows/seance.yml');
+    if (!fs.existsSync(f)) return;
+    const y = fs.readFileSync(f, 'utf-8');
+    const corps = y.split('\n').filter(l => !l.trim().startsWith('#')).join('\n');
+    const dur = corps.match(/date -u -d 'today \d\d:\d\d'/g);
+    if (dur) throw new Error('horaire écrit en dur : ' + dur.join(', '));
+    if (!/scripts\/fenetre\.js/.test(corps)) throw new Error('la fenêtre n\'est pas déduite des stratégies');
+  });
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 console.log('\n── LES DONNÉES D\'ENTRÉE SONT SAINES ──────────────────────────');
