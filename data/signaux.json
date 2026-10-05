@@ -247,16 +247,33 @@
    "etapeBloquee": "dol",
    "dit": "Biais haussier, mais plus aucune liquidité intacte dans ce sens.",
    "apresCoup": true
+  },
+  {
+   "ts": "2026-10-05T16:17:24.033Z",
+   "bougie": "2026-10-05T16:05:00.000Z",
+   "jour": "2026-10-05",
+   "heureNY": "12:05",
+   "prix": 31218,
+   "retardMin": 13,
+   "biais": "haussier",
+   "score": 4,
+   "dol": 31282.5,
+   "niveau": "RB M5",
+   "etat": "ATTEND_IFVG",
+   "niveauxParUnite": "M5:82 M15:99 M30:97 H1:108 H4:95",
+   "etapeBloquee": "ifvg",
+   "dit": "Séance du jour (relevée après coup, dernière bougie vue à 13:55 UTC) : biais haussier, niveau RB M15 (31142 – 31153.25) retenu, mais aucune inversion confirmée par clôture de corps.",
+   "apresCoup": true
   }
  ],
  "bilan": {
-  "maj": "2026-10-02T16:17:48.169Z",
+  "maj": "2026-10-05T16:17:24.033Z",
   "total": 2,
   "clos": 2,
   "ouverts": 0,
   "reussite": 100,
   "cumulR": 0.72,
-  "passages": 10
+  "passages": 11
  },
  "archive": [
   {
