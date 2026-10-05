@@ -1418,6 +1418,39 @@ if (process.argv.includes('--enligne')) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// LE CHIFFRE QUE LA PAGE ANNONCE DOIT ÊTRE CELUI-CI.
+//
+// La page affichait « 157 vérifications » quand il y en avait 166 : un nombre
+// mesuré, recopié dans le hero, et laissé derrière. C'est le même défaut que
+// la fenêtre écrite à deux endroits, pour la troisième fois dans la journée.
+// Il ne peut plus passer : ce contrôle compare ce que la page promet à ce qui
+// a réellement tourné. Il se compte LUI-MÊME dans le total, d'où le +1.
+// ⚠️ Le total dépend de la suite lancée : sans --navigateur il manque les
+// contrôles qui ouvrent vraiment la page. Le chiffre annoncé est celui de la
+// suite COMPLÈTE — c'est celui qu'on cite — donc ce contrôle ne juge que là.
+// Le mesurer sur la suite courte ferait échouer un chiffre pourtant juste.
+t('la page annonce le bon nombre de vérifications', () => {
+  const f = path.join(RACINE, 'index.html');
+  if (!fs.existsSync(f)) return;
+  if (!process.argv.includes('--navigateur')) {
+    const m0 = fs.readFileSync(f, 'utf-8').match(/verifications:\s*(\d+)/);
+    if (!m0) throw new Error('MESURES.verifications introuvable dans la page');
+    if (+m0[1] < ok + ko + 1)
+      throw new Error('la page annonce ' + m0[1] + ', or la suite courte en compte déjà ' + (ok + ko + 1));
+    return;      // le compte exact se juge avec --navigateur
+  }
+  const src = fs.readFileSync(f, 'utf-8');
+  const m = src.match(/verifications:\s*(\d+)/);
+  if (!m) throw new Error('MESURES.verifications introuvable dans la page');
+  const annonce = +m[1], reel = ok + ko + 1;
+  if (annonce !== reel)
+    throw new Error('la page annonce ' + annonce + ' vérifications, il y en a ' + reel);
+  // Et la date des mesures doit exister : un chiffre sans date se croit
+  // éternellement vrai.
+  if (!/date:\s*'\d{4}-\d{2}-\d{2}'/.test(src))
+    throw new Error('MESURES n\'est pas daté');
+});
+
 const total = ok + ko;
 console.log('\n' + '─'.repeat(62));
 console.log(`${ok}/${total} vérifications passées` + (ko ? ` · ${ko} ÉCHEC(S)` : ' · tout est bon'));

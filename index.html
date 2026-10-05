@@ -511,8 +511,8 @@ button,input,select{font:inherit;color:inherit}
       </div>
       <div class="hero-facts">
         <div><b class="mono">3</b><i>Stratégies</i></div>
-        <div><b class="mono">2 ans</b><i>Mesurés</i></div>
-        <div><b class="mono">157</b><i>Vérifications</i></div>
+        <div><b class="mono" id="h-duree">—</b><i>Mesurés</i></div>
+        <div><b class="mono" id="h-verif">—</b><i>Vérifications</i></div>
       </div>
     </div>
 
@@ -1272,7 +1272,8 @@ function paintAmd(){
       ok: !!ouvre,
       d: ouvre ? 'Ouverte — on guette le balayage de la grande liquidité.'
         : 'Fermée. Hors de cette fenêtre, aucun scénario ne démarre.',
-      long:'Mesuré sur deux ans : 64 % des balayages de grande liquidité tombent entre 8 h et 10 h New York, soit 14 h – 16 h à Paris.' },
+      long:'Mesuré sur ' + MESURES.amd.duree + ' : ' + MESURES.amd.partBalayages +
+           ' % des balayages de grande liquidité tombent dans cette fenêtre.' },
     { t:'Grande liquidité balayée',
       ok: !!(e && e.manip),
       d: e && e.manip
@@ -1371,12 +1372,19 @@ function paintAmd(){
       (A.signaux === 0 ? ' — aucun, et c’est une information : la chaîne est exigeante.' : '.') +
       '</div>';
 
+  // Les chiffres viennent tous de MESURES, et la date avec eux : un chiffre
+  // daté qui vieillit se voit, un chiffre nu se croit encore vrai.
+  const M = MESURES.amd, pc1 = v => (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(1).replace('.', ',') + ' %';
   out += '<div class="t-why" style="margin-top:10px">' +
-    '<b>Réserves.</b> Mesuré sur deux ans en exécution 1 heure : 147 trades, ' +
-    '37,4 % de réussite, marge +20 % ; en exigeant la divergence SMT, 82 trades, ' +
-    '41,5 %, marge +22,7 % et un creux maximal de 768 ' + dev.trim() + '. ' +
+    '<b>Réserves.</b> Mesuré sur ' + M.duree + ' en exécution 1 heure : ' +
+    M.sansFiltre.trades + ' trades, ' + M.sansFiltre.reussite.toFixed(1).replace('.', ',') +
+    ' % de réussite, marge ' + pc1(M.sansFiltre.marge) + ' ; en exigeant la divergence SMT, ' +
+    M.smtExigee.trades + ' trades, ' + M.smtExigee.reussite.toFixed(1).replace('.', ',') +
+    ' %, marge ' + pc1(M.smtExigee.marge) + ' et un creux maximal de ' + M.smtExigee.creux + dev.trim() +
+    ' pour ' + MESURES.toleranceCompte + dev.trim() + ' de tolérance. ' +
     'L’exécution réelle en 5 minutes n’a été mesurée que sur 60 jours. ' +
-    'Aucun ordre n’est passé : ce panneau signale, il n’exécute pas.</div>';
+    'Aucun ordre n’est passé : ce panneau signale, il n’exécute pas. ' +
+    '<i>Mesures du ' + MESURES.date + '.</i></div>';
 
   box.innerHTML = out;
 }
@@ -1389,6 +1397,10 @@ function paintAmd(){
    décoratif se lit comme une donnée. On met donc ce qu'on sait vraiment :
    le prix, la fenêtre, le niveau le plus proche, l'âge du relevé. */
 function paintHero(){
+  // Les trois faits du hero viennent de MESURES : « 157 vérifications » y
+  // était écrit en dur, et en annonçait 157 quand il y en avait 166.
+  const v = $('#h-verif'); if(v) v.textContent = MESURES.verifications;
+  const u = $('#h-duree'); if(u) u.textContent = MESURES.amd.duree;
   const h = $('#h-clock');
   if(h){
     const d = new Date().toLocaleTimeString('fr-FR', { timeZone:'Europe/Paris', hour12:false });
@@ -1408,7 +1420,7 @@ function paintHero(){
 
   g.innerHTML =
     cel(D.prix != null ? fmt(D.prix) : '—', 'Nasdaq 100', 'future NQ') +
-    cel(D.hors ? 'Fermée' : 'Ouverte', 'Fenêtre', '08 h → 10 h NY') +
+    cel(D.hors ? 'Fermée' : 'Ouverte', 'Fenêtre', fenAMD() + ' NY') +
     cel(best ? best.distance.toFixed(1) + ' pts' : '—', 'Plus proche',
         best ? best.type + ' ' + best.tf : 'aucun niveau du bon côté') +
     cel(age != null ? (age < 90 ? age + ' min' : Math.round(age/60) + ' h') : '—', 'Relevé',
@@ -1437,13 +1449,49 @@ function paintMarquee(){
    sur quoi ils portent, parce qu'une marge sans son échantillon ne veut rien
    dire. Cliquer fait DÉFILER jusqu'au panneau : ça n'active rien, les trois
    stratégies tournent en permanence et gardent des bilans séparés. */
+/* ── LES CHIFFRES MESURÉS, EN UN SEUL ENDROIT ET DATÉS ────────────────────
+   TROIS FOIS AUJOURD'HUI le même défaut : une valeur écrite à deux endroits
+   finit par diverger, et rien ne le signale. La fenêtre de surveillance du
+   robot portait encore « 13 h 15 » quand le modèle ouvrait à 08 h ; le
+   contrôle censé l'interdire écrivait la même chose en dur ; et cette page
+   annonçait « 157 vérifications » quand il y en avait 166.
+
+   Les RÉGLAGES se lisent donc toujours dans les modules (AMD.CFG, Modele.CFG)
+   et ne sont jamais recopiés. Les MESURES, elles, ne peuvent pas être
+   recalculées dans un navigateur : le backtest ne tourne pas ici. Elles
+   vivent donc dans cet objet unique, AVEC LA DATE à laquelle elles ont été
+   établies — un chiffre daté qui vieillit se voit ; un chiffre nu, non.
+
+   `verifications` est contrôlé par scripts/test.js, qui compare ce nombre à
+   celui de ses propres contrôles : s'il dérive, la suite échoue. */
+const MESURES = {
+  date: '2026-10-05',
+  verifications: 167,
+  // AMD, deux ans, NQ et ES, exécution 1 heure
+  amd: { sansFiltre: { trades: 147, reussite: 37.4, marge: 20.0, creux: 1286 },
+         smtExigee:  { trades:  82, reussite: 41.5, marge: 22.7, creux:  768 },
+         duree: 'deux ans', partBalayages: 64 },
+  // le modèle en place, soixante jours, quatre marchés
+  modele: { trades: 168, marge: 6.1, duree: '60 jours' },
+  kintt:  { trades: 0, marge: null, duree: '60 jours' },
+  // la tolérance de perte du compte visé, qui sert à juger un creux
+  toleranceCompte: 1850
+};
+/* Les heures viennent des modules, jamais d'un littéral. */
+const hNY = m => Math.floor(m / 60) + ' h';
+const fenAMD = () => window.AMD ? hNY(AMD.CFG.manipDeb) + ' → ' + hNY(AMD.CFG.manipFin) : '—';
+const fenKintt = () => window.Kintt ? hNY(Kintt.CFG.deb) + ' → ' + hNY(Kintt.CFG.fin) : '—';
+const fenModele = () => window.Modele ? hNY(Modele.CFG.ghDeb) + ' → ' + hNY(Modele.CFG.ghFin) : '—';
+
 const CARTES = [
-  { cle:'mech',  nom:'Modèle',  pan:'pan-chain', horizon:'Intraday · 5 min', risque:3,
-    marge:6.1,  trades:168, duree:'60 jours', note:'Biais 4 unités, DOL, niveau clé, IFVG.' },
-  { cle:'kintt', nom:'KINTT',   pan:'pan-kintt', horizon:'Intraday · 10 h → 12 h', risque:2,
-    marge:null, trades:0,   duree:'60 jours', note:'Le plan source appliqué à la lettre.' },
-  { cle:'amd',   nom:'AMD',     pan:'pan-amd',   horizon:'Intraday · 8 h → 10 h', risque:4,
-    marge:22.7, trades:82,  duree:'2 ans', note:'Manipulation puis distribution, divergence SMT.' }
+  { cle:'mech',  nom:'Modèle', pan:'pan-chain', risque:3, m:() => MESURES.modele,
+    fen:fenModele, note:'Biais 4 unités, DOL, niveau clé, IFVG.' },
+  { cle:'kintt', nom:'KINTT',  pan:'pan-kintt', risque:2, m:() => MESURES.kintt,
+    fen:fenKintt,  note:'Le plan source appliqué à la lettre.' },
+  { cle:'amd',   nom:'AMD',    pan:'pan-amd',   risque:4,
+    m:() => ({ trades:MESURES.amd.smtExigee.trades, marge:MESURES.amd.smtExigee.marge,
+               duree:MESURES.amd.duree }),
+    fen:fenAMD,    note:'Manipulation puis distribution, divergence SMT.' }
 ];
 function paintCartes(){
   const box = $('#cartes'); if(!box) return;
@@ -1451,18 +1499,19 @@ function paintCartes(){
   box.innerHTML = CARTES.filter(c => vis[c.cle] !== false).map(c => {
     const seg = Array.from({length:5}, (_, i) =>
       '<s class="' + (i < c.risque ? 'f ' + (c.risque >= 4 ? 'hi' : c.risque === 3 ? '' : 'lo') : '') + '"></s>').join('');
-    const marge = c.marge == null ? '—'
-      : (c.marge >= 0 ? '+' : '−') + Math.abs(c.marge).toFixed(1).replace('.', ',') + ' %';
-    const cls = c.marge == null ? '' : c.marge > 0 ? 'pos' : 'neg';
+    const m = c.m();
+    const marge = m.marge == null ? '—'
+      : (m.marge >= 0 ? '+' : '−') + Math.abs(m.marge).toFixed(1).replace('.', ',') + ' %';
+    const cls = m.marge == null ? '' : m.marge > 0 ? 'pos' : 'neg';
     return '<button class="carte" data-pan="' + c.pan + '" type="button">' +
       '<div class="carte-n">' + c.nom + '</div>' +
-      '<div class="carte-h">' + c.horizon + '</div>' +
+      '<div class="carte-h">Intraday · ' + c.fen() + ' NY</div>' +
       '<div class="carte-g">' +
         '<div><b class="' + cls + '">' + marge + '</b><i>Marge</i></div>' +
-        '<div><b>' + (c.trades || '0') + '</b><i>Trades</i></div>' +
+        '<div><b>' + (m.trades || '0') + '</b><i>Trades</i></div>' +
       '</div>' +
       '<div class="risq">' + seg + '</div>' +
-      '<div class="risq-l">Risque ' + c.risque + '/5 · mesuré sur ' + c.duree + '</div>' +
+      '<div class="risq-l">Risque ' + c.risque + '/5 · mesuré sur ' + m.duree + '</div>' +
       '</button>';
   }).join('');
   box.querySelectorAll('.carte').forEach(b => b.addEventListener('click', () => {
