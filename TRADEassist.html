@@ -697,7 +697,7 @@ button,input,select{font:inherit;color:inherit}
   et <b>KINTT</b> — le plan source appliqué à la lettre, fenêtre <span id="f-kfen">—</span>
   à New York, objectif sur une zone. Leurs journaux et leurs bilans sont séparés ;
   aucune moyenne n’est faite entre les deux.
-  <br><b>Dernière mise à jour du site : 05/10/2026 à 21 h 31 UTC.</b>
+  <br><b>Dernière mise à jour du site : 06/10/2026 à 17 h 40 UTC.</b>
   Si cette date ne correspond pas à ce qui t’a été annoncé, la page vient du cache :
   tire-la vers le bas pour la recharger.
   <b>Comptage prudent :</b> quand une bougie de 5 minutes touche l’objectif et le stop, c’est le
@@ -3209,7 +3209,30 @@ if (typeof window !== 'undefined') window.CFD = CFD;
     tp1: 0.4, tp2: 2.5, part: 0,
     sortieMin: 16 * 60,
     maxJour: 2,
-    slMin: 0.3                // stop minimum, en fraction d'ATR
+    slMin: 0.3,               // stop minimum, en fraction d'ATR
+
+    // ── LES FRAIS NE DOIVENT PAS DÉVORER LE RISQUE ───────────── [MESURÉ]
+    // Le 6 octobre, le modèle a pris une vente sur le Russell avec un stop de
+    // 2,3 POINTS. L'aller-retour — un quart de point de dérapage par côté plus
+    // la commission — a coûté 30 % de ce risque. Le trade était perdant à
+    // l'instant où il était passé : il lui fallait un taux de réussite
+    // extraordinaire juste pour rentrer dans ses frais.
+    //
+    // Ce n'est pas un défaut de marché, c'est de l'arithmétique. Mesuré sur
+    // 232 trades, quatre marchés :
+    //
+    //     frais ≤  6 % du risque   151 trades   +17 207 €
+    //     frais 10 – 20 %           25 trades    −1 744 €
+    //     frais > 20 %              31 trades    −2 090 €
+    //
+    // Les stops serrés ne perdent pas par malchance : ils perdent en moyenne.
+    //
+    // 10 % est retenu plutôt que l'optimum mesuré (8 %) : de 3 % à 15 % la
+    // marge reste entre +13 et +17 %, c'est un plateau et non un pic, donc le
+    // seuil exact importe peu. Autant prendre un nombre rond et défendable —
+    // les frais ne mangent pas plus d'un dixième du risque — que la pointe
+    // d'une courbe, qui serait un réglage ajusté après coup.
+    coutMax: 0.10
   };
 
   // ── outils de temps, identiques au modèle en place ─────────────────────
@@ -3535,6 +3558,13 @@ if (typeof window !== 'undefined') window.CFD = CFD;
       var risq = Math.abs(entree - sl);
       if (risq < CFG.slMin * a) risq = CFG.slMin * a;
       if (!(risq > 0)) continue;
+
+      // Un stop si serré que l'aller-retour en mange plus d'un dixième : on
+      // ne le prend pas. Le calcul du coût vit dans js/position.js et n'est
+      // pas recopié ici — une formule à deux endroits finit par diverger.
+      if (CFG.coutMax != null && root.Position && root.Position.cout &&
+          root.Position.cout(risq) > CFG.coutMax) continue;
+
       sl = L ? entree - risq : entree + risq;
       // L'objectif est la liquidité interne, bornée par le multiple de risque.
       var parR = L ? entree + risq * CFG.tp2 : entree - risq * CFG.tp2;
@@ -5014,8 +5044,8 @@ function paintMarquee(){
    `verifications` est contrôlé par scripts/test.js, qui compare ce nombre à
    celui de ses propres contrôles : s'il dérive, la suite échoue. */
 const MESURES = {
-  date: '2026-10-05',
-  verifications: 167,
+  date: '2026-10-06',
+  verifications: 170,
   // AMD, deux ans, NQ et ES, exécution 1 heure
   amd: { sansFiltre: { trades: 147, reussite: 37.4, marge: 20.0, creux: 1286 },
          smtExigee:  { trades:  82, reussite: 41.5, marge: 22.7, creux:  768 },

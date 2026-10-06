@@ -111,7 +111,30 @@
     tp1: 0.4, tp2: 2.5, part: 0,
     sortieMin: 16 * 60,
     maxJour: 2,
-    slMin: 0.3                // stop minimum, en fraction d'ATR
+    slMin: 0.3,               // stop minimum, en fraction d'ATR
+
+    // ── LES FRAIS NE DOIVENT PAS DÉVORER LE RISQUE ───────────── [MESURÉ]
+    // Le 6 octobre, le modèle a pris une vente sur le Russell avec un stop de
+    // 2,3 POINTS. L'aller-retour — un quart de point de dérapage par côté plus
+    // la commission — a coûté 30 % de ce risque. Le trade était perdant à
+    // l'instant où il était passé : il lui fallait un taux de réussite
+    // extraordinaire juste pour rentrer dans ses frais.
+    //
+    // Ce n'est pas un défaut de marché, c'est de l'arithmétique. Mesuré sur
+    // 232 trades, quatre marchés :
+    //
+    //     frais ≤  6 % du risque   151 trades   +17 207 €
+    //     frais 10 – 20 %           25 trades    −1 744 €
+    //     frais > 20 %              31 trades    −2 090 €
+    //
+    // Les stops serrés ne perdent pas par malchance : ils perdent en moyenne.
+    //
+    // 10 % est retenu plutôt que l'optimum mesuré (8 %) : de 3 % à 15 % la
+    // marge reste entre +13 et +17 %, c'est un plateau et non un pic, donc le
+    // seuil exact importe peu. Autant prendre un nombre rond et défendable —
+    // les frais ne mangent pas plus d'un dixième du risque — que la pointe
+    // d'une courbe, qui serait un réglage ajusté après coup.
+    coutMax: 0.10
   };
 
   // ── outils de temps, identiques au modèle en place ─────────────────────
@@ -437,6 +460,13 @@
       var risq = Math.abs(entree - sl);
       if (risq < CFG.slMin * a) risq = CFG.slMin * a;
       if (!(risq > 0)) continue;
+
+      // Un stop si serré que l'aller-retour en mange plus d'un dixième : on
+      // ne le prend pas. Le calcul du coût vit dans js/position.js et n'est
+      // pas recopié ici — une formule à deux endroits finit par diverger.
+      if (CFG.coutMax != null && root.Position && root.Position.cout &&
+          root.Position.cout(risq) > CFG.coutMax) continue;
+
       sl = L ? entree - risq : entree + risq;
       // L'objectif est la liquidité interne, bornée par le multiple de risque.
       var parR = L ? entree + risq * CFG.tp2 : entree - risq * CFG.tp2;

@@ -937,6 +937,36 @@ t('js/position.js est bien le seul à porter la règle', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
+console.log('\n── LES FRAIS NE DÉVORENT PAS LE RISQUE ───────────────────────');
+// Le 6 octobre, AMD a pris une vente avec un stop de 2,3 points : l'aller-
+// retour en a coûté 30 %. Le trade était perdant à l'instant où il était
+// passé. Ce n'est pas de la malchance, c'est de l'arithmétique — et sur
+// 232 trades les stops serrés perdent EN MOYENNE.
+t('AMD refuse les stops que les frais dévorent', () => {
+  if (!AMD) throw new Error('js/amd.js n\'est pas chargé');
+  if (AMD.CFG.coutMax == null) throw new Error('le garde-fou coutMax a disparu');
+  if (!(AMD.CFG.coutMax > 0 && AMD.CFG.coutMax <= 0.2))
+    throw new Error('coutMax ' + AMD.CFG.coutMax + ' : hors de tout bon sens');
+});
+
+t('le calcul du coût n\'est pas recopié dans la stratégie', () => {
+  // Une formule à deux endroits diverge. Celle-ci vit dans js/position.js.
+  const src = fs.readFileSync(path.join(RACINE, 'js/amd.js'), 'utf-8');
+  if (/slip\s*\*\s*2|comm\s*\//.test(src))
+    throw new Error('la formule des frais est recopiée dans js/amd.js');
+  if (!/Position\.cout/.test(src))
+    throw new Error('la stratégie n\'appelle pas Position.cout');
+});
+
+t('un stop serré est bien refusé, un stop large accepté', () => {
+  // On vérifie la RÈGLE, pas seulement sa présence : un seuil qui ne filtre
+  // rien serait un garde-fou décoratif.
+  const serre = Position.cout(2.3), large = Position.cout(60);
+  if (!(serre > AMD.CFG.coutMax)) throw new Error('un stop de 2,3 points passerait encore');
+  if (!(large <= AMD.CFG.coutMax)) throw new Error('un stop de 60 points serait refusé à tort');
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
 console.log('\n── LA FENÊTRE DU ROBOT SUIT CELLE DES STRATÉGIES ─────────────');
 // Le fichier de la tâche planifiée portait « 13 h 15 → 15 h 45 UTC » en dur,
 // ce qui correspondait à 09 h → 10 h New York. Quand AMD a ouvert à 08 h, ce
