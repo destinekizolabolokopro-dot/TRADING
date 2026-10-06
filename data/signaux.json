@@ -281,16 +281,33 @@
    "etapeBloquee": "dol",
    "dit": "Biais haussier, mais plus aucune liquidité intacte dans ce sens.",
    "apresCoup": false
+  },
+  {
+   "ts": "2026-10-06T13:45:24.844Z",
+   "bougie": "2026-10-06T13:35:00.000Z",
+   "jour": "2026-10-06",
+   "heureNY": "09:35",
+   "prix": 31483.5,
+   "retardMin": 10,
+   "biais": "haussier",
+   "score": 4,
+   "dol": null,
+   "niveau": null,
+   "etat": "CHERCHE",
+   "niveauxParUnite": "M5:100 M15:113 M30:99 H1:110 H4:98",
+   "etapeBloquee": "dol",
+   "dit": "Biais haussier, mais plus aucune liquidité intacte dans ce sens.",
+   "apresCoup": false
   }
  ],
  "bilan": {
-  "maj": "2026-10-06T13:25:15.105Z",
+  "maj": "2026-10-06T13:45:24.844Z",
   "total": 2,
   "clos": 2,
   "ouverts": 0,
   "reussite": 100,
   "cumulR": 0.72,
-  "passages": 12
+  "passages": 13
  },
  "archive": [
   {
