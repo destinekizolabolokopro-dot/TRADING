@@ -1,12 +1,12 @@
 {
- "maj": "2026-10-07T20:49:07.702Z",
+ "maj": "2026-10-07T21:24:10.757Z",
  "source": "yahoo",
  "eurusd": 1.1254,
  "confirmePar": "ES=F",
  "sansConfirmation": false,
- "prix": 31384.25,
- "derniereBougie": 1791405300000,
- "retardMin": 14,
+ "prix": 31403.75,
+ "derniereBougie": 1791406500000,
+ "retardMin": 29,
  "hors": true,
  "etat": "CHERCHE",
  "dir": 0,
@@ -63,11 +63,11 @@
   "rr": 2.5,
   "gainSiTout": 0.61,
   "tf": "5m",
-  "niveau": "RB M5",
+  "niveau": "CISD M5",
   "dol": 30957.5,
   "biaisDir": -1,
   "biaisScore": -2,
-  "barre": 13506,
+  "barre": 13491,
   "derniere": false
  },
  "cfg": {
@@ -94,8 +94,8 @@
  },
  "kintt": {
   "hors": true,
-  "prix": 31384.25,
-  "derniereBougie": 1791405300000,
+  "prix": 31403.75,
+  "derniereBougie": 1791406500000,
   "etape": {
    "t": 1791388500000,
    "score": 4,
@@ -113,12 +113,12 @@
   "dernierSignal": {
    "sens": "SHORT",
    "t": 1786980900000,
-   "entree": 30224.5,
+   "entree": 30223.5,
    "sl": 30279.54,
-   "risq": 55.04490000000078,
-   "tp1": 30196.98,
+   "risq": 56.04469999999856,
+   "tp1": 30195.48,
    "tp": 30155.25,
-   "rr": 1.26,
+   "rr": 1.22,
    "niveau": "FVG M30",
    "tf": "5m",
    "fenetre": "étendue",
@@ -126,15 +126,15 @@
    "sweepExt": 30273.5,
    "biaisDir": -1,
    "biaisScore": -2,
-   "barre": 3709,
+   "barre": 3710,
    "derniere": false
   },
   "entonnoir": {
    "barres": 1500,
-   "biaisNeutre": 526,
-   "esDesaccord": 400,
+   "biaisNeutre": 534,
+   "esDesaccord": 390,
    "pasDeZone": 344,
-   "avant10h": 54,
+   "avant10h": 56,
    "pasDeBalayage": 141,
    "pasDeConfirmation": 31,
    "stopMauvaisCote": 0,
@@ -175,9 +175,9 @@
    "clos": 1,
    "gagnes": 1,
    "reussite": 100,
-   "euros": 312,
-   "parTrade": 312,
-   "gainMoyen": 312,
+   "euros": 302,
+   "parTrade": 302,
+   "gainMoyen": 302,
    "perteMoyenne": 0,
    "seuil": 0,
    "pireCreux": 0,
@@ -187,7 +187,7 @@
  "amd": {
   "etape": {
    "jour": "2026-10-07",
-   "min": 995,
+   "min": 1015,
    "dir": 1,
    "internes": 19,
    "cible": 31482,
@@ -212,11 +212,11 @@
    "signal": {
     "sens": "LONG",
     "t": 1791381900000,
-    "entree": 31205.25,
+    "entree": 31205,
     "sl": 31168.51505,
-    "tp": 31297.087374999996,
-    "tp1": 31219.94398,
-    "risq": 36.73494999999821,
+    "tp": 31296.212374999996,
+    "tp1": 31219.593979999998,
+    "risq": 36.48494999999821,
     "dol": 31482,
     "smt": true,
     "manip": "veille"
@@ -234,9 +234,9 @@
   "dernier": {
    "sens": "LONG",
    "t": 1791381900000,
-   "entree": 31205.25,
+   "entree": 31205,
    "sl": 31168.51505,
-   "tp": 31297.087374999996,
+   "tp": 31296.212374999996,
    "smt": true
   }
  }
