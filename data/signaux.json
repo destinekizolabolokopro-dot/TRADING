@@ -109,14 +109,15 @@
    "cfgSortieMin": 720,
    "moteur": "bougies-closes",
    "raisonnement": "Biais baissier (2 sur 4). Liquidité visée à 30957.5. Niveau clé RB M5. Le prix l'a touché, puis une inversion 1m a été confirmée par clôture de corps. Entrée 31251.75, stop à 31305.75 — 54 points, soit 4 fois le bord de l'IFVG, pour ne pas être sorti par la respiration du prix. Objectif partiel à 31230.15, soit 22 points (+100 €), sur 90 % de la position — le stop remonte alors au prix d'entrée et la position ne peut plus perdre. Les 10 % restants courent jusqu'à 31116.75, soit 135 points (+625 €). Gain si tout est touché : +153 € · perte si le stop part : -250 €. Solde au marché à 12 h 00 New York si rien n'est touché avant.",
-   "statut": "ouvert",
-   "resultat": null,
-   "r": null,
-   "closTs": null,
-   "part1": false,
+   "statut": "clos",
+   "resultat": "gagné",
+   "r": 0.36,
+   "closTs": "2026-10-07T13:30:00.000Z",
+   "part1": true,
    "suiviUnite": "1m",
    "ambigu": 0,
-   "slCourant": 31305.75
+   "slCourant": 31305.75,
+   "barres": 30
   },
   {
    "ts": "2026-10-07T13:35:10.801Z",
@@ -152,10 +153,10 @@
    "resultat": null,
    "r": null,
    "closTs": null,
-   "part1": false,
+   "part1": true,
    "suiviUnite": "1m",
    "ambigu": 0,
-   "slCourant": 31318.49
+   "slCourant": 31236.5
   }
  ],
  "passages": [
@@ -376,16 +377,33 @@
    "etapeBloquee": "dol",
    "dit": "Biais haussier, mais plus aucune liquidité intacte dans ce sens.",
    "apresCoup": false
+  },
+  {
+   "ts": "2026-10-07T13:55:20.315Z",
+   "bougie": "2026-10-07T13:45:00.000Z",
+   "jour": "2026-10-07",
+   "heureNY": "09:45",
+   "prix": 31194.25,
+   "retardMin": 10,
+   "biais": "baissier",
+   "score": -2,
+   "dol": 30957.5,
+   "niveau": "CISD M5",
+   "etat": "CHERCHE",
+   "niveauxParUnite": "M5:105 M15:51 M30:23 H1:13 H4:2",
+   "etapeBloquee": "stop",
+   "dit": "Inversion 5m confirmée sur CISD M5 (31265.25 – 31275.25), mais le stop était trop serré face à l'ATR.",
+   "apresCoup": false
   }
  ],
  "bilan": {
-  "maj": "2026-10-07T13:35:10.801Z",
+  "maj": "2026-10-07T13:55:20.315Z",
   "total": 4,
-  "clos": 2,
-  "ouverts": 2,
+  "clos": 3,
+  "ouverts": 1,
   "reussite": 100,
-  "cumulR": 0.72,
-  "passages": 13
+  "cumulR": 1.08,
+  "passages": 14
  },
  "archive": [
   {
