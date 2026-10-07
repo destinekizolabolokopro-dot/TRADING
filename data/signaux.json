@@ -149,14 +149,15 @@
    "cfgSortieMin": 720,
    "moteur": "bougies-closes",
    "raisonnement": "Biais baissier (2 sur 4). Liquidité visée à 30957.5. Niveau clé CISD M5. Le prix l'a touché, puis une inversion 5m a été confirmée par clôture de corps. Entrée 31236.5, stop à 31318.49 — 82 points, soit 4 fois le bord de l'IFVG, pour ne pas être sorti par la respiration du prix. Objectif partiel à 31203.7, soit 33 points (+100 €), sur 90 % de la position — le stop remonte alors au prix d'entrée et la position ne peut plus perdre. Les 10 % restants courent jusqu'à 31031.53, soit 205 points (+625 €). Gain si tout est touché : +153 € · perte si le stop part : -250 €. Solde au marché à 12 h 00 New York si rien n'est touché avant.",
-   "statut": "ouvert",
-   "resultat": null,
-   "r": null,
-   "closTs": null,
+   "statut": "clos",
+   "resultat": "gagné",
+   "r": 0.36,
+   "closTs": "2026-10-07T13:58:00.000Z",
    "part1": true,
    "suiviUnite": "1m",
    "ambigu": 0,
-   "slCourant": 31236.5
+   "slCourant": 31236.5,
+   "barres": 38
   }
  ],
  "passages": [
@@ -397,12 +398,12 @@
   }
  ],
  "bilan": {
-  "maj": "2026-10-07T13:55:20.315Z",
+  "maj": "2026-10-07T14:15:29.372Z",
   "total": 4,
-  "clos": 3,
-  "ouverts": 1,
+  "clos": 4,
+  "ouverts": 0,
   "reussite": 100,
-  "cumulR": 1.08,
+  "cumulR": 1.44,
   "passages": 14
  },
  "archive": [
