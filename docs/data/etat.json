@@ -1,12 +1,12 @@
 {
- "maj": "2026-10-08T16:45:00.741Z",
+ "maj": "2026-10-08T16:51:59.900Z",
  "source": "yahoo",
- "eurusd": 1.1197,
+ "eurusd": 1.1198,
  "confirmePar": "ES=F",
  "sansConfirmation": false,
- "prix": 31242.25,
- "derniereBougie": 1791477000000,
- "retardMin": 15,
+ "prix": 31236.5,
+ "derniereBougie": 1791477600000,
+ "retardMin": 12,
  "hors": true,
  "etat": "ATTEND_IFVG",
  "dir": 0,
@@ -63,11 +63,11 @@
   "rr": 2.5,
   "gainSiTout": 0.61,
   "tf": "5m",
-  "niveau": "RB M5",
+  "niveau": "CISD M5",
   "dol": 30957.5,
   "biaisDir": -1,
   "biaisScore": -2,
-  "barre": 13231,
+  "barre": 13216,
   "derniere": false
  },
  "cfg": {
@@ -94,8 +94,8 @@
  },
  "kintt": {
   "hors": true,
-  "prix": 31242.25,
-  "derniereBougie": 1791477000000,
+  "prix": 31236.5,
+  "derniereBougie": 1791477600000,
   "etape": {
    "t": 1791474900000,
    "score": 0,
@@ -108,12 +108,12 @@
   "dernierSignal": {
    "sens": "SHORT",
    "t": 1786980900000,
-   "entree": 30224.5,
+   "entree": 30223.5,
    "sl": 30279.54,
-   "risq": 55.04490000000078,
-   "tp1": 30196.98,
+   "risq": 56.04469999999856,
+   "tp1": 30195.48,
    "tp": 30155.25,
-   "rr": 1.26,
+   "rr": 1.22,
    "niveau": "FVG M30",
    "tf": "5m",
    "fenetre": "étendue",
@@ -121,15 +121,15 @@
    "sweepExt": 30273.5,
    "biaisDir": -1,
    "biaisScore": -2,
-   "barre": 3434,
+   "barre": 3435,
    "derniere": false
   },
   "entonnoir": {
    "barres": 1500,
-   "biaisNeutre": 547,
-   "esDesaccord": 403,
+   "biaisNeutre": 555,
+   "esDesaccord": 393,
    "pasDeZone": 320,
-   "avant10h": 52,
+   "avant10h": 54,
    "pasDeBalayage": 143,
    "pasDeConfirmation": 31,
    "stopMauvaisCote": 0,
@@ -170,9 +170,9 @@
    "clos": 1,
    "gagnes": 1,
    "reussite": 100,
-   "euros": 312,
-   "parTrade": 312,
-   "gainMoyen": 312,
+   "euros": 302,
+   "parTrade": 302,
+   "gainMoyen": 302,
    "perteMoyenne": 0,
    "seuil": 0,
    "pireCreux": 0,
@@ -182,7 +182,7 @@
  "amd": {
   "etape": {
    "jour": "2026-10-08",
-   "min": 750,
+   "min": 760,
    "dir": 0,
    "internes": 0,
    "cible": null,
@@ -204,9 +204,9 @@
   "dernier": {
    "sens": "LONG",
    "t": 1791381900000,
-   "entree": 31205.25,
+   "entree": 31205,
    "sl": 31168.51505,
-   "tp": 31297.087374999996,
+   "tp": 31296.212374999996,
    "smt": true
   }
  }
