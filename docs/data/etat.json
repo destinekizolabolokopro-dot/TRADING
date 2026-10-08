@@ -1,12 +1,12 @@
 {
- "maj": "2026-10-08T16:42:32.594Z",
+ "maj": "2026-10-08T16:45:00.741Z",
  "source": "yahoo",
  "eurusd": 1.1197,
  "confirmePar": "ES=F",
  "sansConfirmation": false,
- "prix": 31247.5,
+ "prix": 31242.25,
  "derniereBougie": 1791477000000,
- "retardMin": 13,
+ "retardMin": 15,
  "hors": true,
  "etat": "ATTEND_IFVG",
  "dir": 0,
@@ -94,7 +94,7 @@
  },
  "kintt": {
   "hors": true,
-  "prix": 31247.5,
+  "prix": 31242.25,
   "derniereBougie": 1791477000000,
   "etape": {
    "t": 1791474900000,
