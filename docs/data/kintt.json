@@ -30,16 +30,23 @@
    "prix": 31235.5,
    "etapeBloquee": "zone",
    "dit": "Biais haussier, mais aucune zone intacte (M15 → H4) où le prix soit venu."
+  },
+  {
+   "ts": "2026-10-08T13:40:34.336Z",
+   "jour": "2026-10-08",
+   "prix": 31213.5,
+   "etapeBloquee": "biais",
+   "dit": "Biais neutre (score 0 sur 4, il en faut 2) — le plan interdit d'entrer."
   }
  ],
  "bilan": {
-  "maj": "2026-10-07T13:35:10.801Z",
+  "maj": "2026-10-08T13:40:34.336Z",
   "total": 0,
   "clos": 0,
   "ouverts": 0,
   "reussite": null,
   "cumulR": 0,
   "euros": 0,
-  "passages": 4
+  "passages": 5
  }
 }
