@@ -1,11 +1,11 @@
 {
- "maj": "2026-10-08T16:02:06.355Z",
+ "maj": "2026-10-08T16:22:19.734Z",
  "source": "yahoo",
- "eurusd": 1.1192,
+ "eurusd": 1.1194,
  "confirmePar": "ES=F",
  "sansConfirmation": false,
  "prix": 31204,
- "derniereBougie": 1791474600000,
+ "derniereBougie": 1791475800000,
  "retardMin": 12,
  "hors": true,
  "etat": "ATTEND_IFVG",
@@ -93,11 +93,11 @@
   "sortieMin": 720
  },
  "kintt": {
-  "hors": false,
+  "hors": true,
   "prix": 31204,
-  "derniereBougie": 1791474600000,
+  "derniereBougie": 1791475800000,
   "etape": {
-   "t": 1791474600000,
+   "t": 1791474900000,
    "score": 0,
    "dir": 0,
    "conf": null,
@@ -125,8 +125,8 @@
    "derniere": false
   },
   "entonnoir": {
-   "barres": 1499,
-   "biaisNeutre": 546,
+   "barres": 1500,
+   "biaisNeutre": 547,
    "esDesaccord": 403,
    "pasDeZone": 320,
    "avant10h": 52,
@@ -182,7 +182,7 @@
  "amd": {
   "etape": {
    "jour": "2026-10-08",
-   "min": 710,
+   "min": 730,
    "dir": 0,
    "internes": 0,
    "cible": null,
