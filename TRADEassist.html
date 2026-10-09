@@ -697,7 +697,7 @@ button,input,select{font:inherit;color:inherit}
   et <b>KINTT</b> — le plan source appliqué à la lettre, fenêtre <span id="f-kfen">—</span>
   à New York, objectif sur une zone. Leurs journaux et leurs bilans sont séparés ;
   aucune moyenne n’est faite entre les deux.
-  <br><b>Dernière mise à jour du site : 06/10/2026 à 17 h 40 UTC.</b>
+  <br><b>Dernière mise à jour du site : 09/10/2026 à 05 h 19 UTC.</b>
   Si cette date ne correspond pas à ce qui t’a été annoncé, la page vient du cache :
   tire-la vers le bas pour la recharger.
   <b>Comptage prudent :</b> quand une bougie de 5 minutes touche l’objectif et le stop, c’est le
@@ -2083,7 +2083,25 @@ if (typeof window !== 'undefined') window.CFD = CFD;
       } else if (!part1 && (L ? c.h >= pos.tp1 : c.l <= pos.tp1)) {
         part1 = true; sl = pos.entree;                // partiel encaissé
       } else if (part1 && (L ? c.h >= pos.tp : c.l <= pos.tp)) {
-        r = plafond; sortie = 'objectif';
+        // ⚠️ ON CRÉDITAIT LE PLAFOND, PAS LA DISTANCE PARCOURUE.
+        //
+        // Pour le modèle en place, `pos.tp` vaut exactement entrée ± risq×tp2
+        // et les deux coïncident : le défaut ne se voyait pas. Mais AMD place
+        // son objectif sur la LIQUIDITÉ INTERNE, bornée par le plafond —
+        // souvent bien plus près. Atteindre un niveau situé à 0,5 R rapportait
+        // donc 2,5 R. Le même trade payé cinq fois trop.
+        //
+        // La signature était visible et je l'ai d'abord prise pour une bonne
+        // nouvelle : en montant le plafond de 2 R à 6 R, le total quadruplait
+        // SANS que le taux de réussite bouge d'un dixième. C'était impossible :
+        // si les gains venaient vraiment de plus loin, il faudrait aller les
+        // chercher plus souvent en vain.
+        //
+        // On crédite maintenant ce que le prix a réellement parcouru jusqu'à
+        // l'objectif. Le plafond reste une BORNE, il n'est plus un montant.
+        var rTp = pos.risq > 0 ? Math.abs(pos.tp - pos.entree) / pos.risq : cfg.tp2;
+        r = cfg.part * cfg.tp1 + (1 - cfg.part) * Math.min(cfg.tp2, rTp);
+        sortie = 'objectif';
       } else if (opts.prudent === false && stoppe) {
         r = part1 ? cfg.part * cfg.tp1 : -1;
         sortie = part1 ? 'seuil' : 'stop';
@@ -5044,16 +5062,21 @@ function paintMarquee(){
    `verifications` est contrôlé par scripts/test.js, qui compare ce nombre à
    celui de ses propres contrôles : s'il dérive, la suite échoue. */
 const MESURES = {
-  date: '2026-10-06',
-  verifications: 170,
-  // AMD, deux ans, NQ et ES, exécution 1 heure
-  amd: { sansFiltre: { trades: 147, reussite: 37.4, marge: 20.0, creux: 1286 },
-         smtExigee:  { trades:  82, reussite: 41.5, marge: 22.7, creux:  768 },
+  date: '2026-10-09',
+  verifications: 173,
+  // ⚠️ CES CHIFFRES ONT ÉTÉ DIVISÉS PAR CINQ LE 9 OCTOBRE, et ce n'est pas un
+  // changement de marché : c'est la correction d'un défaut. Atteindre
+  // l'objectif créditait le PLAFOND tp2 au lieu de la distance réellement
+  // parcourue. AMD visant la liquidité interne, souvent bien plus proche que
+  // le plafond, chaque gagnant était payé jusqu'à cinq fois trop.
+  //   avant la correction : +13 036 €, marge +22,7 %, 7 trimestres sur 8
+  //   après               :    −985 €, marge  −4,2 %, 3 trimestres sur 8
+  // AMD ne gagne pas d'argent. Le dire est le minimum.
+  amd: { sansFiltre: { trades: 147, reussite: 36.7, marge: -5.8, creux: 3016 },
+         smtExigee:  { trades:  82, reussite: 41.5, marge: -4.2, creux: 1695 },
          duree: 'deux ans', partBalayages: 64 },
-  // le modèle en place, soixante jours, quatre marchés
-  modele: { trades: 168, marge: 6.1, duree: '60 jours' },
+  modele: { trades: 131, marge: -3.1, duree: '60 jours' },
   kintt:  { trades: 0, marge: null, duree: '60 jours' },
-  // la tolérance de perte du compte visé, qui sert à juger un creux
   toleranceCompte: 1850
 };
 /* Les heures viennent des modules, jamais d'un littéral. */

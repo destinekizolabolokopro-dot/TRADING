@@ -937,6 +937,54 @@ t('js/position.js est bien le seul à porter la règle', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
+console.log('\n── UN GAIN VAUT CE QUE LE PRIX A PARCOURU ────────────────────');
+// LE PIRE DÉFAUT DE TOUTE LA SÉRIE. Atteindre l'objectif créditait le PLAFOND
+// `tp2`, pas la distance réellement parcourue. Pour le modèle en place
+// l'objectif EST le plafond, les deux coïncidaient et rien ne se voyait. Mais
+// AMD vise la liquidité interne, bornée par le plafond et souvent bien plus
+// proche : un niveau situé à 0,5 R rapportait 2,5 R. Cinq fois trop, sur
+// chaque gagnant, pendant toute la durée de vie de la stratégie.
+t('un objectif proche rapporte sa distance, pas le plafond', () => {
+  const cfg = { part: 0, tp1: 1, tp2: 2.5, sortieMin: null };
+  // Entrée 100, stop 99 (risque 1), objectif à 100,5 — soit 0,5 R, bien en
+  // deçà du plafond de 2,5 R.
+  const pos = { sens: 'LONG', entree: 100, sl: 99, risq: 1, tp1: 100.4, tp: 100.5 };
+  const b = [{ t: 1, o: 100, h: 100.45, l: 100, c: 100.4 },
+             { t: 2, o: 100.4, h: 100.6, l: 100.4, c: 100.6 }];
+  const f = Position.suivre(pos, b, cfg, { prudent: true, depuis: 0 });
+  if (!f || f.ouverte) throw new Error('la position ne se clôt pas');
+  if (f.sortie !== 'objectif') throw new Error('sortie « ' + f.sortie +' » au lieu de l\'objectif');
+  if (Math.abs(f.r - 0.5) > 1e-6)
+    throw new Error('crédité ' + f.r.toFixed(3) + ' R pour un parcours de 0,5 R');
+});
+
+t('un objectif au plafond rapporte bien le plafond', () => {
+  // Le miroir : la correction ne doit pas amputer le cas normal, celui du
+  // modèle en place, où l'objectif vaut exactement entrée + risq × tp2.
+  const cfg = { part: 0, tp1: 1, tp2: 2.5, sortieMin: null };
+  const pos = { sens: 'LONG', entree: 100, sl: 99, risq: 1, tp1: 100.4, tp: 102.5 };
+  const b = [{ t: 1, o: 100, h: 100.5, l: 100, c: 100.5 },
+             { t: 2, o: 100.5, h: 102.6, l: 100.5, c: 102.6 }];
+  const f = Position.suivre(pos, b, cfg, { prudent: true, depuis: 0 });
+  if (!f || f.ouverte) throw new Error('la position ne se clôt pas');
+  if (Math.abs(f.r - 2.5) > 1e-6) throw new Error('crédité ' + f.r.toFixed(3) + ' R au lieu de 2,5');
+});
+
+t('un gain ne dépasse jamais la distance jusqu\'à l\'objectif', () => {
+  // Le contrôle général : sur TOUS les signaux d'AMD, le gain crédité ne peut
+  // pas excéder ce que le prix aurait parcouru jusqu'à l'objectif.
+  const cfg = { part: 0, tp1: 0.4, tp2: 2.5, sortieMin: null };
+  for (const d of [0.3, 0.8, 1.6, 2.5]) {
+    const pos = { sens: 'SHORT', entree: 100, sl: 101, risq: 1, tp1: 99.6, tp: 100 - d };
+    const b = [{ t: 1, o: 100, h: 100, l: 99.5, c: 99.5 },
+               { t: 2, o: 99.5, h: 99.5, l: 100 - d - 0.1, c: 100 - d - 0.1 }];
+    const f = Position.suivre(pos, b, cfg, { prudent: true, depuis: 0 });
+    if (f && !f.ouverte && f.r > d + 1e-6)
+      throw new Error('objectif à ' + d + ' R crédité ' + f.r.toFixed(3) + ' R');
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
 console.log('\n── LES FRAIS NE DÉVORENT PAS LE RISQUE ───────────────────────');
 // Le 6 octobre, AMD a pris une vente avec un stop de 2,3 points : l'aller-
 // retour en a coûté 30 %. Le trade était perdant à l'instant où il était

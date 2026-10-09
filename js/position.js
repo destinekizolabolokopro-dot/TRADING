@@ -102,7 +102,25 @@
       } else if (!part1 && (L ? c.h >= pos.tp1 : c.l <= pos.tp1)) {
         part1 = true; sl = pos.entree;                // partiel encaissé
       } else if (part1 && (L ? c.h >= pos.tp : c.l <= pos.tp)) {
-        r = plafond; sortie = 'objectif';
+        // ⚠️ ON CRÉDITAIT LE PLAFOND, PAS LA DISTANCE PARCOURUE.
+        //
+        // Pour le modèle en place, `pos.tp` vaut exactement entrée ± risq×tp2
+        // et les deux coïncident : le défaut ne se voyait pas. Mais AMD place
+        // son objectif sur la LIQUIDITÉ INTERNE, bornée par le plafond —
+        // souvent bien plus près. Atteindre un niveau situé à 0,5 R rapportait
+        // donc 2,5 R. Le même trade payé cinq fois trop.
+        //
+        // La signature était visible et je l'ai d'abord prise pour une bonne
+        // nouvelle : en montant le plafond de 2 R à 6 R, le total quadruplait
+        // SANS que le taux de réussite bouge d'un dixième. C'était impossible :
+        // si les gains venaient vraiment de plus loin, il faudrait aller les
+        // chercher plus souvent en vain.
+        //
+        // On crédite maintenant ce que le prix a réellement parcouru jusqu'à
+        // l'objectif. Le plafond reste une BORNE, il n'est plus un montant.
+        var rTp = pos.risq > 0 ? Math.abs(pos.tp - pos.entree) / pos.risq : cfg.tp2;
+        r = cfg.part * cfg.tp1 + (1 - cfg.part) * Math.min(cfg.tp2, rTp);
+        sortie = 'objectif';
       } else if (opts.prudent === false && stoppe) {
         r = part1 ? cfg.part * cfg.tp1 : -1;
         sortie = part1 ? 'seuil' : 'stop';
