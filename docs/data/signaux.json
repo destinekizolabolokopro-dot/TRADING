@@ -412,16 +412,33 @@
    "etapeBloquee": "biais",
    "dit": "Biais neutre (score 0/4, il en faut 2) — aucune position possible.",
    "apresCoup": false
+  },
+  {
+   "ts": "2026-10-09T13:26:26.088Z",
+   "bougie": "2026-10-09T13:15:00.000Z",
+   "jour": "2026-10-09",
+   "heureNY": "09:15",
+   "prix": 31215.25,
+   "retardMin": 12,
+   "biais": "haussier",
+   "score": 2,
+   "dol": 31369.75,
+   "niveau": "ITL M5",
+   "etat": "ATTEND_IFVG",
+   "niveauxParUnite": "M5:64 M15:39 M30:82 H1:96 H4:93",
+   "etapeBloquee": "stop",
+   "dit": "Inversion 5m confirmée sur ITL M5 (31165.25 – 31201), mais le stop était trop serré face à l'ATR.",
+   "apresCoup": false
   }
  ],
  "bilan": {
-  "maj": "2026-10-08T13:40:34.336Z",
+  "maj": "2026-10-09T13:26:26.088Z",
   "total": 4,
   "clos": 4,
   "ouverts": 0,
   "reussite": 100,
   "cumulR": 1.44,
-  "passages": 15
+  "passages": 16
  },
  "archive": [
   {

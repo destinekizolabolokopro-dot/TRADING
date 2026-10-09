@@ -37,16 +37,23 @@
    "prix": 31213.5,
    "etapeBloquee": "biais",
    "dit": "Biais neutre (score 0 sur 4, il en faut 2) — le plan interdit d'entrer."
+  },
+  {
+   "ts": "2026-10-09T13:26:26.088Z",
+   "jour": "2026-10-09",
+   "prix": 31215.25,
+   "etapeBloquee": "biais",
+   "dit": "Biais neutre (score 0 sur 4, il en faut 2) — le plan interdit d'entrer."
   }
  ],
  "bilan": {
-  "maj": "2026-10-08T13:40:34.336Z",
+  "maj": "2026-10-09T13:26:26.088Z",
   "total": 0,
   "clos": 0,
   "ouverts": 0,
   "reussite": null,
   "cumulR": 0,
   "euros": 0,
-  "passages": 5
+  "passages": 6
  }
 }
