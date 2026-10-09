@@ -429,16 +429,33 @@
    "etapeBloquee": "stop",
    "dit": "Inversion 5m confirmée sur ITL M5 (31165.25 – 31201), mais le stop était trop serré face à l'ATR.",
    "apresCoup": false
+  },
+  {
+   "ts": "2026-10-09T13:46:38.435Z",
+   "bougie": "2026-10-09T13:35:00.000Z",
+   "jour": "2026-10-09",
+   "heureNY": "09:35",
+   "prix": 31095.25,
+   "retardMin": 12,
+   "biais": "haussier",
+   "score": 2,
+   "dol": 31369.75,
+   "niveau": "ITL M5",
+   "etat": "ATTEND_IFVG",
+   "niveauxParUnite": "M5:33 M15:21 M30:67 H1:89 H4:89",
+   "etapeBloquee": "stop",
+   "dit": "Inversion 5m confirmée sur ITL M5 (31165.25 – 31201), mais le stop était trop serré face à l'ATR.",
+   "apresCoup": false
   }
  ],
  "bilan": {
-  "maj": "2026-10-09T13:26:26.088Z",
+  "maj": "2026-10-09T13:46:38.435Z",
   "total": 4,
   "clos": 4,
   "ouverts": 0,
   "reussite": 100,
   "cumulR": 1.44,
-  "passages": 16
+  "passages": 17
  },
  "archive": [
   {
