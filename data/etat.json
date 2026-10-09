@@ -1,12 +1,12 @@
 {
- "maj": "2026-10-09T21:35:14.884Z",
+ "maj": "2026-10-09T22:45:50.273Z",
  "source": "yahoo",
  "eurusd": 1.1213,
  "confirmePar": "ES=F",
  "sansConfirmation": false,
  "prix": 31123.25,
  "derniereBougie": 1791579300000,
- "retardMin": 40,
+ "retardMin": 111,
  "hors": true,
  "etat": "ATTEND_IFVG",
  "dir": -1,
@@ -45,12 +45,6 @@
      "haut": 31137.25
     },
     {
-     "type": "CISD",
-     "d": 24,
-     "bas": 31147.25,
-     "haut": 31159.25
-    },
-    {
      "type": "FVG",
      "d": 28.75,
      "bas": 31152,
@@ -76,8 +70,8 @@
     },
     {
      "type": "RB",
-     "d": 39.25,
-     "bas": 31162.5,
+     "d": 39.5,
+     "bas": 31162.75,
      "haut": 31177
     },
     {
@@ -99,22 +93,28 @@
      "haut": 31305
     },
     {
-     "type": "CISD",
-     "d": 64,
-     "bas": 31187.25,
-     "haut": 31219.5
-    },
-    {
      "type": "RB",
      "d": 64.25,
      "bas": 31187.5,
      "haut": 31211
+    },
+    {
+     "type": "CISD",
+     "d": 65.25,
+     "bas": 31188.5,
+     "haut": 31219.5
+    },
+    {
+     "type": "CISD",
+     "d": 65.25,
+     "bas": 31188.5,
+     "haut": 31193.25
     }
    ]
   },
   {
    "tf": "M15",
-   "n": 75,
+   "n": 78,
    "distance": 56.75,
    "type": "FVG",
    "liste": [
@@ -132,8 +132,8 @@
     },
     {
      "type": "CISD",
-     "d": 76.5,
-     "bas": 31199.75,
+     "d": 78.25,
+     "bas": 31201.5,
      "haut": 31215.25
     },
     {
@@ -230,8 +230,8 @@
     },
     {
      "type": "RB",
-     "d": 45.75,
-     "bas": 31169,
+     "d": 46.75,
+     "bas": 31170,
      "haut": 31222.25
     },
     {
@@ -248,14 +248,14 @@
     },
     {
      "type": "RB",
-     "d": 67,
-     "bas": 31190.25,
+     "d": 68,
+     "bas": 31191.25,
      "haut": 31223.5
     },
     {
      "type": "CISD",
-     "d": 68,
-     "bas": 31191.25,
+     "d": 68.25,
+     "bas": 31191.5,
      "haut": 31305
     },
     {
@@ -284,14 +284,14 @@
     },
     {
      "type": "CISD",
-     "d": 125.5,
-     "bas": 31248.75,
+     "d": 124.75,
+     "bas": 31248,
      "haut": 31282.25
     },
     {
      "type": "CISD",
-     "d": 130.25,
-     "bas": 31253.5,
+     "d": 129.75,
+     "bas": 31253,
      "haut": 31268.25
     }
    ]
@@ -455,11 +455,11 @@
  "dernierSignal": {
   "sens": "SHORT",
   "t": 1791379200000,
-  "entree": 31236,
-  "sl": 31319.99,
-  "risq": 83.98880000000645,
-  "tp1": 31202.4,
-  "tp": 31026.03,
+  "entree": 31236.5,
+  "sl": 31318.49,
+  "risq": 81.98919999999634,
+  "tp1": 31203.7,
+  "tp": 31031.53,
   "rr": 2.5,
   "gainSiTout": 0.61,
   "tf": "5m",
@@ -467,7 +467,7 @@
   "dol": 30957.5,
   "biaisDir": -1,
   "biaisScore": -2,
-  "barre": 12953,
+  "barre": 12956,
   "derniere": false
  },
  "cfg": {
@@ -508,12 +508,12 @@
   "dernierSignal": {
    "sens": "SHORT",
    "t": 1786980900000,
-   "entree": 30223.5,
+   "entree": 30224.5,
    "sl": 30279.54,
-   "risq": 56.04469999999856,
-   "tp1": 30195.48,
+   "risq": 55.04490000000078,
+   "tp1": 30196.98,
    "tp": 30155.25,
-   "rr": 1.22,
+   "rr": 1.26,
    "niveau": "FVG M30",
    "tf": "5m",
    "fenetre": "étendue",
@@ -521,20 +521,20 @@
    "sweepExt": 30273.5,
    "biaisDir": -1,
    "biaisScore": -2,
-   "barre": 3158,
+   "barre": 3159,
    "derniere": false
   },
   "entonnoir": {
-   "barres": 1499,
-   "biaisNeutre": 519,
-   "esDesaccord": 424,
-   "pasDeZone": 325,
-   "avant10h": 52,
-   "pasDeBalayage": 144,
-   "pasDeConfirmation": 31,
+   "barres": 1500,
+   "biaisNeutre": 518,
+   "esDesaccord": 433,
+   "pasDeZone": 317,
+   "avant10h": 54,
+   "pasDeBalayage": 143,
+   "pasDeConfirmation": 30,
    "stopMauvaisCote": 0,
    "stopTropSerre": 0,
-   "rrInsuffisant": 3,
+   "rrInsuffisant": 4,
    "entrees": 1
   },
   "cfg": {
@@ -570,9 +570,9 @@
    "clos": 1,
    "gagnes": 1,
    "reussite": 100,
-   "euros": 302,
-   "parTrade": 302,
-   "gainMoyen": 302,
+   "euros": 312,
+   "parTrade": 312,
+   "gainMoyen": 312,
    "perteMoyenne": 0,
    "seuil": 0,
    "pireCreux": 0,
@@ -599,14 +599,14 @@
    "distFin": 720
   },
   "smt": "exige",
-  "signaux": 64,
+  "signaux": 63,
   "manips": 84,
   "dernier": {
    "sens": "LONG",
    "t": 1791381900000,
-   "entree": 31205,
+   "entree": 31205.25,
    "sl": 31168.51505,
-   "tp": 31296.212374999996,
+   "tp": 31297.087374999996,
    "smt": true
   }
  }
