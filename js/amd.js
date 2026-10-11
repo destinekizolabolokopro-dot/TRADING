@@ -248,6 +248,14 @@
     var m5 = D[cleExe];
     // Le marché corrélé, pour la divergence SMT. Absent = filtre inactif.
     var Ecs = opts.E && opts.E[cleExe] ? opts.E[cleExe] : null;
+    // ⚠️ EXIGER UNE DIVERGENCE SANS MARCHÉ CORRÉLÉ, C'EST N'AUTORISER AUCUN
+    // TRADE. Le modèle rendait alors zéro signal sans un mot, et un script
+    // d'épreuves a jugé le vide pendant deux jours sans que ça se voie.
+    // Mieux vaut le dire fort : une configuration impossible n'est pas un
+    // résultat.
+    if (!Ecs && CFG.smt !== 'ignore' && typeof console !== 'undefined' && console.warn)
+      console.warn('AMD : smt « ' + CFG.smt + ' » demandé sans marché corrélé — ' +
+                   'la divergence est injugeable, aucun signal ne sortira.');
     if (!m5 || m5.length < 200 || !D.h1) return { tousSignaux: [], manips: [] };
     var pas = ST.pasDe(m5);
     // Les unités supérieures sont agrégées de ce qui existe. En longue

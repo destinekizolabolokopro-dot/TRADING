@@ -75,7 +75,12 @@ L.jeu(SYMS).then(PS => {
   // ── les signaux réels ──────────────────────────────────────────────────
   const JEU = [];
   for (const sym of Object.keys(PS)) {
-    const sigs = AMD.evaluer(PS[sym], { execution: 'h1' }).tousSignaux
+    // ⚠️ LE MARCHÉ CORRÉLÉ EST OBLIGATOIRE. Sans lui, la divergence SMT ne
+    // peut pas être jugée, et avec le réglage « exigée » — devenu le défaut —
+    // AUCUN signal ne passe. Le script rendait alors zéro trade sans rien
+    // dire, et les épreuves jugeaient le vide.
+    const CORREL = { 'NQ=F': 'ES=F', 'ES=F': 'NQ=F', 'YM=F': 'ES=F', 'RTY=F': 'ES=F' };
+    const sigs = AMD.evaluer(PS[sym], { execution: 'h1', E: PS[CORREL[sym]] }).tousSignaux
       .filter(s => Math.abs(s.risq) * (POINT[sym] || 2) / TAUX <= RISQUE);
     JEU.push({ sym, S: PS[sym], sigs });
   }
@@ -101,6 +106,18 @@ L.jeu(SYMS).then(PS => {
     if (f) REEL.push({ r: f.r - Position.cout(s.risq), t: s.t, sym: j.sym, ambigu: f.ambigu, risq: s.risq });
   }
   const B = bilan(REEL.map(x => x.r));
+  // Un plantage sur `null` trois lignes plus bas ne dit pas POURQUOI. Le cas
+  // arrive pour de bon : lancé pendant que le cache long se télécharge, le
+  // script ne voyait aucune bougie et mourait sur un TypeError obscur.
+  if (!B) {
+    console.error('\nAUCUN TRADE — les épreuves n\'ont rien à juger.');
+    console.error('   séries chargées : ' + Object.keys(PS).map(s =>
+      s + ' ' + ((PS[s].h1 || []).length) + ' bougies h1').join(' · '));
+    console.error('   signaux bruts   : ' + JEU.reduce((a, j) => a + j.sigs.length, 0));
+    console.error('\n   Cause la plus fréquente : le cache long est vide ou en cours');
+    console.error('   de téléchargement. Lancer d\'abord « node scripts/longue.js ».');
+    process.exit(1);
+  }
   console.log('\n╔══════════════════════════════════════════════════════════════════════╗');
   console.log(`║  LES ÉPREUVES DU MODÈLE AMD · 2 ans · ${String(B.n).padStart(3)} trades                    ║`);
   console.log('╚══════════════════════════════════════════════════════════════════════╝');
