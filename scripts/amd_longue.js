@@ -31,6 +31,8 @@ for (const a of process.argv.slice(2)) {
   if ((m = a.match(/^--delai=(\d+)$/))) AMD.CFG.delaiMin = +m[1];
   if ((m = a.match(/^--portee=([\d.]+)$/))) AMD.CFG.fvgPortee = +m[1];
   if ((m = a.match(/^--smt=(ignore|exige|confirme)$/))) AMD.CFG.smt = m[1];
+  if ((m = a.match(/^--entree=(ifvg|immediat|delai)$/))) AMD.CFG.entree = m[1];
+  if ((m = a.match(/^--delaiEntree=(\d+)$/))) AMD.CFG.delaiEntree = +m[1];
 }
 // En longue période le M30 n'existe pas : le modèle se rabat sur H1 et H4.
 AMD.CFG.unitesFVG = ['h1', 'h4'];

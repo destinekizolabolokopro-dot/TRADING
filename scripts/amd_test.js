@@ -38,6 +38,8 @@ for (const a of process.argv.slice(2)) {
   if ((m = a.match(/^--tp2=([\d.]+)$/))) AMD.CFG.tp2 = +m[1];
   // SMT : la divergence avec le marché corrélé au moment du balayage.
   if ((m = a.match(/^--smt=(ignore|exige|confirme)$/))) AMD.CFG.smt = m[1];
+  if ((m = a.match(/^--entree=(ifvg|immediat|delai)$/))) AMD.CFG.entree = m[1];
+  if ((m = a.match(/^--delaiEntree=(\d+)$/))) AMD.CFG.delaiEntree = +m[1];
 }
 const DEM = (process.argv.find(a => a.startsWith('--marches=')) || '').slice(10);
 const SYMS = DEM ? DEM.split(',').map(x => x.trim().toUpperCase() + '=F')

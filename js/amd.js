@@ -88,6 +88,21 @@
     fvgPortee: 3,
     // ── LIQUIDITÉ INTERNE : où chercher les swings ───────────────────────
     unitesInt: ['m30', 'h1', 'h4'],
+    // ── LA PORTE D'ENTRÉE ───────────────────────────────────── [MESURÉ]
+    // 'ifvg'     attendre une inversion de FVG — la règle d'origine
+    // 'immediat' entrer à la clôture de la bougie qui balaie
+    // 'delai'    entrer `delaiEntree` bougies après le balayage
+    //
+    // POURQUOI CE RÉGLAGE EXISTE : l'épreuve de l'instant tiré au sort dit que
+    // la règle d'origine RETIRE de la valeur. Mêmes jours, même sens, même
+    // risque, mais une bougie au hasard dans la fenêtre : +50 € par trade en
+    // médiane sur 200 tirages, quand l'attente de l'IFVG en perd 15. Les deux
+    // cents tirages font mieux qu'elle. Ce n'est pas « aussi bien que le
+    // hasard », c'est nettement pire — et ça désigne la porte d'entrée, pas
+    // le scénario.
+    entree: 'ifvg',
+    delaiEntree: 3,
+
     // ── SORTIE ──────────────────────────────────────────────────────────
     // Stop au-delà de l'extrême de la manipulation, élargi d'un tampon.
     buf: 0.02,
@@ -450,14 +465,22 @@
 
       // ── 5. L'ENTRÉE : UNIQUEMENT SUR UN IFVG DU BON SENS ─────────────
       var decl = null;
-      for (var k = ifvg.length - 1; k >= 0; k--) {
-        var z2 = ifvg[k];
-        if (z2.t > tD) continue;
-        if (z2.t <= manip.t) break;              // l'IFVG doit suivre la manipulation
-        if (z2.sens !== dir) continue;
-        decl = z2; break;
+      if (CFG.entree === 'immediat') {
+        // La bougie du balayage est close, son sens est connu : on entre.
+        decl = { t: manip.t, immediat: true };
+      } else if (CFG.entree === 'delai') {
+        if (i - manip.i < CFG.delaiEntree) continue;
+        decl = { t: tD, differe: true };
+      } else {
+        for (var k = ifvg.length - 1; k >= 0; k--) {
+          var z2 = ifvg[k];
+          if (z2.t > tD) continue;
+          if (z2.t <= manip.t) break;            // l'IFVG doit suivre la manipulation
+          if (z2.sens !== dir) continue;
+          decl = z2; break;
+        }
       }
-      if (decl) EC.ifvg = { bas: decl.bas, haut: decl.haut, t: decl.t };
+      if (decl && decl.bas != null) EC.ifvg = { bas: decl.bas, haut: decl.haut, t: decl.t };
       if (!decl) continue;
 
       // ── 6. NIVEAUX ────────────────────────────────────────────────────
