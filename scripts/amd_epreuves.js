@@ -25,9 +25,17 @@ const RISQUE = +(process.env.RISQUE_EUR || 250);
 const POINT = { 'NQ=F': 2, 'ES=F': 5, 'YM=F': 0.5, 'RTY=F': 5 }, TAUX = 1.08;
 const TIRAGES = +(process.env.TIRAGES || 200);
 
+// ⚠️ LA BOUCLE PORTE DES ACCOLADES, et ce n'est pas un détail de style : sans
+// elles, le `for` ne couvrait que la PREMIÈRE ligne, et les réglages ajoutés
+// ensuite s'exécutaient une seule fois, hors de la boucle, sur un `a` qui
+// n'existait plus. Le script ne démarrait même pas.
 let m;
-for (const a of process.argv.slice(2))
+for (const a of process.argv.slice(2)) {
   if ((m = a.match(/^--fenetre=(\d+),(\d+)$/))) { AMD.CFG.manipDeb = +m[1] * 60; AMD.CFG.manipFin = +m[2] * 60; }
+  if ((m = a.match(/^--cible=(proche|loin)$/))) AMD.CFG.cible = m[1];
+  if ((m = a.match(/^--tp2=([\d.]+)$/))) AMD.CFG.tp2 = +m[1];
+  if ((m = a.match(/^--entree=(ifvg|immediat|delai)$/))) AMD.CFG.entree = m[1];
+}
 AMD.CFG.unitesFVG = ['h1', 'h4'];
 AMD.CFG.unitesInt = ['h1', 'h4'];
 const SYMS = (process.argv.find(a => a.startsWith('--marches=')) || '--marches=NQ,ES')
