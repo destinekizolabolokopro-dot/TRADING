@@ -1,11 +1,11 @@
 {
- "maj": "2026-10-13T19:51:46.195Z",
+ "maj": "2026-10-13T19:56:49.068Z",
  "source": "yahoo",
  "eurusd": 1.116,
  "confirmePar": "ES=F",
  "sansConfirmation": false,
- "prix": 30779.25,
- "derniereBougie": 1791920400000,
+ "prix": 30770.75,
+ "derniereBougie": 1791920700000,
  "retardMin": 12,
  "hors": true,
  "etat": "CHERCHE",
@@ -67,7 +67,7 @@
   "dol": 30604.75,
   "biaisDir": -1,
   "biaisScore": -4,
-  "barre": 13490,
+  "barre": 13503,
   "derniere": false
  },
  "cfg": {
@@ -94,8 +94,8 @@
  },
  "kintt": {
   "hors": true,
-  "prix": 30779.25,
-  "derniereBougie": 1791920400000,
+  "prix": 30770.75,
+  "derniereBougie": 1791920700000,
   "etape": {
    "t": 1791906900000,
    "score": 0,
@@ -121,20 +121,20 @@
    "sweepExt": 30273.5,
    "biaisDir": -1,
    "biaisScore": -2,
-   "barre": 2611,
+   "barre": 2610,
    "derniere": false
   },
   "entonnoir": {
-   "barres": 1500,
-   "biaisNeutre": 535,
-   "esDesaccord": 403,
-   "pasDeZone": 330,
+   "barres": 1499,
+   "biaisNeutre": 540,
+   "esDesaccord": 397,
+   "pasDeZone": 329,
    "avant10h": 55,
-   "pasDeBalayage": 142,
-   "pasDeConfirmation": 31,
+   "pasDeBalayage": 143,
+   "pasDeConfirmation": 30,
    "stopMauvaisCote": 0,
    "stopTropSerre": 0,
-   "rrInsuffisant": 3,
+   "rrInsuffisant": 4,
    "entrees": 1
   },
   "cfg": {
@@ -182,7 +182,7 @@
  "amd": {
   "etape": {
    "jour": "2026-10-13",
-   "min": 940,
+   "min": 945,
    "dir": 1,
    "internes": 54,
    "cible": 30845,
@@ -224,7 +224,7 @@
    "distFin": 720
   },
   "smt": "exige",
-  "signaux": 62,
+  "signaux": 63,
   "manips": 84,
   "dernier": {
    "sens": "LONG",
