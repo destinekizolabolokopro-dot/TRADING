@@ -1,12 +1,12 @@
 {
- "maj": "2026-10-13T16:23:16.462Z",
+ "maj": "2026-10-13T16:43:29.611Z",
  "source": "yahoo",
- "eurusd": 1.1197,
+ "eurusd": 1.1194,
  "confirmePar": "ES=F",
  "sansConfirmation": false,
- "prix": 30734.25,
- "derniereBougie": 1791907800000,
- "retardMin": 13,
+ "prix": 30796.5,
+ "derniereBougie": 1791909000000,
+ "retardMin": 14,
  "hors": true,
  "etat": "CHERCHE",
  "dir": 0,
@@ -94,8 +94,8 @@
  },
  "kintt": {
   "hors": true,
-  "prix": 30734.25,
-  "derniereBougie": 1791907800000,
+  "prix": 30796.5,
+  "derniereBougie": 1791909000000,
   "etape": {
    "t": 1791906900000,
    "score": 0,
@@ -182,7 +182,7 @@
  "amd": {
   "etape": {
    "jour": "2026-10-13",
-   "min": 730,
+   "min": 750,
    "dir": 1,
    "internes": 54,
    "cible": 30845,
