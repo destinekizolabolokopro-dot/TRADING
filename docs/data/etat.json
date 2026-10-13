@@ -1,11 +1,11 @@
 {
- "maj": "2026-10-13T16:03:03.042Z",
+ "maj": "2026-10-13T16:23:16.462Z",
  "source": "yahoo",
- "eurusd": 1.1198,
+ "eurusd": 1.1197,
  "confirmePar": "ES=F",
  "sansConfirmation": false,
- "prix": 30667.5,
- "derniereBougie": 1791906600000,
+ "prix": 30734.25,
+ "derniereBougie": 1791907800000,
  "retardMin": 13,
  "hors": true,
  "etat": "CHERCHE",
@@ -93,11 +93,11 @@
   "sortieMin": 720
  },
  "kintt": {
-  "hors": false,
-  "prix": 30667.5,
-  "derniereBougie": 1791906600000,
+  "hors": true,
+  "prix": 30734.25,
+  "derniereBougie": 1791907800000,
   "etape": {
-   "t": 1791906600000,
+   "t": 1791906900000,
    "score": 0,
    "dir": 0,
    "conf": null,
@@ -125,8 +125,8 @@
    "derniere": false
   },
   "entonnoir": {
-   "barres": 1499,
-   "biaisNeutre": 534,
+   "barres": 1500,
+   "biaisNeutre": 535,
    "esDesaccord": 403,
    "pasDeZone": 330,
    "avant10h": 55,
@@ -182,7 +182,7 @@
  "amd": {
   "etape": {
    "jour": "2026-10-13",
-   "min": 710,
+   "min": 730,
    "dir": 1,
    "internes": 54,
    "cible": 30845,
