@@ -1,11 +1,11 @@
 {
- "maj": "2026-10-13T14:21:55.857Z",
+ "maj": "2026-10-13T14:42:10.459Z",
  "source": "yahoo",
- "eurusd": 1.1193,
+ "eurusd": 1.1191,
  "confirmePar": "ES=F",
  "sansConfirmation": false,
- "prix": 30793.5,
- "derniereBougie": 1791900600000,
+ "prix": 30748,
+ "derniereBougie": 1791901800000,
  "retardMin": 12,
  "hors": true,
  "etat": "CHERCHE",
@@ -94,10 +94,10 @@
  },
  "kintt": {
   "hors": false,
-  "prix": 30793.5,
-  "derniereBougie": 1791900600000,
+  "prix": 30748,
+  "derniereBougie": 1791901800000,
   "etape": {
-   "t": 1791900600000,
+   "t": 1791901800000,
    "score": 0,
    "dir": 0,
    "conf": null,
@@ -125,8 +125,8 @@
    "derniere": false
   },
   "entonnoir": {
-   "barres": 1479,
-   "biaisNeutre": 514,
+   "barres": 1483,
+   "biaisNeutre": 518,
    "esDesaccord": 403,
    "pasDeZone": 330,
    "avant10h": 55,
@@ -182,11 +182,11 @@
  "amd": {
   "etape": {
    "jour": "2026-10-13",
-   "min": 610,
+   "min": 630,
    "dir": 1,
    "internes": 54,
    "cible": 30845,
-   "pris": 0,
+   "pris": 1,
    "manip": {
     "nom": "semaine",
     "prix": 30792,
@@ -195,12 +195,27 @@
     "t": 1791893100000
    },
    "fvg": {
-    "bas": 30584.75,
-    "haut": 30592.25,
+    "bas": 30666.5,
+    "haut": 30744,
     "haussier": true
    },
-   "ifvg": null,
-   "signal": null
+   "ifvg": {
+    "bas": 30706.75,
+    "haut": 30713.25,
+    "t": 1791898800000
+   },
+   "signal": {
+    "sens": "LONG",
+    "t": 1791902100000,
+    "entree": 30748,
+    "sl": 30644.61985,
+    "tp": 30845,
+    "tp1": 30789.35206,
+    "risq": 103.38015000000087,
+    "dol": 30845,
+    "smt": true,
+    "manip": "semaine"
+   }
   },
   "fenetre": {
    "manipDeb": 480,
@@ -209,14 +224,14 @@
    "distFin": 720
   },
   "smt": "exige",
-  "signaux": 61,
+  "signaux": 62,
   "manips": 84,
   "dernier": {
    "sens": "LONG",
-   "t": 1791381900000,
-   "entree": 31205,
-   "sl": 31168.51505,
-   "tp": 31296.212374999996,
+   "t": 1791902100000,
+   "entree": 30748,
+   "sl": 30644.61985,
+   "tp": 30845,
    "smt": true
   }
  }
