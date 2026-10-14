@@ -670,16 +670,33 @@
    "etapeBloquee": "fenetre",
    "dit": "Hors fenêtre. Biais baissier, DOL à 30591.25, niveau le plus proche FVG M5 (30623 – 30801.75).",
    "apresCoup": false
+  },
+  {
+   "ts": "2026-10-14T13:25:06.298Z",
+   "bougie": "2026-10-14T13:15:00.000Z",
+   "jour": "2026-10-14",
+   "heureNY": "09:15",
+   "prix": 30588.25,
+   "retardMin": 10,
+   "biais": "baissier",
+   "score": -2,
+   "dol": 30529.25,
+   "niveau": "RB H1",
+   "etat": "ATTEND_IFVG",
+   "niveauxParUnite": "M5:85 M15:92 M30:83 H1:80 H4:24",
+   "etapeBloquee": "stop",
+   "dit": "Inversion 2m confirmée sur RB H1 (30579.25 – 30639.75), mais le stop était trop serré face à l'ATR.",
+   "apresCoup": false
   }
  ],
  "bilan": {
-  "maj": "2026-10-14T13:04:55.253Z",
+  "maj": "2026-10-14T13:25:06.298Z",
   "total": 8,
   "clos": 8,
   "ouverts": 0,
   "reussite": 100,
   "cumulR": 2.88,
-  "passages": 21
+  "passages": 22
  },
  "archive": [
   {
