@@ -349,10 +349,10 @@
    "resultat": null,
    "r": null,
    "closTs": null,
-   "part1": false,
+   "part1": true,
    "suiviUnite": "1m",
    "ambigu": 0,
-   "slCourant": 30608.13
+   "slCourant": 30473.75
   }
  ],
  "passages": [
@@ -746,7 +746,7 @@
   }
  ],
  "bilan": {
-  "maj": "2026-10-14T14:25:39.870Z",
+  "maj": "2026-10-14T15:06:03.762Z",
   "total": 9,
   "clos": 8,
   "ouverts": 1,
