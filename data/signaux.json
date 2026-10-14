@@ -602,16 +602,33 @@
    "etapeBloquee": "stop",
    "dit": "Inversion 5m confirmée sur ITL M5 (31165.25 – 31201), mais le stop était trop serré face à l'ATR.",
    "apresCoup": false
+  },
+  {
+   "ts": "2026-10-14T12:04:21.070Z",
+   "bougie": "2026-10-14T11:50:00.000Z",
+   "jour": "2026-10-14",
+   "heureNY": "07:50",
+   "prix": 30751.75,
+   "retardMin": 14,
+   "biais": "baissier",
+   "score": -2,
+   "dol": 30705.25,
+   "niveau": "RB M5",
+   "etat": "CHERCHE",
+   "niveauxParUnite": "M5:50 M15:82 M30:79 H1:66 H4:21",
+   "etapeBloquee": "fenetre",
+   "dit": "Hors fenêtre. Biais baissier, DOL à 30705.25, niveau le plus proche RB M5 (30752 – 30763).",
+   "apresCoup": true
   }
  ],
  "bilan": {
-  "maj": "2026-10-13T14:21:55.857Z",
+  "maj": "2026-10-14T12:04:21.070Z",
   "total": 8,
   "clos": 8,
   "ouverts": 0,
   "reussite": 100,
   "cumulR": 2.88,
-  "passages": 17
+  "passages": 18
  },
  "archive": [
   {
