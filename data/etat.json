@@ -1,12 +1,12 @@
 {
- "maj": "2026-10-14T19:26:27.348Z",
+ "maj": "2026-10-14T19:44:55.614Z",
  "source": "yahoo",
- "eurusd": 1.1154,
+ "eurusd": 1.1156,
  "confirmePar": "ES=F",
  "sansConfirmation": false,
- "prix": 30115.5,
- "derniereBougie": 1792005300000,
- "retardMin": 12,
+ "prix": 30235.75,
+ "derniereBougie": 1792006200000,
+ "retardMin": 15,
  "hors": true,
  "etat": "CHERCHE",
  "dir": 0,
@@ -55,11 +55,11 @@
  "dernierSignal": {
   "sens": "SHORT",
   "t": 1791986100000,
-  "entree": 30473.75,
-  "sl": 30608.13,
-  "risq": 134.37900000000081,
-  "tp1": 30420,
-  "tp": 30137.8,
+  "entree": 30474.5,
+  "sl": 30605.88,
+  "risq": 131.3796000000002,
+  "tp1": 30421.95,
+  "tp": 30146.05,
   "rr": 2.5,
   "gainSiTout": 0.61,
   "tf": "5m",
@@ -67,7 +67,7 @@
   "dol": 30372.25,
   "biaisDir": -1,
   "biaisScore": -2,
-  "barre": 13510,
+  "barre": 13498,
   "derniere": false
  },
  "cfg": {
@@ -94,8 +94,8 @@
  },
  "kintt": {
   "hors": true,
-  "prix": 30115.5,
-  "derniereBougie": 1792005300000,
+  "prix": 30235.75,
+  "derniereBougie": 1792006200000,
   "etape": {
    "t": 1791993300000,
    "score": -2,
@@ -121,20 +121,20 @@
    "sweepExt": 30273.5,
    "biaisDir": -1,
    "biaisScore": -2,
-   "barre": 2335,
+   "barre": 2336,
    "derniere": false
   },
   "entonnoir": {
-   "barres": 1499,
-   "biaisNeutre": 540,
-   "esDesaccord": 405,
-   "pasDeZone": 322,
+   "barres": 1500,
+   "biaisNeutre": 535,
+   "esDesaccord": 411,
+   "pasDeZone": 323,
    "avant10h": 55,
-   "pasDeBalayage": 142,
-   "pasDeConfirmation": 30,
+   "pasDeBalayage": 141,
+   "pasDeConfirmation": 31,
    "stopMauvaisCote": 0,
    "stopTropSerre": 0,
-   "rrInsuffisant": 4,
+   "rrInsuffisant": 3,
    "entrees": 1
   },
   "cfg": {
@@ -182,7 +182,7 @@
  "amd": {
   "etape": {
    "jour": "2026-10-14",
-   "min": 915,
+   "min": 930,
    "dir": 1,
    "internes": 62,
    "cible": 30861.75,
@@ -207,10 +207,10 @@
    "signal": {
     "sens": "LONG",
     "t": 1791985200000,
-    "entree": 30578.75,
-    "sl": 30559.051785714284,
-    "tp": 30627.995535714286,
-    "tp1": 30586.629285714287,
+    "entree": 30576,
+    "sl": 30556.301785714284,
+    "tp": 30625.245535714286,
+    "tp1": 30583.879285714287,
     "risq": 19.698214285714286,
     "dol": 30861.75,
     "smt": true,
@@ -224,14 +224,14 @@
    "distFin": 720
   },
   "smt": "exige",
-  "signaux": 64,
+  "signaux": 63,
   "manips": 86,
   "dernier": {
    "sens": "LONG",
    "t": 1791985200000,
-   "entree": 30578.75,
-   "sl": 30559.051785714284,
-   "tp": 30627.995535714286,
+   "entree": 30576,
+   "sl": 30556.301785714284,
+   "tp": 30625.245535714286,
    "smt": true
   }
  }
