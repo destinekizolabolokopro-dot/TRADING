@@ -1,12 +1,12 @@
 {
- "maj": "2026-10-15T17:52:19.968Z",
+ "maj": "2026-10-15T18:18:36.132Z",
  "source": "yahoo",
- "eurusd": 1.1217,
+ "eurusd": 1.1221,
  "confirmePar": "ES=F",
  "sansConfirmation": false,
- "prix": 30091,
- "derniereBougie": 1792086000000,
- "retardMin": 12,
+ "prix": 29986.25,
+ "derniereBougie": 1792087500000,
+ "retardMin": 14,
  "hors": true,
  "etat": "CHERCHE",
  "dir": 0,
@@ -55,19 +55,19 @@
  "dernierSignal": {
   "sens": "SHORT",
   "t": 1792070700000,
-  "entree": 29744.75,
-  "sl": 29845.55,
-  "risq": 100.79580000000715,
-  "tp1": 29704.43,
-  "tp": 29492.76,
+  "entree": 29745.25,
+  "sl": 29844.05,
+  "risq": 98.79619999999704,
+  "tp1": 29705.73,
+  "tp": 29498.26,
   "rr": 2.5,
   "gainSiTout": 0.61,
   "tf": "5m",
-  "niveau": "RB H4",
+  "niveau": "ITH H4",
   "dol": 29659.25,
   "biaisDir": -1,
   "biaisScore": -2,
-  "barre": 13503,
+  "barre": 13492,
   "derniere": false
  },
  "cfg": {
@@ -94,8 +94,8 @@
  },
  "kintt": {
   "hors": true,
-  "prix": 30091,
-  "derniereBougie": 1792086000000,
+  "prix": 29986.25,
+  "derniereBougie": 1792087500000,
   "etape": {
    "t": 1792079700000,
    "score": -4,
@@ -129,20 +129,20 @@
    "sweepExt": 30273.5,
    "biaisDir": -1,
    "biaisScore": -2,
-   "barre": 2060,
+   "barre": 2061,
    "derniere": false
   },
   "entonnoir": {
-   "barres": 1499,
-   "biaisNeutre": 524,
-   "esDesaccord": 417,
-   "pasDeZone": 326,
+   "barres": 1500,
+   "biaisNeutre": 522,
+   "esDesaccord": 420,
+   "pasDeZone": 327,
    "avant10h": 55,
-   "pasDeBalayage": 142,
-   "pasDeConfirmation": 30,
+   "pasDeBalayage": 141,
+   "pasDeConfirmation": 31,
    "stopMauvaisCote": 0,
    "stopTropSerre": 0,
-   "rrInsuffisant": 4,
+   "rrInsuffisant": 3,
    "entrees": 1
   },
   "cfg": {
@@ -190,7 +190,7 @@
  "amd": {
   "etape": {
    "jour": "2026-10-15",
-   "min": 820,
+   "min": 845,
    "dir": 1,
    "internes": 78,
    "cible": 29885,
@@ -215,11 +215,11 @@
    "signal": {
     "sens": "LONG",
     "t": 1792071600000,
-    "entree": 29830,
+    "entree": 29830.5,
     "sl": 29782.5423,
     "tp": 29885,
-    "tp1": 29848.983079999998,
-    "risq": 47.45769999999902,
+    "tp1": 29849.68308,
+    "risq": 47.95769999999902,
     "dol": 29885,
     "smt": true,
     "manip": "veille"
@@ -232,12 +232,12 @@
    "distFin": 720
   },
   "smt": "exige",
-  "signaux": 65,
+  "signaux": 64,
   "manips": 87,
   "dernier": {
    "sens": "LONG",
    "t": 1792071600000,
-   "entree": 29830,
+   "entree": 29830.5,
    "sl": 29782.5423,
    "tp": 29885,
    "smt": true
