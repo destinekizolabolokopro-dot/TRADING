@@ -778,16 +778,33 @@
    "etapeBloquee": "biais",
    "dit": "Biais neutre (score 0/4, il en faut 2) — aucune position possible.",
    "apresCoup": true
+  },
+  {
+   "ts": "2026-10-15T12:25:26.505Z",
+   "bougie": "2026-10-15T12:15:00.000Z",
+   "jour": "2026-10-15",
+   "heureNY": "08:15",
+   "prix": 29815,
+   "retardMin": 11,
+   "biais": "baissier",
+   "score": -2,
+   "dol": 29659.25,
+   "niveau": "FVG M5",
+   "etat": "CHERCHE",
+   "niveauxParUnite": "M5:115 M15:105 M30:90 H1:92 H4:38",
+   "etapeBloquee": "fenetre",
+   "dit": "Hors fenêtre. Biais baissier, DOL à 29659.25, niveau le plus proche FVG M5 (29819.5 – 29842.25).",
+   "apresCoup": true
   }
  ],
  "bilan": {
-  "maj": "2026-10-15T12:05:13.846Z",
+  "maj": "2026-10-15T12:25:26.505Z",
   "total": 9,
   "clos": 9,
   "ouverts": 0,
   "reussite": 100,
   "cumulR": 3.24,
-  "passages": 25
+  "passages": 26
  },
  "archive": [
   {
