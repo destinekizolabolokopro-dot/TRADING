@@ -1049,16 +1049,33 @@
    "etapeBloquee": "stop",
    "dit": "Inversion 2m confirmée sur RB M5 (30064.25 – 30077.75), mais le stop était trop serré face à l'ATR.",
    "apresCoup": false
+  },
+  {
+   "ts": "2026-10-16T13:46:21.223Z",
+   "bougie": "2026-10-16T13:35:00.000Z",
+   "jour": "2026-10-16",
+   "heureNY": "09:35",
+   "prix": 29937.5,
+   "retardMin": 11,
+   "biais": "baissier",
+   "score": -2,
+   "dol": 29622.5,
+   "niveau": "RB M5",
+   "etat": "ATTEND_IFVG",
+   "niveauxParUnite": "M5:60 M15:87 M30:82 H1:91 H4:33",
+   "etapeBloquee": "stop",
+   "dit": "Inversion 5m confirmée sur RB M5 (30064.25 – 30077.75), mais le stop était trop serré face à l'ATR.",
+   "apresCoup": false
   }
  ],
  "bilan": {
-  "maj": "2026-10-16T13:26:07.261Z",
+  "maj": "2026-10-16T13:46:21.223Z",
   "total": 12,
   "clos": 12,
   "ouverts": 0,
   "reussite": 100,
   "cumulR": 4.32,
-  "passages": 34
+  "passages": 35
  },
  "archive": [
   {
