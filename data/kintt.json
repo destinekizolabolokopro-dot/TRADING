@@ -72,16 +72,23 @@
    "prix": 29851,
    "etapeBloquee": "es",
    "dit": "Le NQ est baissier, l'ES dit le contraire — le plan exige les deux ensemble."
+  },
+  {
+   "ts": "2026-10-16T11:45:01.042Z",
+   "jour": "2026-10-16",
+   "prix": 30090,
+   "etapeBloquee": "confirmation",
+   "dit": "Balayage à 30018 sur FVG H4 (30010.75 – 30078), mais la confirmation manque (ifvg false cisd false m15 false)."
   }
  ],
  "bilan": {
-  "maj": "2026-10-15T11:45:00.625Z",
+  "maj": "2026-10-16T11:45:01.042Z",
   "total": 0,
   "clos": 0,
   "ouverts": 0,
   "reussite": null,
   "cumulR": 0,
   "euros": 0,
-  "passages": 10
+  "passages": 11
  }
 }
