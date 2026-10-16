@@ -1015,16 +1015,33 @@
    "etapeBloquee": "fenetre",
    "dit": "Hors fenêtre. Biais baissier, DOL à 29622.5, niveau le plus proche FVG M15 (30098.75 – 30134.25).",
    "apresCoup": true
+  },
+  {
+   "ts": "2026-10-16T13:05:54.061Z",
+   "bougie": "2026-10-16T12:55:00.000Z",
+   "jour": "2026-10-16",
+   "heureNY": "08:55",
+   "prix": 30061.75,
+   "retardMin": 11,
+   "biais": "baissier",
+   "score": -2,
+   "dol": 29622.5,
+   "niveau": "RB M5",
+   "etat": "CHERCHE",
+   "niveauxParUnite": "M5:41 M15:85 M30:82 H1:91 H4:33",
+   "etapeBloquee": "fenetre",
+   "dit": "Hors fenêtre. Biais baissier, DOL à 29622.5, niveau le plus proche RB M5 (30064.25 – 30077.75).",
+   "apresCoup": false
   }
  ],
  "bilan": {
-  "maj": "2026-10-16T12:45:40.926Z",
+  "maj": "2026-10-16T13:05:54.061Z",
   "total": 12,
   "clos": 12,
   "ouverts": 0,
   "reussite": 100,
   "cumulR": 4.32,
-  "passages": 32
+  "passages": 33
  },
  "archive": [
   {
