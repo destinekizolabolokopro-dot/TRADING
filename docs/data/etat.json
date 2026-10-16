@@ -1,26 +1,38 @@
 {
- "maj": "2026-10-16T17:23:23.249Z",
+ "maj": "2026-10-16T17:40:47.150Z",
  "source": "yahoo",
- "eurusd": 1.1228,
+ "eurusd": 1.123,
  "confirmePar": "ES=F",
  "sansConfirmation": false,
- "prix": 29494.75,
- "derniereBougie": 1792170600000,
- "retardMin": 13,
+ "prix": 29503.5,
+ "derniereBougie": 1792171800000,
+ "retardMin": 11,
  "hors": true,
  "etat": "ATTEND_IFVG",
- "dir": 0,
- "score": 0,
- "dol": null,
- "key": null,
+ "dir": 1,
+ "score": 2,
+ "dol": 30225,
+ "key": {
+  "type": "FVG",
+  "tf": "M5",
+  "bas": 29468,
+  "haut": 29487.75
+ },
  "ifvg": null,
  "parTF": [
   {
    "tf": "M5",
-   "n": 0,
-   "distance": null,
-   "type": null,
-   "liste": []
+   "n": 1,
+   "distance": 15.75,
+   "type": "FVG",
+   "liste": [
+    {
+     "type": "FVG",
+     "d": 15.75,
+     "bas": 29468,
+     "haut": 29487.75
+    }
+   ]
   },
   {
    "tf": "M15",
@@ -45,10 +57,95 @@
   },
   {
    "tf": "H4",
-   "n": 0,
-   "distance": null,
-   "type": null,
-   "liste": []
+   "n": 43,
+   "distance": 18.5,
+   "type": "FVG",
+   "liste": [
+    {
+     "type": "FVG",
+     "d": 18.5,
+     "bas": 29478,
+     "haut": 29485
+    },
+    {
+     "type": "RB",
+     "d": 37.5,
+     "bas": 29241.25,
+     "haut": 29466
+    },
+    {
+     "type": "RB",
+     "d": 60.5,
+     "bas": 29220,
+     "haut": 29443
+    },
+    {
+     "type": "FVG",
+     "d": 75,
+     "bas": 28977.5,
+     "haut": 29428.5
+    },
+    {
+     "type": "RB",
+     "d": 79,
+     "bas": 29364,
+     "haut": 29424.5
+    },
+    {
+     "type": "ITL",
+     "d": 105,
+     "bas": 29273.5,
+     "haut": 29398.5
+    },
+    {
+     "type": "ITL",
+     "d": 114.5,
+     "bas": 29202.75,
+     "haut": 29389
+    },
+    {
+     "type": "ITL",
+     "d": 161.25,
+     "bas": 28952,
+     "haut": 29342.25
+    },
+    {
+     "type": "CISD",
+     "d": 193,
+     "bas": 29017.5,
+     "haut": 29310.5
+    },
+    {
+     "type": "RB",
+     "d": 198.25,
+     "bas": 29202.75,
+     "haut": 29305.25
+    },
+    {
+     "type": "ITL",
+     "d": 225.25,
+     "bas": 29043.25,
+     "haut": 29278.25
+    },
+    {
+     "type": "ITL",
+     "d": 228.25,
+     "bas": 29096,
+     "haut": 29275.25
+    },
+    {
+     "type": "ITL",
+     "d": 257.75,
+     "bas": 28946.75,
+     "haut": 29245.75
+    },
+    {
+     "type": "CISD",
+     "d": 258,
+     "bas": 29075,
+     "haut": 29245.5
+    }
+   ]
   }
  ],
  "trade": null,
@@ -94,8 +191,8 @@
  },
  "kintt": {
   "hors": true,
-  "prix": 29494.75,
-  "derniereBougie": 1792170600000,
+  "prix": 29503.5,
+  "derniereBougie": 1792171800000,
   "etape": {
    "t": 1792166100000,
    "score": -2,
@@ -182,7 +279,7 @@
  "amd": {
   "etape": {
    "jour": "2026-10-16",
-   "min": 790,
+   "min": 810,
    "dir": 1,
    "internes": 83,
    "cible": 29947,
