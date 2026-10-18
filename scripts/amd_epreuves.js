@@ -18,7 +18,7 @@ const fs = require('fs'), path = require('path');
 const L = require('./longue.js');
 const RACINE = path.resolve(__dirname, '..');
 const ctx = {};
-for (const f of ['js/structure.js', 'js/position.js', 'js/modele.js', 'js/amd.js'])
+for (const f of ['js/structure.js', 'js/position.js', 'js/modele.js', 'js/dol.js', 'js/amd.js'])
   new Function('root', 'ST', fs.readFileSync(path.join(RACINE, f), 'utf-8')).call(ctx, ctx, ctx.ST);
 const { Position, AMD } = ctx;
 const RISQUE = +(process.env.RISQUE_EUR || 250);
@@ -35,6 +35,12 @@ for (const a of process.argv.slice(2)) {
   if ((m = a.match(/^--cible=(proche|loin)$/))) AMD.CFG.cible = m[1];
   if ((m = a.match(/^--tp2=([\d.]+)$/))) AMD.CFG.tp2 = +m[1];
   if ((m = a.match(/^--entree=(ifvg|immediat|delai)$/))) AMD.CFG.entree = m[1];
+  // Les sept sources du cours. Elles manquaient ici : une configuration qui
+  // les utilise ne pouvait donc PAS être jugée par les six épreuves, et
+  // c'est précisément la seule chose qui compte à son sujet.
+  if (a === '--dol-complet') AMD.CFG.dolComplet = true;
+  if ((m = a.match(/^--sources=(.+)$/))) { AMD.CFG.dolComplet = true; AMD.CFG.sourcesDOL = m[1].split(','); }
+  if ((m = a.match(/^--dol-role=(manip|cible)$/))) AMD.CFG.dolRole = m[1];
 }
 AMD.CFG.unitesFVG = ['h1', 'h4'];
 AMD.CFG.unitesInt = ['h1', 'h4'];

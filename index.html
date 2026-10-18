@@ -711,6 +711,7 @@ button,input,select{font:inherit;color:inherit}
 <script src="js/position.js"></script>
 <script src="js/modele.js"></script>
 <script src="js/kintt.js"></script>
+<script src="js/dol.js"></script>
 <script src="js/amd.js"></script>
 <script src="js/sphere.js"></script>
 <script src="js/compte.js"></script>
@@ -1465,8 +1466,24 @@ function paintMarquee(){
    `verifications` est contrôlé par scripts/test.js, qui compare ce nombre à
    celui de ses propres contrôles : s'il dérive, la suite échoue. */
 const MESURES = {
-  date: '2026-10-09',
-  verifications: 173,
+  date: '2026-10-18',
+  verifications: 185,
+  // 18 OCTOBRE — LES SEPT SOURCES DE LIQUIDITÉ DU COURS SONT AJOUTÉES
+  // (js/dol.js) ET MESURÉES. Le modèle n'en lisait qu'UNE sur sept. L'excuse
+  // était commode : « il perd parce qu'il est amputé ». Elle est fausse.
+  //   · comme OBJECTIFS, ce que dit le cours : AUCUN effet. Les six sources
+  //     ajoutées rendent, au centime près, le chiffre d'avant. La raison est
+  //     mesurée : en visant loin, 121 signaux sur 140 ont déjà leur objectif
+  //     au plafond de 2,5 R, et la liquidité visée est à 12,5 R de médiane.
+  //     Des cibles encore plus lointaines ne déplacent rien.
+  //   · comme NIVEAUX À BALAYER : +746 € → +910 € sur deux ans, 85 trades.
+  //     164 € d'écart sur deux ans, c'est du bruit, pas un avantage.
+  //   · et en les branchant, un REGARD EN AVANT a été trouvé puis corrigé :
+  //     « FVG jamais comblé » se décidait sur TOUTE la série, donc la liste
+  //     des cibles d'un jour dépendait des semaines suivantes. Corrigé, le
+  //     résultat tombe de +1 167 € à +910 €. Le filet y a gagné un contrôle.
+  // AMD NE GAGNE TOUJOURS PAS D'ARGENT. Les sept sources n'y changent rien.
+  //
   // ⚠️ CES CHIFFRES ONT ÉTÉ DIVISÉS PAR CINQ LE 9 OCTOBRE, et ce n'est pas un
   // changement de marché : c'est la correction d'un défaut. Atteindre
   // l'objectif créditait le PLAFOND tp2 au lieu de la distance réellement
