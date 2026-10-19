@@ -1514,6 +1514,25 @@ const MESURES = {
   // Ce n'est donc pas « le robot a raison mais sort mal » : il ne sait pas
   // non plus de quel côté le marché va.
   //
+  //
+  // 19 OCTOBRE — SEIZE FAÇONS DE CHOISIR LE SENS, MISES EN CONCURRENCE
+  // (scripts/scenario.js). Même instant, même risque, SEUL LE SENS CHANGE :
+  // deux règles ne peuvent donc différer que par ce qu'on teste. Le repère
+  // est le point neutre MESURÉ (48,6 %, pas 50 % : la convention prudente
+  // compte perdants les tirages ambigus, pour les deux sens).
+  //   60 jours · 7 043 tirages : le RETOUR VERS L'OUVERTURE DE NEW YORK sort
+  //     à 53,5 %, +4,2 écarts-types par jour, et les deux moitiés tiennent.
+  //   2 ans · 2 901 tirages    : la MÊME règle retombe à 49,0 %, +0,9. Elle
+  //     ne confirme pas. À sa place sort le biais FVG de modele.js, 50,8 %,
+  //     +3,0 — qui lui vaut 47,6 % sur les 60 jours.
+  // CHAQUE ÉCHANTILLON SACRE UN GAGNANT DIFFÉRENT, ET AUCUN NE TIENT SUR
+  // L'AUTRE. C'est la signature du bruit, pas d'un avantage. Aucune des seize
+  // règles ne bat la pièce de monnaie sur les deux jeux à la fois.
+  //   Nuance à ne pas perdre : les deux ans sont en bougies d'une heure, où
+  // la fenêtre ne fait que trois bougies. L'instrument y est faible pour un
+  // effet intrajournalier — ce n'est pas une réfutation propre, c'est une
+  // absence de confirmation.
+  //
   // AMD NE GAGNE TOUJOURS PAS D'ARGENT. Les sept sources n'y changent rien.
   //
   // ⚠️ CES CHIFFRES ONT ÉTÉ DIVISÉS PAR CINQ LE 9 OCTOBRE, et ce n'est pas un

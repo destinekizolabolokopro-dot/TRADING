@@ -697,7 +697,7 @@ button,input,select{font:inherit;color:inherit}
   et <b>KINTT</b> — le plan source appliqué à la lettre, fenêtre <span id="f-kfen">—</span>
   à New York, objectif sur une zone. Leurs journaux et leurs bilans sont séparés ;
   aucune moyenne n’est faite entre les deux.
-  <br><b>Dernière mise à jour du site : 19/10/2026 à 01 h 33 UTC.</b>
+  <br><b>Dernière mise à jour du site : 19/10/2026 à 01 h 47 UTC.</b>
   Si cette date ne correspond pas à ce qui t’a été annoncé, la page vient du cache :
   tire-la vers le bas pour la recharger.
   <b>Comptage prudent :</b> quand une bougie de 5 minutes touche l’objectif et le stop, c’est le
@@ -2718,7 +2718,14 @@ if (typeof window !== 'undefined') window.CFD = CFD;
   // est consulté, et le biais se lit sur 15m, 1h, 4h et le journalier.
   var SERIES2 = SERIES.filter(function (s) { return ['m5', 'm15', 'h1', 'd1'].indexOf(s.cle) >= 0; });
 
+  // prepareBiais et biaisA sont exportés pour que le banc d'essai des
+  // scénarios (scripts/scenario.js) puisse mettre CE biais en concurrence
+  // avec d'autres façons de choisir le sens. Sans l'export, le banc lisait
+  // un biais toujours nul et la règle disparaissait de son tableau SANS
+  // QUE RIEN NE LE DISE — le même défaut silencieux que les épreuves jugeant
+  // le vide pendant deux jours.
   root.Modele = { evaluer: evaluer, CFG: CFG, heure: heure, fenetre: fenetre,
+                  prepareBiais: prepareBiais, biaisA: biaisA,
                   SERIES: SERIES, SERIES2: SERIES2 };
 })(typeof window !== 'undefined' ? window : this);
 
@@ -5418,6 +5425,25 @@ const MESURES = {
   // d'une heure, douze fois trop grosses pour trancher.
   // Ce n'est donc pas « le robot a raison mais sort mal » : il ne sait pas
   // non plus de quel côté le marché va.
+  //
+  //
+  // 19 OCTOBRE — SEIZE FAÇONS DE CHOISIR LE SENS, MISES EN CONCURRENCE
+  // (scripts/scenario.js). Même instant, même risque, SEUL LE SENS CHANGE :
+  // deux règles ne peuvent donc différer que par ce qu'on teste. Le repère
+  // est le point neutre MESURÉ (48,6 %, pas 50 % : la convention prudente
+  // compte perdants les tirages ambigus, pour les deux sens).
+  //   60 jours · 7 043 tirages : le RETOUR VERS L'OUVERTURE DE NEW YORK sort
+  //     à 53,5 %, +4,2 écarts-types par jour, et les deux moitiés tiennent.
+  //   2 ans · 2 901 tirages    : la MÊME règle retombe à 49,0 %, +0,9. Elle
+  //     ne confirme pas. À sa place sort le biais FVG de modele.js, 50,8 %,
+  //     +3,0 — qui lui vaut 47,6 % sur les 60 jours.
+  // CHAQUE ÉCHANTILLON SACRE UN GAGNANT DIFFÉRENT, ET AUCUN NE TIENT SUR
+  // L'AUTRE. C'est la signature du bruit, pas d'un avantage. Aucune des seize
+  // règles ne bat la pièce de monnaie sur les deux jeux à la fois.
+  //   Nuance à ne pas perdre : les deux ans sont en bougies d'une heure, où
+  // la fenêtre ne fait que trois bougies. L'instrument y est faible pour un
+  // effet intrajournalier — ce n'est pas une réfutation propre, c'est une
+  // absence de confirmation.
   //
   // AMD NE GAGNE TOUJOURS PAS D'ARGENT. Les sept sources n'y changent rien.
   //
