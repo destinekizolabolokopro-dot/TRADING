@@ -1066,16 +1066,33 @@
    "etapeBloquee": "stop",
    "dit": "Inversion 5m confirmée sur RB M5 (30064.25 – 30077.75), mais le stop était trop serré face à l'ATR.",
    "apresCoup": false
+  },
+  {
+   "ts": "2026-10-19T13:34:11.359Z",
+   "bougie": "2026-10-19T13:20:00.000Z",
+   "jour": "2026-10-19",
+   "heureNY": "09:20",
+   "prix": 29777.25,
+   "retardMin": 14,
+   "biais": "neutre",
+   "score": 0,
+   "dol": null,
+   "niveau": null,
+   "etat": "CHERCHE",
+   "niveauxParUnite": "M5:50 M15:76 M30:85 H1:90 H4:41",
+   "etapeBloquee": "biais",
+   "dit": "Biais neutre (score 0/4, il en faut 2) — aucune position possible.",
+   "apresCoup": false
   }
  ],
  "bilan": {
-  "maj": "2026-10-16T13:46:21.223Z",
+  "maj": "2026-10-19T13:34:11.359Z",
   "total": 12,
   "clos": 12,
   "ouverts": 0,
   "reussite": 100,
   "cumulR": 4.32,
-  "passages": 35
+  "passages": 36
  },
  "archive": [
   {
