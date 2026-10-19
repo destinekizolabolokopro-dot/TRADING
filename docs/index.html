@@ -697,7 +697,7 @@ button,input,select{font:inherit;color:inherit}
   et <b>KINTT</b> — le plan source appliqué à la lettre, fenêtre <span id="f-kfen">—</span>
   à New York, objectif sur une zone. Leurs journaux et leurs bilans sont séparés ;
   aucune moyenne n’est faite entre les deux.
-  <br><b>Dernière mise à jour du site : 18/10/2026 à 19 h 02 UTC.</b>
+  <br><b>Dernière mise à jour du site : 19/10/2026 à 01 h 33 UTC.</b>
   Si cette date ne correspond pas à ce qui t’a été annoncé, la page vient du cache :
   tire-la vers le bas pour la recharger.
   <b>Comptage prudent :</b> quand une bougie de 5 minutes touche l’objectif et le stop, c’est le
@@ -5401,6 +5401,24 @@ const MESURES = {
   //       6 · retirer le seul meilleur mois laisse −101 € ; les cinq plus
   //           gros gains pèsent +3 092 € sur un total de +910 €, soit 340 %,
   //           et sans eux le total vaut −2 181 €.
+  //
+  // 19 OCTOBRE — LE SENS EST-IL SOUVENT BON ? (scripts/sens.js)
+  // Le taux de réussite des trades ne répondait pas à la question : il mêle
+  // le sens, la taille du stop et la sortie. Ce test isole le SENS seul, par
+  // un pari symétrique : le prix touche-t-il +1 R avant −1 R ? Même distance
+  // des deux côtés, donc le hasard donne 50 % et le chiffre se compare enfin
+  // à quelque chose.
+  //   60 jours · 211 scénarios · signal 5 min : 49,7 %   (−0,1 écart-type)
+  //   2 ans    ·  83 scénarios · signal 1 h   : 57,4 %   (+1,2 écart-type)
+  //   sens de la journée (clôture du bon côté) : 49,8 % et 45,8 %
+  // LE SENS EST UNE PIÈCE DE MONNAIE. Le gros échantillon, celui dont les
+  // bougies sont assez fines pour qu'on sache dans quel ordre les prix sont
+  // passés, donne 49,7 % — un demi-point SOUS le hasard. Le 57,4 % des deux
+  // ans tient dans le bruit (il faudrait 2 écarts-types) et vient de bougies
+  // d'une heure, douze fois trop grosses pour trancher.
+  // Ce n'est donc pas « le robot a raison mais sort mal » : il ne sait pas
+  // non plus de quel côté le marché va.
+  //
   // AMD NE GAGNE TOUJOURS PAS D'ARGENT. Les sept sources n'y changent rien.
   //
   // ⚠️ CES CHIFFRES ONT ÉTÉ DIVISÉS PAR CINQ LE 9 OCTOBRE, et ce n'est pas un
