@@ -30,9 +30,9 @@ const ctx = {};
 // js/amd.js manquait à cette liste : la troisième stratégie échappait donc à
 // TOUS les contrôles partagés — réglages cohérents, absence de regard en
 // avant, bornes des objectifs. Elle est chargée comme les autres.
-for (const f of ['js/structure.js', 'js/position.js', 'js/modele.js', 'js/kintt.js', 'js/amd.js'])
+for (const f of ['js/structure.js', 'js/position.js', 'js/modele.js', 'js/kintt.js', 'js/dol.js', 'js/amd.js'])
   new Function('root', 'ST', fs.readFileSync(path.join(RACINE, f), 'utf-8')).call(ctx, ctx, ctx.ST);
-const { Position, Modele, Kintt, AMD, ST } = ctx;
+const { Position, Modele, Kintt, AMD, DOL, ST } = ctx;
 const CFG = Modele.CFG;
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -937,6 +937,84 @@ t('js/position.js est bien le seul à porter la règle', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
+console.log('\n── UN GAIN VAUT CE QUE LE PRIX A PARCOURU ────────────────────');
+// LE PIRE DÉFAUT DE TOUTE LA SÉRIE. Atteindre l'objectif créditait le PLAFOND
+// `tp2`, pas la distance réellement parcourue. Pour le modèle en place
+// l'objectif EST le plafond, les deux coïncidaient et rien ne se voyait. Mais
+// AMD vise la liquidité interne, bornée par le plafond et souvent bien plus
+// proche : un niveau situé à 0,5 R rapportait 2,5 R. Cinq fois trop, sur
+// chaque gagnant, pendant toute la durée de vie de la stratégie.
+t('un objectif proche rapporte sa distance, pas le plafond', () => {
+  const cfg = { part: 0, tp1: 1, tp2: 2.5, sortieMin: null };
+  // Entrée 100, stop 99 (risque 1), objectif à 100,5 — soit 0,5 R, bien en
+  // deçà du plafond de 2,5 R.
+  const pos = { sens: 'LONG', entree: 100, sl: 99, risq: 1, tp1: 100.4, tp: 100.5 };
+  const b = [{ t: 1, o: 100, h: 100.45, l: 100, c: 100.4 },
+             { t: 2, o: 100.4, h: 100.6, l: 100.4, c: 100.6 }];
+  const f = Position.suivre(pos, b, cfg, { prudent: true, depuis: 0 });
+  if (!f || f.ouverte) throw new Error('la position ne se clôt pas');
+  if (f.sortie !== 'objectif') throw new Error('sortie « ' + f.sortie +' » au lieu de l\'objectif');
+  if (Math.abs(f.r - 0.5) > 1e-6)
+    throw new Error('crédité ' + f.r.toFixed(3) + ' R pour un parcours de 0,5 R');
+});
+
+t('un objectif au plafond rapporte bien le plafond', () => {
+  // Le miroir : la correction ne doit pas amputer le cas normal, celui du
+  // modèle en place, où l'objectif vaut exactement entrée + risq × tp2.
+  const cfg = { part: 0, tp1: 1, tp2: 2.5, sortieMin: null };
+  const pos = { sens: 'LONG', entree: 100, sl: 99, risq: 1, tp1: 100.4, tp: 102.5 };
+  const b = [{ t: 1, o: 100, h: 100.5, l: 100, c: 100.5 },
+             { t: 2, o: 100.5, h: 102.6, l: 100.5, c: 102.6 }];
+  const f = Position.suivre(pos, b, cfg, { prudent: true, depuis: 0 });
+  if (!f || f.ouverte) throw new Error('la position ne se clôt pas');
+  if (Math.abs(f.r - 2.5) > 1e-6) throw new Error('crédité ' + f.r.toFixed(3) + ' R au lieu de 2,5');
+});
+
+t('un gain ne dépasse jamais la distance jusqu\'à l\'objectif', () => {
+  // Le contrôle général : sur TOUS les signaux d'AMD, le gain crédité ne peut
+  // pas excéder ce que le prix aurait parcouru jusqu'à l'objectif.
+  const cfg = { part: 0, tp1: 0.4, tp2: 2.5, sortieMin: null };
+  for (const d of [0.3, 0.8, 1.6, 2.5]) {
+    const pos = { sens: 'SHORT', entree: 100, sl: 101, risq: 1, tp1: 99.6, tp: 100 - d };
+    const b = [{ t: 1, o: 100, h: 100, l: 99.5, c: 99.5 },
+               { t: 2, o: 99.5, h: 99.5, l: 100 - d - 0.1, c: 100 - d - 0.1 }];
+    const f = Position.suivre(pos, b, cfg, { prudent: true, depuis: 0 });
+    if (f && !f.ouverte && f.r > d + 1e-6)
+      throw new Error('objectif à ' + d + ' R crédité ' + f.r.toFixed(3) + ' R');
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+console.log('\n── LES FRAIS NE DÉVORENT PAS LE RISQUE ───────────────────────');
+// Le 6 octobre, AMD a pris une vente avec un stop de 2,3 points : l'aller-
+// retour en a coûté 30 %. Le trade était perdant à l'instant où il était
+// passé. Ce n'est pas de la malchance, c'est de l'arithmétique — et sur
+// 232 trades les stops serrés perdent EN MOYENNE.
+t('AMD refuse les stops que les frais dévorent', () => {
+  if (!AMD) throw new Error('js/amd.js n\'est pas chargé');
+  if (AMD.CFG.coutMax == null) throw new Error('le garde-fou coutMax a disparu');
+  if (!(AMD.CFG.coutMax > 0 && AMD.CFG.coutMax <= 0.2))
+    throw new Error('coutMax ' + AMD.CFG.coutMax + ' : hors de tout bon sens');
+});
+
+t('le calcul du coût n\'est pas recopié dans la stratégie', () => {
+  // Une formule à deux endroits diverge. Celle-ci vit dans js/position.js.
+  const src = fs.readFileSync(path.join(RACINE, 'js/amd.js'), 'utf-8');
+  if (/slip\s*\*\s*2|comm\s*\//.test(src))
+    throw new Error('la formule des frais est recopiée dans js/amd.js');
+  if (!/Position\.cout/.test(src))
+    throw new Error('la stratégie n\'appelle pas Position.cout');
+});
+
+t('un stop serré est bien refusé, un stop large accepté', () => {
+  // On vérifie la RÈGLE, pas seulement sa présence : un seuil qui ne filtre
+  // rien serait un garde-fou décoratif.
+  const serre = Position.cout(2.3), large = Position.cout(60);
+  if (!(serre > AMD.CFG.coutMax)) throw new Error('un stop de 2,3 points passerait encore');
+  if (!(large <= AMD.CFG.coutMax)) throw new Error('un stop de 60 points serait refusé à tort');
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
 console.log('\n── LA FENÊTRE DU ROBOT SUIT CELLE DES STRATÉGIES ─────────────');
 // Le fichier de la tâche planifiée portait « 13 h 15 → 15 h 45 UTC » en dur,
 // ce qui correspondait à 09 h → 10 h New York. Quand AMD a ouvert à 08 h, ce
@@ -1380,6 +1458,165 @@ console.log(JSON.stringify(out)); await b.close();`;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+console.log('\n── LES SEPT SOURCES DE LIQUIDITÉ (js/dol.js) ─────────────────');
+// Le cours source liste sept sources de liquidité ; le modèle n'en lisait
+// qu'une. js/dol.js les construit toutes. Le danger est entier : un bassin
+// daté de son extrême plutôt que de sa confirmation fait lire l'avenir, et
+// c'est exactement la faute qui avait gonflé les trois quarts d'un résultat
+// plus tôt dans ce dépôt. Ces contrôles ne jugent pas si les bassins font
+// gagner de l'argent — la mesure dit que non — ils jugent qu'ils sont
+// HONNÊTES.
+{
+  const fx = path.join(RACINE, 'data', 'fixture.json');
+  const J = fs.existsSync(fx) ? JSON.parse(fs.readFileSync(fx, 'utf-8')) : null;
+  const bou = l => (l || []).map(x => ({ t: x[0] * 1000, o: x[1], h: x[2], l: x[3], c: x[4] }));
+  const D = J ? { m5: bou(J.NQ.m5), m15: bou(J.NQ.m15), h1: bou(J.NQ.h1), d1: bou(J.NQ.d1) } : null;
+  const BASSINS = D ? DOL.tous(D, D.m5, AMD.heure, null) : [];
+
+  t('le module des bassins existe et expose tous()', () => {
+    if (!DOL || typeof DOL.tous !== 'function') throw new Error('DOL.tous manquant');
+  });
+
+  if (!D) {
+    t('les bassins sont mesurables (jeu figé présent)', () => {
+      throw new Error('data/fixture.json absent — lancer node scripts/fixture.js');
+    });
+  } else {
+    t('le jeu figé produit des bassins', () => {
+      if (BASSINS.length < 50) throw new Error('seulement ' + BASSINS.length + ' bassins');
+    });
+
+    t('les SEPT sources sont réellement représentées', () => {
+      // Une source silencieuse est pire qu'une source absente : on croit la
+      // mesurer. Quatre d'entre elles l'étaient, et rien ne le disait.
+      const attendus = [/^IT[HL]$/, /^EQ[HL]$/, /^LRLR-[HL]$/, /^NWOG|NDOG$/,
+                        /^séance /, /^FVG ouvert$/, /^extrême données$/];
+      const noms = [...new Set(BASSINS.map(b => b.type))];
+      const manquants = attendus.filter(re => !noms.some(n => re.test(n)));
+      if (manquants.length)
+        throw new Error(manquants.length + ' source(s) muette(s) : ' + manquants.join(' ') +
+                        ' · présentes : ' + noms.join(', '));
+    });
+
+    t('chaque bassin porte un prix et un instant de naissance', () => {
+      for (const b of BASSINS) {
+        if (!(b.prix > 0)) throw new Error(b.type + ' : prix ' + b.prix);
+        if (!(b.vu > 0)) throw new Error(b.type + ' : vu ' + b.vu);
+        if (typeof b.haut !== 'boolean') throw new Error(b.type + ' : côté indéfini');
+      }
+    });
+
+    t('aucun bassin n\'est franchi AVANT d\'être connaissable', () => {
+      // pris <= vu voudrait dire : le prix a traversé un niveau que personne
+      // ne pouvait encore voir. Le bassin serait une cible imaginaire.
+      const faux = BASSINS.filter(b => b.pris != null && b.pris <= b.vu);
+      if (faux.length)
+        throw new Error(faux.length + ' bassin(s) pris avant d\'exister, ex. ' +
+                        faux[0].type + ' ' + faux[0].prix);
+    });
+
+    t('l\'instant de franchissement est bien le PREMIER franchissement', () => {
+      // Dater le franchissement trop tard laisse un bassin servir de cible
+      // alors qu'il est déjà vidé — un gagnant offert.
+      const pas = ST.pasDe(D.m5);
+      let verifies = 0;
+      for (const b of BASSINS) {
+        if (b.pris == null) continue;
+        for (const c of D.m5) {
+          if (c.t <= b.vu) continue;
+          if (c.t + pas >= b.pris) break;
+          if (b.haut ? c.h >= b.prix : c.l <= b.prix)
+            throw new Error(b.type + ' ' + b.prix + ' franchi à ' +
+                            new Date(c.t).toISOString() + ' mais daté ' +
+                            new Date(b.pris).toISOString());
+        }
+        verifies++;
+      }
+      if (verifies < 20) throw new Error('trop peu de bassins franchis pour juger (' + verifies + ')');
+    });
+
+    t('un bassin jamais franchi ne l\'est vraiment jamais', () => {
+      for (const b of BASSINS) {
+        if (b.pris != null) continue;
+        for (const c of D.m5) {
+          if (c.t <= b.vu) continue;
+          if (b.haut ? c.h >= b.prix : c.l <= b.prix)
+            throw new Error(b.type + ' ' + b.prix + ' dit intact, pourtant franchi à ' +
+                            new Date(c.t).toISOString());
+        }
+      }
+    });
+
+    t('AUCUN REGARD EN AVANT : couper la série à `vu` ne fait pas disparaître le bassin', () => {
+      // LE contrôle qui compte. On coupe toutes les séries à l'instant que le
+      // bassin s'attribue, et on exige qu'il soit TOUJOURS là. S'il n'apparaît
+      // qu'avec les bougies suivantes, il a été daté trop tôt.
+      const coupe = (l, T) => l.filter(c => c.t < T);
+      const candidats = BASSINS.filter(b => b.type !== 'extrême données')
+        .filter((b, i) => i % 37 === 0).slice(0, 12);   // échantillon régulier
+      if (candidats.length < 6) throw new Error('échantillon trop petit');
+      let juges = 0;
+      for (const b of candidats) {
+        const Dc = { m5: coupe(D.m5, b.vu), m15: coupe(D.m15, b.vu),
+                     h1: coupe(D.h1, b.vu), d1: coupe(D.d1, b.vu) };
+        // js/dol.js ignore une unité de moins de 40 bougies. Tôt dans le jeu
+        // figé, couper fait tomber le H1 — donc le H4 qui en dérive — sous ce
+        // seuil, et le bassin manque pour cette raison et non parce qu'il
+        // regarde en avant. Premier essai de ce contrôle : il criait au loup
+        // sur un H4 de douze bougies. On ne juge que les coupes où l'unité du
+        // bassin survit.
+        const assez = { m5: Dc.m5.length, m15: Dc.m15.length, m30: Math.floor(Dc.m15.length / 2),
+                        h1: Dc.h1.length, h4: Math.floor(Dc.h1.length / 4) };
+        if (!(assez[b.tf] >= 40)) continue;
+        if (Dc.m5.length < 60) continue;               // trop tôt dans la série
+        juges++;
+        const vus = DOL.tous(Dc, Dc.m5, AMD.heure, null);
+        const trouve = vus.some(x => x.type === b.type && x.haut === b.haut &&
+                                     Math.abs(x.prix - b.prix) < 1e-6);
+        if (!trouve)
+          throw new Error(b.type + ' ' + b.prix + ' ne se voit QU\'APRÈS ' +
+                          new Date(b.vu).toISOString() + ' : il est daté trop tôt');
+      }
+      if (juges < 4) throw new Error('seulement ' + juges + ' coupe(s) jugeable(s) — le contrôle ne prouve rien');
+    });
+
+    t('les bassins sortent triés par instant de naissance', () => {
+      // Le modèle les consomme avec un curseur qui n'avance jamais : un
+      // désordre lui en ferait sauter silencieusement.
+      for (let i = 1; i < BASSINS.length; i++)
+        if (BASSINS[i].vu < BASSINS[i - 1].vu) throw new Error('rupture de tri en ' + i);
+    });
+
+    t('demander UNE source n\'en renvoie pas d\'autres', () => {
+      const seul = DOL.tous(D, D.m5, AMD.heure, ['seances']);
+      if (!seul.length) throw new Error('aucune séance');
+      const intrus = [...new Set(seul.map(b => b.type))].filter(n => !/^séance /.test(n));
+      if (intrus.length) throw new Error('types non demandés : ' + intrus.join(', '));
+    });
+  }
+
+  t('le modèle n\'utilise les sept sources que si on le lui demande', () => {
+    // Elles restent éteintes par défaut : mesurées, elles ne changent RIEN
+    // quand on vise loin (le plafond en R absorbe tout) et font PERDRE quand
+    // on vise près. Les allumer par défaut serait un réglage sans preuve.
+    if (AMD.CFG.dolComplet !== false) throw new Error('dolComplet allumé par défaut');
+    if (AMD.CFG.dolRole !== 'cible' && AMD.CFG.dolRole !== 'manip')
+      throw new Error('dolRole inconnu : ' + AMD.CFG.dolRole);
+  });
+
+  t('POURQUOI les sept sources ne changent rien : le plafond en R borne l\'objectif', () => {
+    // Mesuré le 18 octobre : en visant LOIN, 121 signaux sur 140 ont leur
+    // objectif AU PLAFOND tp2, et la liquidité visée est à 12,5 R de médiane.
+    // Ajouter des bassins encore plus lointains ne peut donc rien déplacer —
+    // et c'est la raison pour laquelle les six sources donnent, au centime,
+    // le même résultat que sans elles. Ce contrôle garde la borne en place :
+    // si elle disparaît, l'explication ci-dessus cesse d'être vraie et la
+    // mesure doit être refaite.
+    if (!(AMD.CFG.tp2 > 0)) throw new Error('aucun plafond en R : tp2 = ' + AMD.CFG.tp2);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // Le site EN LIGNE comparé au dépôt. Sur demande, parce qu'il faut le réseau :
 //   node scripts/test.js --enligne
 // Rien ne garantissait jusqu'ici que ce qui est publié soit ce qui est ici :
@@ -1418,6 +1655,39 @@ if (process.argv.includes('--enligne')) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// LE CHIFFRE QUE LA PAGE ANNONCE DOIT ÊTRE CELUI-CI.
+//
+// La page affichait « 157 vérifications » quand il y en avait 166 : un nombre
+// mesuré, recopié dans le hero, et laissé derrière. C'est le même défaut que
+// la fenêtre écrite à deux endroits, pour la troisième fois dans la journée.
+// Il ne peut plus passer : ce contrôle compare ce que la page promet à ce qui
+// a réellement tourné. Il se compte LUI-MÊME dans le total, d'où le +1.
+// ⚠️ Le total dépend de la suite lancée : sans --navigateur il manque les
+// contrôles qui ouvrent vraiment la page. Le chiffre annoncé est celui de la
+// suite COMPLÈTE — c'est celui qu'on cite — donc ce contrôle ne juge que là.
+// Le mesurer sur la suite courte ferait échouer un chiffre pourtant juste.
+t('la page annonce le bon nombre de vérifications', () => {
+  const f = path.join(RACINE, 'index.html');
+  if (!fs.existsSync(f)) return;
+  if (!process.argv.includes('--navigateur')) {
+    const m0 = fs.readFileSync(f, 'utf-8').match(/verifications:\s*(\d+)/);
+    if (!m0) throw new Error('MESURES.verifications introuvable dans la page');
+    if (+m0[1] < ok + ko + 1)
+      throw new Error('la page annonce ' + m0[1] + ', or la suite courte en compte déjà ' + (ok + ko + 1));
+    return;      // le compte exact se juge avec --navigateur
+  }
+  const src = fs.readFileSync(f, 'utf-8');
+  const m = src.match(/verifications:\s*(\d+)/);
+  if (!m) throw new Error('MESURES.verifications introuvable dans la page');
+  const annonce = +m[1], reel = ok + ko + 1;
+  if (annonce !== reel)
+    throw new Error('la page annonce ' + annonce + ' vérifications, il y en a ' + reel);
+  // Et la date des mesures doit exister : un chiffre sans date se croit
+  // éternellement vrai.
+  if (!/date:\s*'\d{4}-\d{2}-\d{2}'/.test(src))
+    throw new Error('MESURES n\'est pas daté');
+});
+
 const total = ok + ko;
 console.log('\n' + '─'.repeat(62));
 console.log(`${ok}/${total} vérifications passées` + (ko ? ` · ${ko} ÉCHEC(S)` : ' · tout est bon'));

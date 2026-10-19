@@ -18,16 +18,30 @@ const fs = require('fs'), path = require('path');
 const L = require('./longue.js');
 const RACINE = path.resolve(__dirname, '..');
 const ctx = {};
-for (const f of ['js/structure.js', 'js/position.js', 'js/modele.js', 'js/amd.js'])
+for (const f of ['js/structure.js', 'js/position.js', 'js/modele.js', 'js/dol.js', 'js/amd.js'])
   new Function('root', 'ST', fs.readFileSync(path.join(RACINE, f), 'utf-8')).call(ctx, ctx, ctx.ST);
 const { Position, AMD } = ctx;
 const RISQUE = +(process.env.RISQUE_EUR || 250);
 const POINT = { 'NQ=F': 2, 'ES=F': 5, 'YM=F': 0.5, 'RTY=F': 5 }, TAUX = 1.08;
 const TIRAGES = +(process.env.TIRAGES || 200);
 
+// ⚠️ LA BOUCLE PORTE DES ACCOLADES, et ce n'est pas un détail de style : sans
+// elles, le `for` ne couvrait que la PREMIÈRE ligne, et les réglages ajoutés
+// ensuite s'exécutaient une seule fois, hors de la boucle, sur un `a` qui
+// n'existait plus. Le script ne démarrait même pas.
 let m;
-for (const a of process.argv.slice(2))
+for (const a of process.argv.slice(2)) {
   if ((m = a.match(/^--fenetre=(\d+),(\d+)$/))) { AMD.CFG.manipDeb = +m[1] * 60; AMD.CFG.manipFin = +m[2] * 60; }
+  if ((m = a.match(/^--cible=(proche|loin)$/))) AMD.CFG.cible = m[1];
+  if ((m = a.match(/^--tp2=([\d.]+)$/))) AMD.CFG.tp2 = +m[1];
+  if ((m = a.match(/^--entree=(ifvg|immediat|delai)$/))) AMD.CFG.entree = m[1];
+  // Les sept sources du cours. Elles manquaient ici : une configuration qui
+  // les utilise ne pouvait donc PAS être jugée par les six épreuves, et
+  // c'est précisément la seule chose qui compte à son sujet.
+  if (a === '--dol-complet') AMD.CFG.dolComplet = true;
+  if ((m = a.match(/^--sources=(.+)$/))) { AMD.CFG.dolComplet = true; AMD.CFG.sourcesDOL = m[1].split(','); }
+  if ((m = a.match(/^--dol-role=(manip|cible)$/))) AMD.CFG.dolRole = m[1];
+}
 AMD.CFG.unitesFVG = ['h1', 'h4'];
 AMD.CFG.unitesInt = ['h1', 'h4'];
 const SYMS = (process.argv.find(a => a.startsWith('--marches=')) || '--marches=NQ,ES')
@@ -75,7 +89,12 @@ L.jeu(SYMS).then(PS => {
   // ── les signaux réels ──────────────────────────────────────────────────
   const JEU = [];
   for (const sym of Object.keys(PS)) {
-    const sigs = AMD.evaluer(PS[sym], { execution: 'h1' }).tousSignaux
+    // ⚠️ LE MARCHÉ CORRÉLÉ EST OBLIGATOIRE. Sans lui, la divergence SMT ne
+    // peut pas être jugée, et avec le réglage « exigée » — devenu le défaut —
+    // AUCUN signal ne passe. Le script rendait alors zéro trade sans rien
+    // dire, et les épreuves jugeaient le vide.
+    const CORREL = { 'NQ=F': 'ES=F', 'ES=F': 'NQ=F', 'YM=F': 'ES=F', 'RTY=F': 'ES=F' };
+    const sigs = AMD.evaluer(PS[sym], { execution: 'h1', E: PS[CORREL[sym]] }).tousSignaux
       .filter(s => Math.abs(s.risq) * (POINT[sym] || 2) / TAUX <= RISQUE);
     JEU.push({ sym, S: PS[sym], sigs });
   }
@@ -101,6 +120,18 @@ L.jeu(SYMS).then(PS => {
     if (f) REEL.push({ r: f.r - Position.cout(s.risq), t: s.t, sym: j.sym, ambigu: f.ambigu, risq: s.risq });
   }
   const B = bilan(REEL.map(x => x.r));
+  // Un plantage sur `null` trois lignes plus bas ne dit pas POURQUOI. Le cas
+  // arrive pour de bon : lancé pendant que le cache long se télécharge, le
+  // script ne voyait aucune bougie et mourait sur un TypeError obscur.
+  if (!B) {
+    console.error('\nAUCUN TRADE — les épreuves n\'ont rien à juger.');
+    console.error('   séries chargées : ' + Object.keys(PS).map(s =>
+      s + ' ' + ((PS[s].h1 || []).length) + ' bougies h1').join(' · '));
+    console.error('   signaux bruts   : ' + JEU.reduce((a, j) => a + j.sigs.length, 0));
+    console.error('\n   Cause la plus fréquente : le cache long est vide ou en cours');
+    console.error('   de téléchargement. Lancer d\'abord « node scripts/longue.js ».');
+    process.exit(1);
+  }
   console.log('\n╔══════════════════════════════════════════════════════════════════════╗');
   console.log(`║  LES ÉPREUVES DU MODÈLE AMD · 2 ans · ${String(B.n).padStart(3)} trades                    ║`);
   console.log('╚══════════════════════════════════════════════════════════════════════╝');

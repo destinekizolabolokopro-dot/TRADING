@@ -511,8 +511,8 @@ button,input,select{font:inherit;color:inherit}
       </div>
       <div class="hero-facts">
         <div><b class="mono">3</b><i>Stratégies</i></div>
-        <div><b class="mono">2 ans</b><i>Mesurés</i></div>
-        <div><b class="mono">157</b><i>Vérifications</i></div>
+        <div><b class="mono" id="h-duree">—</b><i>Mesurés</i></div>
+        <div><b class="mono" id="h-verif">—</b><i>Vérifications</i></div>
       </div>
     </div>
 
@@ -697,7 +697,7 @@ button,input,select{font:inherit;color:inherit}
   et <b>KINTT</b> — le plan source appliqué à la lettre, fenêtre <span id="f-kfen">—</span>
   à New York, objectif sur une zone. Leurs journaux et leurs bilans sont séparés ;
   aucune moyenne n’est faite entre les deux.
-  <br><b>Dernière mise à jour du site : 16/10/2026 à 23 h 39 UTC.</b>
+  <br><b>Dernière mise à jour du site : 19/10/2026 à 01 h 47 UTC.</b>
   Si cette date ne correspond pas à ce qui t’a été annoncé, la page vient du cache :
   tire-la vers le bas pour la recharger.
   <b>Comptage prudent :</b> quand une bougie de 5 minutes touche l’objectif et le stop, c’est le
@@ -2083,7 +2083,25 @@ if (typeof window !== 'undefined') window.CFD = CFD;
       } else if (!part1 && (L ? c.h >= pos.tp1 : c.l <= pos.tp1)) {
         part1 = true; sl = pos.entree;                // partiel encaissé
       } else if (part1 && (L ? c.h >= pos.tp : c.l <= pos.tp)) {
-        r = plafond; sortie = 'objectif';
+        // ⚠️ ON CRÉDITAIT LE PLAFOND, PAS LA DISTANCE PARCOURUE.
+        //
+        // Pour le modèle en place, `pos.tp` vaut exactement entrée ± risq×tp2
+        // et les deux coïncident : le défaut ne se voyait pas. Mais AMD place
+        // son objectif sur la LIQUIDITÉ INTERNE, bornée par le plafond —
+        // souvent bien plus près. Atteindre un niveau situé à 0,5 R rapportait
+        // donc 2,5 R. Le même trade payé cinq fois trop.
+        //
+        // La signature était visible et je l'ai d'abord prise pour une bonne
+        // nouvelle : en montant le plafond de 2 R à 6 R, le total quadruplait
+        // SANS que le taux de réussite bouge d'un dixième. C'était impossible :
+        // si les gains venaient vraiment de plus loin, il faudrait aller les
+        // chercher plus souvent en vain.
+        //
+        // On crédite maintenant ce que le prix a réellement parcouru jusqu'à
+        // l'objectif. Le plafond reste une BORNE, il n'est plus un montant.
+        var rTp = pos.risq > 0 ? Math.abs(pos.tp - pos.entree) / pos.risq : cfg.tp2;
+        r = cfg.part * cfg.tp1 + (1 - cfg.part) * Math.min(cfg.tp2, rTp);
+        sortie = 'objectif';
       } else if (opts.prudent === false && stoppe) {
         r = part1 ? cfg.part * cfg.tp1 : -1;
         sortie = part1 ? 'seuil' : 'stop';
@@ -2700,7 +2718,14 @@ if (typeof window !== 'undefined') window.CFD = CFD;
   // est consulté, et le biais se lit sur 15m, 1h, 4h et le journalier.
   var SERIES2 = SERIES.filter(function (s) { return ['m5', 'm15', 'h1', 'd1'].indexOf(s.cle) >= 0; });
 
+  // prepareBiais et biaisA sont exportés pour que le banc d'essai des
+  // scénarios (scripts/scenario.js) puisse mettre CE biais en concurrence
+  // avec d'autres façons de choisir le sens. Sans l'export, le banc lisait
+  // un biais toujours nul et la règle disparaissait de son tableau SANS
+  // QUE RIEN NE LE DISE — le même défaut silencieux que les épreuves jugeant
+  // le vide pendant deux jours.
   root.Modele = { evaluer: evaluer, CFG: CFG, heure: heure, fenetre: fenetre,
+                  prepareBiais: prepareBiais, biaisA: biaisA,
                   SERIES: SERIES, SERIES2: SERIES2 };
 })(typeof window !== 'undefined' ? window : this);
 
@@ -3098,6 +3123,223 @@ if (typeof window !== 'undefined') window.CFD = CFD;
 <script>
 'use strict';
 /**
+ * LES BASSINS DE LIQUIDITÉ — js/dol.js
+ *
+ * POURQUOI CE FICHIER EXISTE. Le cours source liste SEPT sources de
+ * liquidité ; le modèle n'en cherchait qu'une — les sommets et creux
+ * intermédiaires H1. Cinq manquaient entièrement, et une sixième (les
+ * sommets relativement égaux) n'avait servi que de filtre de qualité, jamais
+ * de cible. Mesurer une stratégie amputée de cinq de ses sept cibles ne dit
+ * rien de la stratégie.
+ *
+ *     (Relative) EQH / EQL        sommets ou creux relativement égaux
+ *     Trendline Liquidity LRLR    une ligne de hauts ou de bas alignés
+ *     NWOG / NDOG                 l'écart d'ouverture de semaine ou de jour
+ *     ITH / ITL (5m+)             déjà présent
+ *     Session High/Low            extrêmes d'Asie, de Londres, de New York
+ *     Unfilled FVGs (5m+)         les déséquilibres jamais comblés
+ *     Data Highs/Low              les extrêmes de toute la période connue
+ *
+ * RÈGLE ABSOLUE, ET C'EST LA SEULE QUI COMPTE ICI : chaque bassin porte
+ * `vu`, l'instant où il devient CONNAISSABLE, et `pris`, l'instant où le prix
+ * le franchit. Un bassin n'existe comme cible qu'entre les deux. Dater un
+ * bassin de son extrême plutôt que de sa confirmation, c'est lire l'avenir —
+ * la faute qui avait gonflé les trois quarts d'un résultat plus tôt dans ce
+ * dépôt.
+ */
+(function (root) {
+
+  var CFG = {
+    // « Relativement égaux » veut dire à quelques ticks près. En fraction de
+    // l'ATR de l'unité considérée, pour rester comparable entre indices.
+    eqTol: 0.12,
+    // Une ligne de liquidité demande au moins trois points alignés.
+    lrlrMin: 3,
+    lrlrTol: 0.25,          // écart toléré à la droite, en fraction d'ATR
+    // Les séances, en minutes depuis minuit New York.
+    seances: [['asie', 20 * 60, 24 * 60 + 2 * 60], ['londres', 2 * 60, 5 * 60],
+              ['ny', 9 * 60 + 30, 16 * 60]]
+  };
+
+  function pasDe(cs) { return ST.pasDe(cs); }
+
+  /** L'instant où le prix franchit `prix`, lu sur l'unité d'exécution. */
+  function prisQuand(exe, prix, haut, depuis) {
+    var pas = pasDe(exe);
+    for (var i = 0; i < exe.length; i++) {
+      if (exe[i].t <= depuis) continue;
+      if (haut ? exe[i].h >= prix : exe[i].l <= prix) return exe[i].t + pas;
+    }
+    return null;
+  }
+
+  function ajoute(out, exe, prix, haut, vu, type, tf) {
+    if (!(prix > 0) || vu == null) return;
+    out.push({ prix: prix, haut: haut, vu: vu, type: type, tf: tf,
+               pris: prisQuand(exe, prix, haut, vu) });
+  }
+
+  // ── ITH / ITL ET SOMMETS RELATIVEMENT ÉGAUX ─────────────────────────────
+  function swings(out, cs, exe, tf, atr) {
+    var h = ST.hierarchie(cs);
+    [['ith', true, 'ITH'], ['itl', false, 'ITL']].forEach(function (p) {
+      h[p[0]].forEach(function (sw) { ajoute(out, exe, sw.prix, p[1], sw.vu, p[2], tf); });
+    });
+    // EQH / EQL : deux sommets à quelques ticks l'un de l'autre. Le bassin
+    // n'est connaissable qu'au SECOND — c'est lui qui crée l'égalité.
+    [['sth', true, 'EQH'], ['stl', false, 'EQL']].forEach(function (p) {
+      var l = h[p[0]];
+      for (var i = 1; i < l.length; i++) {
+        for (var j = Math.max(0, i - 4); j < i; j++) {
+          var tol = CFG.eqTol * (atr || Math.abs(l[i].prix) * 0.001);
+          if (Math.abs(l[i].prix - l[j].prix) <= tol) {
+            // Le bassin est au bord EXTÉRIEUR de la paire : le plus haut des
+            // deux sommets, le plus bas des deux creux.
+            var bord = p[1] ? Math.max(l[i].prix, l[j].prix)
+                            : Math.min(l[i].prix, l[j].prix);
+            ajoute(out, exe, bord, p[1], l[i].vu, p[2], tf);
+            break;
+          }
+        }
+      }
+    });
+  }
+
+  // ── LIQUIDITÉ DE LIGNE DE TENDANCE (LRLR) ───────────────────────────────
+  // Trois sommets descendants — ou trois creux montants — à peu près alignés.
+  // La cible est le dernier point de la série : c'est là que les stops
+  // s'empilent le long de la droite.
+  function lrlr(out, cs, exe, tf, atr) {
+    var h = ST.hierarchie(cs);
+    [['sth', true, 'LRLR-H'], ['stl', false, 'LRLR-L']].forEach(function (p) {
+      var l = h[p[0]];
+      for (var i = CFG.lrlrMin - 1; i < l.length; i++) {
+        var pts = l.slice(i - CFG.lrlrMin + 1, i + 1);
+        // monotone ? (hauts descendants pour une ligne de résistance)
+        var mono = true;
+        for (var k = 1; k < pts.length; k++)
+          if (p[1] ? pts[k].prix >= pts[k - 1].prix : pts[k].prix <= pts[k - 1].prix) mono = false;
+        if (!mono) continue;
+        // alignés ? écart du point du milieu à la droite des extrêmes
+        var a = pts[0], b = pts[pts.length - 1], m = pts[Math.floor(pts.length / 2)];
+        if (b.i === a.i) continue;
+        var attendu = a.prix + (b.prix - a.prix) * (m.i - a.i) / (b.i - a.i);
+        if (Math.abs(m.prix - attendu) > CFG.lrlrTol * (atr || 1)) continue;
+        ajoute(out, exe, b.prix, p[1], b.vu, p[2], tf);
+      }
+    });
+  }
+
+  // ── ÉCARTS D'OUVERTURE : NWOG ET NDOG ───────────────────────────────────
+  // NWOG : entre la clôture du vendredi et l'ouverture du dimanche.
+  // NDOG : entre la clôture d'une séance et l'ouverture de la suivante.
+  // Les deux bords sont des cibles — le prix revient combler l'écart.
+  function ecarts(out, exe, heure) {
+    var pas = pasDe(exe), prec = null;
+    for (var i = 1; i < exe.length; i++) {
+      var e = heure(exe[i].t), ep = heure(exe[i - 1].t);
+      if (e.jour === ep.jour) continue;
+      var trou = exe[i].t - exe[i - 1].t;
+      if (trou <= pas * 1.5) continue;                  // pas d'interruption
+      var cloture = exe[i - 1].c, ouverture = exe[i].o;
+      if (cloture === ouverture) continue;
+      // Un écart de plus de dix heures enjambe un week-end.
+      var nom = trou > 10 * 36e5 ? 'NWOG' : 'NDOG';
+      var vu = exe[i].t + pas;                          // connu à la réouverture
+      ajoute(out, exe, cloture, ouverture < cloture, vu, nom, 'écart');
+      ajoute(out, exe, ouverture, ouverture > cloture, vu, nom, 'écart');
+    }
+  }
+
+  // ── EXTRÊMES DE SÉANCE ──────────────────────────────────────────────────
+  function seances(out, exe, heure) {
+    var pas = pasDe(exe), par = {};
+    for (var i = 0; i < exe.length; i++) {
+      var e = heure(exe[i].t);
+      if (e.dow < 1 || e.dow > 5) continue;
+      for (var s = 0; s < CFG.seances.length; s++) {
+        var nom = CFG.seances[s][0], d = CFG.seances[s][1], f = CFG.seances[s][2];
+        var dedans = f > 24 * 60 ? (e.min >= d || e.min < f - 24 * 60) : (e.min >= d && e.min < f);
+        if (!dedans) continue;
+        var cle = e.jour + '/' + nom;
+        var o = par[cle] = par[cle] || { h: -Infinity, l: Infinity, fin: 0, nom: nom };
+        o.h = Math.max(o.h, exe[i].h); o.l = Math.min(o.l, exe[i].l);
+        o.fin = Math.max(o.fin, exe[i].t + pas);
+      }
+    }
+    for (var k in par) {
+      var x = par[k];
+      // L'extrême d'une séance n'est connu qu'à sa FIN.
+      ajoute(out, exe, x.h, true, x.fin, 'séance ' + x.nom, 'séance');
+      ajoute(out, exe, x.l, false, x.fin, 'séance ' + x.nom, 'séance');
+    }
+  }
+
+  // ── FVG JAMAIS COMBLÉS ──────────────────────────────────────────────────
+  function fvgOuverts(out, cs, exe, tf) {
+    ST.fvgs(cs).forEach(function (z) {
+      // ⚠️ IL Y AVAIT ICI `if (z.touche != null) return;` — « ne garder que les
+      // FVG jamais comblés ». C'était un REGARD EN AVANT, et des plus
+      // sournois : `touche` est calculé sur TOUTE la série, donc un FVG encore
+      // vierge au moment où on le lit disparaissait de la liste parce qu'il
+      // serait comblé plus tard. La liste des cibles d'un jour dépendait des
+      // semaines suivantes. Le contrôle « couper la série ne fait pas
+      // disparaître le bassin » l'a attrapé.
+      //   La règle du fichier suffit et dit la même chose honnêtement : le FVG
+      // est une cible dès sa troisième bougie close (`vu`) et cesse de l'être
+      // quand le prix atteint son bord loin (`pris`). « Non comblé » n'est pas
+      // une propriété du FVG, c'est une propriété de l'INSTANT où on regarde.
+      // Le bord LOIN du prix est la cible : c'est lui qu'il faut atteindre
+      // pour que le déséquilibre soit comblé.
+      ajoute(out, exe, z.haussier ? z.bas : z.haut, !z.haussier, z.t, 'FVG ouvert', tf);
+    });
+  }
+
+  // ── EXTRÊMES DE TOUTE LA PÉRIODE ────────────────────────────────────────
+  function extremes(out, exe) {
+    var pas = pasDe(exe), h = -Infinity, l = Infinity, th = 0, tl = 0;
+    for (var i = 0; i < exe.length; i++) {
+      if (exe[i].h > h) { h = exe[i].h; th = exe[i].t + pas; }
+      if (exe[i].l < l) { l = exe[i].l; tl = exe[i].t + pas; }
+    }
+    ajoute(out, exe, h, true, th, 'extrême données', 'tout');
+    ajoute(out, exe, l, false, tl, 'extrême données', 'tout');
+  }
+
+  /**
+   * Tous les bassins, toutes sources confondues.
+   * @param D      les séries disponibles
+   * @param exe    l'unité d'exécution, qui sert à dater les franchissements
+   * @param heure  la fonction d'heure de New York du modèle appelant
+   * @param quels  liste des types retenus, ou null pour tous
+   */
+  function tous(D, exe, heure, quels) {
+    var out = [];
+    var m30 = D.m15 && D.m15.length > 30 ? ST.agreger(D.m15, 2) : null;
+    var h4 = D.h1 && D.h1.length > 30 ? ST.agreger(D.h1, 4) : null;
+    var unites = [['m5', D.m5], ['m15', D.m15], ['m30', m30], ['h1', D.h1], ['h4', h4]];
+    var veut = function (t) { return !quels || quels.indexOf(t) >= 0; };
+
+    unites.forEach(function (u) {
+      if (!u[1] || u[1].length < 40) return;
+      var atrs = ST.atr(u[1], 14), atr = atrs[atrs.length - 1] || 0;
+      if (veut('swings')) swings(out, u[1], exe, u[0], atr);
+      if (veut('lrlr')) lrlr(out, u[1], exe, u[0], atr);
+      if (veut('fvg')) fvgOuverts(out, u[1], exe, u[0]);
+    });
+    if (veut('ecarts')) ecarts(out, exe, heure);
+    if (veut('seances')) seances(out, exe, heure);
+    if (veut('extremes')) extremes(out, exe);
+    return out.sort(function (a, b) { return a.vu - b.vu; });
+  }
+
+  root.DOL = { tous: tous, CFG: CFG };
+})(typeof window !== 'undefined' ? window : this);
+
+</script>
+<script>
+'use strict';
+/**
  * LE MODÈLE AMD — manipulation puis distribution.  js/amd.js
  *
  * Décrit par l'utilisateur, et transcrit ici sans rien y ajouter :
@@ -3154,6 +3396,34 @@ if (typeof window !== 'undefined') window.CFD = CFD;
     // ── GRANDE LIQUIDITÉ : quels bassins comptent ───────────────────────
     veille: true, semaine: true, h4: true, h1: true,
 
+    // ── LES SEPT SOURCES DU COURS ───────────────────────────── [SOURCE]
+    // Le cours en liste sept ; ce modèle n'en cherchait qu'UNE, les sommets
+    // et creux intermédiaires H1. Cinq manquaient entièrement. js/dol.js les
+    // construit toutes ; `sourcesDOL` dit lesquelles retenir, et null les
+    // prend toutes.
+    //   'swings'   ITH/ITL et sommets relativement égaux (EQH/EQL)
+    //   'lrlr'     liquidité de ligne de tendance
+    //   'fvg'      FVG jamais comblés
+    //   'ecarts'   NWOG et NDOG
+    //   'seances'  extrêmes d'Asie, de Londres, de New York
+    //   'extremes' extrêmes de toute la période
+    sourcesDOL: null,
+    // ⚠️ « BEST DOLs » VEUT DIRE *DRAW ON LIQUIDITY* : OÙ LE PRIX VA.
+    // Les sept sources du cours sont des OBJECTIFS, pas des niveaux à
+    // balayer. Elles avaient d'abord été branchées comme bassins de
+    // manipulation — et quatre d'entre elles rendaient alors un résultat
+    // identique au chiffre d'origine, au centime près. La cause : la
+    // manipulation retient le bassin LE PLUS PROCHE, et le haut de la veille
+    // l'est toujours. Un sommet intact plus proche que lui ne peut pas
+    // exister, il aurait été franchi en faisant ce haut. Les six autres
+    // sources ne pouvaient donc jamais être choisies.
+    //
+    // 'manip'  les sept sources servent de bassins à balayer (lecture fausse)
+    // 'cible'  elles servent d'OBJECTIF, ce que dit le cours
+    // false    comportement d'origine
+    dolComplet: false,
+    dolRole: 'cible',
+
     // ── SMT : LA DIVERGENCE AVEC LE MARCHÉ CORRÉLÉ ───────────────────────
     // Au moment du balayage, le marché corrélé fait-il le même extrême ?
     //
@@ -3186,6 +3456,21 @@ if (typeof window !== 'undefined') window.CFD = CFD;
     fvgPortee: 3,
     // ── LIQUIDITÉ INTERNE : où chercher les swings ───────────────────────
     unitesInt: ['m30', 'h1', 'h4'],
+    // ── LA PORTE D'ENTRÉE ───────────────────────────────────── [MESURÉ]
+    // 'ifvg'     attendre une inversion de FVG — la règle d'origine
+    // 'immediat' entrer à la clôture de la bougie qui balaie
+    // 'delai'    entrer `delaiEntree` bougies après le balayage
+    //
+    // POURQUOI CE RÉGLAGE EXISTE : l'épreuve de l'instant tiré au sort dit que
+    // la règle d'origine RETIRE de la valeur. Mêmes jours, même sens, même
+    // risque, mais une bougie au hasard dans la fenêtre : +50 € par trade en
+    // médiane sur 200 tirages, quand l'attente de l'IFVG en perd 15. Les deux
+    // cents tirages font mieux qu'elle. Ce n'est pas « aussi bien que le
+    // hasard », c'est nettement pire — et ça désigne la porte d'entrée, pas
+    // le scénario.
+    entree: 'ifvg',
+    delaiEntree: 3,
+
     // ── SORTIE ──────────────────────────────────────────────────────────
     // Stop au-delà de l'extrême de la manipulation, élargi d'un tampon.
     buf: 0.02,
@@ -3209,7 +3494,30 @@ if (typeof window !== 'undefined') window.CFD = CFD;
     tp1: 0.4, tp2: 2.5, part: 0,
     sortieMin: 16 * 60,
     maxJour: 2,
-    slMin: 0.3                // stop minimum, en fraction d'ATR
+    slMin: 0.3,               // stop minimum, en fraction d'ATR
+
+    // ── LES FRAIS NE DOIVENT PAS DÉVORER LE RISQUE ───────────── [MESURÉ]
+    // Le 6 octobre, le modèle a pris une vente sur le Russell avec un stop de
+    // 2,3 POINTS. L'aller-retour — un quart de point de dérapage par côté plus
+    // la commission — a coûté 30 % de ce risque. Le trade était perdant à
+    // l'instant où il était passé : il lui fallait un taux de réussite
+    // extraordinaire juste pour rentrer dans ses frais.
+    //
+    // Ce n'est pas un défaut de marché, c'est de l'arithmétique. Mesuré sur
+    // 232 trades, quatre marchés :
+    //
+    //     frais ≤  6 % du risque   151 trades   +17 207 €
+    //     frais 10 – 20 %           25 trades    −1 744 €
+    //     frais > 20 %              31 trades    −2 090 €
+    //
+    // Les stops serrés ne perdent pas par malchance : ils perdent en moyenne.
+    //
+    // 10 % est retenu plutôt que l'optimum mesuré (8 %) : de 3 % à 15 % la
+    // marge reste entre +13 et +17 %, c'est un plateau et non un pic, donc le
+    // seuil exact importe peu. Autant prendre un nombre rond et défendable —
+    // les frais ne mangent pas plus d'un dixième du risque — que la pointe
+    // d'une courbe, qui serait un réglage ajusté après coup.
+    coutMax: 0.10
   };
 
   // ── outils de temps, identiques au modèle en place ─────────────────────
@@ -3323,6 +3631,14 @@ if (typeof window !== 'undefined') window.CFD = CFD;
     var m5 = D[cleExe];
     // Le marché corrélé, pour la divergence SMT. Absent = filtre inactif.
     var Ecs = opts.E && opts.E[cleExe] ? opts.E[cleExe] : null;
+    // ⚠️ EXIGER UNE DIVERGENCE SANS MARCHÉ CORRÉLÉ, C'EST N'AUTORISER AUCUN
+    // TRADE. Le modèle rendait alors zéro signal sans un mot, et un script
+    // d'épreuves a jugé le vide pendant deux jours sans que ça se voie.
+    // Mieux vaut le dire fort : une configuration impossible n'est pas un
+    // résultat.
+    if (!Ecs && CFG.smt !== 'ignore' && typeof console !== 'undefined' && console.warn)
+      console.warn('AMD : smt « ' + CFG.smt + ' » demandé sans marché corrélé — ' +
+                   'la divergence est injugeable, aucun signal ne sortira.');
     if (!m5 || m5.length < 200 || !D.h1) return { tousSignaux: [], manips: [] };
     var pas = ST.pasDe(m5);
     // Les unités supérieures sont agrégées de ce qui existe. En longue
@@ -3362,6 +3678,16 @@ if (typeof window !== 'undefined') window.CFD = CFD;
 
     var sea = seances(m5);
     var joursSea = Object.keys(sea).sort();
+
+    // ── LES BASSINS DU COURS, construits UNE fois ───────────────────────
+    // Chacun porte `vu` (quand il devient connaissable) et `pris` (quand le
+    // prix le franchit) : il n'est une cible qu'entre les deux. Les trier
+    // par `vu` permet de n'avancer qu'un curseur au lieu de tout reparcourir
+    // à chaque bougie — sept mille bassins contre treize mille bougies.
+    var POOLS = [];
+    if (CFG.dolComplet && root.DOL)
+      POOLS = root.DOL.tous(D, m5, heure, CFG.sourcesDOL);
+    var curseur = 0, actifs = [];
     var atr = ST.atr(m5, 14);
 
     // ── parcours, bougie de 5 minutes par bougie de 5 minutes ────────────
@@ -3422,15 +3748,26 @@ if (typeof window !== 'undefined') window.CFD = CFD;
           grands.push({ prix: lS, haut: false, nom: 'semaine' });
         }
       }
-      ['h4', 'h1'].forEach(function (u) {
-        if (!CFG[u] || !B[u]) return;
-        B[u].forEach(function (b) {
-          if (b.rang !== 'intermediaire') return;
-          if (b.vu >= tD) return;
-          if (b.pris != null && b.pris <= tD) return;
-          grands.push({ prix: b.prix, haut: b.haut, nom: u });
+      if (CFG.dolComplet && CFG.dolRole === 'manip' && POOLS.length) {
+        // Le curseur n'avance que vers l'avant : les bassins déjà connus
+        // entrent dans `actifs` et n'en sortent qu'une fois pris.
+        while (curseur < POOLS.length && POOLS[curseur].vu < tD) actifs.push(POOLS[curseur++]);
+        for (var ia = 0; ia < actifs.length; ia++) {
+          var ba = actifs[ia];
+          if (ba.pris != null && ba.pris <= tD) continue;
+          grands.push({ prix: ba.prix, haut: ba.haut, nom: ba.type });
+        }
+      } else {
+        ['h4', 'h1'].forEach(function (u) {
+          if (!CFG[u] || !B[u]) return;
+          B[u].forEach(function (b) {
+            if (b.rang !== 'intermediaire') return;
+            if (b.vu >= tD) return;
+            if (b.pris != null && b.pris <= tD) return;
+            grands.push({ prix: b.prix, haut: b.haut, nom: u });
+          });
         });
-      });
+      }
 
       // ── 2. LA MANIPULATION : un grand bassin est-il balayé ? ──────────
       if (manip == null && e.min >= CFG.manipDeb && e.min < CFG.manipFin) {
@@ -3476,6 +3813,18 @@ if (typeof window !== 'undefined') window.CFD = CFD;
 
       // ── 3. LES LIQUIDITÉS INTERNES DANS LE SENS PRÉVU ────────────────
       var internes = [];
+      // Les sept sources du cours comme OBJECTIFS : tout bassin connu, non
+      // encore pris, situé dans le sens prévu.
+      if (CFG.dolComplet && CFG.dolRole === 'cible' && POOLS.length) {
+        while (curseur < POOLS.length && POOLS[curseur].vu < tD) actifs.push(POOLS[curseur++]);
+        for (var ic = 0; ic < actifs.length; ic++) {
+          var bc = actifs[ic];
+          if (bc.pris != null && bc.pris <= tD) continue;
+          if (bc.haut !== L) continue;
+          if (L ? bc.prix <= bar.c : bc.prix >= bar.c) continue;
+          internes.push(bc.prix);
+        }
+      }
       CFG.unitesInt.forEach(function (u) {
         if (!B[u]) return;
         B[u].forEach(function (b) {
@@ -3517,14 +3866,22 @@ if (typeof window !== 'undefined') window.CFD = CFD;
 
       // ── 5. L'ENTRÉE : UNIQUEMENT SUR UN IFVG DU BON SENS ─────────────
       var decl = null;
-      for (var k = ifvg.length - 1; k >= 0; k--) {
-        var z2 = ifvg[k];
-        if (z2.t > tD) continue;
-        if (z2.t <= manip.t) break;              // l'IFVG doit suivre la manipulation
-        if (z2.sens !== dir) continue;
-        decl = z2; break;
+      if (CFG.entree === 'immediat') {
+        // La bougie du balayage est close, son sens est connu : on entre.
+        decl = { t: manip.t, immediat: true };
+      } else if (CFG.entree === 'delai') {
+        if (i - manip.i < CFG.delaiEntree) continue;
+        decl = { t: tD, differe: true };
+      } else {
+        for (var k = ifvg.length - 1; k >= 0; k--) {
+          var z2 = ifvg[k];
+          if (z2.t > tD) continue;
+          if (z2.t <= manip.t) break;            // l'IFVG doit suivre la manipulation
+          if (z2.sens !== dir) continue;
+          decl = z2; break;
+        }
       }
-      if (decl) EC.ifvg = { bas: decl.bas, haut: decl.haut, t: decl.t };
+      if (decl && decl.bas != null) EC.ifvg = { bas: decl.bas, haut: decl.haut, t: decl.t };
       if (!decl) continue;
 
       // ── 6. NIVEAUX ────────────────────────────────────────────────────
@@ -3535,6 +3892,13 @@ if (typeof window !== 'undefined') window.CFD = CFD;
       var risq = Math.abs(entree - sl);
       if (risq < CFG.slMin * a) risq = CFG.slMin * a;
       if (!(risq > 0)) continue;
+
+      // Un stop si serré que l'aller-retour en mange plus d'un dixième : on
+      // ne le prend pas. Le calcul du coût vit dans js/position.js et n'est
+      // pas recopié ici — une formule à deux endroits finit par diverger.
+      if (CFG.coutMax != null && root.Position && root.Position.cout &&
+          root.Position.cout(risq) > CFG.coutMax) continue;
+
       sl = L ? entree - risq : entree + risq;
       // L'objectif est la liquidité interne, bornée par le multiple de risque.
       var parR = L ? entree + risq * CFG.tp2 : entree - risq * CFG.tp2;
@@ -4821,7 +5185,8 @@ function paintAmd(){
       ok: !!ouvre,
       d: ouvre ? 'Ouverte — on guette le balayage de la grande liquidité.'
         : 'Fermée. Hors de cette fenêtre, aucun scénario ne démarre.',
-      long:'Mesuré sur deux ans : 64 % des balayages de grande liquidité tombent entre 8 h et 10 h New York, soit 14 h – 16 h à Paris.' },
+      long:'Mesuré sur ' + MESURES.amd.duree + ' : ' + MESURES.amd.partBalayages +
+           ' % des balayages de grande liquidité tombent dans cette fenêtre.' },
     { t:'Grande liquidité balayée',
       ok: !!(e && e.manip),
       d: e && e.manip
@@ -4920,12 +5285,19 @@ function paintAmd(){
       (A.signaux === 0 ? ' — aucun, et c’est une information : la chaîne est exigeante.' : '.') +
       '</div>';
 
+  // Les chiffres viennent tous de MESURES, et la date avec eux : un chiffre
+  // daté qui vieillit se voit, un chiffre nu se croit encore vrai.
+  const M = MESURES.amd, pc1 = v => (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(1).replace('.', ',') + ' %';
   out += '<div class="t-why" style="margin-top:10px">' +
-    '<b>Réserves.</b> Mesuré sur deux ans en exécution 1 heure : 147 trades, ' +
-    '37,4 % de réussite, marge +20 % ; en exigeant la divergence SMT, 82 trades, ' +
-    '41,5 %, marge +22,7 % et un creux maximal de 768 ' + dev.trim() + '. ' +
+    '<b>Réserves.</b> Mesuré sur ' + M.duree + ' en exécution 1 heure : ' +
+    M.sansFiltre.trades + ' trades, ' + M.sansFiltre.reussite.toFixed(1).replace('.', ',') +
+    ' % de réussite, marge ' + pc1(M.sansFiltre.marge) + ' ; en exigeant la divergence SMT, ' +
+    M.smtExigee.trades + ' trades, ' + M.smtExigee.reussite.toFixed(1).replace('.', ',') +
+    ' %, marge ' + pc1(M.smtExigee.marge) + ' et un creux maximal de ' + M.smtExigee.creux + dev.trim() +
+    ' pour ' + MESURES.toleranceCompte + dev.trim() + ' de tolérance. ' +
     'L’exécution réelle en 5 minutes n’a été mesurée que sur 60 jours. ' +
-    'Aucun ordre n’est passé : ce panneau signale, il n’exécute pas.</div>';
+    'Aucun ordre n’est passé : ce panneau signale, il n’exécute pas. ' +
+    '<i>Mesures du ' + MESURES.date + '.</i></div>';
 
   box.innerHTML = out;
 }
@@ -4938,6 +5310,10 @@ function paintAmd(){
    décoratif se lit comme une donnée. On met donc ce qu'on sait vraiment :
    le prix, la fenêtre, le niveau le plus proche, l'âge du relevé. */
 function paintHero(){
+  // Les trois faits du hero viennent de MESURES : « 157 vérifications » y
+  // était écrit en dur, et en annonçait 157 quand il y en avait 166.
+  const v = $('#h-verif'); if(v) v.textContent = MESURES.verifications;
+  const u = $('#h-duree'); if(u) u.textContent = MESURES.amd.duree;
   const h = $('#h-clock');
   if(h){
     const d = new Date().toLocaleTimeString('fr-FR', { timeZone:'Europe/Paris', hour12:false });
@@ -4957,7 +5333,7 @@ function paintHero(){
 
   g.innerHTML =
     cel(D.prix != null ? fmt(D.prix) : '—', 'Nasdaq 100', 'future NQ') +
-    cel(D.hors ? 'Fermée' : 'Ouverte', 'Fenêtre', '08 h → 10 h NY') +
+    cel(D.hors ? 'Fermée' : 'Ouverte', 'Fenêtre', fenAMD() + ' NY') +
     cel(best ? best.distance.toFixed(1) + ' pts' : '—', 'Plus proche',
         best ? best.type + ' ' + best.tf : 'aucun niveau du bon côté') +
     cel(age != null ? (age < 90 ? age + ' min' : Math.round(age/60) + ' h') : '—', 'Relevé',
@@ -4986,13 +5362,128 @@ function paintMarquee(){
    sur quoi ils portent, parce qu'une marge sans son échantillon ne veut rien
    dire. Cliquer fait DÉFILER jusqu'au panneau : ça n'active rien, les trois
    stratégies tournent en permanence et gardent des bilans séparés. */
+/* ── LES CHIFFRES MESURÉS, EN UN SEUL ENDROIT ET DATÉS ────────────────────
+   TROIS FOIS AUJOURD'HUI le même défaut : une valeur écrite à deux endroits
+   finit par diverger, et rien ne le signale. La fenêtre de surveillance du
+   robot portait encore « 13 h 15 » quand le modèle ouvrait à 08 h ; le
+   contrôle censé l'interdire écrivait la même chose en dur ; et cette page
+   annonçait « 157 vérifications » quand il y en avait 166.
+
+   Les RÉGLAGES se lisent donc toujours dans les modules (AMD.CFG, Modele.CFG)
+   et ne sont jamais recopiés. Les MESURES, elles, ne peuvent pas être
+   recalculées dans un navigateur : le backtest ne tourne pas ici. Elles
+   vivent donc dans cet objet unique, AVEC LA DATE à laquelle elles ont été
+   établies — un chiffre daté qui vieillit se voit ; un chiffre nu, non.
+
+   `verifications` est contrôlé par scripts/test.js, qui compare ce nombre à
+   celui de ses propres contrôles : s'il dérive, la suite échoue. */
+const MESURES = {
+  date: '2026-10-18',
+  verifications: 185,
+  // 18 OCTOBRE — LES SEPT SOURCES DE LIQUIDITÉ DU COURS SONT AJOUTÉES
+  // (js/dol.js) ET MESURÉES. Le modèle n'en lisait qu'UNE sur sept. L'excuse
+  // était commode : « il perd parce qu'il est amputé ». Elle est fausse.
+  //   · comme OBJECTIFS, ce que dit le cours : AUCUN effet. Les six sources
+  //     ajoutées rendent, au centime près, le chiffre d'avant. La raison est
+  //     mesurée : en visant loin, 121 signaux sur 140 ont déjà leur objectif
+  //     au plafond de 2,5 R, et la liquidité visée est à 12,5 R de médiane.
+  //     Des cibles encore plus lointaines ne déplacent rien.
+  //   · comme NIVEAUX À BALAYER : +746 € → +910 € sur deux ans, 85 trades.
+  //     164 € d'écart sur deux ans, c'est du bruit, pas un avantage.
+  //   · et en les branchant, un REGARD EN AVANT a été trouvé puis corrigé :
+  //     « FVG jamais comblé » se décidait sur TOUTE la série, donc la liste
+  //     des cibles d'un jour dépendait des semaines suivantes. Corrigé, le
+  //     résultat tombe de +1 167 € à +910 €. Le filet y a gagné un contrôle.
+  //   · LES SIX ÉPREUVES, PASSÉES SUR LA MEILLEURE DES QUATRE CONFIGURATIONS
+  //     (les sept sources comme niveaux à balayer, en visant loin, +910 €,
+  //     85 trades, 200 tirages) : ÉCHEC AUX ÉPREUVES 1, 2, 3 ET 6.
+  //       1 · sens au hasard      41 tirages sur 200 font aussi bien ou mieux
+  //       2 · instant au hasard  198 tirages sur 200 font aussi bien ou mieux,
+  //           et leur MÉDIANE rapporte +53 € par trade quand le modèle en
+  //           fait +11. Sa règle d'entrée est près de cinq fois PIRE qu'une
+  //           bougie tirée au sort entre 9 h et 12 h NY. C'est la mesure la
+  //           plus accablante du dépôt, et les sept sources ne l'ont pas
+  //           bougée.
+  //       3 · les deux au hasard  68 tirages sur 200 font aussi bien ou mieux
+  //       6 · retirer le seul meilleur mois laisse −101 € ; les cinq plus
+  //           gros gains pèsent +3 092 € sur un total de +910 €, soit 340 %,
+  //           et sans eux le total vaut −2 181 €.
+  //
+  // 19 OCTOBRE — LE SENS EST-IL SOUVENT BON ? (scripts/sens.js)
+  // Le taux de réussite des trades ne répondait pas à la question : il mêle
+  // le sens, la taille du stop et la sortie. Ce test isole le SENS seul, par
+  // un pari symétrique : le prix touche-t-il +1 R avant −1 R ? Même distance
+  // des deux côtés, donc le hasard donne 50 % et le chiffre se compare enfin
+  // à quelque chose.
+  //   60 jours · 211 scénarios · signal 5 min : 49,7 %   (−0,1 écart-type)
+  //   2 ans    ·  83 scénarios · signal 1 h   : 57,4 %   (+1,2 écart-type)
+  //   sens de la journée (clôture du bon côté) : 49,8 % et 45,8 %
+  // LE SENS EST UNE PIÈCE DE MONNAIE. Le gros échantillon, celui dont les
+  // bougies sont assez fines pour qu'on sache dans quel ordre les prix sont
+  // passés, donne 49,7 % — un demi-point SOUS le hasard. Le 57,4 % des deux
+  // ans tient dans le bruit (il faudrait 2 écarts-types) et vient de bougies
+  // d'une heure, douze fois trop grosses pour trancher.
+  // Ce n'est donc pas « le robot a raison mais sort mal » : il ne sait pas
+  // non plus de quel côté le marché va.
+  //
+  //
+  // 19 OCTOBRE — SEIZE FAÇONS DE CHOISIR LE SENS, MISES EN CONCURRENCE
+  // (scripts/scenario.js). Même instant, même risque, SEUL LE SENS CHANGE :
+  // deux règles ne peuvent donc différer que par ce qu'on teste. Le repère
+  // est le point neutre MESURÉ (48,6 %, pas 50 % : la convention prudente
+  // compte perdants les tirages ambigus, pour les deux sens).
+  //   60 jours · 7 043 tirages : le RETOUR VERS L'OUVERTURE DE NEW YORK sort
+  //     à 53,5 %, +4,2 écarts-types par jour, et les deux moitiés tiennent.
+  //   2 ans · 2 901 tirages    : la MÊME règle retombe à 49,0 %, +0,9. Elle
+  //     ne confirme pas. À sa place sort le biais FVG de modele.js, 50,8 %,
+  //     +3,0 — qui lui vaut 47,6 % sur les 60 jours.
+  // CHAQUE ÉCHANTILLON SACRE UN GAGNANT DIFFÉRENT, ET AUCUN NE TIENT SUR
+  // L'AUTRE. C'est la signature du bruit, pas d'un avantage. Aucune des seize
+  // règles ne bat la pièce de monnaie sur les deux jeux à la fois.
+  //   Nuance à ne pas perdre : les deux ans sont en bougies d'une heure, où
+  // la fenêtre ne fait que trois bougies. L'instrument y est faible pour un
+  // effet intrajournalier — ce n'est pas une réfutation propre, c'est une
+  // absence de confirmation.
+  //
+  // AMD NE GAGNE TOUJOURS PAS D'ARGENT. Les sept sources n'y changent rien.
+  //
+  // ⚠️ CES CHIFFRES ONT ÉTÉ DIVISÉS PAR CINQ LE 9 OCTOBRE, et ce n'est pas un
+  // changement de marché : c'est la correction d'un défaut. Atteindre
+  // l'objectif créditait le PLAFOND tp2 au lieu de la distance réellement
+  // parcourue. AMD visant la liquidité interne, souvent bien plus proche que
+  // le plafond, chaque gagnant était payé jusqu'à cinq fois trop.
+  //   avant la correction : +13 036 €, marge +22,7 %, 7 trimestres sur 8
+  //   après               :    −985 €, marge  −4,2 %, 3 trimestres sur 8
+  // AMD ne gagne pas d'argent. Le dire est le minimum.
+  //
+  // LES SIX ÉPREUVES, REFAITES LE 11 OCTOBRE AVEC LE CRÉDIT CORRIGÉ :
+  // ZÉRO SUR SIX. Elles avaient toutes été passées sur des gains gonflés
+  // cinq fois. La plus accablante est la deuxième : une entrée prise AU
+  // HASARD dans la même fenêtre rapporte +50 € par trade quand le modèle en
+  // perd 15. Sa règle d'entrée ne fait pas mieux que le hasard — elle fait
+  // nettement PIRE.
+  amd: { sansFiltre: { trades: 147, reussite: 36.7, marge: -5.8, creux: 3016 },
+         smtExigee:  { trades:  82, reussite: 41.5, marge: -4.2, creux: 1695 },
+         duree: 'deux ans', partBalayages: 64 },
+  modele: { trades: 131, marge: -3.1, duree: '60 jours' },
+  kintt:  { trades: 0, marge: null, duree: '60 jours' },
+  toleranceCompte: 1850
+};
+/* Les heures viennent des modules, jamais d'un littéral. */
+const hNY = m => Math.floor(m / 60) + ' h';
+const fenAMD = () => window.AMD ? hNY(AMD.CFG.manipDeb) + ' → ' + hNY(AMD.CFG.manipFin) : '—';
+const fenKintt = () => window.Kintt ? hNY(Kintt.CFG.deb) + ' → ' + hNY(Kintt.CFG.fin) : '—';
+const fenModele = () => window.Modele ? hNY(Modele.CFG.ghDeb) + ' → ' + hNY(Modele.CFG.ghFin) : '—';
+
 const CARTES = [
-  { cle:'mech',  nom:'Modèle',  pan:'pan-chain', horizon:'Intraday · 5 min', risque:3,
-    marge:6.1,  trades:168, duree:'60 jours', note:'Biais 4 unités, DOL, niveau clé, IFVG.' },
-  { cle:'kintt', nom:'KINTT',   pan:'pan-kintt', horizon:'Intraday · 10 h → 12 h', risque:2,
-    marge:null, trades:0,   duree:'60 jours', note:'Le plan source appliqué à la lettre.' },
-  { cle:'amd',   nom:'AMD',     pan:'pan-amd',   horizon:'Intraday · 8 h → 10 h', risque:4,
-    marge:22.7, trades:82,  duree:'2 ans', note:'Manipulation puis distribution, divergence SMT.' }
+  { cle:'mech',  nom:'Modèle', pan:'pan-chain', risque:3, m:() => MESURES.modele,
+    fen:fenModele, note:'Biais 4 unités, DOL, niveau clé, IFVG.' },
+  { cle:'kintt', nom:'KINTT',  pan:'pan-kintt', risque:2, m:() => MESURES.kintt,
+    fen:fenKintt,  note:'Le plan source appliqué à la lettre.' },
+  { cle:'amd',   nom:'AMD',    pan:'pan-amd',   risque:4,
+    m:() => ({ trades:MESURES.amd.smtExigee.trades, marge:MESURES.amd.smtExigee.marge,
+               duree:MESURES.amd.duree }),
+    fen:fenAMD,    note:'Manipulation puis distribution, divergence SMT.' }
 ];
 function paintCartes(){
   const box = $('#cartes'); if(!box) return;
@@ -5000,18 +5491,19 @@ function paintCartes(){
   box.innerHTML = CARTES.filter(c => vis[c.cle] !== false).map(c => {
     const seg = Array.from({length:5}, (_, i) =>
       '<s class="' + (i < c.risque ? 'f ' + (c.risque >= 4 ? 'hi' : c.risque === 3 ? '' : 'lo') : '') + '"></s>').join('');
-    const marge = c.marge == null ? '—'
-      : (c.marge >= 0 ? '+' : '−') + Math.abs(c.marge).toFixed(1).replace('.', ',') + ' %';
-    const cls = c.marge == null ? '' : c.marge > 0 ? 'pos' : 'neg';
+    const m = c.m();
+    const marge = m.marge == null ? '—'
+      : (m.marge >= 0 ? '+' : '−') + Math.abs(m.marge).toFixed(1).replace('.', ',') + ' %';
+    const cls = m.marge == null ? '' : m.marge > 0 ? 'pos' : 'neg';
     return '<button class="carte" data-pan="' + c.pan + '" type="button">' +
       '<div class="carte-n">' + c.nom + '</div>' +
-      '<div class="carte-h">' + c.horizon + '</div>' +
+      '<div class="carte-h">Intraday · ' + c.fen() + ' NY</div>' +
       '<div class="carte-g">' +
         '<div><b class="' + cls + '">' + marge + '</b><i>Marge</i></div>' +
-        '<div><b>' + (c.trades || '0') + '</b><i>Trades</i></div>' +
+        '<div><b>' + (m.trades || '0') + '</b><i>Trades</i></div>' +
       '</div>' +
       '<div class="risq">' + seg + '</div>' +
-      '<div class="risq-l">Risque ' + c.risque + '/5 · mesuré sur ' + c.duree + '</div>' +
+      '<div class="risq-l">Risque ' + c.risque + '/5 · mesuré sur ' + m.duree + '</div>' +
       '</button>';
   }).join('');
   box.querySelectorAll('.carte').forEach(b => b.addEventListener('click', () => {

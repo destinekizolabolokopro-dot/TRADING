@@ -531,6 +531,13 @@
   // est consulté, et le biais se lit sur 15m, 1h, 4h et le journalier.
   var SERIES2 = SERIES.filter(function (s) { return ['m5', 'm15', 'h1', 'd1'].indexOf(s.cle) >= 0; });
 
+  // prepareBiais et biaisA sont exportés pour que le banc d'essai des
+  // scénarios (scripts/scenario.js) puisse mettre CE biais en concurrence
+  // avec d'autres façons de choisir le sens. Sans l'export, le banc lisait
+  // un biais toujours nul et la règle disparaissait de son tableau SANS
+  // QUE RIEN NE LE DISE — le même défaut silencieux que les épreuves jugeant
+  // le vide pendant deux jours.
   root.Modele = { evaluer: evaluer, CFG: CFG, heure: heure, fenetre: fenetre,
+                  prepareBiais: prepareBiais, biaisA: biaisA,
                   SERIES: SERIES, SERIES2: SERIES2 };
 })(typeof window !== 'undefined' ? window : this);

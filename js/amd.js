@@ -56,6 +56,34 @@
     // ── GRANDE LIQUIDITÉ : quels bassins comptent ───────────────────────
     veille: true, semaine: true, h4: true, h1: true,
 
+    // ── LES SEPT SOURCES DU COURS ───────────────────────────── [SOURCE]
+    // Le cours en liste sept ; ce modèle n'en cherchait qu'UNE, les sommets
+    // et creux intermédiaires H1. Cinq manquaient entièrement. js/dol.js les
+    // construit toutes ; `sourcesDOL` dit lesquelles retenir, et null les
+    // prend toutes.
+    //   'swings'   ITH/ITL et sommets relativement égaux (EQH/EQL)
+    //   'lrlr'     liquidité de ligne de tendance
+    //   'fvg'      FVG jamais comblés
+    //   'ecarts'   NWOG et NDOG
+    //   'seances'  extrêmes d'Asie, de Londres, de New York
+    //   'extremes' extrêmes de toute la période
+    sourcesDOL: null,
+    // ⚠️ « BEST DOLs » VEUT DIRE *DRAW ON LIQUIDITY* : OÙ LE PRIX VA.
+    // Les sept sources du cours sont des OBJECTIFS, pas des niveaux à
+    // balayer. Elles avaient d'abord été branchées comme bassins de
+    // manipulation — et quatre d'entre elles rendaient alors un résultat
+    // identique au chiffre d'origine, au centime près. La cause : la
+    // manipulation retient le bassin LE PLUS PROCHE, et le haut de la veille
+    // l'est toujours. Un sommet intact plus proche que lui ne peut pas
+    // exister, il aurait été franchi en faisant ce haut. Les six autres
+    // sources ne pouvaient donc jamais être choisies.
+    //
+    // 'manip'  les sept sources servent de bassins à balayer (lecture fausse)
+    // 'cible'  elles servent d'OBJECTIF, ce que dit le cours
+    // false    comportement d'origine
+    dolComplet: false,
+    dolRole: 'cible',
+
     // ── SMT : LA DIVERGENCE AVEC LE MARCHÉ CORRÉLÉ ───────────────────────
     // Au moment du balayage, le marché corrélé fait-il le même extrême ?
     //
@@ -88,6 +116,21 @@
     fvgPortee: 3,
     // ── LIQUIDITÉ INTERNE : où chercher les swings ───────────────────────
     unitesInt: ['m30', 'h1', 'h4'],
+    // ── LA PORTE D'ENTRÉE ───────────────────────────────────── [MESURÉ]
+    // 'ifvg'     attendre une inversion de FVG — la règle d'origine
+    // 'immediat' entrer à la clôture de la bougie qui balaie
+    // 'delai'    entrer `delaiEntree` bougies après le balayage
+    //
+    // POURQUOI CE RÉGLAGE EXISTE : l'épreuve de l'instant tiré au sort dit que
+    // la règle d'origine RETIRE de la valeur. Mêmes jours, même sens, même
+    // risque, mais une bougie au hasard dans la fenêtre : +50 € par trade en
+    // médiane sur 200 tirages, quand l'attente de l'IFVG en perd 15. Les deux
+    // cents tirages font mieux qu'elle. Ce n'est pas « aussi bien que le
+    // hasard », c'est nettement pire — et ça désigne la porte d'entrée, pas
+    // le scénario.
+    entree: 'ifvg',
+    delaiEntree: 3,
+
     // ── SORTIE ──────────────────────────────────────────────────────────
     // Stop au-delà de l'extrême de la manipulation, élargi d'un tampon.
     buf: 0.02,
@@ -111,7 +154,30 @@
     tp1: 0.4, tp2: 2.5, part: 0,
     sortieMin: 16 * 60,
     maxJour: 2,
-    slMin: 0.3                // stop minimum, en fraction d'ATR
+    slMin: 0.3,               // stop minimum, en fraction d'ATR
+
+    // ── LES FRAIS NE DOIVENT PAS DÉVORER LE RISQUE ───────────── [MESURÉ]
+    // Le 6 octobre, le modèle a pris une vente sur le Russell avec un stop de
+    // 2,3 POINTS. L'aller-retour — un quart de point de dérapage par côté plus
+    // la commission — a coûté 30 % de ce risque. Le trade était perdant à
+    // l'instant où il était passé : il lui fallait un taux de réussite
+    // extraordinaire juste pour rentrer dans ses frais.
+    //
+    // Ce n'est pas un défaut de marché, c'est de l'arithmétique. Mesuré sur
+    // 232 trades, quatre marchés :
+    //
+    //     frais ≤  6 % du risque   151 trades   +17 207 €
+    //     frais 10 – 20 %           25 trades    −1 744 €
+    //     frais > 20 %              31 trades    −2 090 €
+    //
+    // Les stops serrés ne perdent pas par malchance : ils perdent en moyenne.
+    //
+    // 10 % est retenu plutôt que l'optimum mesuré (8 %) : de 3 % à 15 % la
+    // marge reste entre +13 et +17 %, c'est un plateau et non un pic, donc le
+    // seuil exact importe peu. Autant prendre un nombre rond et défendable —
+    // les frais ne mangent pas plus d'un dixième du risque — que la pointe
+    // d'une courbe, qui serait un réglage ajusté après coup.
+    coutMax: 0.10
   };
 
   // ── outils de temps, identiques au modèle en place ─────────────────────
@@ -225,6 +291,14 @@
     var m5 = D[cleExe];
     // Le marché corrélé, pour la divergence SMT. Absent = filtre inactif.
     var Ecs = opts.E && opts.E[cleExe] ? opts.E[cleExe] : null;
+    // ⚠️ EXIGER UNE DIVERGENCE SANS MARCHÉ CORRÉLÉ, C'EST N'AUTORISER AUCUN
+    // TRADE. Le modèle rendait alors zéro signal sans un mot, et un script
+    // d'épreuves a jugé le vide pendant deux jours sans que ça se voie.
+    // Mieux vaut le dire fort : une configuration impossible n'est pas un
+    // résultat.
+    if (!Ecs && CFG.smt !== 'ignore' && typeof console !== 'undefined' && console.warn)
+      console.warn('AMD : smt « ' + CFG.smt + ' » demandé sans marché corrélé — ' +
+                   'la divergence est injugeable, aucun signal ne sortira.');
     if (!m5 || m5.length < 200 || !D.h1) return { tousSignaux: [], manips: [] };
     var pas = ST.pasDe(m5);
     // Les unités supérieures sont agrégées de ce qui existe. En longue
@@ -264,6 +338,16 @@
 
     var sea = seances(m5);
     var joursSea = Object.keys(sea).sort();
+
+    // ── LES BASSINS DU COURS, construits UNE fois ───────────────────────
+    // Chacun porte `vu` (quand il devient connaissable) et `pris` (quand le
+    // prix le franchit) : il n'est une cible qu'entre les deux. Les trier
+    // par `vu` permet de n'avancer qu'un curseur au lieu de tout reparcourir
+    // à chaque bougie — sept mille bassins contre treize mille bougies.
+    var POOLS = [];
+    if (CFG.dolComplet && root.DOL)
+      POOLS = root.DOL.tous(D, m5, heure, CFG.sourcesDOL);
+    var curseur = 0, actifs = [];
     var atr = ST.atr(m5, 14);
 
     // ── parcours, bougie de 5 minutes par bougie de 5 minutes ────────────
@@ -324,15 +408,26 @@
           grands.push({ prix: lS, haut: false, nom: 'semaine' });
         }
       }
-      ['h4', 'h1'].forEach(function (u) {
-        if (!CFG[u] || !B[u]) return;
-        B[u].forEach(function (b) {
-          if (b.rang !== 'intermediaire') return;
-          if (b.vu >= tD) return;
-          if (b.pris != null && b.pris <= tD) return;
-          grands.push({ prix: b.prix, haut: b.haut, nom: u });
+      if (CFG.dolComplet && CFG.dolRole === 'manip' && POOLS.length) {
+        // Le curseur n'avance que vers l'avant : les bassins déjà connus
+        // entrent dans `actifs` et n'en sortent qu'une fois pris.
+        while (curseur < POOLS.length && POOLS[curseur].vu < tD) actifs.push(POOLS[curseur++]);
+        for (var ia = 0; ia < actifs.length; ia++) {
+          var ba = actifs[ia];
+          if (ba.pris != null && ba.pris <= tD) continue;
+          grands.push({ prix: ba.prix, haut: ba.haut, nom: ba.type });
+        }
+      } else {
+        ['h4', 'h1'].forEach(function (u) {
+          if (!CFG[u] || !B[u]) return;
+          B[u].forEach(function (b) {
+            if (b.rang !== 'intermediaire') return;
+            if (b.vu >= tD) return;
+            if (b.pris != null && b.pris <= tD) return;
+            grands.push({ prix: b.prix, haut: b.haut, nom: u });
+          });
         });
-      });
+      }
 
       // ── 2. LA MANIPULATION : un grand bassin est-il balayé ? ──────────
       if (manip == null && e.min >= CFG.manipDeb && e.min < CFG.manipFin) {
@@ -378,6 +473,18 @@
 
       // ── 3. LES LIQUIDITÉS INTERNES DANS LE SENS PRÉVU ────────────────
       var internes = [];
+      // Les sept sources du cours comme OBJECTIFS : tout bassin connu, non
+      // encore pris, situé dans le sens prévu.
+      if (CFG.dolComplet && CFG.dolRole === 'cible' && POOLS.length) {
+        while (curseur < POOLS.length && POOLS[curseur].vu < tD) actifs.push(POOLS[curseur++]);
+        for (var ic = 0; ic < actifs.length; ic++) {
+          var bc = actifs[ic];
+          if (bc.pris != null && bc.pris <= tD) continue;
+          if (bc.haut !== L) continue;
+          if (L ? bc.prix <= bar.c : bc.prix >= bar.c) continue;
+          internes.push(bc.prix);
+        }
+      }
       CFG.unitesInt.forEach(function (u) {
         if (!B[u]) return;
         B[u].forEach(function (b) {
@@ -419,14 +526,22 @@
 
       // ── 5. L'ENTRÉE : UNIQUEMENT SUR UN IFVG DU BON SENS ─────────────
       var decl = null;
-      for (var k = ifvg.length - 1; k >= 0; k--) {
-        var z2 = ifvg[k];
-        if (z2.t > tD) continue;
-        if (z2.t <= manip.t) break;              // l'IFVG doit suivre la manipulation
-        if (z2.sens !== dir) continue;
-        decl = z2; break;
+      if (CFG.entree === 'immediat') {
+        // La bougie du balayage est close, son sens est connu : on entre.
+        decl = { t: manip.t, immediat: true };
+      } else if (CFG.entree === 'delai') {
+        if (i - manip.i < CFG.delaiEntree) continue;
+        decl = { t: tD, differe: true };
+      } else {
+        for (var k = ifvg.length - 1; k >= 0; k--) {
+          var z2 = ifvg[k];
+          if (z2.t > tD) continue;
+          if (z2.t <= manip.t) break;            // l'IFVG doit suivre la manipulation
+          if (z2.sens !== dir) continue;
+          decl = z2; break;
+        }
       }
-      if (decl) EC.ifvg = { bas: decl.bas, haut: decl.haut, t: decl.t };
+      if (decl && decl.bas != null) EC.ifvg = { bas: decl.bas, haut: decl.haut, t: decl.t };
       if (!decl) continue;
 
       // ── 6. NIVEAUX ────────────────────────────────────────────────────
@@ -437,6 +552,13 @@
       var risq = Math.abs(entree - sl);
       if (risq < CFG.slMin * a) risq = CFG.slMin * a;
       if (!(risq > 0)) continue;
+
+      // Un stop si serré que l'aller-retour en mange plus d'un dixième : on
+      // ne le prend pas. Le calcul du coût vit dans js/position.js et n'est
+      // pas recopié ici — une formule à deux endroits finit par diverger.
+      if (CFG.coutMax != null && root.Position && root.Position.cout &&
+          root.Position.cout(risq) > CFG.coutMax) continue;
+
       sl = L ? entree - risq : entree + risq;
       // L'objectif est la liquidité interne, bornée par le multiple de risque.
       var parR = L ? entree + risq * CFG.tp2 : entree - risq * CFG.tp2;
