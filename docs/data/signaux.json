@@ -543,14 +543,15 @@
    "cfgSortieMin": 720,
    "moteur": "bougies-closes",
    "raisonnement": "Biais baissier (2 sur 4). Liquidité visée à 29268.75. Niveau clé RB H4. Le prix l'a touché, puis une inversion 5m a été confirmée par clôture de corps. Entrée 29453.25, stop à 29866.81 — 414 points, soit 4 fois le bord de l'IFVG, pour ne pas être sorti par la respiration du prix. Objectif partiel à 29287.82, soit 165 points (+100 €), sur 90 % de la position — le stop remonte alors au prix d'entrée et la position ne peut plus perdre. Les 10 % restants courent jusqu'à 28419.34, soit 1034 points (+625 €). Gain si tout est touché : +153 € · perte si le stop part : -250 €. Solde au marché à 12 h 00 New York si rien n'est touché avant.",
-   "statut": "ouvert",
-   "resultat": null,
-   "r": null,
-   "closTs": null,
+   "statut": "clos",
+   "resultat": "perdu",
+   "r": -1,
+   "closTs": "2026-10-20T14:28:00.000Z",
    "part1": false,
    "suiviUnite": "1m",
    "ambigu": 0,
-   "slCourant": 29866.81
+   "slCourant": 29866.81,
+   "barres": 48
   }
  ],
  "passages": [
@@ -1284,12 +1285,12 @@
   }
  ],
  "bilan": {
-  "maj": "2026-10-20T13:50:16.175Z",
+  "maj": "2026-10-20T14:50:54.778Z",
   "total": 14,
-  "clos": 13,
-  "ouverts": 1,
-  "reussite": 100,
-  "cumulR": 4.68,
+  "clos": 14,
+  "ouverts": 0,
+  "reussite": 92.9,
+  "cumulR": 3.68,
   "passages": 43
  },
  "archive": [
