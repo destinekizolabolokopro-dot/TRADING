@@ -1140,16 +1140,33 @@
    "etapeBloquee": "biais",
    "dit": "Biais neutre (score 0/4, il en faut 2) — aucune position possible.",
    "apresCoup": false
+  },
+  {
+   "ts": "2026-10-20T11:49:00.660Z",
+   "bougie": "2026-10-20T11:35:00.000Z",
+   "jour": "2026-10-20",
+   "heureNY": "07:35",
+   "prix": 29551.25,
+   "retardMin": 14,
+   "biais": "baissier",
+   "score": -2,
+   "dol": 29268.75,
+   "niveau": "CISD M5",
+   "etat": "CHERCHE",
+   "niveauxParUnite": "M5:95 M15:100 M30:98 H1:90 H4:49",
+   "etapeBloquee": "fenetre",
+   "dit": "Hors fenêtre. Biais baissier, DOL à 29268.75, niveau le plus proche CISD M5 (29552.75 – 29562).",
+   "apresCoup": true
   }
  ],
  "bilan": {
-  "maj": "2026-10-19T14:34:38.523Z",
+  "maj": "2026-10-20T11:49:00.660Z",
   "total": 13,
   "clos": 13,
   "ouverts": 0,
   "reussite": 100,
   "cumulR": 4.68,
-  "passages": 37
+  "passages": 38
  },
  "archive": [
   {
