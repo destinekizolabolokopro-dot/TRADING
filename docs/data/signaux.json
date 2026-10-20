@@ -1208,16 +1208,33 @@
    "etapeBloquee": "biais",
    "dit": "Biais neutre (score 0/4, il en faut 2) — aucune position possible.",
    "apresCoup": true
+  },
+  {
+   "ts": "2026-10-20T13:09:50.596Z",
+   "bougie": "2026-10-20T12:55:00.000Z",
+   "jour": "2026-10-20",
+   "heureNY": "08:55",
+   "prix": 29594.5,
+   "retardMin": 15,
+   "biais": "neutre",
+   "score": 0,
+   "dol": null,
+   "niveau": null,
+   "etat": "CHERCHE",
+   "niveauxParUnite": "M5:0 M15:0 M30:0 H1:0 H4:0",
+   "etapeBloquee": "biais",
+   "dit": "Biais neutre (score 0/4, il en faut 2) — aucune position possible.",
+   "apresCoup": false
   }
  ],
  "bilan": {
-  "maj": "2026-10-20T12:49:38.280Z",
+  "maj": "2026-10-20T13:09:50.596Z",
   "total": 13,
   "clos": 13,
   "ouverts": 0,
   "reussite": 100,
   "cumulR": 4.68,
-  "passages": 41
+  "passages": 42
  },
  "archive": [
   {
