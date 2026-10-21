@@ -1282,16 +1282,33 @@
    "etapeBloquee": "biais",
    "dit": "Biais neutre (score 0/4, il en faut 2) — aucune position possible.",
    "apresCoup": false
+  },
+  {
+   "ts": "2026-10-21T12:01:02.439Z",
+   "bougie": "2026-10-21T11:50:00.000Z",
+   "jour": "2026-10-21",
+   "heureNY": "07:50",
+   "prix": 29871,
+   "retardMin": 11,
+   "biais": "haussier",
+   "score": 2,
+   "dol": 30010.25,
+   "niveau": "RB M5",
+   "etat": "CHERCHE",
+   "niveauxParUnite": "M5:62 M15:64 M30:35 H1:18 H4:65",
+   "etapeBloquee": "fenetre",
+   "dit": "Hors fenêtre. Biais haussier, DOL à 30010.25, niveau le plus proche RB M5 (29859 – 29870.25).",
+   "apresCoup": true
   }
  ],
  "bilan": {
-  "maj": "2026-10-20T14:50:54.778Z",
+  "maj": "2026-10-21T12:01:02.439Z",
   "total": 14,
   "clos": 14,
   "ouverts": 0,
   "reussite": 92.9,
   "cumulR": 3.68,
-  "passages": 43
+  "passages": 44
  },
  "archive": [
   {
