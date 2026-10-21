@@ -587,10 +587,10 @@
    "resultat": null,
    "r": null,
    "closTs": null,
-   "part1": false,
+   "part1": true,
    "suiviUnite": "1m",
    "ambigu": 0,
-   "slCourant": 29747.84
+   "slCourant": 29885.75
   },
   {
    "ts": "2026-10-21T13:41:58.729Z",
@@ -1431,7 +1431,7 @@
   }
  ],
  "bilan": {
-  "maj": "2026-10-21T13:41:58.729Z",
+  "maj": "2026-10-21T15:02:48.885Z",
   "total": 16,
   "clos": 15,
   "ouverts": 1,
