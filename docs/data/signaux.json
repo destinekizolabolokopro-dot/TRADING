@@ -1481,16 +1481,33 @@
    "etapeBloquee": "fenetre",
    "dit": "Hors fenêtre. Biais baissier, DOL à 29391.75, niveau le plus proche RB M5 (29523.25 – 29547).",
    "apresCoup": true
+  },
+  {
+   "ts": "2026-10-22T13:04:13.831Z",
+   "bougie": "2026-10-22T12:50:00.000Z",
+   "jour": "2026-10-22",
+   "heureNY": "08:50",
+   "prix": 29507,
+   "retardMin": 14,
+   "biais": "baissier",
+   "score": -2,
+   "dol": 29391.75,
+   "niveau": "CISD M5",
+   "etat": "CHERCHE",
+   "niveauxParUnite": "M5:86 M15:94 M30:99 H1:91 H4:56",
+   "etapeBloquee": "fenetre",
+   "dit": "Hors fenêtre. Biais baissier, DOL à 29391.75, niveau le plus proche CISD M5 (29508 – 29517.25).",
+   "apresCoup": false
   }
  ],
  "bilan": {
-  "maj": "2026-10-22T12:44:04.406Z",
+  "maj": "2026-10-22T13:04:13.831Z",
   "total": 16,
   "clos": 16,
   "ouverts": 0,
   "reussite": 87.5,
   "cumulR": 4.04,
-  "passages": 50
+  "passages": 51
  },
  "archive": [
   {
