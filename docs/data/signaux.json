@@ -1447,16 +1447,33 @@
    "etapeBloquee": "fenetre",
    "dit": "Hors fenêtre. Biais baissier, DOL à 29391.75, niveau le plus proche FVG M5 (29517.25 – 29526.75).",
    "apresCoup": true
+  },
+  {
+   "ts": "2026-10-22T12:23:55.125Z",
+   "bougie": "2026-10-22T12:10:00.000Z",
+   "jour": "2026-10-22",
+   "heureNY": "08:10",
+   "prix": 29543.75,
+   "retardMin": 14,
+   "biais": "baissier",
+   "score": -2,
+   "dol": 29391.75,
+   "niveau": "FVG H4",
+   "etat": "CHERCHE",
+   "niveauxParUnite": "M5:79 M15:90 M30:97 H1:91 H4:54",
+   "etapeBloquee": "fenetre",
+   "dit": "Hors fenêtre. Biais baissier, DOL à 29391.75, niveau le plus proche FVG H4 (29545.75 – 29613.75).",
+   "apresCoup": true
   }
  ],
  "bilan": {
-  "maj": "2026-10-22T12:03:45.701Z",
+  "maj": "2026-10-22T12:23:55.125Z",
   "total": 16,
   "clos": 16,
   "ouverts": 0,
   "reussite": 87.5,
   "cumulR": 4.04,
-  "passages": 48
+  "passages": 49
  },
  "archive": [
   {
