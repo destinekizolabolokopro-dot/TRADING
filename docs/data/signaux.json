@@ -1430,16 +1430,33 @@
    "etapeBloquee": "fenetre",
    "dit": "Hors fenêtre. Biais haussier, DOL à 30010.25, niveau le plus proche CISD H4 (29780.5 – 29853).",
    "apresCoup": false
+  },
+  {
+   "ts": "2026-10-22T12:03:45.701Z",
+   "bougie": "2026-10-22T11:50:00.000Z",
+   "jour": "2026-10-22",
+   "heureNY": "07:50",
+   "prix": 29514.25,
+   "retardMin": 14,
+   "biais": "baissier",
+   "score": -2,
+   "dol": 29391.75,
+   "niveau": "FVG M5",
+   "etat": "CHERCHE",
+   "niveauxParUnite": "M5:84 M15:94 M30:98 H1:91 H4:55",
+   "etapeBloquee": "fenetre",
+   "dit": "Hors fenêtre. Biais baissier, DOL à 29391.75, niveau le plus proche FVG M5 (29517.25 – 29526.75).",
+   "apresCoup": true
   }
  ],
  "bilan": {
-  "maj": "2026-10-21T16:23:35.149Z",
+  "maj": "2026-10-22T12:03:45.701Z",
   "total": 16,
   "clos": 16,
   "ouverts": 0,
   "reussite": 87.5,
   "cumulR": 4.04,
-  "passages": 47
+  "passages": 48
  },
  "archive": [
   {

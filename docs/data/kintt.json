@@ -100,16 +100,23 @@
    "prix": 29871,
    "etapeBloquee": "biais",
    "dit": "Biais neutre (score 0 sur 4, il en faut 2) — le plan interdit d'entrer."
+  },
+  {
+   "ts": "2026-10-22T12:03:45.701Z",
+   "jour": "2026-10-22",
+   "prix": 29514.25,
+   "etapeBloquee": "es",
+   "dit": "Le NQ est haussier, l'ES dit le contraire — le plan exige les deux ensemble."
   }
  ],
  "bilan": {
-  "maj": "2026-10-21T12:01:02.439Z",
+  "maj": "2026-10-22T12:03:45.701Z",
   "total": 0,
   "clos": 0,
   "ouverts": 0,
   "reussite": null,
   "cumulR": 0,
   "euros": 0,
-  "passages": 14
+  "passages": 15
  }
 }
