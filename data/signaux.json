@@ -663,14 +663,15 @@
    "cfgSortieMin": 720,
    "moteur": "bougies-closes",
    "raisonnement": "Biais baissier (2 sur 4). Liquidité visée à 29391.75. Niveau clé CISD M15. Le prix l'a touché, puis une inversion 5m a été confirmée par clôture de corps. Entrée 29490.75, stop à 29567.34 — 77 points, soit 4 fois le bord de l'IFVG, pour ne pas être sorti par la respiration du prix. Objectif partiel à 29460.11, soit 31 points (+100 €), sur 90 % de la position — le stop remonte alors au prix d'entrée et la position ne peut plus perdre. Les 10 % restants courent jusqu'à 29299.27, soit 191 points (+625 €). Gain si tout est touché : +153 € · perte si le stop part : -250 €. Solde au marché à 12 h 00 New York si rien n'est touché avant.",
-   "statut": "ouvert",
-   "resultat": null,
-   "r": null,
-   "closTs": null,
-   "part1": false,
+   "statut": "clos",
+   "resultat": "gagné",
+   "r": 0.36,
+   "closTs": "2026-10-22T13:22:00.000Z",
+   "part1": true,
    "suiviUnite": "1m",
    "ambigu": 0,
-   "slCourant": 29567.34
+   "slCourant": 29567.34,
+   "barres": 22
   },
   {
    "ts": "2026-10-22T13:24:22.888Z",
@@ -1576,16 +1577,33 @@
    "etapeBloquee": "fenetre",
    "dit": "Hors fenêtre. Biais baissier, DOL à 29391.75, niveau le plus proche CISD M5 (29508 – 29517.25).",
    "apresCoup": false
+  },
+  {
+   "ts": "2026-10-22T13:44:32.515Z",
+   "bougie": "2026-10-22T13:30:00.000Z",
+   "jour": "2026-10-22",
+   "heureNY": "09:30",
+   "prix": 29538,
+   "retardMin": 15,
+   "biais": "baissier",
+   "score": -2,
+   "dol": 29391.75,
+   "niveau": "CISD H4",
+   "etat": "CHERCHE",
+   "niveauxParUnite": "M5:75 M15:89 M30:96 H1:91 H4:54",
+   "etapeBloquee": "stop",
+   "dit": "Inversion 5m confirmée sur CISD H4 (29500.75 – 29633.75), mais le stop était trop serré face à l'ATR.",
+   "apresCoup": false
   }
  ],
  "bilan": {
-  "maj": "2026-10-22T13:24:22.888Z",
+  "maj": "2026-10-22T13:44:32.515Z",
   "total": 18,
-  "clos": 17,
-  "ouverts": 1,
-  "reussite": 88.2,
-  "cumulR": 4.4,
-  "passages": 51
+  "clos": 18,
+  "ouverts": 0,
+  "reussite": 88.9,
+  "cumulR": 4.76,
+  "passages": 52
  },
  "archive": [
   {
