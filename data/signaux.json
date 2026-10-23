@@ -742,14 +742,15 @@
    "cfgSortieMin": 720,
    "moteur": "bougies-closes",
    "raisonnement": "Biais baissier (2 sur 4). Liquidité visée à 28816.25. Niveau clé CISD M5. Le prix l'a touché, puis une inversion 2m a été confirmée par clôture de corps. Entrée 29055, stop à 29109.24 — 54 points, soit 4 fois le bord de l'IFVG, pour ne pas être sorti par la respiration du prix. Objectif partiel à 29033.3, soit 22 points (+100 €), sur 90 % de la position — le stop remonte alors au prix d'entrée et la position ne peut plus perdre. Les 10 % restants courent jusqu'à 28919.39, soit 136 points (+625 €). Gain si tout est touché : +153 € · perte si le stop part : -250 €. Solde au marché à 12 h 00 New York si rien n'est touché avant.",
-   "statut": "ouvert",
-   "resultat": null,
-   "r": null,
-   "closTs": null,
+   "statut": "clos",
+   "resultat": "gagné",
+   "r": 0.36,
+   "closTs": "2026-10-23T13:20:00.000Z",
    "part1": true,
    "suiviUnite": "1m",
    "ambigu": 0,
-   "slCourant": 29055
+   "slCourant": 29055,
+   "barres": 15
   },
   {
    "ts": "2026-10-23T13:29:40.394Z",
@@ -781,14 +782,15 @@
    "cfgSortieMin": 720,
    "moteur": "bougies-closes",
    "raisonnement": "Biais baissier (4 sur 4). Liquidité visée à 28816.25. Niveau clé CISD M5. Le prix l'a touché, puis une inversion 1m a été confirmée par clôture de corps. Entrée 29033, stop à 29105.23 — 72 points, soit 4 fois le bord de l'IFVG, pour ne pas être sorti par la respiration du prix. Objectif partiel à 29004.11, soit 29 points (+100 €), sur 90 % de la position — le stop remonte alors au prix d'entrée et la position ne peut plus perdre. Les 10 % restants courent jusqu'à 28852.43, soit 181 points (+625 €). Gain si tout est touché : +153 € · perte si le stop part : -250 €. Solde au marché à 12 h 00 New York si rien n'est touché avant.",
-   "statut": "ouvert",
-   "resultat": null,
-   "r": null,
-   "closTs": null,
-   "part1": false,
+   "statut": "clos",
+   "resultat": "gagné",
+   "r": 0.36,
+   "closTs": "2026-10-23T13:31:00.000Z",
+   "part1": true,
    "suiviUnite": "1m",
    "ambigu": 0,
-   "slCourant": 29105.23
+   "slCourant": 29105.23,
+   "barres": 21
   }
  ],
  "passages": [
@@ -1757,16 +1759,33 @@
    "etapeBloquee": "fenetre",
    "dit": "Hors fenêtre. Biais baissier, DOL à 28816.25, niveau le plus proche CISD M5 (29058.5 – 29092.5).",
    "apresCoup": false
+  },
+  {
+   "ts": "2026-10-23T13:49:51.606Z",
+   "bougie": "2026-10-23T13:35:00.000Z",
+   "jour": "2026-10-23",
+   "heureNY": "09:35",
+   "prix": 29041,
+   "retardMin": 15,
+   "biais": "baissier",
+   "score": -4,
+   "dol": 28816.25,
+   "niveau": "CISD M5",
+   "etat": "CHERCHE",
+   "niveauxParUnite": "M5:98 M15:112 M30:96 H1:98 H4:79",
+   "etapeBloquee": "stop",
+   "dit": "Inversion 1m confirmée sur CISD M5 (29046 – 29057.25), mais le stop était trop serré face à l'ATR.",
+   "apresCoup": false
   }
  ],
  "bilan": {
-  "maj": "2026-10-23T13:29:40.394Z",
+  "maj": "2026-10-23T13:49:51.606Z",
   "total": 20,
-  "clos": 18,
-  "ouverts": 2,
-  "reussite": 88.9,
-  "cumulR": 4.76,
-  "passages": 57
+  "clos": 20,
+  "ouverts": 0,
+  "reussite": 90,
+  "cumulR": 5.48,
+  "passages": 58
  },
  "archive": [
   {
