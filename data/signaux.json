@@ -1594,16 +1594,33 @@
    "etapeBloquee": "stop",
    "dit": "Inversion 5m confirmée sur CISD H4 (29500.75 – 29633.75), mais le stop était trop serré face à l'ATR.",
    "apresCoup": false
+  },
+  {
+   "ts": "2026-10-23T11:48:47.800Z",
+   "bougie": "2026-10-23T11:35:00.000Z",
+   "jour": "2026-10-23",
+   "heureNY": "07:35",
+   "prix": 29099.5,
+   "retardMin": 14,
+   "biais": "baissier",
+   "score": -4,
+   "dol": 29022.75,
+   "niveau": "RB M15",
+   "etat": "CHERCHE",
+   "niveauxParUnite": "M5:97 M15:109 M30:95 H1:97 H4:79",
+   "etapeBloquee": "fenetre",
+   "dit": "Hors fenêtre. Biais baissier, DOL à 29022.75, niveau le plus proche RB M15 (29100.25 – 29128.75).",
+   "apresCoup": true
   }
  ],
  "bilan": {
-  "maj": "2026-10-22T13:44:32.515Z",
+  "maj": "2026-10-23T11:48:47.800Z",
   "total": 18,
   "clos": 18,
   "ouverts": 0,
   "reussite": 88.9,
   "cumulR": 4.76,
-  "passages": 52
+  "passages": 53
  },
  "archive": [
   {

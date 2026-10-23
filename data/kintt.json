@@ -107,16 +107,23 @@
    "prix": 29514.25,
    "etapeBloquee": "es",
    "dit": "Le NQ est haussier, l'ES dit le contraire — le plan exige les deux ensemble."
+  },
+  {
+   "ts": "2026-10-23T11:48:47.800Z",
+   "jour": "2026-10-23",
+   "prix": 29099.5,
+   "etapeBloquee": "risque",
+   "dit": "Tout est là sur FVG M15 (29317.25 – 29346.75), mais le stop ou le rapport gain/risque a été refusé."
   }
  ],
  "bilan": {
-  "maj": "2026-10-22T12:03:45.701Z",
+  "maj": "2026-10-23T11:48:47.800Z",
   "total": 0,
   "clos": 0,
   "ouverts": 0,
   "reussite": null,
   "cumulR": 0,
   "euros": 0,
-  "passages": 15
+  "passages": 16
  }
 }
