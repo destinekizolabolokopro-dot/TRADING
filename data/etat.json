@@ -1,11 +1,11 @@
 {
- "maj": "2026-10-26T20:11:10.606Z",
+ "maj": "2026-10-26T20:31:04.582Z",
  "source": "yahoo",
- "eurusd": 1.1181,
+ "eurusd": 1.1178,
  "confirmePar": "ES=F",
  "sansConfirmation": false,
- "prix": 29447,
- "derniereBougie": 1793044800000,
+ "prix": 29461.5,
+ "derniereBougie": 1793046000000,
  "retardMin": 11,
  "hors": true,
  "etat": "CHERCHE",
@@ -67,7 +67,7 @@
   "dol": 29024.25,
   "biaisDir": -1,
   "biaisScore": -2,
-  "barre": 13487,
+  "barre": 13500,
   "derniere": false
  },
  "cfg": {
@@ -94,8 +94,8 @@
  },
  "kintt": {
   "hors": true,
-  "prix": 29447,
-  "derniereBougie": 1793044800000,
+  "prix": 29461.5,
+  "derniereBougie": 1793046000000,
   "etape": {
    "t": 1793030100000,
    "score": 2,
@@ -109,10 +109,10 @@
   "entonnoir": {
    "barres": 1500,
    "biaisNeutre": 495,
-   "esDesaccord": 435,
-   "pasDeZone": 345,
+   "esDesaccord": 432,
+   "pasDeZone": 347,
    "avant10h": 47,
-   "pasDeBalayage": 137,
+   "pasDeBalayage": 138,
    "pasDeConfirmation": 33,
    "stopMauvaisCote": 0,
    "stopTropSerre": 0,
@@ -152,9 +152,9 @@
  "amd": {
   "etape": {
    "jour": "2026-10-26",
-   "min": 960,
+   "min": 980,
    "dir": -1,
-   "internes": 204,
+   "internes": 205,
    "cible": 29071.75,
    "pris": 1,
    "manip": {
