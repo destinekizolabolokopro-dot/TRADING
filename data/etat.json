@@ -1,11 +1,11 @@
 {
- "maj": "2026-10-26T14:37:32.474Z",
+ "maj": "2026-10-26T14:57:45.100Z",
  "source": "yahoo",
- "eurusd": 1.1186,
+ "eurusd": 1.1184,
  "confirmePar": "ES=F",
  "sansConfirmation": false,
- "prix": 29341.25,
- "derniereBougie": 1793024700000,
+ "prix": 29474.75,
+ "derniereBougie": 1793025900000,
  "retardMin": 13,
  "hors": true,
  "etat": "CHERCHE",
@@ -94,10 +94,10 @@
  },
  "kintt": {
   "hors": false,
-  "prix": 29341.25,
-  "derniereBougie": 1793024700000,
+  "prix": 29474.75,
+  "derniereBougie": 1793025900000,
   "etape": {
-   "t": 1793024700000,
+   "t": 1793025900000,
    "score": 0,
    "dir": 0,
    "conf": null,
@@ -107,8 +107,8 @@
   "trade": null,
   "dernierSignal": null,
   "entonnoir": {
-   "barres": 1482,
-   "biaisNeutre": 490,
+   "barres": 1486,
+   "biaisNeutre": 494,
    "esDesaccord": 419,
    "pasDeZone": 347,
    "avant10h": 47,
@@ -152,7 +152,7 @@
  "amd": {
   "etape": {
    "jour": "2026-10-26",
-   "min": 625,
+   "min": 645,
    "dir": -1,
    "internes": 205,
    "cible": 29071.75,
