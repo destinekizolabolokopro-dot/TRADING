@@ -1873,16 +1873,33 @@
    "etapeBloquee": "stop",
    "dit": "Inversion 1m confirmée sur CISD M30 (29261.25 – 29298.25), mais le stop était trop serré face à l'ATR.",
    "apresCoup": false
+  },
+  {
+   "ts": "2026-10-27T12:24:04.504Z",
+   "bougie": "2026-10-27T12:10:00.000Z",
+   "jour": "2026-10-27",
+   "heureNY": "08:10",
+   "prix": 29561.25,
+   "retardMin": 14,
+   "biais": "haussier",
+   "score": 2,
+   "dol": 30113,
+   "niveau": "CISD M5",
+   "etat": "CHERCHE",
+   "niveauxParUnite": "M5:87 M15:57 M30:40 H1:20 H4:43",
+   "etapeBloquee": "fenetre",
+   "dit": "Hors fenêtre. Biais haussier, DOL à 30113, niveau le plus proche CISD M5 (29539 – 29561).",
+   "apresCoup": true
   }
  ],
  "bilan": {
-  "maj": "2026-10-26T13:57:07.276Z",
+  "maj": "2026-10-27T12:24:04.504Z",
   "total": 22,
   "clos": 22,
   "ouverts": 0,
   "reussite": 90.9,
   "cumulR": 6.2,
-  "passages": 59
+  "passages": 60
  },
  "archive": [
   {
