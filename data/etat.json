@@ -1,12 +1,12 @@
 {
- "maj": "2026-10-27T16:26:51.530Z",
+ "maj": "2026-10-27T16:45:00.601Z",
  "source": "yahoo",
- "eurusd": 1.1145,
+ "eurusd": 1.1146,
  "confirmePar": "ES=F",
  "sansConfirmation": false,
- "prix": 29835,
- "derniereBougie": 1793117700000,
- "retardMin": 12,
+ "prix": 29830,
+ "derniereBougie": 1793118600000,
+ "retardMin": 15,
  "hors": true,
  "etat": "ATTEND_IFVG",
  "dir": 0,
@@ -94,8 +94,8 @@
  },
  "kintt": {
   "hors": true,
-  "prix": 29835,
-  "derniereBougie": 1793117700000,
+  "prix": 29830,
+  "derniereBougie": 1793118600000,
   "etape": {
    "t": 1793116500000,
    "score": 2,
@@ -152,7 +152,7 @@
  "amd": {
   "etape": {
    "jour": "2026-10-27",
-   "min": 735,
+   "min": 750,
    "dir": -1,
    "internes": 212,
    "cible": 29519,
