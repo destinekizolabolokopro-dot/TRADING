@@ -2026,16 +2026,33 @@
    "etapeBloquee": "ifvg",
    "dit": "Le prix a touché CISD M5 (29697 – 29707), mais aucune inversion confirmée par clôture de corps.",
    "apresCoup": false
+  },
+  {
+   "ts": "2026-10-29T13:37:19.157Z",
+   "bougie": "2026-10-29T13:25:00.000Z",
+   "jour": "2026-10-29",
+   "heureNY": "09:25",
+   "prix": 29625.5,
+   "retardMin": 12,
+   "biais": "neutre",
+   "score": 0,
+   "dol": null,
+   "niveau": null,
+   "etat": "ATTEND_IFVG",
+   "niveauxParUnite": "M5:77 M15:31 M30:52 H1:74 H4:51",
+   "etapeBloquee": "biais",
+   "dit": "Biais neutre (score 0/4, il en faut 2) — aucune position possible.",
+   "apresCoup": false
   }
  ],
  "bilan": {
-  "maj": "2026-10-29T13:17:05.962Z",
+  "maj": "2026-10-29T13:37:19.157Z",
   "total": 22,
   "clos": 22,
   "ouverts": 0,
   "reussite": 90.9,
   "cumulR": 6.2,
-  "passages": 68
+  "passages": 69
  },
  "archive": [
   {
