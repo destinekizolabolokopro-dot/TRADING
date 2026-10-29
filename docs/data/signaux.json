@@ -2009,16 +2009,33 @@
    "etapeBloquee": "stop",
    "dit": "Inversion 5m confirmée sur CISD M5 (29909.75 – 29916), mais le stop était trop serré face à l'ATR.",
    "apresCoup": false
+  },
+  {
+   "ts": "2026-10-29T13:17:05.962Z",
+   "bougie": "2026-10-29T13:05:00.000Z",
+   "jour": "2026-10-29",
+   "heureNY": "09:05",
+   "prix": 29691.25,
+   "retardMin": 12,
+   "biais": "baissier",
+   "score": -2,
+   "dol": 29482.5,
+   "niveau": "CISD M5",
+   "etat": "ATTEND_IFVG",
+   "niveauxParUnite": "M5:66 M15:26 M30:43 H1:71 H4:50",
+   "etapeBloquee": "ifvg",
+   "dit": "Le prix a touché CISD M5 (29697 – 29707), mais aucune inversion confirmée par clôture de corps.",
+   "apresCoup": false
   }
  ],
  "bilan": {
-  "maj": "2026-10-28T13:51:09.753Z",
+  "maj": "2026-10-29T13:17:05.962Z",
   "total": 22,
   "clos": 22,
   "ouverts": 0,
   "reussite": 90.9,
   "cumulR": 6.2,
-  "passages": 67
+  "passages": 68
  },
  "archive": [
   {
