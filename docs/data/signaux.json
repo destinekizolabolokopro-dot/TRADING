@@ -2043,16 +2043,33 @@
    "etapeBloquee": "biais",
    "dit": "Biais neutre (score 0/4, il en faut 2) — aucune position possible.",
    "apresCoup": false
+  },
+  {
+   "ts": "2026-10-29T13:57:31.527Z",
+   "bougie": "2026-10-29T13:45:00.000Z",
+   "jour": "2026-10-29",
+   "heureNY": "09:45",
+   "prix": 29501.5,
+   "retardMin": 13,
+   "biais": "baissier",
+   "score": -2,
+   "dol": 29482.5,
+   "niveau": "CISD M5",
+   "etat": "ATTEND_IFVG",
+   "niveauxParUnite": "M5:85 M15:39 M30:63 H1:77 H4:57",
+   "etapeBloquee": "stop",
+   "dit": "Inversion 5m confirmée sur CISD M5 (29697 – 29707), mais le stop était trop serré face à l'ATR.",
+   "apresCoup": false
   }
  ],
  "bilan": {
-  "maj": "2026-10-29T13:37:19.157Z",
+  "maj": "2026-10-29T13:57:31.527Z",
   "total": 22,
   "clos": 22,
   "ouverts": 0,
   "reussite": 90.9,
   "cumulR": 6.2,
-  "passages": 69
+  "passages": 70
  },
  "archive": [
   {
