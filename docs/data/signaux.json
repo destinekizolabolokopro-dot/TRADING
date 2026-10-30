@@ -2077,16 +2077,33 @@
    "etapeBloquee": "fenetre",
    "dit": "Hors fenêtre. Biais baissier, DOL à 28313.5, niveau le plus proche CISD M5 (28835 – 28847.5).",
    "apresCoup": false
+  },
+  {
+   "ts": "2026-10-30T13:29:17.306Z",
+   "bougie": "2026-10-30T13:15:00.000Z",
+   "jour": "2026-10-30",
+   "heureNY": "09:15",
+   "prix": 28788.75,
+   "retardMin": 14,
+   "biais": "baissier",
+   "score": -4,
+   "dol": 28313.5,
+   "niveau": "CISD M15",
+   "etat": "ATTEND_IFVG",
+   "niveauxParUnite": "M5:93 M15:90 M30:95 H1:97 H4:79",
+   "etapeBloquee": "stop",
+   "dit": "Inversion 2m confirmée sur CISD M15 (28793 – 28809.5), mais le stop était trop serré face à l'ATR.",
+   "apresCoup": false
   }
  ],
  "bilan": {
-  "maj": "2026-10-30T13:09:03.991Z",
+  "maj": "2026-10-30T13:29:17.306Z",
   "total": 22,
   "clos": 22,
   "ouverts": 0,
   "reussite": 90.9,
   "cumulR": 6.2,
-  "passages": 71
+  "passages": 72
  },
  "archive": [
   {
