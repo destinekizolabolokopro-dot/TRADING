@@ -2094,16 +2094,33 @@
    "etapeBloquee": "stop",
    "dit": "Inversion 2m confirmée sur CISD M15 (28793 – 28809.5), mais le stop était trop serré face à l'ATR.",
    "apresCoup": false
+  },
+  {
+   "ts": "2026-10-30T13:49:29.707Z",
+   "bougie": "2026-10-30T13:35:00.000Z",
+   "jour": "2026-10-30",
+   "heureNY": "09:35",
+   "prix": 28802.5,
+   "retardMin": 15,
+   "biais": "baissier",
+   "score": -4,
+   "dol": 28313.5,
+   "niveau": "CISD M15",
+   "etat": "ATTEND_IFVG",
+   "niveauxParUnite": "M5:92 M15:87 M30:94 H1:97 H4:79",
+   "etapeBloquee": "stop",
+   "dit": "Inversion 2m confirmée sur CISD M15 (28793 – 28809.5), mais le stop était trop serré face à l'ATR.",
+   "apresCoup": false
   }
  ],
  "bilan": {
-  "maj": "2026-10-30T13:29:17.306Z",
+  "maj": "2026-10-30T13:49:29.707Z",
   "total": 22,
   "clos": 22,
   "ouverts": 0,
   "reussite": 90.9,
   "cumulR": 6.2,
-  "passages": 72
+  "passages": 73
  },
  "archive": [
   {
