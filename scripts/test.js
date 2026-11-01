@@ -337,6 +337,25 @@ console.log('\n── LE ROBOT PEUT-IL VRAIMENT VOIR LA SÉANCE ? ────�
   })();
   const deb = _f ? _f.deb : 13 * 60 + 15, fin = _f ? _f.fin : 15 * 60 + 45;
 
+  // ⚠️ LES CRÉNEAUX SE JUGENT SUR L'ANNÉE, PAS SUR AUJOURD'HUI. Ils sont
+  // écrits en UTC fixe dans le YAML ; la fenêtre, elle, suit New York et
+  // glisse d'une heure deux fois par an. Juger les créneaux sur la fenêtre
+  // DU JOUR faisait échouer ce test le 1er novembre 2026, au changement
+  // d'heure américain — et il avait raison : trois créneaux mouraient avant
+  // l'ouverture. Mais les corriger pour l'hiver les aurait cassés en été.
+  // On les juge donc sur l'UNION des deux saisons : un créneau est utile
+  // s'il atteint la fenêtre dans AU MOINS une saison, et l'ensemble doit
+  // couvrir la fenêtre dans LES DEUX.
+  const _u = (() => {
+    try {
+      const b = require('child_process')
+        .execFileSync('node', [path.join(RACINE, 'scripts/fenetre.js'), '--union'], { encoding: 'utf-8' })
+        .trim().split(/\s+/).map(Number);
+      return { deb: b[0], fin: b[1] };
+    } catch (e) { return null; }
+  })();
+  const uDeb = _u ? _u.deb : deb, uFin = _u ? _u.fin : fin;
+
   t('le planning de la séance a plusieurs départs', () => {
     if (crons.length < 4)
       throw new Error(crons.length + ' créneau(x) : un seul abandon suffirait à perdre la journée');
@@ -349,10 +368,25 @@ console.log('\n── LE ROBOT PEUT-IL VRAIMENT VOIR LA SÉANCE ? ────�
     if (lim >= 360) throw new Error(`timeout-minutes ${lim} : GitHub tue à 360`);
   });
 
-  t('chaque créneau atteint la fenêtre et en couvre un bout', () => {
-    const vains = crons.filter(d => deb > d + marge);
+  t('chaque créneau atteint la fenêtre dans au moins une saison', () => {
+    const vains = crons.filter(d => uDeb > d + marge);
     if (vains.length) throw new Error(vains.length +
-      ' créneau(x) mourraient avant l\'ouverture — ils occupent la place pour rien');
+      ' créneau(x) mourraient avant l\'ouverture même en été — ils occupent la place pour rien');
+  });
+
+  t('les créneaux couvrent la fenêtre ÉTÉ COMME HIVER', () => {
+    if (!_u) return;
+    // La fenêtre d'union va de uDeb à uFin ; en été elle occupe la première
+    // heure de cet intervalle, en hiver la dernière. Il faut qu'un créneau
+    // soit encore vivant à chaque instant des deux.
+    for (const [nom, d0, f0] of [['été', uDeb, uFin - 60], ['hiver', uDeb + 60, uFin]]) {
+      for (let m = d0; m <= f0; m += 15) {
+        const vivant = crons.some(c => c <= m && m <= c + marge);
+        if (!vivant)
+          throw new Error('en ' + nom + ', aucun créneau n\'est vivant à ' +
+            String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0') + ' UTC');
+      }
+    }
   });
 
   t('au moins un créneau couvre la fenêtre en entier', () => {
@@ -1617,6 +1651,55 @@ console.log('\n── LES SEPT SOURCES DE LIQUIDITÉ (js/dol.js) ─────
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+console.log('\n── LES BRIQUES DE STRUCTURE SE DÉCLENCHENT-ELLES TROP SOUVENT ? ──');
+// Trouvé en DESSINANT le graphique (scripts/voir.js) au lieu de lire les
+// nombres : huit CISD sur une journée de 31 bougies. Une brique qui se
+// déclenche toutes les six bougies n'est pas un événement de marché, c'est un
+// détecteur de bruit — et aucun test ne surveillait sa CADENCE.
+{
+  const fx = path.join(RACINE, 'data', 'fixture.json');
+  const J = fs.existsSync(fx) ? JSON.parse(fs.readFileSync(fx, 'utf-8')) : null;
+  const bou = l => (l || []).map(x => ({ t: x[0] * 1000, o: x[1], h: x[2], l: x[3], c: x[4] }));
+
+  t('la cadence des briques de structure est surveillée', () => {
+    if (!J) return;
+    const cs = bou(J.NQ.m5);
+    if (cs.length < 500) return;
+    const parCisd = cs.length / Math.max(1, ST.cisd(cs).length);
+    // Ce contrôle ne dit PAS « c'est bon ». Il VERROUILLE un défaut connu :
+    // si quelqu'un resserre la définition du CISD, la cadence doit remonter
+    // et ce test échouera — ce qui est le signal qu'il faut relire le
+    // commentaire de js/structure.js et mettre à jour le chiffre.
+    if (parCisd > 12)
+      throw new Error('la cadence du CISD a changé (une tous les ' + parCisd.toFixed(1) +
+        ' bougies au lieu de ~5,8) — défaut peut-être corrigé, mettre à jour js/structure.js');
+    if (parCisd < 3)
+      throw new Error('le CISD se déclenche encore plus souvent qu\'avant : une tous les ' +
+        parCisd.toFixed(1) + ' bougies');
+  });
+
+  t('la cadence du CISD ne dépend pas de l\'unité de temps — et c\'est le défaut', () => {
+    if (!J) return;
+    const cad = u => {
+      const cs = bou(J.NQ[u]);
+      if (!cs || cs.length < 150) return null;
+      return cs.length / Math.max(1, ST.cisd(cs).length);
+    };
+    const c5 = cad('m5'), c15 = cad('m15'), c1h = cad('h1');
+    if (c5 == null || c15 == null || c1h == null) return;
+    // Une vraie structure de marché se raréfie quand on monte en unité. Si un
+    // jour les trois cadences divergent, la définition est devenue
+    // structurelle au lieu d'être locale : c'est une BONNE nouvelle, et ce
+    // test doit alors être réécrit plutôt que rafistolé.
+    const ecart = Math.max(c5, c15, c1h) - Math.min(c5, c15, c1h);
+    if (ecart > 4)
+      throw new Error('les cadences ont divergé (5 min ' + c5.toFixed(1) + ', 15 min ' +
+        c15.toFixed(1) + ', 1 h ' + c1h.toFixed(1) + ') — relire js/structure.js, ' +
+        'le défaut documenté a peut-être changé de nature');
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // Le site EN LIGNE comparé au dépôt. Sur demande, parce qu'il faut le réseau :
 //   node scripts/test.js --enligne
 // Rien ne garantissait jusqu'ici que ce qui est publié soit ce qui est ici :
@@ -1680,6 +1763,29 @@ t('la page annonce le bon nombre de vérifications', () => {
   const m = src.match(/verifications:\s*(\d+)/);
   if (!m) throw new Error('MESURES.verifications introuvable dans la page');
   const annonce = +m[1], reel = ok + ko + 1;
+  // ⚠️ LE COMPTE EXACT NE PEUT SE JUGER QUE SI LA SUITE A PU TOURNER ENTIÈRE.
+  // Des dizaines de contrôles ont besoin du cache 5 minutes, que Yahoo ne
+  // garde que soixante jours. Après trois semaines sans relevé il a expiré,
+  // 58 contrôles se sont tus, et ce verrou a crié que la page mentait — alors
+  // que son chiffre était juste et que c'était la SUITE qui était amputée.
+  // Un verrou qui se déclenche sur l'absence de données apprend à être
+  // ignoré, et c'est exactement ce qu'il ne doit pas devenir. Il exige donc
+  // l'égalité quand les données sont là, et la simple borne sinon — en le
+  // disant, pour que personne ne croie le compte vérifié.
+  // Le cache vit dans .cache/ (scripts/lib/jeu.js), pas dans data/ — et le
+  // chercher au mauvais endroit aurait rendu ce garde-fou toujours vrai,
+  // c'est-à-dire inutile, sans que rien ne le signale.
+  const dossierCache = process.env.MECH_CACHE || path.join(RACINE, '.cache');
+  const cache = fs.existsSync(dossierCache) &&
+                fs.readdirSync(dossierCache).some(n => /_5m_|_1m_/.test(n));
+  if (!cache) {
+    if (annonce < reel)
+      throw new Error('la page annonce ' + annonce + ', or la suite amputée en compte déjà ' + reel);
+    console.log('       ⚠️  compte exact NON vérifié : le cache 5 min est absent, ' +
+      (annonce - reel) + ' contrôle(s) ne peuvent pas tourner. Relancer après ' +
+      '`node scripts/rafraichir.js` pour juger le chiffre annoncé.');
+    return;
+  }
   if (annonce !== reel)
     throw new Error('la page annonce ' + annonce + ' vérifications, il y en a ' + reel);
   // Et la date des mesures doit exister : un chiffre sans date se croit

@@ -166,6 +166,35 @@
    *   → changement d'état haussier. Zone = [plus-bas de la série, cet open].
    *
    * UNCONFIRMED ASSUMPTION : la source cite « CISD » sans le définir.
+   *
+   * ⚠️ ET CETTE DÉFINITION EST PROBABLEMENT FAUSSE. Mesuré le 1er novembre en
+   * DESSINANT le graphique au lieu de lire les nombres (scripts/voir.js) :
+   * sur une seule journée de 31 bougies, huit CISD, tous empilés dans la même
+   * zone de congestion. Vérifié ensuite sur tout le jeu figé :
+   *
+   *     NQ m5   375 CISD / 2178 bougies   un toutes les 5,8
+   *     ES m5   316 /  2177               un toutes les 6,9
+   *     NQ m15  138 /   732               un toutes les 5,3
+   *     NQ h1    27 /   185               un toutes les 6,9
+   *
+   * C'est la RÉGULARITÉ qui accuse, pas le nombre. Un « changement d'état de
+   * livraison » devrait être un événement de marché : rare, et plus rare
+   * encore quand on monte en unité de temps. Ici la fréquence est la même —
+   * une fois sur six bougies — du 5 minutes au 1 heure. Une cadence qui ne
+   * dépend pas de l'échelle est la signature d'une règle PUREMENT LOCALE :
+   * quelques bougies d'affilée et une clôture au-delà d'un open, ça arrive à
+   * un rythme fixé par la statistique des bougies, pas par le marché.
+   * Autrement dit cette fonction détecte du bruit à cadence régulière.
+   *
+   * Conséquence pratique : en 5 minutes, elle produit environ 65 CISD par
+   * séance. Le cours s'en sert comme CONFIRMATION d'entrée ; 65 confirmations
+   * par jour ne confirment rien. Et la mesure le disait déjà sans qu'on sache
+   * pourquoi : « dernier CISD » est la deuxième PIRE règle de direction du
+   * banc d'essai, 46,8 % contre 48,6 % au point neutre.
+   *
+   * Ce n'est pas corrigé ici : corriger demanderait la vraie définition, que
+   * la source ne donne pas. C'est écrit pour que personne — moi compris — ne
+   * rebâtisse sur cette brique en la croyant solide.
    */
   function cisd(cs) {
     const pas = pasDe(cs);

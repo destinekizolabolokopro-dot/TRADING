@@ -46,8 +46,46 @@ function utcDe(min) {
   return Math.floor(Date.parse(jour + 'T00:00:00Z') / 1000) + (min + decalage) * 60;
 }
 
+/**
+ * LA FENÊTRE DE TOUTE L'ANNÉE, en minutes UTC depuis minuit.
+ *
+ * POURQUOI ELLE EXISTE. `utcDe` donne la bonne fenêtre POUR AUJOURD'HUI, et
+ * c'est ce qu'il faut au robot qui tourne. Mais les créneaux de la tâche
+ * planifiée sont écrits en UTC FIXE dans le YAML, alors que la fenêtre suit
+ * New York : ils se décalent d'une heure deux fois par an et personne ne le
+ * voit venir. C'est arrivé le 1er novembre 2026 — les États-Unis ont quitté
+ * l'heure d'été, la fenêtre est passée de 11 h 45 → 16 h 45 à 12 h 45 →
+ * 17 h 45 UTC, et les trois premiers créneaux mouraient avant l'ouverture.
+ *
+ * Les créneaux doivent donc couvrir l'UNION des deux saisons. On mesure les
+ * deux décalages au lieu de les supposer : −4 h et −5 h aujourd'hui, mais
+ * c'est une règle politique qui a déjà changé et rechangera.
+ */
+function decalageLe(iso) {
+  const sonde = new Date(iso + 'T12:00:00Z');
+  const ny = new Date(sonde.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  const utc = new Date(sonde.toLocaleString('en-US', { timeZone: 'UTC' }));
+  return Math.round((utc - ny) / 60000);
+}
+function union() {
+  const an = new Date().getUTCFullYear();
+  const decs = [decalageLe(an + '-01-15'), decalageLe(an + '-07-15')];
+  const dMin = Math.min(...decs), dMax = Math.max(...decs);
+  return { deb: (deb - AVANT) + dMin, fin: (fin + APRES) + dMax, dMin: dMin, dMax: dMax };
+}
+
 const d = utcDe(deb - AVANT), f = utcDe(fin + APRES);
-if (process.argv.includes('--clair')) {
+if (process.argv.includes('--union')) {
+  const u = union();
+  const hn = m => String(Math.floor(m / 60) % 24).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+  if (process.argv.includes('--clair')) {
+    console.log(`décalages New York mesurés : −${u.dMin / 60} h (été) et −${u.dMax / 60} h (hiver)`);
+    console.log(`fenêtre de TOUTE L'ANNÉE : ${hn(u.deb)} → ${hn(u.fin)} UTC`);
+    console.log(`  c'est elle que les créneaux du YAML doivent couvrir, pas celle du jour.`);
+  } else {
+    console.log(u.deb + ' ' + u.fin);
+  }
+} else if (process.argv.includes('--clair')) {
   const h = s => new Date(s * 1000).toISOString().slice(11, 16);
   const hn = m => String(Math.floor(m / 60)).padStart(2, '0') + ' h ' + String(m % 60).padStart(2, '0');
   console.log(`stratégies : ${hn(deb)} → ${hn(fin)} New York`);
