@@ -1,5 +1,9 @@
 # REPRENDRE — à lire en premier dans une nouvelle session
 
+> `CLAUDE.md`, à la racine, est lu automatiquement au démarrage d'une session
+> Claude Code : il porte les règles qui ne se négocient pas. Ce fichier-ci est
+> le détail — l'état des mesures, les instruments, les pièges en entier.
+
 Une conversation Claude ne se souvient de rien. Ce fichier est là pour que la
 suivante n'ait pas à redécouvrir ce qui a déjà été mesuré, ni à refaire les
 erreurs déjà faites. Il ne remplace pas le code : il dit **où regarder**.
