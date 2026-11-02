@@ -86,6 +86,11 @@ avant d'en inventer un nouveau.
 
 ## Ce qui manque pour avancer
 
+0. **Valider les six définitions `[HYP]` à l'œil, sur TradingView.** Le
+   protocole est dans `SEANCE_TRADINGVIEW.md`. C'est en amont de tout le
+   reste : les mesures s'appuient sur ces définitions, et on sait qu'au moins
+   une (`cisd()`) est fausse. Demande une session Claude sur l'ordinateur de
+   l'utilisateur, pas dans le cloud.
 1. **Les trades réels de l'utilisateur, avec l'heure.** C'est la seule chose
    qui dira si le problème est la stratégie ou sa traduction en code : rejouer
    le modèle à cet instant précis et voir à quelle étape il bloque.

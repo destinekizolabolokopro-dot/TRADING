@@ -3,7 +3,7 @@
 > **Nouvelle session Claude ? Lire [`REPRENDRE.md`](REPRENDRE.md) d'abord.**
 > Une conversation ne se souvient de rien ; le dépôt, si. Ce fichier-là dit ce
 > qui a déjà été mesuré, quels pièges de mesure ont déjà piégé, et ce qui
-> manque pour avancer.
+> manque pour avancer. Pour une séance sur graphique : [`SEANCE_TRADINGVIEW.md`](SEANCE_TRADINGVIEW.md).
 
 
 Site autonome (un seul fichier HTML) qui lit le marché en **top-down** (D1 → H4 → H1)
