@@ -1,5 +1,11 @@
 # TRADEassist — assistant de trading ICT / SMC
 
+> **Nouvelle session Claude ? Lire [`REPRENDRE.md`](REPRENDRE.md) d'abord.**
+> Une conversation ne se souvient de rien ; le dépôt, si. Ce fichier-là dit ce
+> qui a déjà été mesuré, quels pièges de mesure ont déjà piégé, et ce qui
+> manque pour avancer.
+
+
 Site autonome (un seul fichier HTML) qui lit le marché en **top-down** (D1 → H4 → H1)
 selon les concepts **ICT / SMC** et propose des trades **prêts à l'emploi** : sens,
 entrée, stop, objectif, ratio (RR) et gain estimé sur un compte de 10 000 € (risque 1 %).
